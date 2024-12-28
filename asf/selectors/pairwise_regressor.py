@@ -1,13 +1,13 @@
 import numpy as np
 import pandas as pd
-from asf.selectors.abstract_selector import AbstractSelector
+from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 from asf.selectors.feature_generator import (
     AbstractFeatureGenerator,
     DummyFeatureGenerator,
 )
 
 
-class PairwiseRegressor(AbstractSelector, AbstractFeatureGenerator):
+class PairwiseRegressor(AbstractModelBasedSelector, AbstractFeatureGenerator):
     """
     PairwiseRegressor is a selector that uses pairwise regression of algorithms
     to predict the best algorithm for a given instance.
@@ -27,8 +27,10 @@ class PairwiseRegressor(AbstractSelector, AbstractFeatureGenerator):
             model_class: The regression model to be used for pairwise comparisons.
             hierarchical_generator (AbstractFeatureGenerator, optional): The feature generator to be used. Defaults to DummyFeatureGenerator.
         """
-        super().__init__(metadata, hierarchical_generator)
-        self.model_class = model_class
+        AbstractModelBasedSelector.__init__(
+            self, model_class, metadata, hierarchical_generator
+        )
+        AbstractFeatureGenerator.__init__(self)
         self.regressors = []
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame):

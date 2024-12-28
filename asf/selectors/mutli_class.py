@@ -1,10 +1,10 @@
 import pandas as pd
 import numpy as np
 from asf.selectors.feature_generator import DummyFeatureGenerator
-from asf.selectors.abstract_selector import AbstractSelector
+from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 
 
-class MultiClassClassifier(AbstractSelector):
+class MultiClassClassifier(AbstractModelBasedSelector):
     """
     MultiClassClassifier is a class that predicts the best algorithm for a given instance
     using a multi-class classification model.
@@ -26,8 +26,9 @@ class MultiClassClassifier(AbstractSelector):
             metadata: Metadata containing information about the algorithms.
             hierarchical_generator: Feature generator to be used.
         """
-        super().__init__(metadata, hierarchical_generator)
-        self.model = model_class
+        AbstractModelBasedSelector.__init__(
+            self, model_class, metadata, hierarchical_generator
+        )
         self.classifier = None
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame):
@@ -38,7 +39,7 @@ class MultiClassClassifier(AbstractSelector):
             features: DataFrame containing the feature data.
             performance: DataFrame containing the performance data.
         """
-        self.classifier = self.model()
+        self.classifier = self.model_class()
         self.classifier.fit(features, np.argmin(performance.values, axis=1))
 
     def _predict(self, features: pd.DataFrame):

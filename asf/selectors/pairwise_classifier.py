@@ -1,14 +1,14 @@
 import numpy as np
 import pandas as pd
-from sklearn.base import ClassifierMixin
-from asf.selectors.abstract_selector import AbstractSelector
+from asf.predictors import AbstractPredictor
+from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 from asf.selectors.feature_generator import (
     AbstractFeatureGenerator,
     DummyFeatureGenerator,
 )
 
 
-class PairwiseClassifier(AbstractSelector, AbstractFeatureGenerator):
+class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
     """
     PairwiseClassifier is a selector that uses pairwise comparison of algorithms
     to predict the best algorithm for a given instance.
@@ -28,9 +28,11 @@ class PairwiseClassifier(AbstractSelector, AbstractFeatureGenerator):
             model_class (ClassifierMixin): The classifier model to be used for pairwise comparisons.
             hierarchical_generator (AbstractFeatureGenerator, optional): The feature generator to be used. Defaults to DummyFeatureGenerator.
         """
-        super().__init__(metadata, hierarchical_generator)
-        self.model_class: ClassifierMixin = model_class
-        self.classifiers: list[ClassifierMixin] = []
+        AbstractModelBasedSelector.__init__(
+            self, model_class, metadata, hierarchical_generator
+        )
+        AbstractFeatureGenerator.__init__(self)
+        self.classifiers: list[AbstractPredictor] = []
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame):
         """

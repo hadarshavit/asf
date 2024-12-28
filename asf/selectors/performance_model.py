@@ -1,14 +1,14 @@
 import numpy as np
 import pandas as pd
 
-from asf.selectors.abstract_selector import AbstractSelector
+from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 from asf.selectors.feature_generator import (
     AbstractFeatureGenerator,
     DummyFeatureGenerator,
 )
 
 
-class PerformanceModel(AbstractSelector, AbstractFeatureGenerator):
+class PerformanceModel(AbstractModelBasedSelector, AbstractFeatureGenerator):
     """
     PerformancePredictor is a class that predicts the performance of algorithms
     based on given features. It can handle both single-target and multi-target
@@ -40,9 +40,10 @@ class PerformanceModel(AbstractSelector, AbstractFeatureGenerator):
             normalize: Method to normalize the performance data.
             hierarchical_generator: Feature generator to be used.
         """
-        AbstractSelector.__init__(self, metadata, hierarchical_generator)
+        AbstractModelBasedSelector.__init__(
+            self, model_class, metadata, hierarchical_generator
+        )
         AbstractFeatureGenerator.__init__(self)
-        self.model = model_class
         self.regressors = []
         self.use_multi_target = use_multi_target
         self.normalize = normalize
@@ -59,13 +60,13 @@ class PerformanceModel(AbstractSelector, AbstractFeatureGenerator):
             performance = np.log(performance + 1e-8)
 
         if self.use_multi_target:
-            self.regressors = self.model()
+            self.regressors = self.model_class()
             self.regressors.fit(features, performance)
         else:
             for i, algorithm in enumerate(self.metadata.algorithms):
                 algo_times = performance.iloc[:, i]
 
-                cur_model = self.model()
+                cur_model = self.model_class()
                 cur_model.fit(features, algo_times)
                 self.regressors.append(cur_model)
 
