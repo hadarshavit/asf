@@ -53,9 +53,17 @@ def parser_function() -> argparse.ArgumentParser:
     return parser
 
 
-def build_cli_call() -> list[str]:
+def build_cli_call(selector: selectors.AbstractModelBasedSelector,
+                   features: Path,
+                   performance_data: Path,
+                   destination: Path) -> list[str]:
     """Build CLI call from variables."""
-    return
+    return ["python", Path(__file__).absolute(),
+            "--selector", selector,
+            "--model", str(type(selector.model_class)),
+            "--feature-data", str(features),
+            "--performance-data", str(performance_data),
+            "--model-path", str(destination)]
 
 
 if __name__ == "__main__":
@@ -66,7 +74,7 @@ if __name__ == "__main__":
     if metadata:
         metadata = ScenarioMetadata(**ast.literal_eval(metadata))
     # Parse selector in to variable
-    selector: selectors.AbstractSelector = eval(selector_name)(type(args.model), metadata)
+    selector: selectors.AbstractModelBasedSelector = eval(selector_name)(type(args.model), metadata)
 
     # Parse training data into variables
     features = pandas_read_map[args.feature_data.suffix](args.feature_data)
