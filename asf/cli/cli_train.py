@@ -53,11 +53,11 @@ def parser_function() -> argparse.ArgumentParser:
     return parser
 
 
-def build_cli_call(selector: selectors.AbstractModelBasedSelector,
+def build_cli_command(selector: selectors.AbstractModelBasedSelector,
                    features: Path,
                    performance_data: Path,
                    destination: Path) -> list[str]:
-    """Build CLI call from variables for async jobs.
+    """Build CLI command from variables for async jobs.
 
     Args:
         selector: Selector to train
