@@ -4,7 +4,6 @@ import ast
 import argparse
 from pathlib import Path
 
-import sklearn
 import pandas as pd
 
 from asf import selectors
