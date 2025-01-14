@@ -23,5 +23,5 @@ __implemented__ = [
     "PairwiseClassifier",
     "PairwiseRegressor",
     "MultiClassClassifier",
-    "PerformanceModel"
+    "PerformanceModel",
 ]
