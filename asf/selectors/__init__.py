@@ -18,3 +18,10 @@ __all__ = [
     "AbstractModelBasedSelector",
     "SimpleRanking",
 ]
+
+__implemented__ = [
+    "PairwiseClassifier",
+    "PairwiseRegressor",
+    "MultiClassClassifier",
+    "PerformanceModel"
+]
