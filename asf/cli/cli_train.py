@@ -57,7 +57,14 @@ def build_cli_call(selector: selectors.AbstractModelBasedSelector,
                    features: Path,
                    performance_data: Path,
                    destination: Path) -> list[str]:
-    """Build CLI call from variables."""
+    """Build CLI call from variables for async jobs.
+
+    Args:
+        selector: Selector to train
+        features: Path to feature data DataFrame
+        performance_data: Path to performance data DataFrame
+        destination: Path to save model
+    """
     return ["python", Path(__file__).absolute(),
             "--selector", selector,
             "--model", str(type(selector.model_class)),
