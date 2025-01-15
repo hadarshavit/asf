@@ -1,6 +1,6 @@
 [project]
 name = "asf-lib"
-version = "0.0.1.10"
+version = "0.0.1.11"
 requires-python = ">= 3.10"
 authors = [
   {name = "Hadar Shavit", email = "shavit@aim.rwth-aachen.de"},
