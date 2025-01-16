@@ -19,7 +19,6 @@ class AbstractModelBasedSelector(AbstractSelector):
             )
 
     def save(self, path):
-        assert issubclass(self.model_class, (ClassifierMixin, RegressorMixin, XGBModel))
         import joblib
 
         joblib.dump(self, path)
