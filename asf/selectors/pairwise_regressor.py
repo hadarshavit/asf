@@ -90,6 +90,7 @@ class PairwiseRegressor(AbstractModelBasedSelector, AbstractFeatureGenerator):
         Returns:
             Dict[str, List[Tuple[str, float]]]: A dictionary mapping instance names to the predicted best algorithm
             and the associated budget.
+            Example: {instance_name: [(algorithm_name, budget)]}
         """
         predictions_sum = self.generate_features(features)
         return {

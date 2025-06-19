@@ -97,6 +97,7 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
 
         Returns:
             Dict[str, List[Tuple[str, Union[int, float]]]]: A dictionary mapping instance names to the predicted best algorithm and budget.
+            Example: {instance_name: [(algorithm_name, budget)]}
         """
         predictions_sum = self.generate_features(features)
 

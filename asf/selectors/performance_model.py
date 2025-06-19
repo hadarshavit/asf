@@ -105,6 +105,7 @@ class PerformanceModel(AbstractModelBasedSelector, AbstractFeatureGenerator):
         Returns:
             Dict[str, List[tuple]]: A dictionary mapping instance names to the predicted best algorithm
             and the associated budget.
+            Example: {instance_name: [(algorithm_name, budget)]}
         """
         predictions = self.generate_features(features)
 

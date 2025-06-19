@@ -24,7 +24,7 @@ def train_selector(scenario_name: str, selector_class: AbstractSelector) -> None
     """
     # Load the scenario
     features, performance, cv, feature_groups, maximize, budget = (
-        aslib_reader.read_scenario(scenario_name)
+        aslib_reader.read_aslib_scenario(scenario_name)
     )
 
     performance[performance >= budget] = budget * 10

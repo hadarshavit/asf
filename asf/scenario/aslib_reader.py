@@ -4,6 +4,7 @@ import pandas as pd
 try:
     import yaml
     from yaml import SafeLoader as Loader
+    # liac-arff, not arff
     from arff import load
 
     ASLIB_AVAILABLE = True
@@ -59,7 +60,7 @@ def read_aslib_scenario(
         performance["data"], columns=[a[0] for a in performance["attributes"]]
     )
     performance = performance.set_index("instance_id")
-    performance = performance.pivot(columns="algorithm", values="runtime")
+    performance = performance.pivot(columns="algorithm", values="time")
 
     # Load feature values
     with open(features_path, "r") as f:
