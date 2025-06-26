@@ -8,7 +8,6 @@ try:
     import yaml
     from yaml import SafeLoader as Loader
 
-    # liac-arff, not arff
     from arff import load
 
     ASLIB_AVAILABLE = True
@@ -128,8 +127,9 @@ def evaluate_selector(
     scenario_path: str,
     fold: int,
     hpo_func=None,
-    hpo_kwargs=None,
-    algorithm_pre_selector=None,  # <-- Directly pass any preselector here
+    hpo_kwargs={},
+    algorithm_pre_selector=None,
+    metric=running_time_closed_gap,
 ):
     """
     Runs HPO for a selector on a given ASlib scenario and fold, returns test performance.
@@ -146,8 +146,6 @@ def evaluate_selector(
         test_score: The test performance (e.g., PAR10 or other metric)
         selector: The fitted selector
     """
-    if hpo_kwargs is None:
-        hpo_kwargs = {}
 
     # Load scenario
     (
@@ -204,9 +202,6 @@ def evaluate_selector(
 
     # Predict and evaluate
     predictions = selector.predict(X_test)
-    par = 10  # TODO: Make this configurable?
-    test_score = running_time_closed_gap(
-        predictions, y_test, budget, par, features_running_time
-    )
+    test_score = metric(predictions, y_test, budget, features_running_time)
 
     return test_score, selector

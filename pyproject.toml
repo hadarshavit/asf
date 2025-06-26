@@ -31,10 +31,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-aslib = [ 'pyyaml' ]
+aslib = [ 'pyyaml', 'liac-arff' ]
 nn = [ 'torch' ]
 xgb = [ 'xgboost' ]
 tune = [ 'smac' ]
+all = [ 'pyyaml', 'liac-arff', 'torch', 'xgboost', 'smac' ]
 
 [build-system]
 requires = ["setuptools", "wheel"]

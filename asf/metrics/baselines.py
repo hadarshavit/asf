@@ -101,8 +101,8 @@ def running_time_closed_gap(
     schedules: Dict[str, List[Tuple[str, float]]],
     performance: pd.DataFrame,
     budget: float,
-    par: float,
     feature_time: pd.DataFrame,
+    par: float = 10,
 ) -> float:
     """
     Calculates the closed gap metric for a given selector.

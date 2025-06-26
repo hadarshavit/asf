@@ -32,11 +32,6 @@ from asf.selectors.selector_pipeline import SelectorPipeline
 from asf.utils.groupkfoldshuffle import GroupKFoldShuffle
 
 
-# Helper to get the underlying class from a partial or class
-def get_underlying_class(obj):
-    return obj.func if hasattr(obj, "func") else obj
-
-
 def tune_selector(
     X: pd.DataFrame,
     y: pd.DataFrame,
@@ -108,11 +103,9 @@ def tune_selector(
     else:
         selector_param = Categorical(
             name="selector",
-            items=[get_underlying_class(c).__name__ for c in selector_class],
+            items=[str(c.__name__) for c in selector_class],
         )
-        cs_transform["selector"] = {
-            get_underlying_class(c).__name__: c for c in selector_class
-        }
+        cs_transform["selector"] = {str(c.__name__): c for c in selector_class}
     cs.add(selector_param)
 
     for selector in selector_class:
@@ -122,13 +115,11 @@ def tune_selector(
         else:
             selector_space_kwargs = {}
 
-        # Get the selector class and its configuration space
-        cls = get_underlying_class(selector)
-        cs, cs_transform = cls.get_configuration_space(
+        cs, cs_transform = selector.get_configuration_space(
             cs=cs,
             cs_transform=cs_transform,
             parent_param=selector_param,
-            parent_value=str(cls.__name__),
+            parent_value=str(selector.__name__),
             **selector_space_kwargs,
         )
 
@@ -153,11 +144,10 @@ def tune_selector(
             X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
             y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
-            selector_obj = cs_transform["selector"][config["selector"]]
-            cls = get_underlying_class(selector_obj)
-
             selector = SelectorPipeline(
-                selector=cls.get_from_configuration(
+                selector=cs_transform["selector"][
+                    config["selector"]
+                ].get_from_configuration(
                     config,
                     cs_transform,
                     budget=budget,
@@ -185,12 +175,10 @@ def tune_selector(
     best_config = smac.optimize()
 
     del smac  # clean up SMAC to free memory and delete dask client
-
-    selector_obj = cs_transform["selector"][best_config["selector"]]
-    cls = get_underlying_class(selector_obj)
-
-    best_selector = SelectorPipeline(
-        selector=cls.get_from_configuration(
+    return SelectorPipeline(
+        selector=cs_transform["selector"][
+            best_config["selector"]
+        ].get_from_configuration(
             best_config,
             cs_transform,
             budget=budget,
@@ -206,7 +194,3 @@ def tune_selector(
         maximize=maximize,
         feature_groups=feature_groups,
     )
-
-    best_selector.fit(X, y)
-
-    return best_selector
