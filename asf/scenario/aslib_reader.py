@@ -7,6 +7,7 @@ from asf.selectors.selector_pipeline import SelectorPipeline
 try:
     import yaml
     from yaml import SafeLoader as Loader
+
     # liac-arff, not arff
     from arff import load
 
@@ -63,7 +64,7 @@ def read_aslib_scenario(
     performance = pd.DataFrame(
         performance["data"], columns=[a[0] for a in performance["attributes"]]
     )
-    
+
     # Identify which column contains runtime information
     # e.g. SAT12-INDU = "runtime", CSP-Minizinc-Obj-2016 = "time"
     runtime_col = description["performance_measures"][0]
@@ -71,9 +72,11 @@ def read_aslib_scenario(
     # Aggregate over repetitions (e.g., take mean)
     group_cols = ["instance_id", "algorithm"]
     performance = performance.groupby(group_cols, as_index=False)[runtime_col].mean()
-    
-    performance = performance.pivot(index="instance_id", columns="algorithm", values=runtime_col)
-    
+
+    performance = performance.pivot(
+        index="instance_id", columns="algorithm", values=runtime_col
+    )
+
     # Load feature values
     with open(features_path, "r") as f:
         features: dict = load(f)
@@ -120,7 +123,7 @@ def read_aslib_scenario(
     )
 
 
-def evaluate_selector_with_hpo(
+def evaluate_selector(
     selector_class,
     scenario_path: str,
     fold: int,
@@ -147,7 +150,15 @@ def evaluate_selector_with_hpo(
         hpo_kwargs = {}
 
     # Load scenario
-    features, performance, features_running_time, cv, feature_groups, maximize, budget = read_aslib_scenario(scenario_path)
+    (
+        features,
+        performance,
+        features_running_time,
+        cv,
+        feature_groups,
+        maximize,
+        budget,
+    ) = read_aslib_scenario(scenario_path)
 
     # Align indices
     common_idx = features.index.intersection(cv.index)
@@ -165,16 +176,18 @@ def evaluate_selector_with_hpo(
     y_test = performance.loc[test_instance_ids]
 
     if hpo_func is None:
-        base_selector = selector_class(budget=budget, maximize=maximize, feature_groups=feature_groups)
+        base_selector = selector_class(
+            budget=budget, maximize=maximize, feature_groups=feature_groups
+        )
 
-        selector =  SelectorPipeline(
+        selector = SelectorPipeline(
             selector=base_selector,
             algorithm_pre_selector=algorithm_pre_selector,
             budget=budget,
             maximize=maximize,
             feature_groups=feature_groups,
         )
-        
+
         selector.fit(X_train, y_train)
     else:
         # Run HPO (should return a fitted selector)
@@ -185,77 +198,15 @@ def evaluate_selector_with_hpo(
             maximize=maximize,
             budget=budget,
             feature_groups=feature_groups,
-            algorithm_pre_selector=algorithm_pre_selector, 
+            algorithm_pre_selector=algorithm_pre_selector,
             **hpo_kwargs,
         )
 
     # Predict and evaluate
     predictions = selector.predict(X_test)
-    par = 10 #TODO: Make this configurable?
-    test_score = running_time_closed_gap(predictions, y_test, budget, par, features_running_time)
-
-    return test_score, selector
-
-
-from asf.pre_selector.knee_of_the_curve_pre_selector import KneeOfCurvePreSelector
-from asf.pre_selector.marginal_contribution_based import MarginalContributionBasedPreSelector
-from asf.metrics.baselines import virtual_best_solver
-from asf.selectors import PairwiseClassifier, MultiClassClassifier, PerformanceModel, tune_selector
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from functools import partial
-
-if __name__ == "__main__":
-    knee_preselector = KneeOfCurvePreSelector(
-        metric=virtual_best_solver,
-        base_pre_selector=MarginalContributionBasedPreSelector,
-        maximize=False,
-        S=1.0,
-        workers=1,
+    par = 10  # TODO: Make this configurable?
+    test_score = running_time_closed_gap(
+        predictions, y_test, budget, par, features_running_time
     )
 
-    selectors = [
-        # PairwiseClassifier(model_class=RandomForestClassifier),
-        # MultiClassClassifier(model_class=RandomForestClassifier),
-        partial(PerformanceModel, model_class=RandomForestRegressor),
-    ]
-
-    scenarios = [
-        "/home/schiller/asf/aslib_data/SAT12-INDU",
-        "/home/schiller/asf/aslib_data/SAT20-MAIN",
-        "/home/schiller/asf/aslib_data/TSP-LION2015",
-        "/home/schiller/asf/aslib_data/QBF-2016",
-        "/home/schiller/asf/aslib_data/MIP-2016",
-        "/home/schiller/asf/aslib_data/MAXSAT19-UCMS",
-        "/home/schiller/asf/aslib_data/IPC2018",
-        "/home/schiller/asf/aslib_data/CSP-Minizinc-Time-2016",
-        "/home/schiller/asf/aslib_data/ASP-POTASSCO",
-    ]
-
-    for selector in selectors:
-        # Print name of the selector
-        if hasattr(selector, "__name__"):
-            selector_name = selector.__name__
-        elif hasattr(selector, "func"):  # for functools.partial
-            selector_name = selector.func.__name__
-        else:
-            selector_name = selector.__class__.__name__
-
-        print(f"Evaluating selector: {selector_name}")
-
-        for scenario in scenarios:
-            print(f"Evaluating scenario: {scenario}")
-
-
-            score, result_selector = evaluate_selector_with_hpo(
-                selector_class=selector,
-                scenario_path=scenario,
-                fold=10,
-                # hpo_func=tune_selector,
-                hpo_kwargs={"runcount_limit": 10, "cv": 3, "smac_kwargs": {"overwrite": True},
-                 "output_dir": f"smac_output/{scenario.split('/')[-1]}"},
-                algorithm_pre_selector=knee_preselector,
-            )
-
-            print(f"Test score: {score}")
-            print(f"Selector: {result_selector}")
-    
+    return test_score, selector

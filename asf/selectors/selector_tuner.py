@@ -31,9 +31,11 @@ from asf.selectors.abstract_selector import AbstractSelector
 from asf.selectors.selector_pipeline import SelectorPipeline
 from asf.utils.groupkfoldshuffle import GroupKFoldShuffle
 
+
 # Helper to get the underlying class from a partial or class
 def get_underlying_class(obj):
     return obj.func if hasattr(obj, "func") else obj
+
 
 def tune_selector(
     X: pd.DataFrame,
@@ -106,9 +108,11 @@ def tune_selector(
     else:
         selector_param = Categorical(
             name="selector",
-            items = [get_underlying_class(c).__name__ for c in selector_class],
+            items=[get_underlying_class(c).__name__ for c in selector_class],
         )
-        cs_transform["selector"] = {get_underlying_class(c).__name__: c for c in selector_class}
+        cs_transform["selector"] = {
+            get_underlying_class(c).__name__: c for c in selector_class
+        }
     cs.add(selector_param)
 
     for selector in selector_class:
@@ -184,8 +188,8 @@ def tune_selector(
 
     selector_obj = cs_transform["selector"][best_config["selector"]]
     cls = get_underlying_class(selector_obj)
-    
-    best_selector =  SelectorPipeline(
+
+    best_selector = SelectorPipeline(
         selector=cls.get_from_configuration(
             best_config,
             cs_transform,
