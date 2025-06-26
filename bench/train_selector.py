@@ -1,7 +1,5 @@
 from asf.pre_selector.knee_of_the_curve_pre_selector import KneeOfCurvePreSelector
-from asf.pre_selector.marginal_contribution_based import (
-    MarginalContributionBasedPreSelector,
-)
+from asf.pre_selector import OptimizePreSelection
 from asf.scenario.aslib_reader import evaluate_selector
 from asf.metrics.baselines import virtual_best_solver
 from asf.selectors import (
@@ -9,35 +7,35 @@ from asf.selectors import (
     MultiClassClassifier,
     PerformanceModel,
 )
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from functools import partial
+from asf.selectors.selector_tuner import tune_selector
+from asf.predictors import RandomForestClassifierWrapper, RandomForestRegressorWrapper
 
 
 if __name__ == "__main__":
     knee_preselector = KneeOfCurvePreSelector(
         metric=virtual_best_solver,
-        base_pre_selector=MarginalContributionBasedPreSelector,
+        base_pre_selector=OptimizePreSelection,
         maximize=False,
         S=1.0,
         workers=1,
     )
 
     selectors = [
-        PairwiseClassifier(model_class=RandomForestClassifier),
-        MultiClassClassifier(model_class=RandomForestClassifier),
-        partial(PerformanceModel, model_class=RandomForestRegressor),
+        (PairwiseClassifier, {"model_class": [RandomForestClassifierWrapper]}),
+        (MultiClassClassifier, {"model_class": [RandomForestClassifierWrapper]}),
+        (PerformanceModel, {"model_class": [RandomForestRegressorWrapper]}),
     ]
 
     scenarios = [
-        "/home/schiller/asf/aslib_data/SAT12-INDU",
-        "/home/schiller/asf/aslib_data/SAT20-MAIN",
-        "/home/schiller/asf/aslib_data/TSP-LION2015",
-        "/home/schiller/asf/aslib_data/QBF-2016",
-        "/home/schiller/asf/aslib_data/MIP-2016",
-        "/home/schiller/asf/aslib_data/MAXSAT19-UCMS",
-        "/home/schiller/asf/aslib_data/IPC2018",
-        "/home/schiller/asf/aslib_data/CSP-Minizinc-Time-2016",
-        "/home/schiller/asf/aslib_data/ASP-POTASSCO",
+        "aslib_data/SAT12-INDU",
+        "aslib_data/SAT20-MAIN",
+        "aslib_data/TSP-LION2015",
+        "aslib_data/QBF-2016",
+        "aslib_data/MIP-2016",
+        "aslib_data/MAXSAT19-UCMS",
+        "aslib_data/IPC2018",
+        "aslib_data/CSP-Minizinc-Time-2016",
+        "asf/aslib_data/ASP-POTASSCO",
     ]
 
     for selector in selectors:
@@ -58,7 +56,7 @@ if __name__ == "__main__":
                 selector_class=selector,
                 scenario_path=scenario,
                 fold=10,
-                # hpo_func=tune_selector,
+                hpo_func=tune_selector,
                 hpo_kwargs={
                     "runcount_limit": 100,
                     "cv": 10,
