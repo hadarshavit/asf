@@ -4,6 +4,7 @@ from sklearn.ensemble import RandomForestClassifier
 from asf.pre_selector import MarginalContributionBasedPreSelector
 from asf.preprocessing import get_default_preprocessor
 from asf.metrics import virtual_best_solver
+from asf.presolving import Aspeed
 import pandas as pd
 import numpy as np
 
@@ -74,6 +75,7 @@ if __name__ == "__main__":
         algorithm_pre_selector=MarginalContributionBasedPreSelector(
             metric=virtual_best_solver, n_algorithms=2
         ),
+        pre_solving=Aspeed(budget=1000, presolver_cutoff=10),
     )
 
     # Fit the selector to the data

@@ -1,6 +1,6 @@
 from typing import Optional, Callable, Any
 from asf.selectors.abstract_selector import AbstractSelector
-from sklearn.base import TransformerMixin
+from asf.presolving.presolver import AbstractPresolver
 
 
 class SelectorPipeline:
@@ -23,7 +23,7 @@ class SelectorPipeline:
         self,
         selector: AbstractSelector,
         preprocessor: Optional[Callable] = None,
-        pre_solving: TransformerMixin = None,
+        pre_solving: AbstractPresolver = None,
         feature_selector: Optional[Callable] = None,
         algorithm_pre_selector: Optional[Callable] = None,
         budget: Optional[Any] = None,
@@ -87,12 +87,15 @@ class SelectorPipeline:
             X = self.preprocessor.transform(X)
 
         if self.pre_solving:
-            X = self.pre_solving.transform(X)
+            scheds = self.pre_solving.predict()
+            print(scheds)
 
         if self.feature_selector:
             X = self.feature_selector.transform(X)
 
-        return self.selector.predict(X)
+        return self.selector.predict(
+            X
+        )  # TODO update the schedules with the pre_solving schedules if needed
 
     def save(self, path: str) -> None:
         """
