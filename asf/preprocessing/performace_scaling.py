@@ -169,7 +169,7 @@ class LogNormalization(AbstractNormalization):
     Normalization using logarithmic scaling.
     """
 
-    def __init__(self, base: float = 10, eps: float = 1e-6) -> None:
+    def __init__(self, base: float = 10, eps: float = 0.0) -> None:
         """
         Initialize LogNormalization.
 
