@@ -35,7 +35,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest pytest-cov
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        pip install .[nn,tune,aslib,xgb]
+        pip install .[all]
     - name: Test with pytest
       run: |
         pytest --cov-report=xml --cov asf test/
