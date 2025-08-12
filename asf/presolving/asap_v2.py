@@ -18,10 +18,8 @@ class ASAPv2(AbstractPresolver):
         budget: float,
         presolver_cutoff: float,
         maximize: bool = False,
-        size_preschedule: int = 3,
         max_runtime_preschedule: float = -1,
         regularization_weight: float = 0.0,
-        variance_weight: float = 0.0,
         penalty_factor: float = 2.0,
         de_popsize: int = 15,
         de_maxiter: int = 100,
@@ -34,10 +32,8 @@ class ASAPv2(AbstractPresolver):
             maximize=maximize
         )
         
-        self.size_preschedule = size_preschedule
         self.max_runtime_preschedule = max_runtime_preschedule
         self.regularization_weight = regularization_weight
-        self.variance_weight = variance_weight
         self.penalty_factor = penalty_factor
         self.de_popsize = de_popsize
         self.de_maxiter = de_maxiter
@@ -47,8 +43,6 @@ class ASAPv2(AbstractPresolver):
         # Will be set during fit
         self.algorithms: List[str] = []
         self.numAlg: int = 0
-        self.preschedule_algorithms: List[str] = []
-        self.ialgos_preschedule: np.ndarray = None
         self.runtimes_preschedule: np.ndarray = None
         self.features = None
         self.performance = None
@@ -63,7 +57,6 @@ class ASAPv2(AbstractPresolver):
         self.performance = performance
         self.algorithms = list(performance.columns)
         self.numAlg = len(self.algorithms)
-        self.size_preschedule = min(self.size_preschedule, self.numAlg - 1)
         
         # Convert to numpy
         self.feature_train = features.values
@@ -71,52 +64,40 @@ class ASAPv2(AbstractPresolver):
         
         if self.verbosity > 0:
             print()
-            print("+" * 40)
+            print("+ " * 30)
             print(f"Training ASAP v2 with {len(self.algorithms)} algorithms")
-            print(f"Preschedule size: {self.size_preschedule}")
         
-        # 1. Identify algorithms for preschedule
-        if self.size_preschedule > 0:
-            self._identify_algorithms_for_preschedule()
-        else:
-            self.runtimes_preschedule = np.zeros((0,))
-            self.ialgos_preschedule = np.zeros((0,)).astype(int)
+        # Initialize with equal time distribution across all algorithms
+        self._initialize_preschedule()
         
-        # 2. Optimize preschedule using differential evolution
-        if self.size_preschedule > 1:
+        # Optimize preschedule using differential evolution
+        if self.numAlg > 1:
             self._optimize_preschedule_de()
         elif self.verbosity > 0:
-            print("1-D schedule can't be optimized.")
+            print("Single algorithm - no optimization needed")
             
-        # 3. Build final schedule
+        # Build final schedule
         self._build_schedule()
     
 
-    def _identify_algorithms_for_preschedule(self):
-        """Select algorithms with highest avg. performance"""
-        avg_performance = np.mean(self.performance_train, axis=0)
-        best_alg_indices = np.argsort(avg_performance)[:self.size_preschedule]
-        
-        self.ialgos_preschedule = best_alg_indices
-        self.preschedule_algorithms = [self.algorithms[i] for i in best_alg_indices]
-        
-        # Initialize with equal time distribution
+    def _initialize_preschedule(self):
+        """Initialize preschedule with equal time for all algorithms"""
         if self.max_runtime_preschedule > 0:
             total_time = min(self.max_runtime_preschedule, self.presolver_cutoff)
         else:
             total_time = self.presolver_cutoff
         
+        # Start with equal time for all algorithms
         self.runtimes_preschedule = np.full(
-            self.size_preschedule, total_time / self.size_preschedule
+            self.numAlg, total_time / self.numAlg
         )
         
         if self.verbosity > 0:
-            print(f"Selected preschedule algorithms: {self.preschedule_algorithms}")
-            print(f"Initial runtimes: {self.runtimes_preschedule}")
+            print(f"Initial equal time allocation: {self.runtimes_preschedule.round(2)}")
     
 
     def _optimize_preschedule_de(self):
-        """Optimize preschedule bdugets using differential evolution"""
+        """Optimize preschedule time allocations using differential evolution"""
         
         if self.verbosity > 0:
             print("Optimizing preschedule with differential evolution...")
@@ -137,7 +118,7 @@ class ASAPv2(AbstractPresolver):
             if len(x) == 0:
                 return self.runtimes_preschedule
             
-            x_ = np.abs(x)
+            x_ = np.abs(x)  # Ensure non-negative
             rt = np.zeros(len(x_) + 1)
             
             # Normalize if sum exceeds 1
@@ -147,8 +128,8 @@ class ASAPv2(AbstractPresolver):
             rt[:-1] = x_ * total_runtime_preschedule
             rt[-1] = total_runtime_preschedule - np.sum(rt[:-1])
             
-            # Ensure all times are non-negative
-            rt = np.maximum(rt, 0.001)  # Minimum 1ms per algorithm
+            # Allow times to be 0 (algorithms can be excluded)
+            rt = np.maximum(rt, 0.0)
             
             return rt
         
@@ -173,21 +154,16 @@ class ASAPv2(AbstractPresolver):
                 # Add regularization
                 regularization = 0.0
                 if self.regularization_weight > 0:
-                    # Penalize uneven time distribution
-                    rt_normalized = decoded_runtimes / np.sum(decoded_runtimes)
-                    regularization = (self.regularization_weight * 
-                                    len(self.performance_train) * 
-                                    self.presolver_cutoff * 
-                                    np.var(rt_normalized))
-                
-                # Add variance penalty
-                variance_penalty = 0.0
-                if self.variance_weight > 0:
-                    solved_costs = costs[costs < self.presolver_cutoff * self.penalty_factor]
-                    if len(solved_costs) > 1:
-                        variance_penalty = self.variance_weight * np.var(solved_costs)
-                
-                return total_cost + regularization + variance_penalty
+                    # Penalize uneven time distribution among non-zero allocations
+                    nonzero_times = decoded_runtimes[decoded_runtimes > 0]
+                    if len(nonzero_times) > 1:
+                        rt_normalized = nonzero_times / np.sum(nonzero_times)
+                        regularization = (self.regularization_weight * 
+                                        len(self.performance_train) * 
+                                        self.presolver_cutoff * 
+                                        np.var(rt_normalized))
+
+                return total_cost + regularization
                 
             except Exception as e:
                 if self.verbosity > 1:
@@ -200,11 +176,11 @@ class ASAPv2(AbstractPresolver):
         
         if len(initial_encoded) == 0:
             if self.verbosity > 0:
-                print("No optimization needed for single algorithm preschedule")
+                print("No optimization needed for single algorithm")
             return
         
-        # Set up bounds
-        bounds = [(0.01, 0.99) for _ in range(len(initial_encoded))]
+        # Set up bounds - allow full range [0, 1] for each normalized time allocation
+        bounds = [(0.0, 1.0) for _ in range(len(initial_encoded))]
         
         # Run differential evolution
         try:
@@ -227,17 +203,17 @@ class ASAPv2(AbstractPresolver):
             if self.verbosity > 0:
                 print(f"Optimization failed: {e}")
                 print("Using initial runtimes")
-        
-        if self.verbosity > 0:
-            print(f"Optimized preschedule times: {dict(zip(self.preschedule_algorithms, self.runtimes_preschedule))}")
     
 
     def _simulate_preschedule(self, instance_performance, runtimes):
         """Simulate preschedule execution for one instance"""
         total_time = 0.0
         
-        # Execute preschedule
-        for i, (alg_idx, time_limit) in enumerate(zip(self.ialgos_preschedule, runtimes)):
+        # Execute preschedule for all algorithms with non-zero time
+        for alg_idx, time_limit in enumerate(runtimes):
+            if time_limit <= 0:
+                continue  # Skip algorithms with 0 time allocation
+                
             if alg_idx >= len(instance_performance):
                 continue
                 
@@ -255,18 +231,21 @@ class ASAPv2(AbstractPresolver):
 
     
     def _build_schedule(self):
-        """Build the final schedule"""
-        self.schedule = []
+        """Build the final schedule from algorithms with non-zero time"""
+        active_algorithms = []
         
-        # Add preschedule algorithms
-        for i, alg in enumerate(self.preschedule_algorithms):
-            if i < len(self.runtimes_preschedule):
-                self.schedule.append((alg, float(self.runtimes_preschedule[i])))
+        for alg, time_alloc in zip(self.algorithms, self.runtimes_preschedule):
+            if time_alloc > 0:
+                active_algorithms.append((alg, round(float(time_alloc), 3)))
+        
+        active_algorithms.sort(key=lambda x: x[1])
+        
+        self.schedule = active_algorithms
         
         if self.verbosity > 0:
             print()
             print(f"Final schedule: {self.schedule}")
-            print("+" * 40)
+            print("+ " * 40)
 
 
     def predict(self, features: Optional[pd.DataFrame] = None) -> Dict[str, List[Tuple[str, float]]]:
@@ -287,26 +266,19 @@ class ASAPv2(AbstractPresolver):
         return result
     
 
-
-
-
-
-
-    # def get_preschedule_config(self) -> Dict[str, float]:
-    #     """Get the optimized preschedule configuration"""
-    #     if self.preschedule_algorithms and self.runtimes_preschedule is not None:
-    #         return dict(zip(self.preschedule_algorithms, self.runtimes_preschedule))
-    #     return {}
+    def get_preschedule_config(self) -> Dict[str, float]:
+        """Get the optimized preschedule configuration (only non-zero times)"""
+        if self.algorithms and self.runtimes_preschedule is not None:
+            return {alg: time for alg, time in zip(self.algorithms, self.runtimes_preschedule) if time > 0}
+        return {}
     
-    # def get_configuration(self) -> Dict:
-    #     """Return configuration for compatibility with ASF selectors"""
-    #     return {
-    #         'algorithms': self.algorithms,
-    #         'budget': self.budget,
-    #         'presolver_cutoff': self.presolver_cutoff,
-    #         'size_preschedule': self.size_preschedule,
-    #         'preschedule_config': self.get_preschedule_config(),
-    #         'regularization_weight': self.regularization_weight,
-    #         'variance_weight': self.variance_weight,
-    #         'penalty_factor': self.penalty_factor
-    #     }
+    def get_configuration(self) -> Dict:
+        """Return configuration for compatibility with ASF selectors"""
+        return {
+            'algorithms': self.algorithms,
+            'budget': self.budget,
+            'presolver_cutoff': self.presolver_cutoff,
+            'preschedule_config': self.get_preschedule_config(),
+            'regularization_weight': self.regularization_weight,
+            'penalty_factor': self.penalty_factor
+        }
