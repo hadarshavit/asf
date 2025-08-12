@@ -15,28 +15,25 @@ class ASAPv2(AbstractPresolver):
     
     def __init__(
         self,
-        budget: float,
-        presolver_cutoff: float,
+        budget: float = 100.0,
+        presolver_cutoff: float = 30.0,
         maximize: bool = False,
-        max_runtime_preschedule: float = -1,
         regularization_weight: float = 0.0,
         penalty_factor: float = 2.0,
         de_popsize: int = 15,
-        de_maxiter: int = 100,
         seed: int = 42,
         verbosity: int = 0
     ):
         super().__init__(
+            budget=budget,
             presolver_cutoff=presolver_cutoff, 
-            budget=budget, 
             maximize=maximize
         )
         
-        self.max_runtime_preschedule = max_runtime_preschedule
         self.regularization_weight = regularization_weight
         self.penalty_factor = penalty_factor
         self.de_popsize = de_popsize
-        self.de_maxiter = de_maxiter
+        self.de_maxiter = budget
         self.seed = seed
         self.verbosity = verbosity
         
@@ -82,14 +79,9 @@ class ASAPv2(AbstractPresolver):
 
     def _initialize_preschedule(self):
         """Initialize preschedule with equal time for all algorithms"""
-        if self.max_runtime_preschedule > 0:
-            total_time = min(self.max_runtime_preschedule, self.presolver_cutoff)
-        else:
-            total_time = self.presolver_cutoff
-        
         # Start with equal time for all algorithms
         self.runtimes_preschedule = np.full(
-            self.numAlg, total_time / self.numAlg
+            self.numAlg, self.presolver_cutoff / self.numAlg
         )
         
         if self.verbosity > 0:
@@ -252,7 +244,7 @@ class ASAPv2(AbstractPresolver):
         """
         Returns the optimized preschedule (same for all features).
         """
-        if self.schedule is None:
+        if self.runtimes_preschedule is None:
             raise ValueError("Must call fit() before predict()")
         
         if features is None:
