@@ -62,14 +62,15 @@ class SelectorPipeline:
         if self.preprocessor:
             X = self.preprocessor.fit_transform(X)
 
+        if self.pre_solving:
+            self.pre_solving.fit(X, y)
+
         if self.algorithm_pre_selector:
             y = self.algorithm_pre_selector.fit_transform(y)
 
         if self.feature_selector:
             X, y = self.feature_selector.fit_transform(X, y)
 
-        if self.pre_solving:
-            self.pre_solving.fit(X, y)
 
         self.selector.fit(X, y)
 
@@ -88,15 +89,15 @@ class SelectorPipeline:
 
         if self.pre_solving:
             scheds = self.pre_solving.predict()
-            print(scheds)
 
         if self.feature_selector:
             X = self.feature_selector.transform(X)
 
-        return self.selector.predict(
-            X
-        )  # TODO update the schedules with the pre_solving schedules if needed
+        selector = self.selector.predict(X)
+        selector["pre_solver_schedule"] = scheds['default'] if self.pre_solving else None
 
+        return selector
+    
     def save(self, path: str) -> None:
         """
         Saves the pipeline to a file.
