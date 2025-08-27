@@ -8,6 +8,7 @@ from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelect
 
 class _DummyModel:
     """Dummy model class to satisfy AbstractModelBasedSelector requirements."""
+
     pass
 
 
@@ -30,7 +31,7 @@ class SurvivalAnalysisSelector(AbstractModelBasedSelector):
             cutoff_time (float): The time budget for the decision-making policy.
             model_params (Optional[Dict]): Parameters for the Random Survival Forest model.
             **kwargs: Additional arguments for the parent classes.
-        
+
         Raises:
             ValueError: If cutoff_time is not a positive number.
         """
@@ -39,13 +40,12 @@ class SurvivalAnalysisSelector(AbstractModelBasedSelector):
 
         if not isinstance(cutoff_time, (int, float)) or cutoff_time <= 0:
             raise ValueError("cutoff_time must be a positive number.")
-            
+
         self.cutoff_time = cutoff_time
         self.model_params = model_params if model_params is not None else {}
         self.survival_model: RandomSurvivalForest = None
         self.algorithms: List[str] = []
         self.feature_columns: List[str] = []
-
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
         """
@@ -68,30 +68,35 @@ class SurvivalAnalysisSelector(AbstractModelBasedSelector):
                 finished = not pd.isna(runtime) and runtime < self.cutoff_time
                 status = int(finished)
                 runtime = runtime if finished else self.cutoff_time
-                row = {**instance_features.to_dict(), 'algorithm': algo, 'runtime': runtime, 'status': status}
+                row = {
+                    **instance_features.to_dict(),
+                    "algorithm": algo,
+                    "runtime": runtime,
+                    "status": status,
+                }
                 fit_data.append(row)
         fit_df = pd.DataFrame(fit_data)
-        
+
         # 2. One-hot encode the 'algorithm' feature
-        fit_features = pd.get_dummies(fit_df.drop(columns=['runtime', 'status']), columns=['algorithm'], prefix='algo')
-        
+        fit_features = pd.get_dummies(
+            fit_df.drop(columns=["runtime", "status"]),
+            columns=["algorithm"],
+            prefix="algo",
+        )
+
         # Store the feature columns for prediction alignment
         self.feature_columns = list(fit_features.columns)
-        
+
         # 3. Create the structured array for the survival target
         y_structured = Surv.from_arrays(
-            event=fit_df['status'].astype(bool).values,
-            time=fit_df['runtime'].values
+            event=fit_df["status"].astype(bool).values, time=fit_df["runtime"].values
         )
-        
+
         # 4. Instantiate and fit the model
         self.survival_model = RandomSurvivalForest(
-            n_estimators=100,
-            random_state=42,
-            **self.model_params
+            n_estimators=100, random_state=42, **self.model_params
         )
         self.survival_model.fit(fit_features, y_structured)
-
 
     def _predict(self, features: pd.DataFrame) -> Dict[str, List[Tuple[str, float]]]:
         """
@@ -103,24 +108,28 @@ class SurvivalAnalysisSelector(AbstractModelBasedSelector):
         Returns:
             Dict[str, List[Tuple[str, float]]]: A dictionary mapping instance names to the predicted
             best algorithm and the associated budget.
-            
+
         Raises:
             ValueError: If the model has not been fitted yet.
         """
         if self.survival_model is None:
             raise ValueError("Model has not been fitted yet. Call fit() first.")
-            
+
         predictions = {}
         # Ensure all algorithms are in the prediction loop
         for instance, instance_features in features.iterrows():
             best_algo = None
             best_prob = -1.0
-            
+
             # Get the survival curve for each algorithm
             for algo in self.algorithms:
                 # 1. Prepare the input for prediction
-                pred_row = pd.DataFrame([{**instance_features.to_dict(), 'algorithm': algo}])
-                pred_row = pd.get_dummies(pred_row, columns=['algorithm'], prefix='algo')
+                pred_row = pd.DataFrame(
+                    [{**instance_features.to_dict(), "algorithm": algo}]
+                )
+                pred_row = pd.get_dummies(
+                    pred_row, columns=["algorithm"], prefix="algo"
+                )
                 pred_row = pred_row.reindex(columns=self.feature_columns, fill_value=0)
 
                 # 2. Predict the survival probability at the cutoff time
@@ -131,7 +140,7 @@ class SurvivalAnalysisSelector(AbstractModelBasedSelector):
                 if prob > best_prob:
                     best_prob = prob
                     best_algo = algo
-            
+
             predictions[instance] = [(best_algo, self.cutoff_time)]
 
         return predictions

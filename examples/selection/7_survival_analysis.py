@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from asf.selectors.survival_analysis import SurvivalAnalysisSelector
 
+
 def generate_complex_data(n_instances=100, n_algorithms=6, cutoff_time=150.0, seed=42):
     """
     Generates synthetic data to demonstrate the value of survival analysis.
@@ -11,30 +12,35 @@ def generate_complex_data(n_instances=100, n_algorithms=6, cutoff_time=150.0, se
     - Timeout probability is dependent on instance complexity.
     """
     np.random.seed(seed)
-    
+
     # Features: Each instance has a "type" that influences which algorithm is best
-    types = np.random.choice(['easy', 'medium', 'hard', 'special'], size=n_instances, p=[0.4, 0.3, 0.2, 0.1])
-    features = pd.DataFrame({
-        "feature1": np.random.uniform(0, 10, n_instances),
-        "feature2": np.random.uniform(0, 5, n_instances),
-        "feature3": np.random.uniform(0, 1, n_instances),
-        "type": types
-    }, index=[f"instance_{i}" for i in range(n_instances)])
+    types = np.random.choice(
+        ["easy", "medium", "hard", "special"], size=n_instances, p=[0.4, 0.3, 0.2, 0.1]
+    )
+    features = pd.DataFrame(
+        {
+            "feature1": np.random.uniform(0, 10, n_instances),
+            "feature2": np.random.uniform(0, 5, n_instances),
+            "feature3": np.random.uniform(0, 1, n_instances),
+            "type": types,
+        },
+        index=[f"instance_{i}" for i in range(n_instances)],
+    )
 
     # Performance: Each algorithm is best for a specific type
     performance = pd.DataFrame(index=features.index)
-    
+
     # Define timeout probabilities based on problem type
-    timeout_probs = {'easy': 0.05, 'medium': 0.15, 'hard': 0.30, 'special': 0.25}
+    timeout_probs = {"easy": 0.05, "medium": 0.15, "hard": 0.30, "special": 0.25}
 
     for algo in range(n_algorithms):
         base = 70 + algo * 15
         perf = base + np.random.normal(0, 10, n_instances)
-        
+
         # Make each algorithm specialized for a type
-        for t in ['easy', 'medium', 'hard', 'special']:
-            mask = features['type'] == t
-            if algo == ['easy', 'medium', 'hard', 'special'].index(t):
+        for t in ["easy", "medium", "hard", "special"]:
+            mask = features["type"] == t
+            if algo == ["easy", "medium", "hard", "special"].index(t):
                 perf[mask] -= 30 * algo  # This algorithm is faster for this type
             else:
                 perf[mask] += 25  # Slower for other types
@@ -42,27 +48,34 @@ def generate_complex_data(n_instances=100, n_algorithms=6, cutoff_time=150.0, se
         # "Fast but Unreliable" algorithm -> Should not be chosen often
         if algo == 4:
             perf = np.random.uniform(10, 50, n_instances)
-            perf_timeouts = np.random.choice([True, False], size=n_instances, p=[0.5, 0.5])
+            perf_timeouts = np.random.choice(
+                [True, False], size=n_instances, p=[0.5, 0.5]
+            )
             perf[perf_timeouts] = cutoff_time
-        
+
         # "Slow but Reliable" algorithm -> Should be chosen often
         elif algo == 5:
             perf = np.random.uniform(100, 130, n_instances)
-            perf_timeouts = np.random.choice([True, False], size=n_instances, p=[0.05, 0.95])
+            perf_timeouts = np.random.choice(
+                [True, False], size=n_instances, p=[0.05, 0.95]
+            )
             perf[perf_timeouts] = cutoff_time
 
         # Apply timeouts based on problem type
         else:
             for t, prob in timeout_probs.items():
-                mask = features['type'] == t
-                timeouts = np.random.choice([True, False], size=mask.sum(), p=[prob, 1-prob])
+                mask = features["type"] == t
+                timeouts = np.random.choice(
+                    [True, False], size=mask.sum(), p=[prob, 1 - prob]
+                )
                 perf[mask] = np.where(timeouts, cutoff_time, perf[mask])
 
-        performance[f"algo{algo+1}"] = perf
+        performance[f"algo{algo + 1}"] = perf
 
     # Drop the 'type' column for training/testing
-    features = features.drop(columns=['type'])
+    features = features.drop(columns=["type"])
     return features, performance, types
+
 
 if __name__ == "__main__":
     features, performance, types = generate_complex_data()

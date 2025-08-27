@@ -71,7 +71,6 @@ class SelectorPipeline:
         if self.feature_selector:
             X, y = self.feature_selector.fit_transform(X, y)
 
-
         self.selector.fit(X, y)
 
     def predict(self, X: Any) -> Any:
@@ -94,10 +93,12 @@ class SelectorPipeline:
             X = self.feature_selector.transform(X)
 
         selector = self.selector.predict(X)
-        selector["pre_solver_schedule"] = scheds['default'] if self.pre_solving else None
+        selector["pre_solver_schedule"] = (
+            scheds["default"] if self.pre_solving else None
+        )
 
         return selector
-    
+
     def save(self, path: str) -> None:
         """
         Saves the pipeline to a file.

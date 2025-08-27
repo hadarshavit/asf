@@ -203,11 +203,13 @@ def test_joint_ranking(dummy_performance, dummy_features):
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
 
+
 def test_survival_analysis(dummy_performance, dummy_features):
     selector = SurvivalAnalysisSelector(cutoff_time=450.0)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
+
 
 def test_selector_tuner(dummy_performance, dummy_features):
     # Keep runcount_limit and cv low for fast testing
