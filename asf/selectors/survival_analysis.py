@@ -134,11 +134,11 @@ class SurvivalAnalysisSelector(AbstractModelBasedSelector):
 
                 # 2. Predict the survival probability at the cutoff time
                 surv_func = self.survival_model.predict_survival_function(pred_row)[0]
-                prob = 1.0 - surv_func(self.cutoff_time)
+                completion_prob = 1.0 - surv_func(self.cutoff_time)
 
                 # 3. Apply the decision policy
-                if prob > best_prob:
-                    best_prob = prob
+                if completion_prob > best_prob:
+                    best_prob = completion_prob
                     best_algo = algo
 
             predictions[instance] = [(best_algo, self.cutoff_time)]
