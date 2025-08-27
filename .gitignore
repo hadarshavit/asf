@@ -176,4 +176,3 @@ cython_debug/
 
 aslib_data/** 
 test*.ipynb
-test*.py
