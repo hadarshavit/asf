@@ -37,7 +37,7 @@ xgb = [ 'xgboost' ]
 tune = [ 'smac' ]
 aspeed = [ 'clingo' ]
 survival = [ 'scikit-survival' ] 
-all = [ 'pyyaml', 'liac-arff', 'torch', 'xgboost', 'smac', 'clingo', 'survival']
+all = [ 'pyyaml', 'liac-arff', 'torch', 'xgboost', 'smac', 'clingo', 'scikit-survival']
 
 [build-system]
 requires = ["setuptools", "wheel"]
