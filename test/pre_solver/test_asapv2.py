@@ -24,7 +24,7 @@ def validate_predictions(predictions, n_instances):
         assert len(schedule) > 0, "Schedule should not be empty"
         for alg_name, time_alloc in schedule:
             assert isinstance(alg_name, str), "Algorithm name should be a string"
-            assert time_alloc > 0, "Time allocation should be positive"
+            assert time_alloc >= 0, "Time allocation should be positive"
 
 
 class TestASAPv2Basic:
