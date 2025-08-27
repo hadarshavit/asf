@@ -92,12 +92,15 @@ class SelectorPipeline:
         if self.feature_selector:
             X = self.feature_selector.transform(X)
 
-        selector = self.selector.predict(X)
-        selector["pre_solver_schedule"] = (
-            scheds["default"] if self.pre_solving else None
-        )
-
-        return selector
+        predictions = self.selector.predict(X)
+        pre_solver_schedule = scheds["default"] if self.pre_solving else None
+        
+        if isinstance(predictions, dict):
+            predictions["pre_solver_schedule"] = pre_solver_schedule
+            return predictions
+        else:
+            return (predictions, pre_solver_schedule)
+        
 
     def save(self, path: str) -> None:
         """

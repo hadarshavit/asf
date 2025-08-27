@@ -55,7 +55,7 @@ class TestASAPv2Basic:
         assert asap_custom.regularization_weight == 0.5, error
         assert asap_custom.penalty_factor == 3.0, error
         assert asap_custom.de_popsize == 20, error
-        assert asap_custom.de_maxiter == 50.0, error
+        assert asap_custom.de_maxiter == 50, error
         assert asap_custom.seed == 123, error
         assert asap_custom.verbosity == 1, error
 
