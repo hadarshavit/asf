@@ -1,9 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.optimize import differential_evolution
-from typing import List, Dict, Tuple, Optional, Union
-from sklearn.ensemble import RandomForestRegressor
-from functools import partial
+from typing import List, Dict, Tuple, Optional
 
 from asf.presolving.presolver import AbstractPresolver
 
@@ -33,7 +31,7 @@ class ASAPv2(AbstractPresolver):
         self.regularization_weight = regularization_weight
         self.penalty_factor = penalty_factor
         self.de_popsize = de_popsize
-        self.de_maxiter = budget
+        self.de_maxiter = int(budget)
         self.seed = seed
         self.verbosity = verbosity
         

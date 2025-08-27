@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 from typing import Dict, List, Tuple, Optional
 from sksurv.ensemble import RandomSurvivalForest
 from sksurv.util import Surv

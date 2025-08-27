@@ -155,7 +155,7 @@ if __name__ == "__main__":
     print(f"Schedule coverage: {total_solved}/{len(test_performance)} ({schedule_coverage:.0f}%)")
     
     # Show compact examples
-    print(f"\nExample predictions (test set):")
+    print("\nExample predictions (test set):")
     preschedule_str = " → ".join([f"{alg}:{time:.0f}s" for alg, time in asap_config.items()])
     
     for i, (instance_id, prediction) in enumerate(list(predictions.items())[:3]):

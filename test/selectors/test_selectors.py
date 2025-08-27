@@ -226,7 +226,7 @@ def test_selector_tuner(dummy_performance, dummy_features):
     tuned_pipeline.fit(dummy_features, dummy_performance)
     predictions = tuned_pipeline.predict(dummy_features)
     # Remove pre_solver_schedule if present
-    if "pre_solver_schedule" in predictions.keys():
+    if "pre_solver_schedule" in predictions:
         del predictions["pre_solver_schedule"]
     validate_predictions(predictions)
 
