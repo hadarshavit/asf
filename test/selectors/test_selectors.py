@@ -8,6 +8,7 @@ from asf.selectors import (
     PerformanceModel,
     SimpleRanking,
     JointRanking,
+    SurvivalAnalysisSelector,
 )
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from xgboost import XGBRanker
@@ -202,6 +203,11 @@ def test_joint_ranking(dummy_performance, dummy_features):
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
 
+def test_survival_analysis(dummy_performance, dummy_features):
+    selector = SurvivalAnalysisSelector(cutoff_time=450.0)
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+    validate_predictions(predictions)
 
 def test_selector_tuner(dummy_performance, dummy_features):
     # Keep runcount_limit and cv low for fast testing
@@ -219,6 +225,9 @@ def test_selector_tuner(dummy_performance, dummy_features):
     # Fit the best pipeline found by the tuner
     tuned_pipeline.fit(dummy_features, dummy_performance)
     predictions = tuned_pipeline.predict(dummy_features)
+    # Remove pre_solver_schedule if present
+    if "pre_solver_schedule" in predictions.keys():
+        del predictions["pre_solver_schedule"]
     validate_predictions(predictions)
 
     # Clean up SMAC output directory if needed (optional)
