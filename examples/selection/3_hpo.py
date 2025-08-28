@@ -69,7 +69,7 @@ if __name__ == "__main__":
         features,
         performance,
         selector_class=[PairwiseClassifier, PairwiseRegressor],
-        selector_kwargs={"budget": 5000},
+        budget=5000,
         runcount_limit=10,
     )
 
@@ -92,7 +92,7 @@ if __name__ == "__main__":
             (PairwiseClassifier, {"model_class": [SVMClassifierWrapper]}),
             (PairwiseRegressor, {"model_class": [SVMRegressorWrapper]}),
         ],
-        selector_kwargs={"budget": 5000},
+        budget=5000,
         runcount_limit=10,
     )
 

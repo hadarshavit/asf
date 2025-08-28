@@ -86,6 +86,7 @@ class SelectorPipeline:
         if self.preprocessor:
             X = self.preprocessor.transform(X)
 
+        scheds = None
         if self.pre_solving:
             scheds = self.pre_solving.predict()
 
@@ -93,13 +94,15 @@ class SelectorPipeline:
             X = self.feature_selector.transform(X)
 
         predictions = self.selector.predict(X)
-        pre_solver_schedule = scheds["default"] if self.pre_solving else None
 
-        if isinstance(predictions, dict):
-            predictions["pre_solver_schedule"] = pre_solver_schedule
+        # Prepend pre-solver schedule to each instance's schedule
+        if isinstance(predictions, dict) and scheds is not None:
+            for instance_id, pre_schedule in scheds.items():
+                if instance_id in predictions:
+                    predictions[instance_id] = pre_schedule + predictions[instance_id]
             return predictions
         else:
-            return (predictions, pre_solver_schedule)
+            return predictions
 
     def save(self, path: str) -> None:
         """
