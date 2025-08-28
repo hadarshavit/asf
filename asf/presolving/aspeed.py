@@ -18,13 +18,13 @@ class Aspeed(AbstractPresolver):
         cutoff (int): Time limit for solving.
         data_threshold (int): Minimum number of instances to use.
         data_fraction (float): Fraction of instances to use.
-        schedule (list): Computed schedule of algorithms and their budgets.
+        schedule (list): Computed schedule of algorithms and their runcount_limits.
     """
 
     def __init__(
         self,
-        budget: float,
-        presolver_cutoff: float,
+        runcount_limit: float = 100.0,
+        budget: float = 30.0,
         aspeed_cutoff: int = 60,
         maximize: bool = False,
         cores: int = 1,
@@ -40,7 +40,7 @@ class Aspeed(AbstractPresolver):
             cutoff (int): Time limit for solving.
         """
         super().__init__(
-            presolver_cutoff=presolver_cutoff, budget=budget, maximize=maximize
+            budget=budget, runcount_limit=runcount_limit, maximize=maximize
         )
         self.cores = cores
         self.data_threshold = data_threshold  # minimal number of instances to use
@@ -147,7 +147,7 @@ solved(I)   :- solved(I,_).
             for j in range(performance.shape[1])
         ]
 
-        kappa = "kappa(%d)." % (self.presolver_cutoff)
+        kappa = "kappa(%d)." % (self.budget)
 
         data_in = " ".join(times) + " " + kappa
         ctl.add(data_in)
@@ -167,8 +167,8 @@ solved(I)   :- solved(I,_).
             schedule_dict = {}
             for slice in model.symbols(shown=True):
                 algo = self.algorithms[slice.arguments[1].number]
-                budget = slice.arguments[2].number
-                schedule_dict[algo] = budget
+                runcount_limit = slice.arguments[2].number
+                schedule_dict[algo] = runcount_limit
                 self.schedule = sorted(schedule_dict.items(), key=lambda x: x[1])
             return False
 

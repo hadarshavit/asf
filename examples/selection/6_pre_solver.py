@@ -116,7 +116,7 @@ if __name__ == "__main__":
             metric=virtual_best_solver, n_algorithms=3
         ),
         pre_solving=ASAPv2(
-            presolver_cutoff=60.0, budget=50, regularization_weight=0.15, verbosity=1
+            runcount_limit=60.0, budget=50, regularization_weight=0.15, verbosity=1
         ),
     )
 

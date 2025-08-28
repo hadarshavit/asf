@@ -75,7 +75,7 @@ if __name__ == "__main__":
         algorithm_pre_selector=MarginalContributionBasedPreSelector(
             metric=virtual_best_solver, n_algorithms=2
         ),
-        pre_solving=Aspeed(budget=1000, presolver_cutoff=10),
+        pre_solving=Aspeed(runcount_limit=1000, budget=10),
     )
 
     # Fit the selector to the data

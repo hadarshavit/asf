@@ -5,12 +5,12 @@ from abc import abstractmethod
 class AbstractPresolver:
     def __init__(
         self,
+        runcount_limit: float,
         budget: float,
-        presolver_cutoff: float,
         maximize: bool = False,
     ):
+        self.runcount_limit = runcount_limit
         self.budget = budget
-        self.presolver_cutoff = presolver_cutoff
         self.maximize = maximize
 
     @abstractmethod

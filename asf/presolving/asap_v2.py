@@ -13,8 +13,8 @@ class ASAPv2(AbstractPresolver):
 
     def __init__(
         self,
-        budget: float = 100.0,
-        presolver_cutoff: float = 30.0,
+        runcount_limit: float = 100.0,
+        budget: float = 30.0,
         maximize: bool = False,
         regularization_weight: float = 0.0,
         penalty_factor: float = 2.0,
@@ -23,13 +23,13 @@ class ASAPv2(AbstractPresolver):
         verbosity: int = 0,
     ):
         super().__init__(
-            budget=budget, presolver_cutoff=presolver_cutoff, maximize=maximize
+            runcount_limit=runcount_limit, budget=budget, maximize=maximize
         )
 
         self.regularization_weight = regularization_weight
         self.penalty_factor = penalty_factor
         self.de_popsize = de_popsize
-        self.de_maxiter = int(budget)
+        self.de_maxiter = int(runcount_limit)
         self.seed = seed
         self.verbosity = verbosity
 
@@ -44,7 +44,12 @@ class ASAPv2(AbstractPresolver):
     def fit(self, features: pd.DataFrame, performance: pd.DataFrame):
         """Train the ASAP v2 presolver"""
 
-        # Extract data
+        # Convert to DataFrame if needed
+        if isinstance(features, np.ndarray):
+            features = pd.DataFrame(features)
+        if isinstance(performance, np.ndarray):
+            performance = pd.DataFrame(performance)
+
         self.features = features
         self.performance = performance
         self.algorithms = list(performance.columns)
@@ -74,9 +79,7 @@ class ASAPv2(AbstractPresolver):
     def _initialize_preschedule(self):
         """Initialize preschedule with equal time for all algorithms"""
         # Start with equal time for all algorithms
-        self.runtimes_preschedule = np.full(
-            self.numAlg, self.presolver_cutoff / self.numAlg
-        )
+        self.runtimes_preschedule = np.full(self.numAlg, self.budget / self.numAlg)
 
         if self.verbosity > 0:
             print(
@@ -147,7 +150,7 @@ class ASAPv2(AbstractPresolver):
                         regularization = (
                             self.regularization_weight
                             * len(self.performance_train)
-                            * self.presolver_cutoff
+                            * self.budget
                             * np.var(rt_normalized)
                         )
 
@@ -156,11 +159,7 @@ class ASAPv2(AbstractPresolver):
             except Exception as e:
                 if self.verbosity > 1:
                     print(f"Error in objective function: {e}")
-                return (
-                    len(self.performance_train)
-                    * self.presolver_cutoff
-                    * self.penalty_factor
-                )
+                return len(self.performance_train) * self.budget * self.penalty_factor
 
         # Encode initial guess
         initial_encoded = encode_runtimes(self.runtimes_preschedule)
@@ -217,7 +216,7 @@ class ASAPv2(AbstractPresolver):
             total_time += time_limit
 
         # Preschedule failed - return cost with penalty
-        return self.presolver_cutoff * self.penalty_factor
+        return self.budget * self.penalty_factor
 
     def _build_schedule(self):
         """Build the final schedule from algorithms with non-zero time"""
@@ -269,8 +268,8 @@ class ASAPv2(AbstractPresolver):
         """Return configuration for compatibility with ASF selectors"""
         return {
             "algorithms": self.algorithms,
+            "runcount_limit": self.runcount_limit,
             "budget": self.budget,
-            "presolver_cutoff": self.presolver_cutoff,
             "preschedule_config": self.get_preschedule_config(),
             "regularization_weight": self.regularization_weight,
             "penalty_factor": self.penalty_factor,

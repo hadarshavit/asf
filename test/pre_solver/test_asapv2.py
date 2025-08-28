@@ -32,14 +32,14 @@ class TestASAPv2Basic:
 
     def test_initialization(self):
         """Test initialization with default and custom parameters"""
-        asap = ASAPv2(presolver_cutoff=30.0)
-        assert asap.budget == 100.0
-        assert asap.presolver_cutoff == 30.0
+        asap = ASAPv2(budget=30.0)
+        assert asap.runcount_limit == 100.0
+        assert asap.budget == 30.0
         assert asap.regularization_weight == 0.0
 
         asap_custom = ASAPv2(
-            budget=50.0,
-            presolver_cutoff=60.0,
+            runcount_limit=50.0,
+            budget=60.0,
             maximize=True,
             regularization_weight=0.5,
             penalty_factor=3.0,
@@ -49,8 +49,8 @@ class TestASAPv2Basic:
         )
 
         error = "Initialization parameter mismatch"
-        assert asap_custom.budget == 50.0, error
-        assert asap_custom.presolver_cutoff == 60.0, error
+        assert asap_custom.runcount_limit == 50.0, error
+        assert asap_custom.budget == 60.0, error
         assert asap_custom.maximize, error
         assert asap_custom.regularization_weight == 0.5, error
         assert asap_custom.penalty_factor == 3.0, error
@@ -62,7 +62,7 @@ class TestASAPv2Basic:
     def test_fit_and_predict(self, dummy_data):
         """Test basic fit and predict workflow"""
         features, performance = dummy_data
-        asap = ASAPv2(presolver_cutoff=30.0, verbosity=0)
+        asap = ASAPv2(budget=30.0, verbosity=0)
 
         asap.fit(features, performance)
 
@@ -77,7 +77,7 @@ class TestASAPv2Basic:
     def test_predict_before_fit_raises_error(self, dummy_data):
         """Test error when predict called before fit"""
         features, _ = dummy_data
-        asap = ASAPv2(presolver_cutoff=30.0)
+        asap = ASAPv2(budget=30.0)
 
         with pytest.raises(ValueError):
             asap.predict(features)
@@ -85,7 +85,7 @@ class TestASAPv2Basic:
     def test_schedule_ordering(self, dummy_data):
         """Test that schedule is ordered by time allocation"""
         features, performance = dummy_data
-        asap = ASAPv2(presolver_cutoff=30.0, verbosity=0)
+        asap = ASAPv2(budget=30.0, verbosity=0)
         asap.fit(features, performance)
 
         times = [time for _, time in asap.schedule]
@@ -94,7 +94,7 @@ class TestASAPv2Basic:
     def test_same_schedule_for_all_instances(self, dummy_data):
         """Test ASAP behavior: same schedule for all instances"""
         features, performance = dummy_data
-        asap = ASAPv2(presolver_cutoff=30.0, verbosity=0)
+        asap = ASAPv2(budget=30.0, verbosity=0)
         asap.fit(features, performance)
 
         predictions = asap.predict(features)
@@ -105,25 +105,25 @@ class TestASAPv2Basic:
         )
 
 
-@pytest.mark.parametrize("presolver_cutoff", [10.0, 30.0, 60.0, 120.0])
-def test_schedule_time_allocation(dummy_data, presolver_cutoff):
-    """Test that schedule time allocation respects presolver_cutoff"""
+@pytest.mark.parametrize("budget", [10.0, 30.0, 60.0, 120.0])
+def test_schedule_time_allocation(dummy_data, budget):
+    """Test that schedule time allocation respects budget"""
     features, performance = dummy_data
-    asap = ASAPv2(presolver_cutoff=presolver_cutoff, budget=5, verbosity=0)
+    asap = ASAPv2(budget=budget, runcount_limit=5, verbosity=0)
 
     asap.fit(features, performance)
 
     assert len(asap.schedule) > 0, "Schedule should not be empty"
 
     total_time = sum(time for _, time in asap.schedule)
-    assert total_time <= presolver_cutoff + 0.01, (
-        f"Total schedule time {total_time} should not exceed presolver_cutoff {presolver_cutoff}"
+    assert total_time <= budget + 0.01, (
+        f"Total schedule time {total_time} should not exceed budget {budget}"
     )
 
     # Also check that individual algorithm times are reasonable
     for alg_name, time_alloc in asap.schedule:
-        assert 0 <= time_alloc <= presolver_cutoff, (
-            f"Algorithm {alg_name} time allocation {time_alloc} should be between 0 and presolver_cutoff {presolver_cutoff}"
+        assert 0 <= time_alloc <= budget, (
+            f"Algorithm {alg_name} time allocation {time_alloc} should be between 0 and budget {budget}"
         )
 
 
@@ -137,7 +137,7 @@ class TestASAPv2EdgeCases:
             np.random.exponential(10, (5, 1)), columns=["only_algo"]
         )
 
-        asap = ASAPv2(presolver_cutoff=20.0, verbosity=0)
+        asap = ASAPv2(budget=20.0, verbosity=0)
         asap.fit(features, performance)
 
         assert len(asap.schedule) == 1
@@ -150,7 +150,7 @@ class TestASAPv2EdgeCases:
             np.random.exponential(15, (10, 8)), columns=[f"algo_{i}" for i in range(8)]
         )
 
-        asap = ASAPv2(presolver_cutoff=20.0, budget=5, verbosity=0)
+        asap = ASAPv2(budget=20.0, runcount_limit=5, verbosity=0)
         asap.fit(features, performance)
 
         assert len(asap.algorithms) == 8
@@ -163,9 +163,9 @@ def test_regularization_weights(dummy_data, regularization_weight):
     """Test different regularization weights"""
     features, performance = dummy_data
     asap = ASAPv2(
-        presolver_cutoff=30.0,
+        budget=30.0,
         regularization_weight=regularization_weight,
-        budget=5,
+        runcount_limit=5,
         verbosity=0,
     )
 
@@ -179,8 +179,8 @@ def test_reproducibility(dummy_data, seed):
     """Test reproducibility with same seed"""
     features, performance = dummy_data
 
-    asap1 = ASAPv2(presolver_cutoff=30.0, seed=seed, budget=10, verbosity=0)
-    asap2 = ASAPv2(presolver_cutoff=30.0, seed=seed, budget=10, verbosity=0)
+    asap1 = ASAPv2(budget=30.0, seed=seed, runcount_limit=10, verbosity=0)
+    asap2 = ASAPv2(budget=30.0, seed=seed, runcount_limit=10, verbosity=0)
 
     asap1.fit(features, performance)
     asap2.fit(features, performance)
@@ -194,7 +194,7 @@ class TestASAPv2Configuration:
     def test_get_preschedule_config(self, dummy_data):
         """Test preschedule config method"""
         features, performance = dummy_data
-        asap = ASAPv2(presolver_cutoff=30.0, verbosity=0)
+        asap = ASAPv2(budget=30.0, verbosity=0)
         asap.fit(features, performance)
 
         config = asap.get_preschedule_config()
@@ -208,15 +208,15 @@ class TestASAPv2Configuration:
     def test_get_configuration(self, dummy_data):
         """Test full configuration method"""
         features, performance = dummy_data
-        asap = ASAPv2(presolver_cutoff=30.0, regularization_weight=0.1, verbosity=0)
+        asap = ASAPv2(budget=30.0, regularization_weight=0.1, verbosity=0)
         asap.fit(features, performance)
 
         config = asap.get_configuration()
 
         expected_keys = {
             "algorithms",
+            "runcount_limit",
             "budget",
-            "presolver_cutoff",
             "preschedule_config",
             "regularization_weight",
             "penalty_factor",
