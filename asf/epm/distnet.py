@@ -1,18 +1,21 @@
 """
-DistNet implementation for deep probability estimation.
+DistNet implementation for algorithm runtime distribution prediction.
 
-Based on the paper "Deep Probability Estimation" (https://arxiv.org/abs/1709.07615).
-This module implements DistNet as a predictor for the ASF framework.
+Based on "Neural Networks for Predicting Algorithm Runtime Distributions" 
+by Eggensperger et al. (https://arxiv.org/abs/1709.07615).
+
+This module implements DistNet as a predictor for runtime distribution estimation
+in the ASF framework.
 """
 
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, Tuple
 from functools import partial
+import warnings
 
 try:
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
-
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
@@ -20,7 +23,6 @@ except ImportError:
 try:
     from ConfigSpace import ConfigurationSpace, Float, Integer, Categorical
     from ConfigSpace.hyperparameters import Hyperparameter
-
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
@@ -28,6 +30,7 @@ except ImportError:
 import pandas as pd
 import numpy as np
 from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
 
 from asf.predictors.abstract_predictor import AbstractPredictor
 
@@ -36,36 +39,26 @@ if TORCH_AVAILABLE:
 
     class DistNetArchitecture(nn.Module):
         """
-        Deep probability estimation network architecture.
+        Neural network architecture for predicting algorithm runtime distributions.
         
-        This implements a neural network designed for probability estimation
-        with multiple output distributions and uncertainty quantification.
+        Predicts parameters of log-normal distribution for algorithm runtimes.
         """
         
         def __init__(
             self,
             input_size: int,
-            hidden_sizes: list = [256, 128, 64],
-            output_size: int = 1,
-            dropout: float = 0.2,
+            hidden_sizes: list = [128, 64, 32],
+            dropout: float = 0.1,
             activation: str = 'relu',
-            use_batch_norm: bool = True,
-            num_components: int = 5,  # For mixture distributions
         ):
             super().__init__()
             
-            self.input_size = input_size
-            self.output_size = output_size
-            self.num_components = num_components
-            
-            # Build the main network
+            # Build the network layers
             layers = []
             prev_size = input_size
             
             for hidden_size in hidden_sizes:
                 layers.append(nn.Linear(prev_size, hidden_size))
-                if use_batch_norm:
-                    layers.append(nn.BatchNorm1d(hidden_size))
                 
                 if activation == 'relu':
                     layers.append(nn.ReLU())
@@ -81,68 +74,45 @@ if TORCH_AVAILABLE:
             
             self.backbone = nn.Sequential(*layers)
             
-            # Output heads for probability estimation
-            # Mean prediction
-            self.mean_head = nn.Linear(prev_size, output_size)
-            
-            # Variance prediction (log scale for numerical stability)
-            self.log_var_head = nn.Linear(prev_size, output_size)
-            
-            # Mixture weights (for mixture of experts)
-            self.mixture_weights = nn.Linear(prev_size, num_components)
-            
-            # Component means and variances
-            self.component_means = nn.Linear(prev_size, num_components * output_size)
-            self.component_log_vars = nn.Linear(prev_size, num_components * output_size)
+            # Output heads for log-normal distribution parameters
+            # Predict log(mean) and log(variance) for numerical stability
+            self.log_mean_head = nn.Linear(prev_size, 1)
+            self.log_var_head = nn.Linear(prev_size, 1)
             
         def forward(self, x):
-            """Forward pass through the network."""
+            """Forward pass predicting log-normal distribution parameters."""
             features = self.backbone(x)
             
-            # Basic predictions
-            mean = self.mean_head(features)
+            # Predict log-space parameters for numerical stability
+            log_mean = self.log_mean_head(features)
             log_var = self.log_var_head(features)
             
-            # Mixture components
-            mixture_weights = F.softmax(self.mixture_weights(features), dim=-1)
-            component_means = self.component_means(features).view(-1, self.num_components, self.output_size)
-            component_log_vars = self.component_log_vars(features).view(-1, self.num_components, self.output_size)
-            
-            return {
-                'mean': mean,
-                'log_var': log_var,
-                'mixture_weights': mixture_weights,
-                'component_means': component_means,
-                'component_log_vars': component_log_vars
-            }
+            return log_mean, log_var
 
 
     class DistNet(AbstractPredictor):
         """
-        DistNet predictor implementing deep probability estimation.
+        DistNet predictor for algorithm runtime distribution prediction.
         
-        This class provides a neural network approach to probability estimation
-        with uncertainty quantification and mixture distributions.
+        Predicts parameters of log-normal distributions for algorithm runtimes,
+        providing uncertainty quantification for runtime predictions.
         """
         
         def __init__(
             self,
-            hidden_sizes: list = [256, 128, 64],
-            dropout: float = 0.2,
+            hidden_sizes: list = [128, 64, 32],
+            dropout: float = 0.1,
             activation: str = 'relu',
-            use_batch_norm: bool = True,
-            num_components: int = 5,
             learning_rate: float = 0.001,
             batch_size: int = 64,
             epochs: int = 100,
             device: str = 'cpu',
             seed: int = 42,
             early_stopping_patience: int = 10,
-            mixture_loss_weight: float = 0.1,
             **kwargs
         ):
             """
-            Initialize DistNet predictor.
+            Initialize DistNet predictor for runtime prediction.
             
             Parameters
             ----------
@@ -152,10 +122,6 @@ if TORCH_AVAILABLE:
                 Dropout probability
             activation : str
                 Activation function ('relu', 'tanh', 'elu')
-            use_batch_norm : bool
-                Whether to use batch normalization
-            num_components : int
-                Number of mixture components
             learning_rate : float
                 Learning rate for optimizer
             batch_size : int
@@ -168,25 +134,21 @@ if TORCH_AVAILABLE:
                 Random seed for reproducibility
             early_stopping_patience : int
                 Patience for early stopping
-            mixture_loss_weight : float
-                Weight for mixture loss component
             """
             super().__init__(**kwargs)
             
-            assert TORCH_AVAILABLE, "PyTorch is not available. Please install it."
+            if not TORCH_AVAILABLE:
+                raise ImportError("PyTorch is not available. Please install it with: pip install torch")
             
             self.hidden_sizes = hidden_sizes
             self.dropout = dropout
             self.activation = activation
-            self.use_batch_norm = use_batch_norm
-            self.num_components = num_components
             self.learning_rate = learning_rate
             self.batch_size = batch_size
             self.epochs = epochs
             self.device = device
             self.seed = seed
             self.early_stopping_patience = early_stopping_patience
-            self.mixture_loss_weight = mixture_loss_weight
             
             # Set random seed
             torch.manual_seed(seed)
@@ -197,17 +159,15 @@ if TORCH_AVAILABLE:
             self.model = None
             self.optimizer = None
             self.scaler = None
+            self.feature_scaler = None
             
-        def _create_model(self, input_size: int, output_size: int = 1):
+        def _create_model(self, input_size: int):
             """Create the DistNet model."""
             self.model = DistNetArchitecture(
                 input_size=input_size,
                 hidden_sizes=self.hidden_sizes,
-                output_size=output_size,
                 dropout=self.dropout,
-                activation=self.activation,
-                use_batch_norm=self.use_batch_norm,
-                num_components=self.num_components
+                activation=self.activation
             ).to(self.device)
             
             self.optimizer = torch.optim.Adam(
@@ -215,48 +175,36 @@ if TORCH_AVAILABLE:
                 lr=self.learning_rate
             )
             
-        def _compute_loss(self, outputs, targets):
-            """Compute the loss for training."""
-            mean_pred = outputs['mean']
-            log_var_pred = outputs['log_var']
+        def _compute_loss(self, log_mean_pred, log_var_pred, log_runtime_targets):
+            """
+            Compute negative log-likelihood loss for log-normal distribution.
             
-            # Basic Gaussian negative log-likelihood
-            var_pred = torch.exp(log_var_pred)
-            nll_loss = 0.5 * (torch.log(2 * np.pi * var_pred) + 
-                             (targets - mean_pred) ** 2 / var_pred)
-            nll_loss = torch.mean(nll_loss)
+            For log-normal distribution with parameters μ and σ²:
+            log p(x|μ,σ²) = -0.5*log(2π) - 0.5*log(σ²) - 0.5*(log(x)-μ)²/σ²
             
-            # Mixture loss
-            mixture_weights = outputs['mixture_weights']
-            component_means = outputs['component_means']
-            component_log_vars = outputs['component_log_vars']
-            component_vars = torch.exp(component_log_vars)
+            We predict log(μ) and log(σ²) for numerical stability.
+            """
+            # Convert predictions back to distribution parameters
+            mu = log_mean_pred  # This is already log(mean) of the underlying normal
+            log_sigma_sq = log_var_pred  # This is log(variance) of the underlying normal
             
-            # Compute likelihood for each component
-            targets_expanded = targets.unsqueeze(1).expand(-1, self.num_components, -1)
-            component_nll = 0.5 * (torch.log(2 * np.pi * component_vars) + 
-                                  (targets_expanded - component_means) ** 2 / component_vars)
+            # Negative log-likelihood for log-normal distribution
+            # Note: log_runtime_targets are already log-transformed runtimes
+            nll = 0.5 * (np.log(2 * np.pi) + log_sigma_sq + 
+                        (log_runtime_targets - mu) ** 2 / torch.exp(log_sigma_sq))
             
-            # Weighted mixture likelihood
-            component_likelihood = torch.exp(-component_nll)
-            mixture_likelihood = torch.sum(mixture_weights.unsqueeze(-1) * component_likelihood, dim=1)
-            mixture_loss = -torch.mean(torch.log(mixture_likelihood + 1e-8))
-            
-            # Total loss
-            total_loss = nll_loss + self.mixture_loss_weight * mixture_loss
-            
-            return total_loss
+            return torch.mean(nll)
             
         def fit(self, X: pd.DataFrame, y: pd.DataFrame, sample_weight=None) -> "DistNet":
             """
-            Fit the DistNet model.
+            Fit the DistNet model to runtime data.
             
             Parameters
             ----------
             X : pd.DataFrame
-                Feature matrix
+                Feature matrix (algorithm/instance features)
             y : pd.DataFrame
-                Target values
+                Runtime values (will be log-transformed)
             sample_weight : optional
                 Sample weights (not supported)
                 
@@ -266,19 +214,31 @@ if TORCH_AVAILABLE:
                 Fitted predictor
             """
             if sample_weight is not None:
-                raise ValueError("Sample weights are not supported by DistNet")
+                warnings.warn("Sample weights are not supported by DistNet and will be ignored")
                 
             # Preprocess features
-            self.scaler = SimpleImputer(strategy='median')
-            X_processed = pd.DataFrame(
-                self.scaler.fit_transform(X),
+            self.feature_scaler = StandardScaler()
+            X_scaled = pd.DataFrame(
+                self.feature_scaler.fit_transform(X),
                 index=X.index,
                 columns=X.columns
             )
             
+            # Handle missing values
+            self.scaler = SimpleImputer(strategy='median')
+            X_processed = pd.DataFrame(
+                self.scaler.fit_transform(X_scaled),
+                index=X_scaled.index,
+                columns=X_scaled.columns
+            )
+            
+            # Log-transform runtime targets (typical for runtime distributions)
+            # Add small epsilon to handle zero runtimes
+            y_log = np.log(np.maximum(y.values.flatten(), 1e-6))
+            
             # Convert to tensors
             X_tensor = torch.FloatTensor(X_processed.values).to(self.device)
-            y_tensor = torch.FloatTensor(y.values.reshape(-1, 1)).to(self.device)
+            y_tensor = torch.FloatTensor(y_log.reshape(-1, 1)).to(self.device)
             
             # Create model
             if self.model is None:
@@ -300,8 +260,8 @@ if TORCH_AVAILABLE:
                 epoch_loss = 0.0
                 for batch_X, batch_y in dataloader:
                     self.optimizer.zero_grad()
-                    outputs = self.model(batch_X)
-                    loss = self._compute_loss(outputs, batch_y)
+                    log_mean_pred, log_var_pred = self.model(batch_X)
+                    loss = self._compute_loss(log_mean_pred, log_var_pred, batch_y)
                     loss.backward()
                     self.optimizer.step()
                     epoch_loss += loss.item()
@@ -322,7 +282,7 @@ if TORCH_AVAILABLE:
             
         def predict(self, X: pd.DataFrame) -> np.ndarray:
             """
-            Predict using the fitted model.
+            Predict runtime (point estimates).
             
             Parameters
             ----------
@@ -332,30 +292,37 @@ if TORCH_AVAILABLE:
             Returns
             -------
             predictions : np.ndarray
-                Predicted values (mean predictions)
+                Predicted runtime values (median of log-normal distribution)
             """
             if self.model is None:
                 raise ValueError("Model must be fitted before making predictions")
                 
             # Preprocess features
-            X_processed = pd.DataFrame(
-                self.scaler.transform(X),
+            X_scaled = pd.DataFrame(
+                self.feature_scaler.transform(X),
                 index=X.index,
                 columns=X.columns
+            )
+            X_processed = pd.DataFrame(
+                self.scaler.transform(X_scaled),
+                index=X_scaled.index,
+                columns=X_scaled.columns
             )
             
             X_tensor = torch.FloatTensor(X_processed.values).to(self.device)
             
             self.model.eval()
             with torch.no_grad():
-                outputs = self.model(X_tensor)
-                predictions = outputs['mean'].cpu().numpy().flatten()
+                log_mean_pred, log_var_pred = self.model(X_tensor)
                 
-            return predictions
+                # For log-normal distribution, median = exp(μ) where μ is the mean of log-space
+                median_runtime = torch.exp(log_mean_pred).cpu().numpy().flatten()
+                
+            return median_runtime
             
-        def predict_with_uncertainty(self, X: pd.DataFrame) -> Dict[str, np.ndarray]:
+        def predict_distribution(self, X: pd.DataFrame) -> Dict[str, np.ndarray]:
             """
-            Predict with uncertainty quantification.
+            Predict runtime distribution parameters.
             
             Parameters
             ----------
@@ -365,30 +332,51 @@ if TORCH_AVAILABLE:
             Returns
             -------
             results : dict
-                Dictionary containing 'mean', 'variance', and 'mixture_weights'
+                Dictionary containing 'mean', 'variance', 'median', 'std'
             """
             if self.model is None:
                 raise ValueError("Model must be fitted before making predictions")
                 
             # Preprocess features
-            X_processed = pd.DataFrame(
-                self.scaler.transform(X),
+            X_scaled = pd.DataFrame(
+                self.feature_scaler.transform(X),
                 index=X.index,
                 columns=X.columns
+            )
+            X_processed = pd.DataFrame(
+                self.scaler.transform(X_scaled),
+                index=X_scaled.index,
+                columns=X_scaled.columns
             )
             
             X_tensor = torch.FloatTensor(X_processed.values).to(self.device)
             
             self.model.eval()
             with torch.no_grad():
-                outputs = self.model(X_tensor)
+                log_mean_pred, log_var_pred = self.model(X_tensor)
+                
+                # Convert to numpy
+                mu = log_mean_pred.cpu().numpy().flatten()  # Mean in log-space
+                log_sigma_sq = log_var_pred.cpu().numpy().flatten()  # Log variance in log-space
+                sigma_sq = np.exp(log_sigma_sq)  # Variance in log-space
+                
+                # For log-normal distribution with log-space parameters μ and σ²:
+                # Mean = exp(μ + σ²/2)
+                # Variance = exp(2μ + σ²) * (exp(σ²) - 1)
+                # Median = exp(μ)
+                
+                runtime_mean = np.exp(mu + sigma_sq / 2)
+                runtime_variance = np.exp(2 * mu + sigma_sq) * (np.exp(sigma_sq) - 1)
+                runtime_median = np.exp(mu)
+                runtime_std = np.sqrt(runtime_variance)
                 
             return {
-                'mean': outputs['mean'].cpu().numpy().flatten(),
-                'variance': torch.exp(outputs['log_var']).cpu().numpy().flatten(),
-                'mixture_weights': outputs['mixture_weights'].cpu().numpy(),
-                'component_means': outputs['component_means'].cpu().numpy(),
-                'component_variances': torch.exp(outputs['component_log_vars']).cpu().numpy()
+                'mean': runtime_mean,
+                'variance': runtime_variance,
+                'median': runtime_median,
+                'std': runtime_std,
+                'log_mean': mu,
+                'log_variance': sigma_sq
             }
             
         def save(self, file_path: str) -> None:
@@ -400,13 +388,13 @@ if TORCH_AVAILABLE:
                 'model_state_dict': self.model.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'scaler': self.scaler,
+                'feature_scaler': self.feature_scaler,
                 'config': {
                     'hidden_sizes': self.hidden_sizes,
                     'dropout': self.dropout,
                     'activation': self.activation,
-                    'use_batch_norm': self.use_batch_norm,
-                    'num_components': self.num_components,
                     'learning_rate': self.learning_rate,
+                    'input_size': self.model.backbone[0].in_features,
                 }
             }, file_path)
             
@@ -417,17 +405,15 @@ if TORCH_AVAILABLE:
             # Restore configuration
             config = checkpoint['config']
             for key, value in config.items():
-                setattr(self, key, value)
-                
+                if key != 'input_size':
+                    setattr(self, key, value)
+                    
             # Create and load model
-            if self.model is None:
-                # We need input size, but it's not saved. This is a limitation.
-                raise ValueError("Cannot load model without knowing input size. "
-                               "Consider saving input size in the checkpoint.")
-                
+            self._create_model(config['input_size'])
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             self.scaler = checkpoint['scaler']
+            self.feature_scaler = checkpoint['feature_scaler']
             
         if CONFIGSPACE_AVAILABLE:
             @staticmethod
@@ -444,24 +430,20 @@ if TORCH_AVAILABLE:
                 prefix = f"{pre_prefix}:DistNet" if pre_prefix else "DistNet"
                 
                 # Network architecture parameters
-                hidden_size_1 = Integer(f"{prefix}:hidden_size_1", (64, 512), default=256, log=True)
-                hidden_size_2 = Integer(f"{prefix}:hidden_size_2", (32, 256), default=128, log=True)
-                hidden_size_3 = Integer(f"{prefix}:hidden_size_3", (16, 128), default=64, log=True)
+                hidden_size_1 = Integer(f"{prefix}:hidden_size_1", (32, 256), default=128, log=True)
+                hidden_size_2 = Integer(f"{prefix}:hidden_size_2", (16, 128), default=64, log=True)
+                hidden_size_3 = Integer(f"{prefix}:hidden_size_3", (8, 64), default=32, log=True)
                 
-                dropout = Float(f"{prefix}:dropout", (0.0, 0.5), default=0.2)
+                dropout = Float(f"{prefix}:dropout", (0.0, 0.3), default=0.1)
                 activation = Categorical(f"{prefix}:activation", ['relu', 'tanh', 'elu'], default='relu')
-                use_batch_norm = Categorical(f"{prefix}:use_batch_norm", [True, False], default=True)
-                num_components = Integer(f"{prefix}:num_components", (2, 10), default=5)
                 
                 # Training parameters
-                learning_rate = Float(f"{prefix}:learning_rate", (1e-5, 1e-1), default=1e-3, log=True)
-                batch_size = Integer(f"{prefix}:batch_size", (16, 256), default=64, log=True)
-                mixture_loss_weight = Float(f"{prefix}:mixture_loss_weight", (0.01, 1.0), default=0.1, log=True)
+                learning_rate = Float(f"{prefix}:learning_rate", (1e-5, 1e-2), default=1e-3, log=True)
+                batch_size = Integer(f"{prefix}:batch_size", (16, 128), default=64, log=True)
                 
                 params = [
                     hidden_size_1, hidden_size_2, hidden_size_3,
-                    dropout, activation, use_batch_norm, num_components,
-                    learning_rate, batch_size, mixture_loss_weight
+                    dropout, activation, learning_rate, batch_size
                 ]
                 
                 if parent_param is not None:
@@ -494,11 +476,8 @@ if TORCH_AVAILABLE:
                     ],
                     'dropout': configuration[f"{prefix}:dropout"],
                     'activation': configuration[f"{prefix}:activation"],
-                    'use_batch_norm': configuration[f"{prefix}:use_batch_norm"],
-                    'num_components': configuration[f"{prefix}:num_components"],
                     'learning_rate': configuration[f"{prefix}:learning_rate"],
                     'batch_size': configuration[f"{prefix}:batch_size"],
-                    'mixture_loss_weight': configuration[f"{prefix}:mixture_loss_weight"],
                     **kwargs
                 }
                 
@@ -508,16 +487,16 @@ else:
     # Placeholder when PyTorch is not available
     class DistNet:
         def __init__(self, *args, **kwargs):
-            raise ImportError("PyTorch is not available. Please install it to use DistNet.")
+            raise ImportError("PyTorch is not available. Please install it with: pip install torch")
             
         def fit(self, *args, **kwargs):
-            raise ImportError("PyTorch is not available. Please install it to use DistNet.")
+            raise ImportError("PyTorch is not available. Please install it with: pip install torch")
             
         def predict(self, *args, **kwargs):
-            raise ImportError("PyTorch is not available. Please install it to use DistNet.")
+            raise ImportError("PyTorch is not available. Please install it with: pip install torch")
             
         def save(self, *args, **kwargs):
-            raise ImportError("PyTorch is not available. Please install it to use DistNet.")
+            raise ImportError("PyTorch is not available. Please install it with: pip install torch")
             
         def load(self, *args, **kwargs):
-            raise ImportError("PyTorch is not available. Please install it to use DistNet.")
+            raise ImportError("PyTorch is not available. Please install it with: pip install torch")
