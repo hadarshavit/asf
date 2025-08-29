@@ -9,6 +9,8 @@ from asf.selectors import (
     SimpleRanking,
     JointRanking,
     SurvivalAnalysisSelector,
+    SNNAP,
+    ISAC,
 )
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from xgboost import XGBRanker
@@ -234,3 +236,35 @@ def test_selector_tuner(dummy_performance, dummy_features):
 
     # Clean up SMAC output directory if needed (optional)
     shutil.rmtree("./smac_test_output", ignore_errors=True)
+
+
+def test_snnap_voting(dummy_performance, dummy_features):
+    """Test SNNAP with voting strategy."""
+    selector = SNNAP(k=3, weight_strategy="distance", algorithm_selection_strategy="voting")
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+    validate_predictions(predictions)
+
+
+def test_snnap_best_performance(dummy_performance, dummy_features):
+    """Test SNNAP with best performance strategy."""
+    selector = SNNAP(k=5, weight_strategy="uniform", algorithm_selection_strategy="best_performance")
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+    validate_predictions(predictions)
+
+
+def test_isac_clustering(dummy_performance, dummy_features):
+    """Test ISAC with clustering mode."""
+    selector = ISAC(mode="clustering", n_clusters=5, distance_threshold=1.5)
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+    validate_predictions(predictions)
+
+
+def test_isac_regression(dummy_performance, dummy_features):
+    """Test ISAC with regression mode."""
+    selector = ISAC(mode="regression", fallback_strategy="best_overall")
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+    validate_predictions(predictions)
