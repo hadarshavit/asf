@@ -129,11 +129,6 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
         for i, algorithm in enumerate(self.algorithms):
             for j, other_algorithm in enumerate(self.algorithms[i + 1 :]):
                 prediction = self.classifiers[cnt].predict(features)
-                # Ensure prediction is a boolean Series with the correct index
-                if not isinstance(prediction, pd.Series):
-                    prediction = pd.Series(prediction, index=features.index)
-                if prediction.dtype != bool:
-                    prediction = prediction.astype(bool)
                 predictions_sum.loc[prediction, algorithm] += 1
                 predictions_sum.loc[~prediction, other_algorithm] += 1
                 cnt += 1
