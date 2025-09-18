@@ -16,7 +16,11 @@ import numpy as np
 import pandas as pd
 
 try:
-    from ConfigSpace import Categorical, ConfigurationSpace
+    from ConfigSpace import (
+        Categorical,
+        ConfigurationSpace,
+        UniformFloatHyperparameter,
+    )
     from smac import HyperparameterOptimizationFacade, Scenario
 
     CONFIGSPACE_AVAILABLE = True
@@ -39,8 +43,8 @@ def tune_selector(
     | AbstractSelector
     | list[tuple[AbstractSelector, dict]],
     selector_kwargs: dict = {},
-    preprocessing_class: TransformerMixin = None,
-    pre_solving: object = None,
+    preprocessing_class: list[TransformerMixin] = None,
+    pre_solving_class: list[object] = None,
     feature_selector: object = None,
     algorithm_pre_selector: object = None,
     budget: float = None,
@@ -66,7 +70,7 @@ def tune_selector(
         selector_space_kwargs (dict): Additional arguments for the selector's configuration space.
         selector_kwargs (dict): Additional arguments for the selector's instantiation.
         preprocessing_class (AbstractPreprocessor, optional): Preprocessing class to apply before selector. Defaults to None.
-        pre_solving (object, optional): Pre-solving strategy to use. Defaults to None.
+        pre_solving_class (object, optional): Pre-solving strategies to use. Defaults to None.
         feature_selector (object, optional): Feature selector to use. Defaults to None.
         algorithm_pre_selector (object, optional): Algorithm pre-selector to use. Defaults to None.
         budget (float, optional): Budget for the selector. Defaults to None.
@@ -88,12 +92,19 @@ def tune_selector(
     assert CONFIGSPACE_AVAILABLE, (
         "SMAC is not installed. Please install it to use this function via pip install asf-lib[tune]."
     )
+
+    if pre_solving_class is not None and len(pre_solving_class) > 0 and budget is None:
+        raise ValueError(
+            "If pre_solving_class is provided, you must also provide a budget."
+        )
+
     if type(selector_class) is not list:
         selector_class = [selector_class]
 
     cs = ConfigurationSpace()
     cs_transform = {}
 
+    # Add selectors to configuration space
     if type(selector_class[0]) is tuple:
         selector_param = Categorical(
             name="selector",
@@ -123,6 +134,36 @@ def tune_selector(
             **selector_space_kwargs,
         )
 
+    # Add pre-solving and budget to configuration space
+    if pre_solving_class is not None and len(pre_solving_class) > 0:
+        presolver_param = Categorical(
+            name="presolver",
+            items=[str(type(p).__name__) for p in pre_solving_class],
+        )
+        cs_transform["presolver"] = {
+            str(type(p).__name__): p for p in pre_solving_class
+        }
+        cs.add(presolver_param)
+        # Budget for presolver (fraction of total budget)
+        presolver_budget_param = UniformFloatHyperparameter(
+            name="presolver_budget",
+            lower=0.0,
+            upper=1.0,
+            default_value=0.2,
+        )
+        cs.add(presolver_budget_param)
+
+    # Add preprocessors to configuration spaces
+    if preprocessing_class is not None and len(preprocessing_class) > 0:
+        # Use a multi-categorical: for each preprocessor, a boolean flag
+        for i, preproc in enumerate(preprocessing_class):
+            preproc_param = Categorical(
+                name=f"preprocessor_{i}",
+                items=["off", "on"],
+            )
+            cs.add(preproc_param)
+        cs_transform["preprocessors"] = preprocessing_class
+
     scenario = Scenario(
         configspace=cs,
         n_trials=runcount_limit,
@@ -144,19 +185,42 @@ def tune_selector(
             X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
             y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
+            # Preprocessor selection
+            preprocessors = None
+            if "preprocessors" in cs_transform:
+                preprocessors = []
+                for i, preproc in enumerate(cs_transform["preprocessors"]):
+                    if config.get(f"preprocessor_{i}", "off") == "on":
+                        preprocessors.append(preproc)
+                if len(preprocessors) == 0:
+                    preprocessors = None
+
+            # Presolver selection and budget
+            presolver = None
+            presolver_budget = None
+            if "presolver" in cs_transform:
+                presolver = cs_transform["presolver"][config["presolver"]]
+                presolver_budget = (
+                    config["presolver_budget"] * budget if budget is not None else None
+                )
+                if presolver is not None and presolver_budget is not None:
+                    setattr(presolver, "budget", presolver_budget)
+
             selector = SelectorPipeline(
                 selector=cs_transform["selector"][
                     config["selector"]
                 ].get_from_configuration(
                     config,
                     cs_transform,
-                    budget=budget,
+                    budget=(budget - presolver_budget)
+                    if presolver_budget is not None
+                    else budget,
                     maximize=maximize,
                     feature_groups=feature_groups,
                     **selector_kwargs,
                 ),
-                preprocessor=preprocessing_class,
-                pre_solving=pre_solving,
+                preprocessor=preprocessors,
+                pre_solving=presolver,
                 feature_selector=feature_selector,
                 algorithm_pre_selector=algorithm_pre_selector,
                 budget=budget,
@@ -175,19 +239,41 @@ def tune_selector(
     best_config = smac.optimize()
 
     del smac  # clean up SMAC to free memory and delete dask client
+
+    # Final pipeline construction
+    preprocessors = None
+    if "preprocessors" in cs_transform:
+        preprocessors = []
+        for i, preproc in enumerate(cs_transform["preprocessors"]):
+            if best_config.get(f"preprocessor_{i}", "off") == "on":
+                preprocessors.append(preproc)
+        if len(preprocessors) == 0:
+            preprocessors = None
+
+    presolver = None
+    presolver_budget = None
+    if "presolver" in cs_transform:
+        presolver = cs_transform["presolver"][best_config["presolver"]]
+        presolver_budget = (
+            best_config["presolver_budget"] * budget if budget is not None else None
+        )
+        setattr(presolver, "budget", presolver_budget)
+
     return SelectorPipeline(
         selector=cs_transform["selector"][
             best_config["selector"]
         ].get_from_configuration(
             best_config,
             cs_transform,
-            budget=budget,
+            budget=(budget - presolver_budget)
+            if presolver_budget is not None
+            else budget,
             maximize=maximize,
             feature_groups=feature_groups,
             **selector_kwargs,
         ),
-        preprocessor=preprocessing_class,
-        pre_solving=pre_solving,
+        preprocessor=preprocessors,
+        pre_solving=presolver,
         feature_selector=feature_selector,
         algorithm_pre_selector=algorithm_pre_selector,
         budget=budget,

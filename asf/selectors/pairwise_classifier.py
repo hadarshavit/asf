@@ -76,6 +76,9 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
                 else:
                     diffs = algo1_times < algo2_times
 
+                # Ensure diffs are integers (0/1), not boolean
+                diffs = diffs.astype(int)
+
                 cur_model = self.model_class()
                 cur_model.fit(
                     features,
@@ -100,8 +103,7 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
             Example: {instance_name: [(algorithm_name, budget)]}
         """
         predictions_sum = self.generate_features(features)
-
-        return {
+        result = {
             instance_name: [
                 (
                     predictions_sum.loc[instance_name].idxmax(),
@@ -110,6 +112,7 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
             ]
             for i, instance_name in enumerate(features.index)
         }
+        return result
 
     def generate_features(self, features: pd.DataFrame) -> pd.DataFrame:
         """
@@ -126,6 +129,11 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
         for i, algorithm in enumerate(self.algorithms):
             for j, other_algorithm in enumerate(self.algorithms[i + 1 :]):
                 prediction = self.classifiers[cnt].predict(features)
+                # Ensure prediction is a boolean Series with the correct index
+                if not isinstance(prediction, pd.Series):
+                    prediction = pd.Series(prediction, index=features.index)
+                if prediction.dtype != bool:
+                    prediction = prediction.astype(bool)
                 predictions_sum.loc[prediction, algorithm] += 1
                 predictions_sum.loc[~prediction, other_algorithm] += 1
                 cnt += 1

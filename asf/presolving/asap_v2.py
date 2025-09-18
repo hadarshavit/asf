@@ -43,7 +43,6 @@ class ASAPv2(AbstractPresolver):
 
     def fit(self, features: pd.DataFrame, performance: pd.DataFrame):
         """Train the ASAP v2 presolver"""
-
         # Convert to DataFrame if needed
         if isinstance(features, np.ndarray):
             features = pd.DataFrame(features)

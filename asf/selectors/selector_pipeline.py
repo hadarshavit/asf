@@ -1,6 +1,9 @@
 from typing import Optional, Callable, Any
 from asf.selectors.abstract_selector import AbstractSelector
 from asf.presolving.presolver import AbstractPresolver
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+import pandas as pd
 
 
 class SelectorPipeline:
@@ -22,7 +25,7 @@ class SelectorPipeline:
     def __init__(
         self,
         selector: AbstractSelector,
-        preprocessor: Optional[Callable] = None,
+        preprocessor: Optional[Any] = None,
         pre_solving: AbstractPresolver = None,
         feature_selector: Optional[Callable] = None,
         algorithm_pre_selector: Optional[Callable] = None,
@@ -44,12 +47,24 @@ class SelectorPipeline:
             feature_groups (Optional[Any], optional): Feature groups to be used by the selector. Defaults to None.
         """
         self.selector = selector
-        self.preprocessor = preprocessor
         self.pre_solving = pre_solving
         self.feature_selector = feature_selector
         self.algorithm_pre_selector = algorithm_pre_selector
         self.budget = budget
         self.maximize = maximize
+
+        # Always include SimpleImputer as the first step in the preprocessing pipeline
+        if preprocessor is None:
+            preprocessor = []
+        elif not isinstance(preprocessor, list):
+            preprocessor = [preprocessor]
+        preprocessor = [SimpleImputer(strategy="mean")] + preprocessor
+        steps = [(type(p).__name__, p) for p in preprocessor]
+        self.preprocessor = Pipeline(steps)
+        self.preprocessor.set_output(transform="pandas")
+
+        self._orig_columns = None
+        self._orig_index = None
 
     def fit(self, X: Any, y: Any) -> None:
         """
@@ -59,6 +74,10 @@ class SelectorPipeline:
             X (Any): The input features.
             y (Any): The target labels.
         """
+        if isinstance(X, pd.DataFrame):
+            self._orig_columns = X.columns
+            self._orig_index = X.index
+
         if self.preprocessor:
             X = self.preprocessor.fit_transform(X)
 
@@ -73,7 +92,7 @@ class SelectorPipeline:
 
         self.selector.fit(X, y)
 
-    def predict(self, X: Any) -> Any:
+    def predict(self, X: Any) -> dict:
         """
         Makes predictions using the fitted pipeline.
 
@@ -88,21 +107,20 @@ class SelectorPipeline:
 
         scheds = None
         if self.pre_solving:
-            scheds = self.pre_solving.predict()
+            scheds = self.pre_solving.predict(X)
 
         if self.feature_selector:
             X = self.feature_selector.transform(X)
 
         predictions = self.selector.predict(X)
 
-        # Prepend pre-solver schedule to each instance's schedule
-        if isinstance(predictions, dict) and scheds is not None:
+        # Ensure predictions use the same index as X
+        predictions = pd.Series(predictions, index=X.index)
+        if scheds is not None:
             for instance_id, pre_schedule in scheds.items():
                 if instance_id in predictions:
                     predictions[instance_id] = pre_schedule + predictions[instance_id]
-            return predictions
-        else:
-            return predictions
+        return predictions.to_dict()
 
     def save(self, path: str) -> None:
         """
@@ -129,3 +147,50 @@ class SelectorPipeline:
         import joblib
 
         return joblib.load(path)
+
+    def get_config(self) -> dict:
+        """
+        Returns a dictionary with the configuration of the pipeline.
+
+        Returns:
+            dict: Configuration details of the pipeline.
+        """
+
+        def get_model_class_name(selector):
+            if hasattr(selector, "model_class"):
+                mc = selector.model_class
+                # Handle functools.partial
+                if hasattr(mc, "func"):
+                    return mc.func.__name__
+                elif hasattr(mc, "__name__"):
+                    return mc.__name__
+                else:
+                    return str(type(mc))
+            return None
+
+        config = {
+            "budget": self.budget,
+            "selector": type(self.selector).__name__,
+            "selector_model": get_model_class_name(self.selector),
+            "pre_solving": type(self.pre_solving).__name__
+            if self.pre_solving
+            else None,
+            "presolving_budget": getattr(self.pre_solving, "budget", None)
+            if self.pre_solving
+            else None,
+            "preprocessor": type(self.preprocessor).__name__
+            if self.preprocessor
+            else None,
+            "preprocessor_steps": [
+                type(step[1]).__name__ for step in self.preprocessor.steps
+            ]
+            if hasattr(self.preprocessor, "steps")
+            else None,
+            "feature_selector": type(self.feature_selector).__name__
+            if self.feature_selector
+            else None,
+            "algorithm_pre_selector": type(self.algorithm_pre_selector).__name__
+            if self.algorithm_pre_selector
+            else None,
+        }
+        return config
