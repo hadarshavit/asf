@@ -5,4 +5,5 @@ from asf.presolving.presolver import AbstractPresolver
 __all__ = [
     "Aspeed",
     "AbstractPresolver",
+    "ASAPv2",
 ]
