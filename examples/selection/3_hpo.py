@@ -1,6 +1,9 @@
-from asf.selectors import PairwiseClassifier, PairwiseRegressor
+from asf.selectors import PairwiseClassifier, PairwiseRegressor, tune_selector
 from asf.predictors import SVMRegressorWrapper, SVMClassifierWrapper
-from asf.selectors import tune_selector
+from asf.presolving.asap_v2 import ASAPv2
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, PowerTransformer
+import asf.scenario.aslib_reader as aslib_reader
+
 import pandas as pd
 import numpy as np
 
@@ -65,21 +68,32 @@ if __name__ == "__main__":
     # Load the data
     features, performance = get_data()
 
+    preprocessors = [StandardScaler(), MinMaxScaler(), PowerTransformer()]
+    presolvers = [ASAPv2()]
+
     selector = tune_selector(
         features,
         performance,
         selector_class=[PairwiseClassifier, PairwiseRegressor],
         budget=5000,
         runcount_limit=10,
+        preprocessing_class=preprocessors,
+        pre_solving_class=presolvers,
     )
+
+    print("\nSelector Pipeline Configuration:")
+    config = selector.get_config()
+    print(config)
+    print()
 
     # Fit the selector to the data
     selector.fit(features, performance)
-
     predictions = selector.predict(features)
 
     # Print the predictions
-    print(predictions)
+    for idx, sched in predictions.items():
+        print(f"Instance {idx}, Schedule: {sched}")
+    print()
 
     # Load the data
     features, performance = get_data()
@@ -94,12 +108,73 @@ if __name__ == "__main__":
         ],
         budget=5000,
         runcount_limit=10,
+        preprocessing_class=preprocessors,
+        pre_solving_class=presolvers,
     )
+
+    print("\nSelector Pipeline Configuration:")
+    config = selector.get_config()
+    print(config)
+    print()
 
     # Fit the selector to the data
     selector.fit(features, performance)
-
     predictions = selector.predict(features)
 
     # Print the predictions
-    print(predictions)
+    for idx, sched in predictions.items():
+        print(f"Instance {idx}, Schedule: {sched}")
+
+    # Use ASLIB
+    scenario_path = None
+    if scenario_path is not None:
+        print("Using ASLIB scenario")
+        (
+            features,
+            performance,
+            features_running_time,
+            cv,
+            feature_groups,
+            maximize,
+            budget,
+        ) = aslib_reader.read_aslib_scenario(scenario_path)
+
+        # Subsample for speed (first 100 instances, first 3 algorithms, first 10 features)
+        # features = features.iloc[:100, :10]
+        # performance = performance.iloc[:100, :3]
+        # if features_running_time is not None:
+        #     features_running_time = features_running_time.iloc[:100, :10]
+        # if cv is not None:
+        #     cv = cv.iloc[:100]
+
+        print(f"Number of instances: {performance.shape[0]}")
+        print(f"Number of algorithms: {performance.shape[1]}")
+        print(f"Number of features: {features.shape[1]}")
+
+        # Setting configuration space manually
+        selector = tune_selector(
+            features,
+            performance,
+            selector_class=[
+                (PairwiseRegressor, {"model_class": [SVMRegressorWrapper]}),
+            ],
+            budget=budget,
+            runcount_limit=10,
+            preprocessing_class=preprocessors,
+            pre_solving_class=presolvers,
+        )
+
+        print("\nSelector Pipeline Configuration:")
+        config = selector.get_config()
+        print(config)
+        print()
+
+        # Fit the selector to the data
+        selector.fit(features, performance)
+        predictions = selector.predict(features)
+
+        # Print the predictions
+        for i, (idx, sched) in enumerate(predictions.items()):
+            if i >= 10:
+                break
+            print(f"Instance {idx}, Schedule: {sched} \n")
