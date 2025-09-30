@@ -141,7 +141,6 @@ class AbstractSelector:
             return self._predict(features)
         else:
             return self._predict(features, performance)
-    
 
     def save(self, path: str) -> None:
         """

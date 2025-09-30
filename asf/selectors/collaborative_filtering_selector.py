@@ -5,9 +5,12 @@ from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelect
 from sklearn.linear_model import Ridge
 from sklearn.preprocessing import StandardScaler
 
+
 class _DummyModel:
     """Dummy model class to satisfy AbstractModelBasedSelector requirements."""
+
     pass
+
 
 class CollaborativeFilteringSelector(AbstractModelBasedSelector):
     """
@@ -49,9 +52,9 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
         self.scaler = None  # Add scaler attribute
 
         # Bias terms
-        self.mu = None      # Global mean
-        self.b_U = None     # Instance biases
-        self.b_V = None     # Algorithm biases
+        self.mu = None  # Global mean
+        self.b_U = None  # Instance biases
+        self.b_V = None  # Algorithm biases
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
         """
@@ -85,7 +88,9 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
         for it in range(self.n_iter):
             for i, j in zip(rows, cols):
                 r_ij = performance.values[i, j]
-                pred = self.mu + self.b_U[i] + self.b_V[j] + np.dot(self.U[i], self.V[j])
+                pred = (
+                    self.mu + self.b_U[i] + self.b_V[j] + np.dot(self.U[i], self.V[j])
+                )
                 if np.isnan(r_ij) or np.isnan(pred):
                     continue
                 err = r_ij - pred
@@ -125,7 +130,7 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
     def _predict(
         self,
         features: Optional[pd.DataFrame] = None,
-        performance: Optional[pd.DataFrame] = None
+        performance: Optional[pd.DataFrame] = None,
     ) -> Dict[str, List[Tuple[str, float]]]:
         """
         Predicts the best algorithm for instances according to the scenario described.
@@ -137,7 +142,9 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
 
         # Case 1: Return best algorithm for training instances
         if features is None and performance is None:
-            pred_matrix = self.mu + self.b_U[:, None] + self.b_V[None, :] + (self.U @ self.V.T)
+            pred_matrix = (
+                self.mu + self.b_U[:, None] + self.b_V[None, :] + (self.U @ self.V.T)
+            )
             for idx, instance in enumerate(self.performance_matrix.index):
                 scores = np.asarray(pred_matrix[idx]).flatten()
                 best_idx = np.argmin(scores)
@@ -189,7 +196,9 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
         if features is not None and performance is None:
             for instance in features.index:
                 instance_features = features.loc[instance]
-                best_algo, best_score = self._predict_cold_start(instance_features, instance)
+                best_algo, best_score = self._predict_cold_start(
+                    instance_features, instance
+                )
                 predictions[instance] = [(best_algo, best_score)]
             return predictions
 
