@@ -4,6 +4,8 @@ from asf.selectors.feature_generator import (
 )
 import numpy as np
 
+from typing import Optional
+
 try:
     from ConfigSpace import ConfigurationSpace, Categorical, Configuration
 
@@ -111,7 +113,9 @@ class AbstractSelector:
         self.algorithm_features = algorithm_features
         self._fit(features, performance, **kwargs)
 
-    def predict(self, features: pd.DataFrame) -> dict[str, list[tuple[str, float]]]:
+    def predict(
+        self, features: pd.DataFrame, performance: Optional[pd.DataFrame] = None
+    ) -> dict[str, list[tuple[str, float]]]:
         """
         Predict the ranking or selection of features for the given input features.
 
@@ -119,6 +123,8 @@ class AbstractSelector:
         ----------
         features : pd.DataFrame
             The input features for prediction.
+        performance : pd.DataFrame or None, optional
+            The (partial) performance data corresponding to the features, if applicable. Defaults to None.
 
         Returns
         -------
@@ -131,7 +137,11 @@ class AbstractSelector:
                 [features, self.hierarchical_generator.generate_features(features)],
                 axis=1,
             )
-        return self._predict(features)
+        if performance is None:
+            return self._predict(features)
+        else:
+            return self._predict(features, performance)
+    
 
     def save(self, path: str) -> None:
         """
