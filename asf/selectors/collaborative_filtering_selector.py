@@ -48,6 +48,11 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
         self.feature_names = []
         self.scaler = None  # Add scaler attribute
 
+        # Bias terms
+        self.mu = None      # Global mean
+        self.b_U = None     # Instance biases
+        self.b_V = None     # Algorithm biases
+
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
         """
         Fits the collaborative filtering model to the given data.
@@ -69,17 +74,28 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
         observed = ~performance.isna()
         rows, cols = np.where(observed.values)
 
-        # SGD optimization
+        # --- Bias initialization ---
+        # Global mean from observed entries
+        self.mu = np.nanmean(performance.values)
+        # Instance and algorithm biases
+        self.b_U = np.zeros(n_instances)
+        self.b_V = np.zeros(n_algorithms)
+
+        # SGD optimization with bias terms
         for it in range(self.n_iter):
             for i, j in zip(rows, cols):
                 r_ij = performance.values[i, j]
-                pred = np.dot(self.U[i], self.V[j])
+                pred = self.mu + self.b_U[i] + self.b_V[j] + np.dot(self.U[i], self.V[j])
                 if np.isnan(r_ij) or np.isnan(pred):
                     continue
                 err = r_ij - pred
                 err = np.clip(err, -10, 10)
+                # Update latent factors
                 self.U[i] += self.lr * (err * self.V[j] - self.reg * self.U[i])
                 self.V[j] += self.lr * (err * self.U[i] - self.reg * self.V[j])
+                # Update biases with L2 regularization
+                self.b_U[i] += self.lr * (err - self.reg * self.b_U[i])
+                self.b_V[j] += self.lr * (err - self.reg * self.b_V[j])
 
         # Cold-start feature mapper training with standardized features
         self.scaler = StandardScaler()
@@ -87,6 +103,24 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
         self.feature_mapper = Ridge(alpha=1.0)
         self.feature_mapper.fit(X_scaled, self.U)
         self.feature_names = list(features.columns)
+
+    def _predict_cold_start(
+        self, instance_features: pd.Series, instance_name: str
+    ) -> Tuple[str, float]:
+        """
+        Predict the best algorithm for a single instance using only its features (cold-start).
+        """
+        # Align and scale features
+        X = instance_features[self.feature_names].values.reshape(1, -1)
+        X_scaled = self.scaler.transform(X)
+        U_new = self.feature_mapper.predict(X_scaled)
+        # Compute scores with global and algorithm bias
+        scores = self.mu + self.b_V + np.dot(U_new, self.V.T).flatten()
+        scores = np.asarray(scores).flatten()
+        best_idx = np.argmin(scores)
+        best_algo = self.algorithms[best_idx]
+        best_score = scores[best_idx]
+        return best_algo, best_score
 
     def _predict(
         self,
@@ -103,8 +137,9 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
 
         # Case 1: Return best algorithm for training instances
         if features is None and performance is None:
+            pred_matrix = self.mu + self.b_U[:, None] + self.b_V[None, :] + (self.U @ self.V.T)
             for idx, instance in enumerate(self.performance_matrix.index):
-                scores = np.dot(self.U[idx], self.V.T)
+                scores = np.asarray(pred_matrix[idx]).flatten()
                 best_idx = np.argmin(scores)
                 best_algo = self.algorithms[best_idx]
                 best_score = scores[best_idx]
@@ -118,38 +153,43 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
                 if not perf_row.isnull().all():
                     # Infer latent factors for this instance using observed entries
                     u = np.random.normal(scale=0.1, size=(self.n_components,))
-                    observed_algos = ~perf_row.isnull()
                     for _ in range(20):  # few SGD steps
                         for j, algo in enumerate(self.algorithms):
-                            if observed_algos[algo]:
+                            if not pd.isna(perf_row[algo]):
                                 r_ij = perf_row[algo]
-                                pred = np.dot(u, self.V[j])
+                                pred = self.mu + self.b_V[j] + np.dot(u, self.V[j])
                                 err = r_ij - pred
                                 u += self.lr * (err * self.V[j] - self.reg * u)
-                    scores = np.dot(u, self.V.T)
+                    scores = self.mu + self.b_V[None, :] + np.dot(u, self.V.T)
+                    scores = np.asarray(scores).flatten()
+                    best_idx = np.argmin(scores)
+                    best_algo = self.algorithms[best_idx]
+                    best_score = scores[best_idx]
+                    predictions[instance] = [(best_algo, best_score)]
                 else:
-                    # No observed performance, fallback to average
-                    avg_scores = self.performance_matrix.mean()
-                    scores = avg_scores.values
-
-                best_idx = np.argmin(scores)
-                best_algo = self.algorithms[best_idx]
-                best_score = scores[best_idx]
-                predictions[instance] = [(best_algo, best_score)]
+                    # True cold-start within the warm-start batch: use features if available
+                    if features is None:
+                        # Fallback to average if no features are available
+                        avg_scores = self.performance_matrix.mean()
+                        scores = np.asarray(avg_scores.values).flatten()
+                        best_idx = np.argmin(scores)
+                        best_algo = self.algorithms[best_idx]
+                        best_score = scores[best_idx]
+                        predictions[instance] = [(best_algo, best_score)]
+                    else:
+                        instance_features = features.loc[instance]
+                        best_algo, best_score = self._predict_cold_start(
+                            instance_features, instance
+                        )
+                        predictions[instance] = [(best_algo, best_score)]
+                    continue
             return predictions
 
         # Case 3: Features is not None, Performance is None (cold start)
         if features is not None and performance is None:
-            # Align features to training column order
-            X = features[self.feature_names].values
-            X_scaled = self.scaler.transform(X)
-            U_new = self.feature_mapper.predict(X_scaled)
-            pred_matrix = U_new @ self.V.T
-            for idx, instance in enumerate(features.index):
-                scores = pred_matrix[idx]
-                best_idx = np.argmin(scores)
-                best_algo = self.algorithms[best_idx]
-                best_score = scores[best_idx]
+            for instance in features.index:
+                instance_features = features.loc[instance]
+                best_algo, best_score = self._predict_cold_start(instance_features, instance)
                 predictions[instance] = [(best_algo, best_score)]
             return predictions
 
