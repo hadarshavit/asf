@@ -6,7 +6,7 @@ try:
     from sksurv.util import Surv
 
     SKSURV_AVAIL = True
-except ImportError as e:
+except ImportError:
     SKSURV_AVAIL = False
 
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector

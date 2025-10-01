@@ -29,6 +29,7 @@ from asf.predictors import (
     RegressionMLP,
 )
 import shutil
+from asf.selectors.collaborative_filtering_selector import CollaborativeFilteringSelector
 
 
 @pytest.fixture
@@ -208,6 +209,29 @@ def test_survival_analysis(dummy_performance, dummy_features):
     selector = SurvivalAnalysisSelector(cutoff_time=450.0)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
+    validate_predictions(predictions)
+
+
+def test_collaborative_filtering_selector(dummy_performance, dummy_features):
+    # Insert some NaNs into the performance matrix to simulate missing data
+    perf = dummy_performance.copy()
+    np.random.seed(42)
+    nan_mask = np.random.rand(*perf.shape) < 0.2
+    perf[nan_mask] = np.nan
+
+    selector = CollaborativeFilteringSelector(n_components=3, n_iter=100, lr=0.01, reg=0.1)
+    selector.fit(dummy_features, perf)
+
+    # Validate predictions on training set
+    predictions = selector.predict(None, None)
+    validate_predictions(predictions)
+
+    # Validate predictions with sparse performance matrix
+    predictions = selector.predict(None, perf)
+    validate_predictions(predictions)
+
+    # Validate cold start predictions (features only)
+    predictions = selector.predict(dummy_features, None)
     validate_predictions(predictions)
 
 

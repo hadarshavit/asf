@@ -155,11 +155,12 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
 
         # Case 2: Performance is not None (ALORS-style prediction for new instances)
         if performance is not None:
+            rng = np.random.RandomState(self.random_state)
             for i, instance in enumerate(performance.index):
                 perf_row = performance.loc[instance]
                 if not perf_row.isnull().all():
                     # Infer latent factors for this instance using observed entries
-                    u = np.random.normal(scale=0.1, size=(self.n_components,))
+                    u = rng.normal(scale=0.1, size=(self.n_components,))
                     for _ in range(20):  # few SGD steps
                         for j, algo in enumerate(self.algorithms):
                             if not pd.isna(perf_row[algo]):
