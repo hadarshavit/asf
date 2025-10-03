@@ -1,5 +1,7 @@
 import pandas as pd
 from typing import Dict, List, Tuple, Optional, Union
+import warnings
+import numpy as np
 
 
 def single_best_solver(performance: pd.DataFrame, maximize: bool = False) -> float:
@@ -125,3 +127,38 @@ def running_time_closed_gap(
     )
 
     return (sbs_val - s_val) / (sbs_val - vbs_val)
+
+
+def precision_regret(
+    schedules: dict[str, list[tuple[str, float]]],
+    performance: pd.DataFrame,
+    precision_data: pd.DataFrame = None,
+    **kwargs,
+) -> float:
+    """
+    Computes the sum of regrets for the given schedules based on the provided performance data.
+
+    Args:
+        schedules (dict): selector predictions: instance_id → [(algorithm, budget)]
+        performance (pd.DataFrame): ground-truth precision table
+
+    Returns:
+        float: sum of regrets for the given schedules
+    """
+    regrets = []
+    for instance, schedule in schedules.items():
+        if not schedule or instance not in performance.index:
+            continue
+        selected_algo, _ = schedule[0]
+        if selected_algo not in performance.columns:
+            continue
+        if precision_data is not None:
+            selector_precision = precision_data.loc[instance, selected_algo]
+        else:
+            selector_precision = performance.loc[instance, selected_algo]
+        regret = selector_precision
+        regrets.append(regret)
+    if len(regrets) == 0:
+        warnings.warn("No valid schedules found for regret calculation.")
+        return float("inf")
+    return float(np.sum(regrets))

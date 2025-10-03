@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import inspect
 from typing import Type, List, Dict, Union
-
+from asf.predictors import RandomForestRegressorWrapper
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 from asf.selectors.feature_generator import AbstractFeatureGenerator
 
@@ -105,7 +105,6 @@ class PerformanceModel(AbstractModelBasedSelector, AbstractFeatureGenerator):
         Returns:
             Dict[str, List[tuple]]: A dictionary mapping instance names to the predicted best algorithm
             and the associated budget.
-            Example: {instance_name: [(algorithm_name, budget)]}
         """
         predictions = self.generate_features(features)
 
@@ -154,3 +153,47 @@ class PerformanceModel(AbstractModelBasedSelector, AbstractFeatureGenerator):
                     predictions[:, i] = prediction
 
         return predictions
+
+    @classmethod
+    def get_configuration_space(
+        cls, cs, cs_transform, parent_param, parent_value, **kwargs
+    ):
+        """
+        Adds the configuration space for the PerformanceModel using RandomForestRegressorWrapper.
+        """
+        cs = RandomForestRegressorWrapper.get_configuration_space(
+            cs=cs,
+            pre_prefix=cls.__name__,
+            parent_param=parent_param,
+            parent_value=parent_value,
+        )
+
+        def constructor(config, cs_transform, **init_kwargs):
+            # Make sure that the random forests get random state from the init_kwargs for reproducibility
+            model_init_args = {
+                k: init_kwargs[k] for k in ["random_state"] if k in init_kwargs
+            }
+
+            # Build model constructor with model-related kwargs
+            model_constructor = RandomForestRegressorWrapper.get_from_configuration(
+                config, pre_prefix=cls.__name__, **model_init_args
+            )
+
+            # Only pass the kwargs intended for PerformanceModel init (not model-specific)
+            model_related_keys = ["random_state"]
+            selector_kwargs = {
+                k: v for k, v in init_kwargs.items() if k not in model_related_keys
+            }
+
+            return cls(model_class=model_constructor, **selector_kwargs)
+
+        cs_transform[parent_value] = constructor
+        return cs, cs_transform
+
+    @classmethod
+    def get_from_configuration(cls, config, cs_transform, **kwargs):
+        """
+        Instantiates the PerformanceModel from a ConfigSpace configuration.
+        """
+        constructor = cs_transform[str(cls.__name__)]
+        return constructor(config, cs_transform, **kwargs)
