@@ -1,16 +1,12 @@
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Optional
-from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
+from asf.selectors.abstract_model_based_selector import AbstractSelector
 from sklearn.neighbors import NearestNeighbors
 from sklearn.model_selection import KFold
 
 
-class _DummyModel:
-    pass
-
-
-class SunnySelector(AbstractModelBasedSelector):
+class SunnySelector(AbstractSelector):
     """
     SUNNY/SUNNY-AS2 algorithm selector.
 
@@ -21,8 +17,9 @@ class SunnySelector(AbstractModelBasedSelector):
         self,
         k: int = 10,
         use_v2: bool = False,
-        budget: float = 200.0,
         random_state: int = 42,
+        n_folds: int = 5,
+        k_candidates: list[int] = [3, 5, 7, 10, 20, 50],
         **kwargs,
     ):
         """
@@ -35,15 +32,15 @@ class SunnySelector(AbstractModelBasedSelector):
             random_state (int): Random seed.
             **kwargs: Additional arguments for the parent class.
         """
-        super().__init__(model_class=_DummyModel, **kwargs)
+        super().__init__(**kwargs)
         self.k = k
         self.use_v2 = use_v2
         self.random_state = random_state
-        self.budget = budget
         self.features = None
         self.performance = None
-        self.algorithms = []
-        self.nn_model = None
+        self.knn = None
+        self.n_folds = n_folds
+        self.k_candidates = k_candidates
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
         """
@@ -60,18 +57,17 @@ class SunnySelector(AbstractModelBasedSelector):
         perf = performance.copy()
         perf[perf > self.budget] = np.nan
         self.performance = perf
-        self.algorithms = list(perf.columns)
 
         # SUNNY-AS2: tune k using cross-validation if requested
         if self.use_v2:
-            K_CANDIDATES = [3, 5, 7, 10, 20, 50]
-            N_FOLDS = 5
             best_k = self.k
             best_score = float("inf")
-            kf = KFold(n_splits=N_FOLDS, shuffle=True, random_state=self.random_state)
+            kf = KFold(
+                n_splits=self.n_folds, shuffle=True, random_state=self.random_state
+            )
             instance_indices = np.arange(len(self.features))
 
-            for candidate_k in K_CANDIDATES:
+            for candidate_k in self.k_candidates:
                 fold_scores = []
                 for train_idx, val_idx in kf.split(instance_indices):
                     train_features = self.features.iloc[train_idx]
@@ -79,18 +75,18 @@ class SunnySelector(AbstractModelBasedSelector):
                     val_features = self.features.iloc[val_idx]
                     val_perf = self.performance.iloc[val_idx]
 
-                    nn_model = NearestNeighbors(
+                    knn = NearestNeighbors(
                         n_neighbors=min(candidate_k, len(train_features)),
                         metric="euclidean",
                     )
-                    nn_model.fit(train_features.values)
+                    knn.fit(train_features.values)
 
                     # For each validation instance, get schedule and compute achieved runtime
                     total_runtime = 0.0
                     n_instances = 0
                     for idx, instance in enumerate(val_features.index):
                         x = val_features.loc[instance].values.reshape(1, -1)
-                        dists, neighbor_idxs = nn_model.kneighbors(
+                        dists, neighbor_idxs = knn.kneighbors(
                             x, n_neighbors=min(candidate_k, len(train_features))
                         )
                         neighbor_idxs = neighbor_idxs.flatten()
@@ -123,10 +119,10 @@ class SunnySelector(AbstractModelBasedSelector):
             self.k = best_k
 
         # Fit final model with optimal k
-        self.nn_model = NearestNeighbors(
+        self.knn = NearestNeighbors(
             n_neighbors=min(self.k, len(self.features)), metric="euclidean"
         )
-        self.nn_model.fit(self.features.values)
+        self.knn.fit(self.features.values)
 
     def _mine_solvers(
         self,
@@ -268,7 +264,7 @@ class SunnySelector(AbstractModelBasedSelector):
         predictions = {}
         for idx, instance in enumerate(features.index):
             x = features.loc[instance].values.reshape(1, -1)
-            dists, neighbor_idxs = self.nn_model.kneighbors(x, n_neighbors=self.k)
+            dists, neighbor_idxs = self.knn.kneighbors(x, n_neighbors=self.k)
             neighbor_idxs = neighbor_idxs.flatten()
             neighbor_perf = self.performance.iloc[neighbor_idxs]
 
