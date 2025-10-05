@@ -1,12 +1,14 @@
 import numpy as np
 import pytest
 import pandas as pd
+from asf.predictors import RegressionMLP
 from asf.selectors import (
     PairwiseClassifier,
     PairwiseRegressor,
     SimpleRanking,
     JointRanking,
     SurvivalAnalysisSelector,
+    PerformanceModel,
 )
 from xgboost import XGBRanker
 from asf.selectors.selector_tuner import tune_selector
@@ -172,3 +174,16 @@ def test_selector_tuner(dummy_performance, dummy_features):
 
     # Clean up SMAC output directory if needed (optional)
     shutil.rmtree("./smac_test_output", ignore_errors=True)
+
+
+@pytest.mark.parametrize(
+    "model_class",
+    [
+        RegressionMLP,
+    ],
+)
+def test_performance_model(dummy_performance, dummy_features, model_class):
+    model = PerformanceModel(model_class=model_class)
+    model.fit(dummy_features, dummy_performance)
+    predictions = model.predict(dummy_features)
+    validate_predictions(predictions)

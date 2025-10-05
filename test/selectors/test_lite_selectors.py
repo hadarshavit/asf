@@ -16,7 +16,6 @@ from asf.predictors import (
     EPMRandomForest,
     MLPClassifierWrapper,
     MLPRegressorWrapper,
-    RegressionMLP,
 )
 
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -146,7 +145,6 @@ def test_multi_class_classifier(dummy_performance, dummy_features, model_class):
         LinearRegressorWrapper,
         EPMRandomForest,
         MLPRegressorWrapper,
-        RegressionMLP,
     ],
 )
 def test_pairwise_regressor(dummy_performance, dummy_features, model_class):
@@ -165,7 +163,6 @@ def test_pairwise_regressor(dummy_performance, dummy_features, model_class):
         LinearRegressorWrapper,
         EPMRandomForest,
         MLPRegressorWrapper,
-        RegressionMLP,
     ],
 )
 def test_performance_model(dummy_performance, dummy_features, model_class):
