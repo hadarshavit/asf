@@ -75,7 +75,7 @@ jobs:
         pip install .
     - name: Test with pytest
       run: |
-        pytest --cov-report=xml --cov asf --junitxml=junit.xml -o junit_family=legacy test/ -k "test_pairwise_classifier or test_pairwise_regressor or test_performance_model or test_multi_class_classifier or test_collaborative_filtering"
+        pytest --cov-report=xml --cov asf --junitxml=junit.xml -o junit_family=legacy test/selectors/test_lite_selectors.py
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v5
       with:
