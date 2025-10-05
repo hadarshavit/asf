@@ -7,8 +7,6 @@ from asf.selectors import (
 from asf.predictors import (
     RandomForestClassifierWrapper,
     RandomForestRegressorWrapper,
-    XGBoostClassifierWrapper,
-    XGBoostRegressorWrapper,
     SVMClassifierWrapper,
     SVMRegressorWrapper,
     LinearClassifierWrapper,
@@ -103,7 +101,6 @@ def dummy_features():
     [
         RandomForestClassifier,
         RandomForestClassifierWrapper,
-        XGBoostClassifierWrapper,
         SVMClassifierWrapper,
         LinearClassifierWrapper,
         MLPClassifierWrapper,
@@ -123,7 +120,6 @@ def test_pairwise_classifier(dummy_performance, dummy_features, model_class):
     [
         RandomForestClassifier,
         RandomForestClassifierWrapper,
-        XGBoostClassifierWrapper,
         SVMClassifierWrapper,
         LinearClassifierWrapper,
         MLPClassifierWrapper,
@@ -140,7 +136,6 @@ def test_multi_class_classifier(dummy_performance, dummy_features, model_class):
     "model_class",
     [
         RandomForestRegressorWrapper,
-        XGBoostRegressorWrapper,
         SVMRegressorWrapper,
         LinearRegressorWrapper,
         EPMRandomForest,
@@ -158,7 +153,6 @@ def test_pairwise_regressor(dummy_performance, dummy_features, model_class):
     "model_class",
     [
         RandomForestRegressorWrapper,
-        XGBoostRegressorWrapper,
         SVMRegressorWrapper,
         LinearRegressorWrapper,
         EPMRandomForest,
