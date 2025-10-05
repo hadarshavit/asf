@@ -1,13 +1,18 @@
 import numpy as np
 import pytest
 import pandas as pd
-from asf.predictors import RegressionMLP
+from asf.predictors import (
+    RegressionMLP,
+    XGBoostClassifierWrapper,
+    XGBoostRegressorWrapper,
+)
 from asf.selectors import (
     PairwiseClassifier,
     PairwiseRegressor,
     SimpleRanking,
     JointRanking,
     SurvivalAnalysisSelector,
+    MultiClassClassifier,
     PerformanceModel,
 )
 from xgboost import XGBRanker
@@ -179,8 +184,41 @@ def test_selector_tuner(dummy_performance, dummy_features):
 @pytest.mark.parametrize(
     "model_class",
     [
-        RegressionMLP,
+        XGBoostClassifierWrapper,
     ],
+)
+def test_pairwise_classifier(dummy_performance, dummy_features, model_class):
+    classifier = PairwiseClassifier(model_class=model_class, use_weights=True)
+    classifier.fit(dummy_features, dummy_performance)
+    predictions = classifier.predict(dummy_features)
+    validate_predictions(predictions)
+
+
+@pytest.mark.parametrize(
+    "model_class",
+    [XGBoostClassifierWrapper],
+)
+def test_multi_class_classifier(dummy_performance, dummy_features, model_class):
+    classifier = MultiClassClassifier(model_class=model_class)
+    classifier.fit(dummy_features, dummy_performance)
+    predictions = classifier.predict(dummy_features)
+    validate_predictions(predictions)
+
+
+@pytest.mark.parametrize(
+    "model_class",
+    [XGBoostRegressorWrapper, RegressionMLP],
+)
+def test_pairwise_regressor(dummy_performance, dummy_features, model_class):
+    regressor = PairwiseRegressor(model_class=model_class)
+    regressor.fit(dummy_features, dummy_performance)
+    predictions = regressor.predict(dummy_features)
+    validate_predictions(predictions)
+
+
+@pytest.mark.parametrize(
+    "model_class",
+    [XGBoostRegressorWrapper, RegressionMLP],
 )
 def test_performance_model(dummy_performance, dummy_features, model_class):
     model = PerformanceModel(model_class=model_class)
