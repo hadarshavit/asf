@@ -1,4 +1,3 @@
-import clingo.script
 import pandas as pd
 import numpy as np
 import math
@@ -6,6 +5,7 @@ from asf.presolving.presolver import AbstractPresolver
 
 try:
     import clingo
+    import clingo.script
 
     clingo.script.enable_python()
     CLINGO_AVAIL = True
