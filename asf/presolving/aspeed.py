@@ -2,11 +2,15 @@ import clingo.script
 import pandas as pd
 import numpy as np
 import math
-import clingo
 from asf.presolving.presolver import AbstractPresolver
 
+try:
+    import clingo
 
-clingo.script.enable_python()
+    clingo.script.enable_python()
+    CLINGO_AVAIL = True
+except ImportError:
+    CLINGO_AVAIL = False
 
 
 class Aspeed(AbstractPresolver):
@@ -39,6 +43,10 @@ class Aspeed(AbstractPresolver):
             cores (int): Number of CPU cores to use.
             cutoff (int): Time limit for solving.
         """
+        if not CLINGO_AVAIL:
+            raise ImportError(
+                "clingo is not installed. Please install it to use the Aspeed presolver."
+            )
         super().__init__(
             budget=budget, runcount_limit=runcount_limit, maximize=maximize
         )
