@@ -38,7 +38,7 @@ def parser_function() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--selector",
-        choices=selectors.__implemented__,
+        choices=selectors.__all__,
         required=True,
         help="Selector to train",
     )
