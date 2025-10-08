@@ -2,32 +2,59 @@ import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
 from asf.selectors.isac_selector import ISACSelector
+from asf.selectors.snnap_selector import SNNAPSelector
 
-def generate_isac_data(n_instances=120, n_algorithms=5, seed=0):
+def generate_data(n_instances=120, n_algorithms=5, seed=0):
     """
-    Synthetic dataset for ISAC example.
+    Synthetic dataset.
     """
     rng = np.random.RandomState(seed)
+
+    n_clusters = 4
+    centers = rng.uniform(0, 10, size=(n_clusters, 2))
+
+    # create roughly even assignment to clusters to avoid tiny clusters dominating
+    base_assign = np.repeat(np.arange(n_clusters), n_instances // n_clusters)
+    if base_assign.size < n_instances:
+        extra = rng.choice(n_clusters, size=(n_instances - base_assign.size))
+        cluster_ids = np.concatenate([base_assign, extra])
+    else:
+        cluster_ids = base_assign[:n_instances]
+    rng.shuffle(cluster_ids)
+
     features = pd.DataFrame(
-        rng.uniform(0, 10, size=(n_instances, 2)),
+        centers[cluster_ids] + rng.normal(scale=0.8, size=(n_instances, 2)),
         columns=["f1", "f2"],
         index=[f"inst_{i}" for i in range(n_instances)],
     )
 
-    perf = pd.DataFrame(index=features.index)
-    perf["algo1"] = 50 + 2.5 * features["f1"] + rng.normal(0, 3, n_instances)
-    perf["algo2"] = 40 + 3 * features["f2"] + rng.normal(0, 3, n_instances)
-    perf["algo3"] = 60 - 2 * features["f1"] + 1.5 * features["f2"] + rng.normal(0, 3, n_instances)
-    perf["algo4"] = 30 + 1 * features["f1"] + 4 * features["f2"] + rng.normal(0, 3, n_instances)
-    perf["algo5"] = 60 + 2 * features["f1"] - 1 * features["f2"] + rng.normal(0, 3, n_instances)
+    # Create cluster-specific base performance for each algorithm
+    base_by_cluster = rng.uniform(40, 80, size=(n_clusters, n_algorithms))
+    global_algo_bias = rng.normal(0, 3.0, size=(n_algorithms,))
 
-    # enforce reasonable minimum runtime
+    for cid in range(n_clusters):
+        favored = cid % n_algorithms
+        base_by_cluster[cid, favored] -= rng.uniform(2.0, 6.0)
+
+    algo_coeffs = rng.uniform(-1.0, 1.0, size=(n_algorithms, 2))
+
+    perf = pd.DataFrame(index=features.index)
+    for j in range(n_algorithms):
+        vals = []
+        for i in range(n_instances):
+            cid = cluster_ids[i]
+            base = base_by_cluster[cid, j]
+            linear = features.iloc[i].values @ algo_coeffs[j]
+            noise = rng.normal(0, 4.0) 
+            vals.append(base + global_algo_bias[j] + linear + noise)
+        perf[f"algo{j+1}"] = vals
+
     perf[perf < 5] = 5
     return features, perf
 
-def evaluate_isac(predictions, true_perf, budget=None):
+def evaluate_predictions(predictions, true_perf, budget=None):
     """
-    Evaluate ISAC predictions.
+    Evaluate predictions.
 
     Returns:
         achieved_acc (float): Fraction of instances where the recommended algorithm
@@ -65,7 +92,7 @@ def evaluate_isac(predictions, true_perf, budget=None):
     return achieved_acc, max_acc
 
 def print_sample(predictions, true_perf, n=8):
-    print("\nSample ISAC predictions:")
+    print("\nSample predictions:")
     for inst in list(true_perf.index)[:n]:
         rec = predictions.get(inst, [(None, 0.0)])
         algo = rec[0][0]
@@ -74,7 +101,7 @@ def print_sample(predictions, true_perf, n=8):
 
 if __name__ == "__main__":
     # generate data
-    features, performance = generate_isac_data(n_instances=120, n_algorithms=5, seed=1)
+    features, performance = generate_data(n_instances=120, n_algorithms=5, seed=1)
 
     # split train/test
     n_train = int(0.7 * len(features))
@@ -90,7 +117,7 @@ if __name__ == "__main__":
     selector = ISACSelector()
     selector.fit(train_features, train_perf)
     preds = selector.predict(test_features)
-    acc, max_acc = evaluate_isac(preds, test_perf, budget=60)
+    acc, max_acc = evaluate_predictions(preds, test_perf, budget=60)
     print(f"\nISAC (GMeans) accuracy (<=60s): {acc:.2%} (max achievable: {max_acc:.2%})")
     print_sample(preds, test_perf, n=10)
 
@@ -98,6 +125,14 @@ if __name__ == "__main__":
     selector_km = ISACSelector(clusterer=KMeans, clusterer_kwargs={"n_clusters": 6})
     selector_km.fit(train_features, train_perf)
     preds_km = selector_km.predict(test_features)
-    acc_km, max_acc_km = evaluate_isac(preds_km, test_perf, budget=60)
+    acc_km, max_acc_km = evaluate_predictions(preds_km, test_perf, budget=60)
     print(f"\nISAC (KMeans, n_clusters=6) accuracy (<=60s): {acc_km:.2%} (max achievable: {max_acc_km:.2%})")
     print_sample(preds_km, test_perf, n=10)
+
+    # SNNAP (k-NN majority-vote)
+    selector_snnap = SNNAPSelector(k=5)
+    selector_snnap.fit(train_features, train_perf)
+    preds_snnap = selector_snnap.predict(test_features)
+    acc_snnap, max_acc_snnap = evaluate_predictions(preds_snnap, test_perf, budget=60)
+    print(f"\nSNNAP (k=5) accuracy (<=60s): {acc_snnap:.2%} (max achievable: {max_acc_snnap:.2%})")
+    print_sample(preds_snnap, test_perf, n=10)

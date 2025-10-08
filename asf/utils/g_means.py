@@ -2,6 +2,7 @@ import warnings
 import numpy as np
 from sklearn.cluster import KMeans
 from scipy.stats import anderson
+from sklearn.utils import check_random_state
 from sklearn.metrics import pairwise_distances
 
 class GMeans:
@@ -19,11 +20,6 @@ class GMeans:
         n_init_kmeans (int): Number of initializations for KMeans during splitting.
         n_init_final (int): Number of initializations for the final KMeans fit.
         random_state (int or None): Random seed for reproducibility.
-
-    Attributes:
-        cluster_centers_ (np.ndarray): Coordinates of cluster centers.
-        labels_ (np.ndarray): Cluster labels for each point.
-        inertia_ (float): Final value of the inertia criterion.
     """
 
     def __init__(
@@ -33,15 +29,18 @@ class GMeans:
         n_init=5,
         n_init_kmeans=5,
         n_init_final=5,
-        random_state=42,
+        random_state=None,
     ):
         self._min_samples = min_samples
         self._significance = [0.15, 0.1, 0.05, 0.025, 0.001].index(significance)
         self._n_init = n_init
         self._n_init_kmeans = n_init_kmeans
         self._n_init_final = n_init_final
-        self._random_state = random_state
+        self._random_state = check_random_state(random_state)
         self._kmeans = None
+        self.cluster_centers_ = None
+        self.labels_ = None
+        self.inertia_ = None
 
     def fit(self, X):
         """
@@ -53,10 +52,10 @@ class GMeans:
         Returns:
             self
         """
-        self.inertia_ = np.inf
-
         if self._min_samples < 1.0:
             self._min_samples = X.shape[0] * self._min_samples
+
+        self.inertia_ = np.inf
 
         for _ in range(self._n_init):
             seed_main = int(self._random_state.randint(0, 2 ** 31 - 1))
@@ -90,6 +89,8 @@ class GMeans:
                 y = np.inner(v, X_) / np.linalg.norm(v, ord=2)
                 mean = np.mean(y)
                 std = np.std(y)
+                if std == 0:
+                    continue
                 y = (y - mean) / std
                 A2, critical, _ = anderson(y)
 
@@ -108,8 +109,6 @@ class GMeans:
             if kmeans.inertia_ < self.inertia_:
                 self.inertia_ = kmeans.inertia_
                 self._k = np.size(kmeans.cluster_centers_, axis=0)
-
-            print(f"G-Means iteration found {np.size(kmeans.cluster_centers_, axis=0)} clusters.")
 
             seed_final = int(self._random_state.randint(0, 2 ** 31 - 1))
             self._kmeans = KMeans(
@@ -147,10 +146,10 @@ class GMeans:
             self.cluster_centers_ = self._kmeans.cluster_centers_
             
             centroids = np.zeros(self.cluster_centers_.shape)
-            for label, center in enumerate(self.cluster_centers_):
-                X_assigned = X[self.labels_ == label]
+            for lab, center in enumerate(self.cluster_centers_):
+                X_assigned = X[self.labels_ == lab]
                 if X_assigned.shape[0] > 0:
-                     centroids[label] = np.mean(X_assigned, axis=0)
+                     centroids[lab] = np.mean(X_assigned, axis=0)
 
             self.cluster_centers_ = centroids
             self._kmeans.cluster_centers_ = self.cluster_centers_
@@ -165,5 +164,11 @@ class GMeans:
         Returns:
             np.ndarray: Cluster labels.
         """
+        if self._kmeans is None:
+            raise RuntimeError("GMeans instance is not fitted yet.")
         return self._kmeans.predict(X)
+
+    def fit_predict(self, X):
+        self.fit(X)
+        return self.predict(X)
 
