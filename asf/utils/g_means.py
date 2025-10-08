@@ -2,7 +2,6 @@ import warnings
 import numpy as np
 from sklearn.cluster import KMeans
 from scipy.stats import anderson
-from sklearn.utils import check_random_state
 from sklearn.metrics import pairwise_distances
 
 class GMeans:
@@ -34,14 +33,14 @@ class GMeans:
         n_init=5,
         n_init_kmeans=5,
         n_init_final=5,
-        random_state=None,
+        random_state=42,
     ):
         self._min_samples = min_samples
         self._significance = [0.15, 0.1, 0.05, 0.025, 0.001].index(significance)
         self._n_init = n_init
         self._n_init_kmeans = n_init_kmeans
         self._n_init_final = n_init_final
-        self._random_state = check_random_state(random_state)
+        self._random_state = random_state
         self._kmeans = None
 
     def fit(self, X):
@@ -60,7 +59,8 @@ class GMeans:
             self._min_samples = X.shape[0] * self._min_samples
 
         for _ in range(self._n_init):
-            kmeans = KMeans(n_clusters=1, n_init=1, random_state=self._random_state).fit(X)
+            seed_main = int(self._random_state.randint(0, 2 ** 31 - 1))
+            kmeans = KMeans(n_clusters=1, n_init=1, random_state=seed_main).fit(X)
             queue = [0]
 
             while queue:
@@ -71,10 +71,11 @@ class GMeans:
 
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
+                    seed_tmp = int(self._random_state.randint(0, 2 ** 31 - 1))
                     tmp_kmeans = KMeans(
                         n_clusters=2,
                         n_init=self._n_init_kmeans,
-                        random_state=self._random_state
+                        random_state=seed_tmp,
                     ).fit(X_)
 
                 child_one, child_two = tmp_kmeans.cluster_centers_
@@ -108,10 +109,13 @@ class GMeans:
                 self.inertia_ = kmeans.inertia_
                 self._k = np.size(kmeans.cluster_centers_, axis=0)
 
+            print(f"G-Means iteration found {np.size(kmeans.cluster_centers_, axis=0)} clusters.")
+
+            seed_final = int(self._random_state.randint(0, 2 ** 31 - 1))
             self._kmeans = KMeans(
                 n_clusters=self._k,
                 n_init=self._n_init_final,
-                random_state=self._random_state
+                random_state=seed_final,
             ).fit(X)
             self.inertia_ = self._kmeans.inertia_
             self.cluster_centers_ = self._kmeans.cluster_centers_
