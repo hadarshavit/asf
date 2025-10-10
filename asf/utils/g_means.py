@@ -57,9 +57,11 @@ class GMeans:
             self._min_samples = X.shape[0] * self._min_samples
 
         self.inertia_ = np.inf
+        self._k = 3
+        self._kmeans = None
 
         for _ in range(self._n_init):
-            seed_main = int(self._random_state.randint(0, 2**31 - 1))
+            seed_main = int(self._random_state.randint(0, 2 ** 31 - 1))
             kmeans = KMeans(n_clusters=1, n_init=1, random_state=seed_main).fit(X)
             queue = [0]
 
@@ -115,18 +117,32 @@ class GMeans:
                 self.inertia_ = kmeans.inertia_
                 self._k = np.size(kmeans.cluster_centers_, axis=0)
 
-            seed_final = int(self._random_state.randint(0, 2**31 - 1))
+            seed_final = int(self._random_state.randint(0, 2 ** 31 - 1))
             candidate_kmeans = KMeans(
                 n_clusters=self._k,
                 n_init=self._n_init_final,
                 random_state=seed_final,
             ).fit(X)
+            # accept candidate only if it improves inertia
             if candidate_kmeans.inertia_ < self.inertia_:
                 self.inertia_ = candidate_kmeans.inertia_
                 self._kmeans = candidate_kmeans
                 self.cluster_centers_ = candidate_kmeans.cluster_centers_
                 self.labels_ = candidate_kmeans.labels_
 
+        # If no candidate was accepted (edge case), fit a final kmeans with fallback _k
+        if self._kmeans is None:
+            seed_final = int(self._random_state.randint(0, 2 ** 31 - 1))
+            self._kmeans = KMeans(
+                n_clusters=self._k,
+                n_init=self._n_init_final,
+                random_state=seed_final,
+            ).fit(X)
+            self.inertia_ = self._kmeans.inertia_
+            self.cluster_centers_ = self._kmeans.cluster_centers_
+            self.labels_ = self._kmeans.labels_
+
+        # Ensure minimum cluster size by redistributing small clusters
         self._redistribute(X)
         return self
 
