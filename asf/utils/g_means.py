@@ -116,14 +116,16 @@ class GMeans:
                 self._k = np.size(kmeans.cluster_centers_, axis=0)
 
             seed_final = int(self._random_state.randint(0, 2**31 - 1))
-            self._kmeans = KMeans(
+            candidate_kmeans = KMeans(
                 n_clusters=self._k,
                 n_init=self._n_init_final,
                 random_state=seed_final,
             ).fit(X)
-            self.inertia_ = self._kmeans.inertia_
-            self.cluster_centers_ = self._kmeans.cluster_centers_
-            self.labels_ = self._kmeans.labels_
+            if candidate_kmeans.inertia_ < self.inertia_:
+                self.inertia_ = candidate_kmeans.inertia_
+                self._kmeans = candidate_kmeans
+                self.cluster_centers_ = candidate_kmeans.cluster_centers_
+                self.labels_ = candidate_kmeans.labels_
 
         self._redistribute(X)
         return self

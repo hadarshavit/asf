@@ -96,7 +96,7 @@ class SNNAPSelector(AbstractSelector):
             else:
                 # tie-break: choose candidate with smallest mean runtime across recorded neighbor runtimes
                 mean_runtimes = {
-                    a: (np.mean(runtimes_for_candidates.get(a, [np.inf])))
+                    a: np.mean(runtimes_for_candidates.get(a, [np.inf]))
                     for a in candidates
                 }
                 chosen = min(mean_runtimes.items(), key=lambda x: x[1])[0]
