@@ -13,6 +13,8 @@ from asf.selectors.collaborative_filtering_selector import (
     CollaborativeFilteringSelector,
 )
 from asf.selectors.sunny_selector import SunnySelector
+from asf.selectors.isac_selector import ISACSelector
+from asf.selectors.snnap_selector import SNNAPSelector
 from asf.selectors.selector_tuner import tune_selector
 
 __all__ = [
@@ -31,4 +33,6 @@ __all__ = [
     "SelectorPipeline",
     "CollaborativeFilteringSelector",
     "SunnySelector",
+    "ISACSelector",
+    "SNNAPSelector",
 ]

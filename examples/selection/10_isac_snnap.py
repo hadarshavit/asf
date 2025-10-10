@@ -4,6 +4,7 @@ from sklearn.cluster import KMeans
 from asf.selectors.isac_selector import ISACSelector
 from asf.selectors.snnap_selector import SNNAPSelector
 
+
 def generate_data(n_instances=120, n_algorithms=5, seed=0):
     """
     Synthetic dataset.
@@ -45,12 +46,13 @@ def generate_data(n_instances=120, n_algorithms=5, seed=0):
             cid = cluster_ids[i]
             base = base_by_cluster[cid, j]
             linear = features.iloc[i].values @ algo_coeffs[j]
-            noise = rng.normal(0, 4.0) 
+            noise = rng.normal(0, 4.0)
             vals.append(base + global_algo_bias[j] + linear + noise)
-        perf[f"algo{j+1}"] = vals
+        perf[f"algo{j + 1}"] = vals
 
     perf[perf < 5] = 5
     return features, perf
+
 
 def evaluate_predictions(predictions, true_perf, budget=None):
     """
@@ -91,6 +93,7 @@ def evaluate_predictions(predictions, true_perf, budget=None):
 
     return achieved_acc, max_acc
 
+
 def print_sample(predictions, true_perf, n=8):
     print("\nSample predictions:")
     for inst in list(true_perf.index)[:n]:
@@ -98,6 +101,7 @@ def print_sample(predictions, true_perf, n=8):
         algo = rec[0][0]
         runtime = true_perf.loc[inst, algo] if algo in true_perf.columns else None
         print(f"{inst}: recommended = {algo} | runtime = {runtime}")
+
 
 if __name__ == "__main__":
     # generate data
@@ -118,7 +122,9 @@ if __name__ == "__main__":
     selector.fit(train_features, train_perf)
     preds = selector.predict(test_features)
     acc, max_acc = evaluate_predictions(preds, test_perf, budget=60)
-    print(f"\nISAC (GMeans) accuracy (<=60s): {acc:.2%} (max achievable: {max_acc:.2%})")
+    print(
+        f"\nISAC (GMeans) accuracy (<=60s): {acc:.2%} (max achievable: {max_acc:.2%})"
+    )
     print_sample(preds, test_perf, n=10)
 
     # ISAC with KMeans (example: 6 clusters)
@@ -126,7 +132,9 @@ if __name__ == "__main__":
     selector_km.fit(train_features, train_perf)
     preds_km = selector_km.predict(test_features)
     acc_km, max_acc_km = evaluate_predictions(preds_km, test_perf, budget=60)
-    print(f"\nISAC (KMeans, n_clusters=6) accuracy (<=60s): {acc_km:.2%} (max achievable: {max_acc_km:.2%})")
+    print(
+        f"\nISAC (KMeans, n_clusters=6) accuracy (<=60s): {acc_km:.2%} (max achievable: {max_acc_km:.2%})"
+    )
     print_sample(preds_km, test_perf, n=10)
 
     # SNNAP (k-NN majority-vote)
@@ -134,5 +142,7 @@ if __name__ == "__main__":
     selector_snnap.fit(train_features, train_perf)
     preds_snnap = selector_snnap.predict(test_features)
     acc_snnap, max_acc_snnap = evaluate_predictions(preds_snnap, test_perf, budget=60)
-    print(f"\nSNNAP (k=5) accuracy (<=60s): {acc_snnap:.2%} (max achievable: {max_acc_snnap:.2%})")
+    print(
+        f"\nSNNAP (k=5) accuracy (<=60s): {acc_snnap:.2%} (max achievable: {max_acc_snnap:.2%})"
+    )
     print_sample(preds_snnap, test_perf, n=10)

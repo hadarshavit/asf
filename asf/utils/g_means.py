@@ -5,6 +5,7 @@ from scipy.stats import anderson
 from sklearn.utils import check_random_state
 from sklearn.metrics import pairwise_distances
 
+
 class GMeans:
     """
     G-Means clustering algorithm.
@@ -58,7 +59,7 @@ class GMeans:
         self.inertia_ = np.inf
 
         for _ in range(self._n_init):
-            seed_main = int(self._random_state.randint(0, 2 ** 31 - 1))
+            seed_main = int(self._random_state.randint(0, 2**31 - 1))
             kmeans = KMeans(n_clusters=1, n_init=1, random_state=seed_main).fit(X)
             queue = [0]
 
@@ -70,7 +71,7 @@ class GMeans:
 
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    seed_tmp = int(self._random_state.randint(0, 2 ** 31 - 1))
+                    seed_tmp = int(self._random_state.randint(0, 2**31 - 1))
                     tmp_kmeans = KMeans(
                         n_clusters=2,
                         n_init=self._n_init_kmeans,
@@ -95,8 +96,12 @@ class GMeans:
                 A2, critical, _ = anderson(y)
 
                 if A2 > critical[self._significance]:
-                    kmeans.cluster_centers_ = np.delete(kmeans.cluster_centers_, center_idx, axis=0)
-                    kmeans.cluster_centers_ = np.vstack([kmeans.cluster_centers_, child_one, child_two])
+                    kmeans.cluster_centers_ = np.delete(
+                        kmeans.cluster_centers_, center_idx, axis=0
+                    )
+                    kmeans.cluster_centers_ = np.vstack(
+                        [kmeans.cluster_centers_, child_one, child_two]
+                    )
                     offset = np.size(kmeans.cluster_centers_, axis=0) - 2
 
                     del_idx = kmeans.labels_ > center_idx
@@ -110,7 +115,7 @@ class GMeans:
                 self.inertia_ = kmeans.inertia_
                 self._k = np.size(kmeans.cluster_centers_, axis=0)
 
-            seed_final = int(self._random_state.randint(0, 2 ** 31 - 1))
+            seed_final = int(self._random_state.randint(0, 2**31 - 1))
             self._kmeans = KMeans(
                 n_clusters=self._k,
                 n_init=self._n_init_final,
@@ -124,32 +129,38 @@ class GMeans:
         return self
 
     def _redistribute(self, X):
-        redistribute = {label: center for label, center in enumerate(self._kmeans.cluster_centers_)}
-        
+        redistribute = {
+            label: center for label, center in enumerate(self._kmeans.cluster_centers_)
+        }
+
         while redistribute:
             label, center = redistribute.popitem()
             X_ = X[self._kmeans.labels_ == label]
-            
+
             if np.size(X_, axis=0) >= self._min_samples:
                 continue
-            
+
             if self._kmeans.cluster_centers_.shape[0] <= 1:
                 break
-            
-            distances = pairwise_distances(X_, self._kmeans.cluster_centers_, metric='euclidean')
+
+            distances = pairwise_distances(
+                X_, self._kmeans.cluster_centers_, metric="euclidean"
+            )
             assignments = np.argpartition(distances, 1, axis=1)[:, 1]
-    
+
             self._kmeans.labels_[self._kmeans.labels_ == label] = assignments
-            self._kmeans.cluster_centers_ = np.delete(self._kmeans.cluster_centers_, label, axis=0)
+            self._kmeans.cluster_centers_ = np.delete(
+                self._kmeans.cluster_centers_, label, axis=0
+            )
             self._kmeans.labels_[self._kmeans.labels_ > label] -= 1
             self.labels_ = self._kmeans.labels_
             self.cluster_centers_ = self._kmeans.cluster_centers_
-            
+
             centroids = np.zeros(self.cluster_centers_.shape)
             for lab, center in enumerate(self.cluster_centers_):
                 X_assigned = X[self.labels_ == lab]
                 if X_assigned.shape[0] > 0:
-                     centroids[lab] = np.mean(X_assigned, axis=0)
+                    centroids[lab] = np.mean(X_assigned, axis=0)
 
             self.cluster_centers_ = centroids
             self._kmeans.cluster_centers_ = self.cluster_centers_
@@ -171,4 +182,3 @@ class GMeans:
     def fit_predict(self, X):
         self.fit(X)
         return self.predict(X)
-

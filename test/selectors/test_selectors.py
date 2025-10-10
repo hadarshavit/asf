@@ -23,6 +23,8 @@ from asf.selectors.collaborative_filtering_selector import (
     CollaborativeFilteringSelector,
 )
 from asf.selectors.sunny_selector import SunnySelector
+from asf.selectors.isac_selector import ISACSelector
+from asf.selectors.snnap_selector import SNNAPSelector
 
 
 @pytest.fixture
@@ -157,6 +159,20 @@ def test_sunny_selector(dummy_performance, dummy_features):
         assert isinstance(sched, list)
         assert all(isinstance(x, tuple) and len(x) == 2 for x in sched)
         assert all(isinstance(x[0], str) and isinstance(x[1], float) for x in sched)
+
+
+def test_isac_selector(dummy_performance, dummy_features):
+    selector = ISACSelector()
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+    validate_predictions(predictions)
+
+
+def test_snnap_selector(dummy_performance, dummy_features):
+    selector = SNNAPSelector(k=3)
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+    validate_predictions(predictions)
 
 
 def test_selector_tuner(dummy_performance, dummy_features):

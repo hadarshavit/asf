@@ -4,6 +4,7 @@ from typing import Dict, List, Tuple, Optional, Any
 from asf.selectors.abstract_selector import AbstractSelector
 from asf.utils.g_means import GMeans
 
+
 class ISACSelector(AbstractSelector):
     """
     ISAC (Instance-Specific Algorithm Configuration) selector.
@@ -46,7 +47,9 @@ class ISACSelector(AbstractSelector):
             performance (pd.DataFrame): Performance matrix (instances x algorithms).
         """
         self.algorithms = list(performance.columns)
-        self.clusterer = self.clusterer(random_state=self.random_state, **self.clusterer_kwargs)
+        self.clusterer = self.clusterer(
+            random_state=self.random_state, **self.clusterer_kwargs
+        )
 
         self.clusterer.fit(features.values)
         cluster_labels = self.clusterer.predict(features.values)

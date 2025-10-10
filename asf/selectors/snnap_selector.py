@@ -4,6 +4,7 @@ from typing import Dict, List, Tuple, Optional
 from sklearn.neighbors import NearestNeighbors
 from asf.selectors.abstract_selector import AbstractSelector
 
+
 class SNNAPSelector(AbstractSelector):
     """
     SNNAP (Simple Nearest Neighbor Algorithm Portfolio) selector.
@@ -79,7 +80,9 @@ class SNNAPSelector(AbstractSelector):
                     continue
                 best_algo = valid.idxmin()
                 votes[best_algo] = votes.get(best_algo, 0) + 1
-                runtimes_for_candidates.setdefault(best_algo, []).append(valid.loc[best_algo])
+                runtimes_for_candidates.setdefault(best_algo, []).append(
+                    valid.loc[best_algo]
+                )
 
             if not votes:
                 predictions[instance] = [(None, 0.0)]
