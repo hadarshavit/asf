@@ -1,6 +1,7 @@
 from typing import Callable, Union
 
 import pandas as pd
+import numpy as np
 
 try:
     import torch
@@ -159,22 +160,49 @@ if TORCH_AVAILABLE:
 
             return self
 
-        def predict(self, features: pd.DataFrame) -> pd.DataFrame:
+        def predict(
+            self, features: pd.DataFrame, algorithm_features: pd.DataFrame
+        ) -> pd.DataFrame:
             """
-            Predicts the performance of algorithms for the given features.
+            Predicts the performance of algorithms for the given features and algorithm features.
 
             Args:
                 features (pd.DataFrame): DataFrame containing the feature data.
+                algorithm_features (pd.DataFrame): DataFrame containing algorithm-specific features.
 
             Returns:
                 pd.DataFrame: DataFrame containing the predicted performance data.
             """
             self.model.eval()
 
-            features = torch.from_numpy(features.values).to(self.device).float()
-            predictions = self.model(features).detach().numpy()
+            # Repeat algorithm_features for each instance in features
+            repeated_alg_feats = pd.concat(
+                [algorithm_features] * len(features), ignore_index=True
+            )
+            repeated_feats = pd.DataFrame(
+                np.repeat(features.values, len(algorithm_features), axis=0),
+                columns=features.columns,
+            )
+            # Concatenate features and algorithm_features
+            input_df = pd.concat(
+                [
+                    repeated_alg_feats.reset_index(drop=True),
+                    repeated_feats.reset_index(drop=True),
+                ],
+                axis=1,
+            )
+            input_tensor = torch.from_numpy(input_df.values).to(self.device).float()
+            predictions = (
+                self.model(input_tensor)
+                .detach()
+                .cpu()
+                .numpy()
+                .reshape(len(features), len(algorithm_features))
+            )
 
-            return predictions
+            return pd.DataFrame(
+                predictions, index=features.index, columns=algorithm_features.index
+            )
 
         def save(self, file_path: str) -> None:
             """
