@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from asf.pre_selector.brute_force_pre_selection import BruteForcePreSelector
 from asf.pre_selector.beam_search_pre_selection import BeamSearchPreSelector
@@ -16,6 +17,13 @@ from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
 
 def _sum_metric(frame: pd.DataFrame) -> float:
     return frame.to_numpy().sum()
+
+
+_PARALLEL_METRIC_VALUES = {1: 1.08, 2: 0.1, 3: 1.08}
+
+
+def _parallel_metric(frame: pd.DataFrame) -> float:
+    return _PARALLEL_METRIC_VALUES[frame.shape[1]]
 
 
 def test_brute_force_selects_lowest_sum_dataframe():
@@ -208,3 +216,102 @@ def test_knee_of_curve_pre_selector_returns_original_when_no_knee():
     selected = selector.fit_transform(performance)
 
     pd.testing.assert_frame_equal(selected, performance)
+
+
+def test_knee_of_curve_pre_selector_parallel_numpy_detects_knee():
+    pytest.importorskip("joblib")
+
+    performance = np.array(
+        [
+            [1.0, 1.5, 10.0],
+            [2.0, 2.5, 10.0],
+            [3.0, 3.5, 10.0],
+        ]
+    )
+
+    selector = KneeOfCurvePreSelector(
+        metric=_parallel_metric,
+        base_pre_selector=_DummyBasePreSelector,
+        maximize=False,
+        workers=1,
+    )
+
+    selected = selector.fit_transform(performance)
+
+    assert isinstance(selected, np.ndarray)
+    np.testing.assert_allclose(selected, performance[:, :2])
+
+
+def test_optimize_pre_selection_raises_with_insufficient_algorithms():
+    performance = pd.DataFrame(
+        {
+            "A": [1.0, 2.0],
+            "B": [2.0, 1.0],
+            "C": [3.0, 3.0],
+        }
+    )
+
+    optimizer = _RecordingOptimizer([0.9, 0.8, 0.1])
+
+    selector = OptimizePreSelection(
+        metric=_sum_metric,
+        n_algorithms=5,
+        maximize=False,
+        fmin_function=optimizer,
+    )
+
+    with pytest.raises(ValueError):
+        selector.fit_transform(performance)
+
+
+def test_optimize_pre_selection_zero_algorithms_raises():
+    performance = pd.DataFrame(
+        {
+            "A": [1.0, 2.0],
+            "B": [2.0, 1.0],
+        }
+    )
+
+    optimizer = _RecordingOptimizer([0.9, 0.8])
+
+    selector = OptimizePreSelection(
+        metric=_sum_metric,
+        n_algorithms=0,
+        maximize=False,
+        fmin_function=optimizer,
+    )
+
+    with pytest.raises(ValueError):
+        selector.fit_transform(performance)
+
+
+def test_brute_force_maximize_returns_best_columns():
+    performance = pd.DataFrame(
+        {
+            "A": [1.0, 2.0],
+            "B": [5.0, 6.0],
+            "C": [3.0, 4.0],
+        }
+    )
+
+    selector = BruteForcePreSelector(metric=_sum_metric, n_algorithms=1, maximize=True)
+
+    selected = selector.fit_transform(performance)
+
+    assert list(selected.columns) == ["B"]
+
+
+def test_sbs_pre_selector_dataframe_minimize_orders_correctly():
+    performance = pd.DataFrame(
+        {
+            "A": [1.0, 1.0, 1.0],
+            "B": [2.0, 2.0, 2.0],
+            "C": [0.5, 0.5, 0.5],
+        }
+    )
+
+    selector = SBSPreSelector(metric=_sum_metric, n_algorithms=2, maximize=False)
+
+    selected = selector.fit_transform(performance)
+
+    assert list(selected.columns) == ["C", "A"]
