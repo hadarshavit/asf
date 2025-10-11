@@ -1,12 +1,14 @@
 import numpy as np
 
-from asf.preprocessing.performace_scaling import (
+from asf.preprocessing.performance_scaling import (
     MinMaxNormalization,
     ZScoreNormalization,
     LogNormalization,
     SqrtNormalization,
     InvSigmoidNormalization,
     NegExpNormalization,
+    DummyNormalization,
+    BoxCoxNormalization,
 )
 
 
@@ -67,3 +69,35 @@ def test_inv_sigmoid_and_negexp():
     t2 = neg.transform(data)
     back2 = neg.inverse_transform(t2)
     assert np.allclose(data, back2, atol=1e-6)
+
+
+def test_dummy_normalization_identity():
+    data = np.array([-3.5, 0.0, 7.2])
+    dummy = DummyNormalization()
+    dummy.fit(data)
+    transformed = dummy.transform(data)
+    assert transformed is data
+    assert np.allclose(transformed, data)
+    assert np.allclose(dummy.inverse_transform(transformed), data)
+
+
+def test_boxcox_roundtrip():
+    data = np.array([-2.5, -0.5, 0.0, 1.5, 3.0])
+    norm = BoxCoxNormalization()
+    norm.fit(data)
+    transformed = norm.transform(data)
+    assert not np.isnan(transformed).any()
+    inverted = norm.inverse_transform(transformed)
+    assert np.allclose(data, inverted, atol=1e-6)
+
+
+def test_log_fit_sets_eps_for_positive_data():
+    data = np.array([1.0, 2.0, 4.0])
+    norm = LogNormalization(base=2, eps=1e-3)
+    norm.fit(data)
+    assert norm.min_val == 0
+    assert norm.eps == 0
+    transformed = norm.transform(data)
+    assert np.allclose(np.log2(data), transformed)
+    inverted = norm.inverse_transform(transformed)
+    assert np.allclose(data, inverted, atol=1e-6)

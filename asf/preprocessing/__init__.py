@@ -1,6 +1,6 @@
 from asf.preprocessing.sklearn_preprocessor import get_default_preprocessor
 
-from asf.preprocessing.performace_scaling import (
+from asf.preprocessing.performance_scaling import (
     AbstractNormalization,
     BoxCoxNormalization,
     DummyNormalization,

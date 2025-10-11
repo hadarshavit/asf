@@ -5,7 +5,10 @@ import pandas as pd
 import numpy as np
 from sklearn.base import RegressorMixin
 
-from asf.preprocessing.performace_scaling import AbstractNormalization, LogNormalization
+from asf.preprocessing.performance_scaling import (
+    AbstractNormalization,
+    LogNormalization,
+)
 from asf.predictors import SklearnWrapper
 from asf.preprocessing.sklearn_preprocessor import get_default_preprocessor
 from sklearn.base import TransformerMixin
