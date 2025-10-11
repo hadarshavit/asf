@@ -157,6 +157,8 @@ def test_sunny_selector(dummy_performance, dummy_features):
         assert isinstance(sched, list)
         assert all(isinstance(x, tuple) and len(x) == 2 for x in sched)
         assert all(isinstance(x[0], str) and isinstance(x[1], float) for x in sched)
+        assert all(x[0] in ["algo1", "algo2", "algo3"] for x in sched)
+        assert np.isclose(sum(x[1] for x in sched), budget)
 
 
 def test_selector_tuner(dummy_performance, dummy_features):
