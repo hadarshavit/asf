@@ -6,7 +6,7 @@ try:
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
-from sklearn.linear_model import SGDClassifier, SGDRegressor
+from sklearn.linear_model import SGDClassifier, SGDRegressor, Ridge
 
 from asf.predictors.sklearn_wrapper import SklearnWrapper
 
@@ -243,3 +243,12 @@ class LinearRegressorWrapper(SklearnWrapper):
             }
 
             return partial(LinearRegressorWrapper, init_params=linear_regressor_params)
+
+
+class RidgeRegressorWrapper(SklearnWrapper):
+    """Wrapper around scikit-learn's Ridge regressor for ASF predictors."""
+
+    PREFIX = "ridge_regressor"
+
+    def __init__(self, init_params: Optional[Dict[str, Any]] = None):
+        super().__init__(Ridge, init_params or {})
