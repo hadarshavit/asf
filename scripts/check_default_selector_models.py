@@ -129,7 +129,6 @@ def main() -> int:
             continue
         tree = ast.parse(path.read_text())
         defaults = find_default_models(tree, path)
-        print(defaults)
         for default in defaults:
             module = default.resolved_module or ""
             if not module.startswith(TARGET_PREFIX):
