@@ -1,4 +1,6 @@
 name: Selector Default Model Wrappers
+permissions:
+  contents: read
 
 on:
   push:
