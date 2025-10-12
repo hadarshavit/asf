@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Optional
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
-from sklearn.linear_model import Ridge
+from asf.predictors.linear_model import RidgeRegressorWrapper
 
 
 class CollaborativeFilteringSelector(AbstractModelBasedSelector):
@@ -12,7 +12,7 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
 
     def __init__(
         self,
-        model_class=Ridge,
+        model_class=RidgeRegressorWrapper,
         n_components: int = 10,
         n_iter: int = 100,
         lr: float = 0.001,
