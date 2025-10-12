@@ -39,11 +39,19 @@ jobs:
     - name: Test with pytest
       run: |
         pytest --cov-report=xml --cov asf --junitxml=junit.xml -o junit_family=legacy test/
+    - name: Inspect coverage artifact
+      run: |
+        ls -l
+        ls -l coverage.xml
+        head -n 20 coverage.xml
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        file: ./coverage.xml
+        files: coverage.xml
+        flags: full
+        name: full-tests-${{ matrix.python-version }}
+        verbose: true
         fail_ci_if_error: true
     - name: Upload test results to Codecov
       if: ${{ !cancelled() }}
