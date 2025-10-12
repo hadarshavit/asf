@@ -8,13 +8,23 @@ coverage:
   status:
     project:
       default:
+        flags: [full]
         target: auto
         threshold: 2%
         informational: true
+      lite:
+        flags: [lite]
+        target: auto
+        informational: true
     patch:
       default:
+        flags: [full]
         target: auto
         threshold: 1%
+        informational: true
+      lite:
+        flags: [lite]
+        target: auto
         informational: true
 
 comment:
