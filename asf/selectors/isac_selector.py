@@ -35,6 +35,7 @@ class ISACSelector(AbstractSelector):
         self.random_state = random_state
         self.clusterer = clusterer
         self.clusterer_kwargs = clusterer_kwargs or {}
+        self.clusterer_instance = None
         self.cluster_to_best_algo = {}
         self.algorithms = []
 
@@ -47,12 +48,18 @@ class ISACSelector(AbstractSelector):
             performance (pd.DataFrame): Performance matrix (instances x algorithms).
         """
         self.algorithms = list(performance.columns)
-        self.clusterer = self.clusterer(
-            random_state=self.random_state, **self.clusterer_kwargs
-        )
 
-        self.clusterer.fit(features.values)
-        cluster_labels = self.clusterer.predict(features.values)
+        if callable(self.clusterer):
+            self.clusterer_instance = self.clusterer(
+                random_state=self.random_state, **self.clusterer_kwargs
+            )
+        elif hasattr(self.clusterer, "fit") and hasattr(self.clusterer, "predict"):
+            self.clusterer_instance = self.clusterer
+        else:
+            raise ValueError("clusterer must be a class or an instance with fit/predict")
+
+        self.clusterer_instance.fit(features.values)
+        cluster_labels = self.clusterer_instance.predict(features.values)
 
         # For each cluster, find the best algorithm (lowest mean performance)
         n_clusters = len(np.unique(cluster_labels))
@@ -80,8 +87,10 @@ class ISACSelector(AbstractSelector):
         """
         if features is None:
             raise ValueError("Features must be provided for prediction.")
+        if self.clusterer_instance is None:
+            raise RuntimeError("ISACSelector must be fitted before prediction.")
 
-        cluster_labels = self.clusterer.predict(features.values)
+        cluster_labels = self.clusterer_instance.predict(features.values)
         predictions = {}
         for idx, instance in enumerate(features.index):
             cluster_id = cluster_labels[idx]
