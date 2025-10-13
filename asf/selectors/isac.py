@@ -44,11 +44,7 @@ class ISAC(AbstractSelector):
             features (pd.DataFrame): Feature matrix (instances x features).
             performance (pd.DataFrame): Performance matrix (instances x algorithms).
         """
-<<<<<<< HEAD:asf/selectors/isac_selector.py
-        self.algorithms = list(performance.columns)
-=======
         self.clusterer = self.clusterer(**self.clusterer_kwargs)
->>>>>>> 4187ed79267c7958016d5a09e7d800390271889c:asf/selectors/isac.py
 
         if callable(self.clusterer):
             self.clusterer_instance = self.clusterer(
@@ -84,7 +80,7 @@ class ISAC(AbstractSelector):
             features (pd.DataFrame): Feature matrix for test instances.
 
         Returns:
-            Dict[str, List[Tuple[str, float]]]: Mapping from instance name to [(algorithm, dummy_score)].
+            Dict[str, List[Tuple[str, float]]]: Mapping from instance name to [(algorithm, budget)].
         """
         if features is None:
             raise ValueError("Features must be provided for prediction.")
@@ -96,5 +92,5 @@ class ISAC(AbstractSelector):
         for idx, instance in enumerate(features.index):
             cluster_id = cluster_labels[idx]
             best_algo = self.cluster_to_best_algo.get(cluster_id, None)
-            predictions[instance] = [(best_algo, 0.0)]
+            predictions[instance] = [(best_algo, self.budget)] if best_algo else [(None, self.budget)]
         return predictions
