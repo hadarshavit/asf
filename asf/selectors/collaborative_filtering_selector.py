@@ -135,8 +135,7 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
                 scores = np.asarray(pred_matrix[idx]).flatten()
                 best_idx = np.argmin(scores)
                 best_algo = self.algorithms[best_idx]
-                best_score = scores[best_idx]
-                predictions[instance] = [(best_algo, best_score)]
+                predictions[instance] = [(best_algo, self.budget)]
             return predictions
 
         # Case 2: Performance is not None (ALORS-style prediction for new instances)
@@ -158,8 +157,7 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
                     scores = np.asarray(scores).flatten()
                     best_idx = np.argmin(scores)
                     best_algo = self.algorithms[best_idx]
-                    best_score = scores[best_idx]
-                    predictions[instance] = [(best_algo, best_score)]
+                    predictions[instance] = [(best_algo, self.budget)]
                 else:
                     # True cold-start within the warm-start batch: use features if available
                     if features is None:
@@ -168,14 +166,13 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
                         scores = np.asarray(avg_scores.values).flatten()
                         best_idx = np.argmin(scores)
                         best_algo = self.algorithms[best_idx]
-                        best_score = scores[best_idx]
-                        predictions[instance] = [(best_algo, best_score)]
+                        predictions[instance] = [(best_algo, self.budget)]
                     else:
                         instance_features = features.loc[instance]
-                        best_algo, best_score = self._predict_cold_start(
+                        best_algo, _ = self._predict_cold_start(
                             instance_features, instance
                         )
-                        predictions[instance] = [(best_algo, best_score)]
+                        predictions[instance] = [(best_algo, self.budget)]
                     continue
             return predictions
 
@@ -183,10 +180,8 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
         if features is not None and performance is None:
             for instance in features.index:
                 instance_features = features.loc[instance]
-                best_algo, best_score = self._predict_cold_start(
-                    instance_features, instance
-                )
-                predictions[instance] = [(best_algo, best_score)]
+                best_algo, _ = self._predict_cold_start(instance_features, instance)
+                predictions[instance] = [(best_algo, self.budget)]
             return predictions
 
         return predictions
