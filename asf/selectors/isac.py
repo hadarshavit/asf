@@ -5,7 +5,7 @@ from asf.selectors.abstract_selector import AbstractSelector
 from asf.utils.g_means import GMeans
 
 
-class ISACSelector(AbstractSelector):
+class ISAC(AbstractSelector):
     """
     ISAC (Instance-Specific Algorithm Configuration) selector.
 
@@ -28,16 +28,13 @@ class ISACSelector(AbstractSelector):
         self,
         clusterer: Optional[Any] = GMeans,
         clusterer_kwargs: Optional[dict] = None,
-        random_state: int = 42,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.random_state = random_state
         self.clusterer = clusterer
         self.clusterer_kwargs = clusterer_kwargs or {}
         self.clusterer_instance = None
         self.cluster_to_best_algo = {}
-        self.algorithms = []
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
         """
@@ -47,7 +44,11 @@ class ISACSelector(AbstractSelector):
             features (pd.DataFrame): Feature matrix (instances x features).
             performance (pd.DataFrame): Performance matrix (instances x algorithms).
         """
+<<<<<<< HEAD:asf/selectors/isac_selector.py
         self.algorithms = list(performance.columns)
+=======
+        self.clusterer = self.clusterer(**self.clusterer_kwargs)
+>>>>>>> 4187ed79267c7958016d5a09e7d800390271889c:asf/selectors/isac.py
 
         if callable(self.clusterer):
             self.clusterer_instance = self.clusterer(

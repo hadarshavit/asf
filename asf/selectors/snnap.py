@@ -5,7 +5,7 @@ from sklearn.neighbors import NearestNeighbors
 from asf.selectors.abstract_selector import AbstractSelector
 
 
-class SNNAPSelector(AbstractSelector):
+class SNNAP(AbstractSelector):
     """
     SNNAP (Simple Nearest Neighbor Algorithm Portfolio) selector.
 
@@ -29,7 +29,6 @@ class SNNAPSelector(AbstractSelector):
 
         self.features: Optional[pd.DataFrame] = None
         self.performance: Optional[pd.DataFrame] = None
-        self.algorithms: List[str] = []
         self.nn_model: Optional[NearestNeighbors] = None
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
@@ -42,7 +41,6 @@ class SNNAPSelector(AbstractSelector):
         """
         self.features = features.copy()
         self.performance = performance.copy()
-        self.algorithms = list(performance.columns)
 
         n_neighbors = min(self.k, len(self.features))
         self.nn_model = NearestNeighbors(n_neighbors=n_neighbors, metric=self.metric)
