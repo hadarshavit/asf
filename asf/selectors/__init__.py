@@ -16,6 +16,7 @@ from asf.selectors.sunny_selector import SunnySelector
 from asf.selectors.isac_selector import ISACSelector
 from asf.selectors.snnap_selector import SNNAPSelector
 from asf.selectors.selector_tuner import tune_selector
+from asf.selectors.satzilla import SATzilla
 
 __all__ = [
     "PairwiseClassifier",
@@ -35,4 +36,5 @@ __all__ = [
     "SunnySelector",
     "ISACSelector",
     "SNNAPSelector",
+    "SATzilla",
 ]
