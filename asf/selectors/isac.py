@@ -53,7 +53,9 @@ class ISAC(AbstractSelector):
         elif hasattr(self.clusterer, "fit") and hasattr(self.clusterer, "predict"):
             self.clusterer_instance = self.clusterer
         else:
-            raise ValueError("clusterer must be a class or an instance with fit/predict")
+            raise ValueError(
+                "clusterer must be a class or an instance with fit/predict"
+            )
 
         self.clusterer_instance.fit(features.values)
         cluster_labels = self.clusterer_instance.predict(features.values)
@@ -92,5 +94,7 @@ class ISAC(AbstractSelector):
         for idx, instance in enumerate(features.index):
             cluster_id = cluster_labels[idx]
             best_algo = self.cluster_to_best_algo.get(cluster_id, None)
-            predictions[instance] = [(best_algo, self.budget)] if best_algo else [(None, self.budget)]
+            predictions[instance] = (
+                [(best_algo, self.budget)] if best_algo else [(None, self.budget)]
+            )
         return predictions
