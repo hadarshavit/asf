@@ -89,8 +89,8 @@ class SATzilla(AbstractSelector):
         X_exp[:, :k] = X_norm
         col = k
         for j in range(k):
-            for l in range(j, k):
-                X_exp[:, col] = X_norm[:, j] * X_norm[:, l]
+            for m in range(j, k):
+                X_exp[:, col] = X_norm[:, j] * X_norm[:, m]
                 col += 1
         return X_exp
 
