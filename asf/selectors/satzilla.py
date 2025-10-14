@@ -195,11 +195,13 @@ class SATzilla(AbstractSelector):
         sat_np = np.asarray(sat_arr)
         if n is not None and sat_np.shape[0] != n:
             raise ValueError("sat labels length must match number of instances")
-        return np.where(
-            (sat_np) | (sat_np == "SAT") | (sat_np == "sat") | (sat_np == "Sat"),
-            "SAT",
-            "UNSAT",
-        )
+        if sat_np.dtype == bool:
+            mask = sat_np
+        else:
+            # Convert to lowercase strings and compare to "sat"
+            sat_str = np.char.lower(sat_np.astype(str))
+            mask = sat_str == "sat"
+        return (np.where(mask, "SAT", "UNSAT"),)
 
     def _predict_for_entry(
         self,
