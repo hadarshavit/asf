@@ -331,10 +331,5 @@ class SATzilla(AbstractSelector):
         for i, inst in enumerate(features.index):
             j = int(best_idx[i])
             algo = algos[j] if np.isfinite(preds[i, j]) else None
-            pred_time = (
-                float(preds[i, j])
-                if algo is not None and np.isfinite(preds[i, j])
-                else float("inf")
-            )
-            results[inst] = [(algo, pred_time)]
+            results[inst] = [(algo, self.budget)]
         return results

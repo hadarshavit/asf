@@ -183,7 +183,7 @@ def test_snnap_selector(dummy_performance, dummy_features):
 
 
 def test_satzilla_selector(dummy_performance, dummy_features):
-    selector = SATzilla(budget=500)
+    selector = SATzilla(budget=450)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
