@@ -25,6 +25,7 @@ from asf.selectors.collaborative_filtering_selector import (
 from asf.selectors.sunny_selector import SunnySelector
 from asf.selectors.isac_selector import ISACSelector
 from asf.selectors.snnap_selector import SNNAPSelector
+from asf.selectors.satzilla import SATzilla
 
 
 @pytest.fixture
@@ -148,12 +149,10 @@ def test_collaborative_filtering_selector(dummy_performance, dummy_features):
 
 
 def test_sunny_selector(dummy_performance, dummy_features):
-    # Use a reasonable budget for the test
     budget = 500
     selector = SunnySelector(k=3, use_v2=True, budget=budget)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
-    # Each prediction should be a non-empty list of (algo, time) tuples
     assert len(predictions) == len(dummy_features)
     for sched in predictions.values():
         assert isinstance(sched, list)
@@ -170,6 +169,13 @@ def test_isac_selector(dummy_performance, dummy_features):
 
 def test_snnap_selector(dummy_performance, dummy_features):
     selector = SNNAPSelector(k=3)
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+    validate_predictions(predictions)
+
+
+def test_satzilla_selector(dummy_performance, dummy_features):
+    selector = SATzilla(budget=500)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
