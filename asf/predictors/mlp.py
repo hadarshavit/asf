@@ -93,7 +93,7 @@ class MLPClassifierWrapper(SklearnWrapper):
             batch_size = Integer(
                 f"{prefix}:batch_size",
                 (256, 1024),
-                default=32,
+                default=256,
                 log=True,
             )  # MODIFIED from HPOBENCH
 
@@ -162,7 +162,7 @@ class MLPClassifierWrapper(SklearnWrapper):
                 kwargs["solver"] = "adam"
 
             mlp_params = {
-                "hidden_layer_sizes": hidden_layers,
+                "hidden_layer_sizes": tuple(hidden_layers),
                 "batch_size": configuration[f"{prefix}:batch_size"],
                 "alpha": configuration[f"{prefix}:alpha"],
                 "learning_rate_init": configuration[f"{prefix}:learning_rate_init"],
@@ -319,7 +319,7 @@ class MLPRegressorWrapper(SklearnWrapper):
                 kwargs["solver"] = "adam"
 
             mlp_params = {
-                "hidden_layer_sizes": hidden_layers,
+                "hidden_layer_sizes": tuple(hidden_layers),
                 "batch_size": configuration[f"{prefix}:batch_size"],
                 "alpha": configuration[f"{prefix}:alpha"],
                 "learning_rate_init": configuration[f"{prefix}:learning_rate_init"],

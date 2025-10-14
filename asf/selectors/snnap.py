@@ -5,7 +5,7 @@ from sklearn.neighbors import NearestNeighbors
 from asf.selectors.abstract_selector import AbstractSelector
 
 
-class SNNAPSelector(AbstractSelector):
+class SNNAP(AbstractSelector):
     """
     SNNAP (Simple Nearest Neighbor Algorithm Portfolio) selector.
 
@@ -29,7 +29,6 @@ class SNNAPSelector(AbstractSelector):
 
         self.features: Optional[pd.DataFrame] = None
         self.performance: Optional[pd.DataFrame] = None
-        self.algorithms: List[str] = []
         self.nn_model: Optional[NearestNeighbors] = None
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
@@ -42,7 +41,6 @@ class SNNAPSelector(AbstractSelector):
         """
         self.features = features.copy()
         self.performance = performance.copy()
-        self.algorithms = list(performance.columns)
 
         n_neighbors = min(self.k, len(self.features))
         self.nn_model = NearestNeighbors(n_neighbors=n_neighbors, metric=self.metric)
@@ -56,7 +54,7 @@ class SNNAPSelector(AbstractSelector):
         Predict the single best algorithm for each instance using majority vote among k neighbors.
 
         Returns:
-            dict: instance_id -> [(algorithm_name or None, vote_count)]
+            dict: instance_id -> [(algorithm_name or None, budget)]
         """
         if features is None:
             raise ValueError("Features must be provided for prediction.")
@@ -85,7 +83,7 @@ class SNNAPSelector(AbstractSelector):
                 )
 
             if not votes:
-                predictions[instance] = [(None, 0.0)]
+                predictions[instance] = [(None, self.budget)]
                 continue
 
             max_votes = max(votes.values())
@@ -96,11 +94,19 @@ class SNNAPSelector(AbstractSelector):
             else:
                 # tie-break: choose candidate with smallest mean runtime across recorded neighbor runtimes
                 mean_runtimes = {
-                    a: np.mean(runtimes_for_candidates.get(a, [np.inf]))
+                    a: np.mean(runtimes_for_candidates[a])
                     for a in candidates
+                    if a in runtimes_for_candidates
+                    and len(runtimes_for_candidates[a]) > 0
                 }
-                chosen = min(mean_runtimes.items(), key=lambda x: x[1])[0]
-
-            predictions[instance] = [(chosen, float(votes.get(chosen, 0)))]
+                if not mean_runtimes:
+                    # No candidates have recorded runtimes; fallback to None
+                    chosen = None
+                else:
+                    chosen = min(mean_runtimes.items(), key=lambda x: x[1])[0]
+            if chosen is None:
+                predictions[instance] = [(None, self.budget)]
+            else:
+                predictions[instance] = [(chosen, self.budget)]
 
         return predictions

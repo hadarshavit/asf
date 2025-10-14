@@ -1,18 +1,11 @@
 import pandas as pd
 from typing import Dict, List, Tuple
 
-try:
-    from sksurv.ensemble import RandomSurvivalForest
-    from sksurv.base import SurvivalAnalysisMixin
-    from sksurv.util import Surv
-
-    SKSURV_AVAIL = True
-except ImportError:
-    SKSURV_AVAIL = False
-
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
+from asf.predictors.survival import RandomSurvivalForestWrapper, SKSURV_AVAILABLE
 
-if SKSURV_AVAIL:
+if SKSURV_AVAILABLE:
+    from sksurv.util import Surv
 
     class SurvivalAnalysisSelector(AbstractModelBasedSelector):
         """
@@ -22,7 +15,9 @@ if SKSURV_AVAIL:
 
         def __init__(
             self,
-            model_class: SurvivalAnalysisMixin = RandomSurvivalForest,
+            model_class: type[
+                RandomSurvivalForestWrapper
+            ] = RandomSurvivalForestWrapper,
             **kwargs,
         ):
             """

@@ -38,7 +38,7 @@ def parser_function() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--selector",
-        choices=selectors.__implemented__,
+        choices=selectors.__all__,
         required=True,
         help="Selector to train",
     )
@@ -61,13 +61,6 @@ def parser_function() -> argparse.ArgumentParser:
         default=False,
         required=False,
         help="Maximize the objective",
-    )
-    parser.add_argument(
-        "--performance-metric",
-        type=str,
-        default="",
-        required=False,
-        help="Performance metric to optimize",
     )
     parser.add_argument(
         "--feature-data",
@@ -123,8 +116,6 @@ def build_cli_command(
         str(selector.budget),
         "--maximize",
         str(selector.maximize),
-        "--performance-metric",
-        str(selector.performance_metric),
         "--feature-data",
         str(feature_data),
         "--performance-data",

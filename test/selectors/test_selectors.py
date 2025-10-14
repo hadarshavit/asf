@@ -23,9 +23,9 @@ from asf.selectors.collaborative_filtering_selector import (
     CollaborativeFilteringSelector,
 )
 from asf.selectors.sunny_selector import SunnySelector
-from asf.selectors.isac_selector import ISACSelector
-from asf.selectors.snnap_selector import SNNAPSelector
 from asf.selectors.satzilla import SATzilla
+from asf.selectors.isac import ISAC
+from asf.selectors.snnap import SNNAP
 
 
 @pytest.fixture
@@ -100,17 +100,23 @@ def validate_predictions(predictions):
     assert all(len(v) == 1 for v in predictions.values()), (
         "Not all lists in predictions have length 1"
     )
+    for pred in predictions.values():
+        algo, score = pred[0]
+        assert algo in ["algo1", "algo2", "algo3"] or algo is None, (
+            "Algorithm name is not valid"
+        )
+        assert score == 450.0, "Score is not 450.0"
 
 
 def test_simple_ranking(dummy_performance, dummy_features):
-    selector = SimpleRanking(model_class=XGBRanker)
+    selector = SimpleRanking(model_class=XGBRanker, budget=450.0)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
 
 
 def test_joint_ranking(dummy_performance, dummy_features):
-    selector = JointRanking()
+    selector = JointRanking(budget=450.0)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
@@ -131,7 +137,7 @@ def test_collaborative_filtering_selector(dummy_performance, dummy_features):
     perf[nan_mask] = np.nan
 
     selector = CollaborativeFilteringSelector(
-        n_components=3, n_iter=100, lr=0.01, reg=0.1
+        n_components=3, n_iter=100, lr=0.01, reg=0.1, budget=450.0
     )
     selector.fit(dummy_features, perf)
 
@@ -158,17 +164,19 @@ def test_sunny_selector(dummy_performance, dummy_features):
         assert isinstance(sched, list)
         assert all(isinstance(x, tuple) and len(x) == 2 for x in sched)
         assert all(isinstance(x[0], str) and isinstance(x[1], float) for x in sched)
+        assert all(x[0] in ["algo1", "algo2", "algo3"] for x in sched)
+        assert np.isclose(sum(x[1] for x in sched), budget)
 
 
 def test_isac_selector(dummy_performance, dummy_features):
-    selector = ISACSelector()
+    selector = ISAC(budget=450.0)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
 
 
 def test_snnap_selector(dummy_performance, dummy_features):
-    selector = SNNAPSelector(k=3)
+    selector = SNNAP(k=3, budget=450.0)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
@@ -192,6 +200,7 @@ def test_selector_tuner(dummy_performance, dummy_features):
         seed=42,
         output_dir="./smac_test_output",  # Use a test-specific output dir
         smac_scenario_kwargs={},
+        budget=450.0,
     )
     assert isinstance(tuned_pipeline, SelectorPipeline)
     # Fit the best pipeline found by the tuner
@@ -210,7 +219,9 @@ def test_selector_tuner(dummy_performance, dummy_features):
     ],
 )
 def test_pairwise_classifier(dummy_performance, dummy_features, model_class):
-    classifier = PairwiseClassifier(model_class=model_class, use_weights=True)
+    classifier = PairwiseClassifier(
+        model_class=model_class, use_weights=True, budget=450.0
+    )
     classifier.fit(dummy_features, dummy_performance)
     predictions = classifier.predict(dummy_features)
     validate_predictions(predictions)
@@ -221,7 +232,7 @@ def test_pairwise_classifier(dummy_performance, dummy_features, model_class):
     [XGBoostClassifierWrapper],
 )
 def test_multi_class_classifier(dummy_performance, dummy_features, model_class):
-    classifier = MultiClassClassifier(model_class=model_class)
+    classifier = MultiClassClassifier(model_class=model_class, budget=450.0)
     classifier.fit(dummy_features, dummy_performance)
     predictions = classifier.predict(dummy_features)
     validate_predictions(predictions)
@@ -232,7 +243,7 @@ def test_multi_class_classifier(dummy_performance, dummy_features, model_class):
     [XGBoostRegressorWrapper, RegressionMLP],
 )
 def test_pairwise_regressor(dummy_performance, dummy_features, model_class):
-    regressor = PairwiseRegressor(model_class=model_class)
+    regressor = PairwiseRegressor(model_class=model_class, budget=450.0)
     regressor.fit(dummy_features, dummy_performance)
     predictions = regressor.predict(dummy_features)
     validate_predictions(predictions)
@@ -243,7 +254,7 @@ def test_pairwise_regressor(dummy_performance, dummy_features, model_class):
     [XGBoostRegressorWrapper, RegressionMLP],
 )
 def test_performance_model(dummy_performance, dummy_features, model_class):
-    model = PerformanceModel(model_class=model_class)
+    model = PerformanceModel(model_class=model_class, budget=450.0)
     model.fit(dummy_features, dummy_performance)
     predictions = model.predict(dummy_features)
     validate_predictions(predictions)
