@@ -3,11 +3,11 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
-from asf.selectors.abstract_selector import AbstractSelector
+from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 from asf.predictors.ridge import RidgeRegressorWrapper
 
 
-class SATzilla(AbstractSelector):
+class SATzilla(AbstractModelBasedSelector):
     """
     SATzilla-like selector using Schmee & Hahn (1979) iterative imputation
     for censored runtimes (log-scale) and per-algorithm ridge models on
@@ -17,7 +17,7 @@ class SATzilla(AbstractSelector):
 
     def __init__(
         self,
-        model_factory: Optional[Callable[..., object]] = RidgeRegressorWrapper,
+        model_class: Optional[Callable[..., object]] = RidgeRegressorWrapper,
         model_kwargs: Optional[Dict[str, Any]] = None,
         use_log10: bool = True,
         random_state: Optional[int] = None,
@@ -30,8 +30,8 @@ class SATzilla(AbstractSelector):
         Initialize the SATzillaSelector.
 
         Args:
-            model_factory: Callable returning a fresh model instance; takes precedence.
-            model_kwargs: Keyword args forwarded to model constructor/factory.
+            model_class: Callable returning a fresh model instance.
+            model_kwargs: Keyword args forwarded to model.
             use_log10: If True, use base-10 log transform for targets.
             random_state: Random seed for reproducibility.
             em_max_iter: Max iterations for Schmee & Hahn imputation.
@@ -41,7 +41,7 @@ class SATzilla(AbstractSelector):
         """
         super().__init__(**kwargs)
 
-        self.model_factory = model_factory
+        self.model_factory = model_class
         self.model_kwargs = model_kwargs or {}
         self.use_log10 = use_log10
         self.random_state = random_state
@@ -308,7 +308,7 @@ class SATzilla(AbstractSelector):
             features: DataFrame of instance features to predict for.
 
         Returns:
-            Mapping instance_name -> [(algorithm_name_or_None, predicted_runtime)].
+            Mapping instance_name -> [(algorithm_name_or_None, budget)].
         """
         if features is None:
             raise ValueError("Features must be provided for prediction.")
