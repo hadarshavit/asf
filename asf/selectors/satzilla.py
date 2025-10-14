@@ -39,7 +39,7 @@ class SATzilla(AbstractModelBasedSelector):
             em_min_sigma: Minimum residual std to avoid numerical issues.
             **kwargs: Additional args passed to parent.
         """
-        super().__init__(**kwargs)
+        super().__init__(model_class, **kwargs)
 
         self.model_factory = model_class
         self.model_kwargs = model_kwargs or {}
