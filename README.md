@@ -3,6 +3,7 @@
 [![License](https://img.shields.io/pypi/l/asf-lib?color=informational)](LICENSE)
 [![Python application](https://github.com/hadarshavit/asf/actions/workflows/tests.yml/badge.svg)](https://github.com/hadarshavit/asf/actions/workflows/tests.yml)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14957286.svg)](https://doi.org/10.5281/zenodo.14957286)
+[![codecov](https://codecov.io/gh/hadarshavit/asf/graph/badge.svg?token=WOQ37XYZWG)](https://codecov.io/gh/hadarshavit/asf)
 
 # Algorithm Selection Framework (ASF)
 

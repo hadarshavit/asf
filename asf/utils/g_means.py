@@ -33,7 +33,6 @@ class GMeans:
         random_state=None,
     ):
         self._min_samples = min_samples
-        self._significance = [0.15, 0.1, 0.05, 0.025, 0.001].index(significance)
         self._n_init = n_init
         self._n_init_kmeans = n_init_kmeans
         self._n_init_final = n_init_final
@@ -42,6 +41,13 @@ class GMeans:
         self.cluster_centers_ = None
         self.labels_ = None
         self.inertia_ = None
+
+        allowed_significance = [0.15, 0.1, 0.05, 0.025, 0.001]
+        if significance not in allowed_significance:
+            raise ValueError(
+                f"Invalid significance value: {significance}. Must be one of {allowed_significance}."
+            )
+        self._significance = allowed_significance.index(significance)
 
     def fit(self, X):
         """
@@ -61,7 +67,7 @@ class GMeans:
         self._kmeans = None
 
         for _ in range(self._n_init):
-            seed_main = int(self._random_state.randint(0, 2**31 - 1))
+            seed_main = self._random_state.randint(0, 2**31 - 1)
             kmeans = KMeans(n_clusters=1, n_init=1, random_state=seed_main).fit(X)
             queue = [0]
 
@@ -73,7 +79,7 @@ class GMeans:
 
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    seed_tmp = int(self._random_state.randint(0, 2**31 - 1))
+                    seed_tmp = self._random_state.randint(0, 2**31 - 1)
                     tmp_kmeans = KMeans(
                         n_clusters=2,
                         n_init=self._n_init_kmeans,
@@ -117,7 +123,7 @@ class GMeans:
                 self.inertia_ = kmeans.inertia_
                 self._k = np.size(kmeans.cluster_centers_, axis=0)
 
-            seed_final = int(self._random_state.randint(0, 2**31 - 1))
+            seed_final = self._random_state.randint(0, 2**31 - 1)
             candidate_kmeans = KMeans(
                 n_clusters=self._k,
                 n_init=self._n_init_final,
@@ -132,7 +138,7 @@ class GMeans:
 
         # If no candidate was accepted (edge case), fit a final kmeans with fallback _k
         if self._kmeans is None:
-            seed_final = int(self._random_state.randint(0, 2**31 - 1))
+            seed_final = self._random_state.randint(0, 2**31 - 1)
             self._kmeans = KMeans(
                 n_clusters=self._k,
                 n_init=self._n_init_final,

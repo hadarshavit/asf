@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
-from asf.selectors.isac_selector import ISACSelector
-from asf.selectors.snnap_selector import SNNAPSelector
+from asf.selectors.isac import ISAC
+from asf.selectors.snnap import SNNAP
 
 
 def generate_data(n_instances=120, n_algorithms=5, seed=0):
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     print(test_perf.head(10))
 
     # Default ISAC (GMeans)
-    selector = ISACSelector()
+    selector = ISAC()
     selector.fit(train_features, train_perf)
     preds = selector.predict(test_features)
     acc, max_acc = evaluate_predictions(preds, test_perf, budget=60)
@@ -128,7 +128,7 @@ if __name__ == "__main__":
     print_sample(preds, test_perf, n=10)
 
     # ISAC with KMeans (example: 6 clusters)
-    selector_km = ISACSelector(clusterer=KMeans, clusterer_kwargs={"n_clusters": 6})
+    selector_km = ISAC(clusterer=KMeans, clusterer_kwargs={"n_clusters": 6})
     selector_km.fit(train_features, train_perf)
     preds_km = selector_km.predict(test_features)
     acc_km, max_acc_km = evaluate_predictions(preds_km, test_perf, budget=60)
@@ -138,7 +138,7 @@ if __name__ == "__main__":
     print_sample(preds_km, test_perf, n=10)
 
     # SNNAP (k-NN majority-vote)
-    selector_snnap = SNNAPSelector(k=5)
+    selector_snnap = SNNAP(k=5)
     selector_snnap.fit(train_features, train_perf)
     preds_snnap = selector_snnap.predict(test_features)
     acc_snnap, max_acc_snnap = evaluate_predictions(preds_snnap, test_perf, budget=60)

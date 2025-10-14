@@ -120,12 +120,16 @@ solved(I)   :- solved(I,_).
 #show slice/3.
     """
 
+        # remember algorithm names (expects DataFrame columns)
+        try:
+            self.algorithms = list(performance.columns)
+        except Exception:
+            # if performance is provided as numpy array, create default names
+            self.algorithms = [f"a{i}" for i in range(performance.shape[1])]
+
         # Create a Clingo Control object with the specified number of threads
-        ctl = clingo.Control(
-            arguments=[
-                f"--parallel-mode={self.cores}",
-            ]  # f"--time-limit={self.aspeed_cutoff}"]
-        )
+        # Use -t (threads) argument which is broadly supported
+        ctl = clingo.Control(arguments=[f"-t{self.cores}"])
 
         # # Register external Python functions
         # ctl.register_external("insert", insert)
@@ -147,7 +151,8 @@ solved(I)   :- solved(I,_).
                 ),
                 replace=True,
             )
-            performance = performance[random_indx, :]
+            # keep it as a pandas DataFrame view using iloc
+            performance = performance.iloc[random_indx, :]
 
         times = [
             "time(i%d, %d, %d)." % (i, j, max(1, math.ceil(performance.iloc[i, j])))
@@ -157,34 +162,42 @@ solved(I)   :- solved(I,_).
 
         kappa = "kappa(%d)." % (self.budget)
 
-        data_in = " ".join(times) + " " + kappa
+        # join facts with newlines (more readable for clingo) and add kappa
+        data_in = "\n".join(times) + "\n" + kappa
         ctl.add(data_in)
-        # Ground the logic program
-        ctl.ground()
 
-        def clingo_callback(model: clingo.Model) -> bool:
-            """
-            Callback function to process the Clingo model.
+        # Ground the logic program (ground the default 'base' part)
+        try:
+            ctl.ground([("base", [])])
+        except Exception:
+            # fallback to grounding everything
+            ctl.ground()
 
-            Args:
-                model (clingo.Model): The Clingo model.
-
-            Returns:
-                bool: Always returns False to stop after the first model.
-            """
+        def clingo_callback(model: clingo.Model):
+            """Callback function to process the Clingo model."""
             schedule_dict = {}
             for slice in model.symbols(shown=True):
-                algo = self.algorithms[slice.arguments[1].number]
+                try:
+                    algo = self.algorithms[slice.arguments[1].number]
+                except Exception:
+                    algo = str(slice.arguments[1])
                 runcount_limit = slice.arguments[2].number
                 schedule_dict[algo] = runcount_limit
-                self.schedule = sorted(schedule_dict.items(), key=lambda x: x[1])
-            return False
 
-        # Solve the logic program
-        result = ctl.solve(yield_=False, on_model=clingo_callback)
-        if result.satisfiable:
-            assert self.schedule is not None
-        else:
+            # sort by allocated time
+            self.schedule = sorted(schedule_dict.items(), key=lambda x: x[1])
+
+        # Use async solve and a timeout similar to AutoFolio
+        try:
+            with ctl.solve(on_model=clingo_callback, async_=True) as handle:
+                if handle.wait(self.aspeed_cutoff):
+                    handle.get()
+                else:
+                    # timeout: cancel and keep whatever was found (if any)
+                    handle.cancel()
+        except Exception as e:
+            # If solving failed, leave schedule empty and report
+            print(f"Clingo solving failed: {e}")
             self.schedule = []
 
     def predict(self) -> dict[str, list[tuple[str, float]]]:
