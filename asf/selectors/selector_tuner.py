@@ -223,8 +223,6 @@ def tune_selector(
                 pre_solving=presolver,
                 feature_selector=feature_selector,
                 algorithm_pre_selector=algorithm_pre_selector,
-                budget=budget,
-                maximize=maximize,
                 feature_groups=feature_groups,
             )
             selector.fit(X_train, y_train)
@@ -276,7 +274,5 @@ def tune_selector(
         pre_solving=presolver,
         feature_selector=feature_selector,
         algorithm_pre_selector=algorithm_pre_selector,
-        budget=budget,
-        maximize=maximize,
         feature_groups=feature_groups,
     )

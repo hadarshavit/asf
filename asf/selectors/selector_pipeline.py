@@ -17,8 +17,6 @@ class SelectorPipeline:
         pre_solving (Optional[Callable]): A callable for pre-solving steps.
         feature_selector (Optional[Callable]): A callable for feature selection.
         algorithm_pre_selector (Optional[Callable]): A callable for algorithm pre-selection.
-        budget (Optional[Any]): The budget constraint for the selector.
-        maximize (bool): Whether to maximize the objective function.
         feature_groups (Optional[Any]): Feature groups to be used by the selector.
     """
 
@@ -29,8 +27,6 @@ class SelectorPipeline:
         pre_solving: AbstractPresolver = None,
         feature_selector: Optional[Callable] = None,
         algorithm_pre_selector: Optional[Callable] = None,
-        budget: Optional[Any] = None,
-        maximize: bool = False,
         feature_groups: Optional[Any] = None,
     ) -> None:
         """
@@ -42,16 +38,12 @@ class SelectorPipeline:
             pre_solving (Optional[Callable], optional): A callable for pre-solving steps. Defaults to None.
             feature_selector (Optional[Callable], optional): A callable for feature selection. Defaults to None.
             algorithm_pre_selector (Optional[Callable], optional): A callable for algorithm pre-selection. Defaults to None.
-            budget (Optional[Any], optional): The budget constraint for the selector. Defaults to None.
-            maximize (bool, optional): Whether to maximize the objective function. Defaults to False.
             feature_groups (Optional[Any], optional): Feature groups to be used by the selector. Defaults to None.
         """
         self.selector = selector
         self.pre_solving = pre_solving
         self.feature_selector = feature_selector
         self.algorithm_pre_selector = algorithm_pre_selector
-        self.budget = budget
-        self.maximize = maximize
 
         # Always include SimpleImputer as the first step in the preprocessing pipeline
         if preprocessor is None:
@@ -169,12 +161,12 @@ class SelectorPipeline:
             return None
 
         config = {
-            "budget": self.budget,
             "selector": type(self.selector).__name__,
             "selector_model": get_model_class_name(self.selector),
             "pre_solving": type(self.pre_solving).__name__
             if self.pre_solving
             else None,
+            "selector_budget": self.selector.budget if self.selector else None,
             "presolving_budget": getattr(self.pre_solving, "budget", None)
             if self.pre_solving
             else None,
