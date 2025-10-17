@@ -3,7 +3,7 @@ import numpy as np
 from asf.selectors.sunny_selector import SunnySelector
 
 
-def generate_simple_data(n_instances=80, n_algorithms=4, seed=0):
+def generate_simple_data(n_instances=80, seed=0):
     np.random.seed(seed)
     features = pd.DataFrame(
         np.random.uniform(0, 10, size=(n_instances, 2)),

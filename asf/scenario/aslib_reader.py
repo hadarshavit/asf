@@ -181,8 +181,6 @@ def evaluate_selector(
         selector = SelectorPipeline(
             selector=base_selector,
             algorithm_pre_selector=algorithm_pre_selector,
-            budget=budget,
-            maximize=maximize,
             feature_groups=feature_groups,
         )
 

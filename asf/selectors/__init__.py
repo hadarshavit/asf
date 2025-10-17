@@ -16,6 +16,7 @@ from asf.selectors.sunny_selector import SunnySelector
 from asf.selectors.isac import ISAC
 from asf.selectors.snnap import SNNAP
 from asf.selectors.selector_tuner import tune_selector
+from asf.selectors.satzilla import SATzilla
 
 __all__ = [
     "PairwiseClassifier",
@@ -33,6 +34,7 @@ __all__ = [
     "SelectorPipeline",
     "CollaborativeFilteringSelector",
     "SunnySelector",
+    "SATzilla",
     "ISAC",
     "SNNAP",
 ]

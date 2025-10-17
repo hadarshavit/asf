@@ -3,9 +3,15 @@ from typing import Type, Union, Optional
 import pandas as pd
 import numpy as np
 from sklearn.base import TransformerMixin
-from sklearn.metrics import mean_squared_error  # Fixed incorrect import
+from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import KFold
-from smac import HyperparameterOptimizationFacade, Scenario
+
+try:
+    from smac import HyperparameterOptimizationFacade, Scenario
+
+    SMAC_AVAILABLE = True
+except ImportError:
+    SMAC_AVAILABLE = False
 from asf.utils.groupkfoldshuffle import GroupKFoldShuffle
 
 from asf.epm.epm import EPM
@@ -80,6 +86,10 @@ def tune_epm(
     EPM
         The tuned Empirical Performance Model instance.
     """
+    assert SMAC_AVAILABLE, (
+        "SMAC is not installed. Please install it to use this function."
+    )
+
     if isinstance(X, np.ndarray) and isinstance(y, np.ndarray):
         X = pd.DataFrame(
             X,

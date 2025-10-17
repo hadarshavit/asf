@@ -23,6 +23,7 @@ from asf.selectors.collaborative_filtering_selector import (
     CollaborativeFilteringSelector,
 )
 from asf.selectors.sunny_selector import SunnySelector
+from asf.selectors.satzilla import SATzilla
 from asf.selectors.isac import ISAC
 from asf.selectors.snnap import SNNAP
 
@@ -154,12 +155,10 @@ def test_collaborative_filtering_selector(dummy_performance, dummy_features):
 
 
 def test_sunny_selector(dummy_performance, dummy_features):
-    # Use a reasonable budget for the test
     budget = 500
     selector = SunnySelector(k=3, use_v2=True, budget=budget)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
-    # Each prediction should be a non-empty list of (algo, time) tuples
     assert len(predictions) == len(dummy_features)
     for sched in predictions.values():
         assert isinstance(sched, list)
@@ -179,6 +178,21 @@ def test_isac_selector(dummy_performance, dummy_features):
 def test_snnap_selector(dummy_performance, dummy_features):
     selector = SNNAP(k=3, budget=450.0)
     selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+    validate_predictions(predictions)
+
+
+def test_satzilla_selector(dummy_performance, dummy_features):
+    selector = SATzilla(budget=450)
+    selector.fit(
+        dummy_features,
+        dummy_performance,
+        labels=pd.DataFrame(
+            ["SAT"] * (len(dummy_features) // 2)
+            + ["UNSAT"] * (len(dummy_features) // 2),
+            index=dummy_features.index,
+        ),
+    )
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
 

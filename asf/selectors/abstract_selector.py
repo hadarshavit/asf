@@ -40,6 +40,7 @@ class AbstractSelector:
         maximize: bool = False,
         feature_groups: list[str] | None = None,
         hierarchical_generator: AbstractFeatureGenerator | None = None,
+        **kwargs,
     ):
         """
         Initialize the AbstractSelector.
