@@ -3,6 +3,10 @@ import pandas as pd
 import inspect
 from asf.predictors import RandomForestRegressorWrapper
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
+from asf.preprocessing.performance_scaling import (
+    LogNormalization,
+    AbstractNormalization,
+)
 from asf.selectors.feature_generator import AbstractFeatureGenerator
 
 
@@ -27,7 +31,7 @@ class PerformanceModel(AbstractModelBasedSelector, AbstractFeatureGenerator):
         self,
         model_class: type,
         use_multi_target: bool = False,
-        normalize: str = "log",
+        normalize: AbstractNormalization = LogNormalization,
         **kwargs,
     ):
         """
@@ -36,14 +40,14 @@ class PerformanceModel(AbstractModelBasedSelector, AbstractFeatureGenerator):
         Args:
             model_class (type): The class of the regression model to be used.
             use_multi_target (bool): Indicates whether to use multi-target regression.
-            normalize (str): Method to normalize the performance data. Default is "log".
+            normalize (AbstractNormalization): Method to normalize the performance data. Default is LogNormalization.
             **kwargs: Additional arguments for the parent classes.
         """
         AbstractModelBasedSelector.__init__(self, model_class, **kwargs)
         AbstractFeatureGenerator.__init__(self)
         self.regressors: list | object = []
         self.use_multi_target: bool = use_multi_target
-        self.normalize: str = normalize
+        self.normalize: AbstractNormalization = normalize
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
         """
@@ -56,8 +60,8 @@ class PerformanceModel(AbstractModelBasedSelector, AbstractFeatureGenerator):
         assert self.algorithm_features is None, (
             "PerformanceModel does not use algorithm features."
         )
-        if self.normalize == "log":
-            performance = np.log10(performance + 1e-6)
+        if self.normalize is not None:
+            performance = self.normalize.fit_transform(performance)
 
         regressor_init_args = {}
         if "input_size" in inspect.signature(self.model_class).parameters.keys():
