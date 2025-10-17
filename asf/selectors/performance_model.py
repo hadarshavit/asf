@@ -31,7 +31,7 @@ class PerformanceModel(AbstractModelBasedSelector, AbstractFeatureGenerator):
         self,
         model_class: type,
         use_multi_target: bool = False,
-        normalize: AbstractNormalization = LogNormalization,
+        normalize: AbstractNormalization = LogNormalization(),
         **kwargs,
     ):
         """
