@@ -195,8 +195,9 @@ class LogNormalization(AbstractNormalization):
         Returns:
             LogNormalization: The fitted normalization instance.
         """
-        if X.min() <= 0:
-            self.min_val = X.min()
+        x_min = np.min(np.asarray(X))
+        if x_min <= 0:
+            self.min_val = x_min
         else:
             self.min_val = 0
             self.eps = 0
@@ -261,8 +262,9 @@ class SqrtNormalization(AbstractNormalization):
         Returns:
             SqrtNormalization: The fitted normalization instance.
         """
-        if X.min() < 0:
-            self.min_val = X.min()
+        x_min = np.min(np.asarray(X))
+        if x_min < 0:
+            self.min_val = x_min
             X = X + self.min_val + self.eps
         else:
             self.min_val = 0
@@ -320,7 +322,7 @@ class InvSigmoidNormalization(AbstractNormalization):
             InvSigmoidNormalization: The fitted normalization instance.
         """
         self.min_max_scale = MinMaxScaler(feature_range=(1e-6, 1 - 1e-6))
-        self.min_max_scale.fit(X)
+        self.min_max_scale.fit(np.asarray(X).reshape(-1, 1))
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
