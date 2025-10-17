@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -36,14 +36,13 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
             **kwargs: Additional args passed to parent.
         """
         super().__init__(model_class=model_class, **kwargs)
-
-        self.epms: Dict[str, EPM] = {}
+        self.epms: dict[str, EPM] = {}
 
     def _fit(
         self,
         features: pd.DataFrame,
         performance: pd.DataFrame,
-        labels: pd.DataFrame | pd.Series | List[str] | np.ndarray,
+        labels: pd.DataFrame | pd.Series | list[str] | np.ndarray,
     ) -> None:
         """
         Fit per-algorithm models.
@@ -95,8 +94,8 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
 
     def _predict(
         self,
-        features: Optional[pd.DataFrame] = None,
-    ) -> Dict[str, List[Tuple[Optional[str], float]]]:
+        features: pd.DataFrame | None = None,
+    ) -> dict[str, list[tuple[str | None, float]]]:
         """
         Predict best algorithm per instance.
 

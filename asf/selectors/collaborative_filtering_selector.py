@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Tuple, Optional
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 from asf.predictors.linear_model import RidgeRegressorWrapper
 
@@ -98,7 +97,7 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
 
     def _predict_cold_start(
         self, instance_features: pd.Series, instance_name: str
-    ) -> Tuple[str, float]:
+    ) -> tuple[str, float]:
         """
         Predict the best algorithm for a single instance using only its features (cold-start).
         """
@@ -115,9 +114,9 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
 
     def _predict(
         self,
-        features: Optional[pd.DataFrame] = None,
-        performance: Optional[pd.DataFrame] = None,
-    ) -> Dict[str, List[Tuple[str, float]]]:
+        features: pd.DataFrame | None = None,
+        performance: pd.DataFrame | None = None,
+    ) -> dict[str, list[tuple[str, float]]]:
         """
         Predicts the best algorithm for instances according to the scenario described.
         """

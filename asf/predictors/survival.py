@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from asf.predictors.abstract_predictor import AbstractPredictor
 
@@ -20,7 +20,7 @@ if SKSURV_AVAILABLE:
 
         PREFIX = "random_survival_forest"
 
-        def __init__(self, init_params: Optional[Dict[str, Any]] = None) -> None:
+        def __init__(self, init_params: dict[str, Any] | None = None) -> None:
             if not SKSURV_AVAILABLE:
                 raise ImportError(
                     "sksurv is not installed. Install scikit-survival to use RandomSurvivalForestWrapper."

@@ -1,5 +1,4 @@
 import pandas as pd
-from typing import Dict, List, Tuple
 
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 from asf.predictors.survival import RandomSurvivalForestWrapper, SKSURV_AVAILABLE
@@ -86,7 +85,7 @@ if SKSURV_AVAILABLE:
 
         def _predict(
             self, features: pd.DataFrame
-        ) -> Dict[str, List[Tuple[str, float]]]:
+        ) -> dict[str, list[tuple[str, float]]]:
             """
             Predicts the best algorithm for a new problem instance.
 

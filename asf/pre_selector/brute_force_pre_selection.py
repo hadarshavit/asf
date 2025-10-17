@@ -2,7 +2,7 @@ from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
 import pandas as pd
 import numpy as np
 from itertools import combinations
-from typing import Union, Callable
+from typing import Callable
 
 
 class BruteForcePreSelector(AbstractPreSelector):
@@ -33,8 +33,8 @@ class BruteForcePreSelector(AbstractPreSelector):
         self.maximize = maximize
 
     def fit_transform(
-        self, performance: Union[pd.DataFrame, np.ndarray]
-    ) -> Union[pd.DataFrame, np.ndarray]:
+        self, performance: pd.DataFrame | np.ndarray
+    ) -> pd.DataFrame | np.ndarray:
         """
         Selects the best subset of algorithms based on the provided performance data and metric.
 
@@ -43,11 +43,11 @@ class BruteForcePreSelector(AbstractPreSelector):
         `maximize` flag).
 
         Args:
-            performance (Union[pd.DataFrame, np.ndarray]): A DataFrame or ndarray containing the performance
+            performance (pd.DataFrame | np.ndarray): A DataFrame or ndarray containing the performance
                 scores of algorithms. Rows correspond to instances, columns to algorithms.
 
         Returns:
-            Union[pd.DataFrame, np.ndarray]: The performance data of the selected subset of algorithms,
+            pd.DataFrame | np.ndarray: The performance data of the selected subset of algorithms,
                 in the same format as the input (DataFrame or ndarray).
         """
 

@@ -9,7 +9,7 @@ to train and save the selector model.
 import argparse
 from pathlib import Path
 from functools import partial
-from typing import Dict, Callable, List
+from typing import Callable
 
 import pandas as pd
 
@@ -18,7 +18,7 @@ from asf import selectors
 import sklearn
 
 # Mapping of file extensions to pandas read functions
-pandas_read_map: Dict[str, Callable] = {
+pandas_read_map: dict[str, Callable] = {
     ".csv": pd.read_csv,
     ".parquet": pd.read_parquet,
     ".json": pd.read_json,
@@ -88,7 +88,7 @@ def build_cli_command(
     feature_data: Path,
     performance_data: Path,
     destination: Path,
-) -> List[str]:
+) -> list[str]:
     """Build a CLI command from variables for async jobs.
 
     Args:
@@ -98,7 +98,7 @@ def build_cli_command(
         destination (Path): Path to save the trained model.
 
     Returns:
-        List[str]: A list of command-line arguments to execute the training job.
+        list[str]: A list of command-line arguments to execute the training job.
     """
     model_class = (
         selector.model_class.args[0]

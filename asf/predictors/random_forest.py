@@ -15,7 +15,7 @@ try:
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 from functools import partial
-from typing import Optional, Dict, Any
+from typing import Any
 
 
 class RandomForestClassifierWrapper(SklearnWrapper):
@@ -26,7 +26,7 @@ class RandomForestClassifierWrapper(SklearnWrapper):
 
     PREFIX = "rf_classifier"
 
-    def __init__(self, init_params: Dict[str, Any] = {}):
+    def __init__(self, init_params: dict[str, Any] = {}):
         """
         Initialize the RandomForestClassifierWrapper.
 
@@ -41,10 +41,10 @@ class RandomForestClassifierWrapper(SklearnWrapper):
 
         @staticmethod
         def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
+            cs: ConfigurationSpace | None = None,
             pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
         ) -> ConfigurationSpace:
             """
             Get the configuration space for the Random Forest Classifier.
@@ -122,7 +122,7 @@ class RandomForestClassifierWrapper(SklearnWrapper):
 
         @staticmethod
         def get_from_configuration(
-            configuration: Dict[str, Any], pre_prefix: str = "", **kwargs
+            configuration: dict[str, Any], pre_prefix: str = "", **kwargs
         ) -> partial:
             """
             Create a RandomForestClassifierWrapper instance from a configuration.
@@ -164,7 +164,7 @@ class RandomForestRegressorWrapper(SklearnWrapper):
 
     PREFIX = "rf_regressor"
 
-    def __init__(self, init_params: Dict[str, Any] = {}):
+    def __init__(self, init_params: dict[str, Any] = {}):
         """
         Initialize the RandomForestRegressorWrapper.
 
@@ -179,10 +179,10 @@ class RandomForestRegressorWrapper(SklearnWrapper):
 
         @staticmethod
         def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
+            cs: ConfigurationSpace | None = None,
             pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
         ) -> ConfigurationSpace:
             """
             Get the configuration space for the Random Forest Regressor.
@@ -259,7 +259,7 @@ class RandomForestRegressorWrapper(SklearnWrapper):
 
         @staticmethod
         def get_from_configuration(
-            configuration: Dict[str, Any], pre_prefix: str = "", **kwargs
+            configuration: dict[str, Any], pre_prefix: str = "", **kwargs
         ) -> partial:
             """
             Create a RandomForestRegressorWrapper instance from a configuration.

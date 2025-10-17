@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 try:
     from ConfigSpace import ConfigurationSpace
@@ -7,7 +7,6 @@ try:
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
-from typing import Dict
 from abc import ABC, abstractmethod
 
 
@@ -101,28 +100,28 @@ if CONFIGSPACE_AVAILABLE:
 
     @staticmethod
     def get_configuration_space(
-        cs: Optional[ConfigurationSpace] = None,
+        cs: ConfigurationSpace | None = None,
         pre_prefix: str = "",
-        parent_param: Optional[Hyperparameter] = None,
-        parent_value: Optional[str] = None,
+        parent_param: Hyperparameter | None = None,
+        parent_value: str | None = None,
     ) -> Any:
         """
-        Get the configuration space for the predictor.
+            Get the configuration space for the predictor.
 
-        Parameters
-        ----------
-        cs : Optional[Any], optional
-            The configuration space to add the parameters to. If None, a new configuration space will be created.
+            Parameters
+            ----------
+        cs : Any | None, optional
+                The configuration space to add the parameters to. If None, a new configuration space will be created.
 
-        Returns
-        -------
-        Any
-            The configuration space for the predictor.
+            Returns
+            -------
+            Any
+                The configuration space for the predictor.
 
-        Raises
-        ------
-        NotImplementedError
-            If the method is not implemented for the predictor.
+            Raises
+            ------
+            NotImplementedError
+                If the method is not implemented for the predictor.
         """
         raise NotImplementedError(
             "get_configuration_space() is not implemented for this predictor"
@@ -130,7 +129,7 @@ if CONFIGSPACE_AVAILABLE:
 
     @staticmethod
     def get_from_configuration(
-        configuration: Dict[str, Any], pre_prefix: str = "", **kwargs
+        configuration: dict[str, Any], pre_prefix: str = "", **kwargs
     ) -> "AbstractPredictor":
         """
         Get a predictor instance from a configuration.
