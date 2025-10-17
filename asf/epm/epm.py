@@ -1,18 +1,18 @@
 from functools import partial
-from typing import Type, Union, Optional
+from typing import Optional, Type, Union
 
-import pandas as pd
 import numpy as np
-from sklearn.base import RegressorMixin
+import pandas as pd
+from sklearn.base import RegressorMixin, TransformerMixin
 
+from asf.predictors import SklearnWrapper
+from asf.predictors.abstract_predictor import AbstractPredictor
+from asf.predictors.random_forest import RandomForestRegressorWrapper
 from asf.preprocessing.performance_scaling import (
     AbstractNormalization,
     LogNormalization,
 )
-from asf.predictors import SklearnWrapper
 from asf.preprocessing.sklearn_preprocessor import get_default_preprocessor
-from sklearn.base import TransformerMixin
-from asf.predictors.abstract_predictor import AbstractPredictor
 
 
 class EPM:
@@ -31,7 +31,9 @@ class EPM:
 
     def __init__(
         self,
-        predictor_class: Union[Type[AbstractPredictor], Type[RegressorMixin]],
+        predictor_class: Union[
+            Type[AbstractPredictor], Type[RegressorMixin]
+        ] = RandomForestRegressorWrapper,
         normalization_class: Type[AbstractNormalization] = LogNormalization,
         transform_back: bool = True,
         features_preprocessing: Union[str, TransformerMixin] = "default",
@@ -39,6 +41,7 @@ class EPM:
         numerical_features: Optional[list] = None,
         predictor_config: Optional[dict] = None,
         predictor_kwargs: Optional[dict] = None,
+        imputer: callable = None,
     ):
         """
         Initialize the EPM model.
@@ -65,6 +68,7 @@ class EPM:
         self.transform_back = transform_back
         self.predictor_config = predictor_config
         self.predictor_kwargs = predictor_kwargs or {}
+        self.imputer = imputer
         self.numpy = False
 
         if features_preprocessing == "default":
@@ -111,15 +115,23 @@ class EPM:
         self.normalization.fit(y)
         y = self.normalization.transform(y)
 
-        if self.predictor_config is None:
-            self.predictor = self.predictor_class(**self.predictor_kwargs)
-        else:
-            self.predictor = self.predictor_class.get_from_configuration(
-                self.predictor_config, **self.predictor_kwargs
-            )()
+        if self.imputer is not None:
+            y = self.imputer(y, X)
+
+        self.predictor = self._get_predictor()
 
         self.predictor.fit(X, y, sample_weight=sample_weight)
         return self
+
+    def _get_predictor(self) -> AbstractPredictor:
+        if self.predictor_config is None:
+            predictor = self.predictor_class(**self.predictor_kwargs)
+        else:
+            predictor = self.predictor_class.get_from_configuration(
+                self.predictor_config, **self.predictor_kwargs
+            )()
+
+        return predictor
 
     def predict(self, X: Union[pd.DataFrame, pd.Series, list]) -> list:
         """
