@@ -57,9 +57,7 @@ class PerformanceModel(AbstractModelBasedSelector, AbstractFeatureGenerator):
             features (pd.DataFrame): DataFrame containing the feature data.
             performance (pd.DataFrame): DataFrame containing the performance data.
         """
-        assert self.algorithm_features is None, (
-            "PerformanceModel does not use algorithm features."
-        )
+
         if self.normalize is not None:
             performance = self.normalize.fit_transform(performance)
 
