@@ -24,7 +24,6 @@ from asf.selectors.feature_generator import (
     AbstractFeatureGenerator,
 )
 from functools import partial
-from typing import Optional, List, Dict, Tuple, Union
 
 
 class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
@@ -52,7 +51,7 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
         """
         AbstractModelBasedSelector.__init__(self, model_class, **kwargs)
         AbstractFeatureGenerator.__init__(self)
-        self.classifiers: List[AbstractPredictor] = []
+        self.classifiers: list[AbstractPredictor] = []
         self.use_weights: bool = use_weights
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
@@ -91,7 +90,7 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
 
     def _predict(
         self, features: pd.DataFrame
-    ) -> Dict[str, List[Tuple[str, Union[int, float]]]]:
+    ) -> dict[str, list[tuple[str, int | float]]]:
         """
         Predicts the best algorithm for each instance using the trained pairwise classifiers.
 
@@ -99,7 +98,7 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
             features (pd.DataFrame): The feature data for the instances.
 
         Returns:
-            Dict[str, List[Tuple[str, Union[int, float]]]]: A dictionary mapping instance names to the predicted best algorithm and budget.
+            dict[str, list[tuple[str, int | float]]]: A dictionary mapping instance names to the predicted best algorithm and budget.
             Example: {instance_name: [(algorithm_name, budget)]}
         """
         predictions_sum = self.generate_features(features)
@@ -139,17 +138,17 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
 
         @staticmethod
         def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
-            cs_transform: Optional[Dict[str, dict]] = None,
-            model_class: List[type[AbstractPredictor]] = [
+            cs: ConfigurationSpace | None = None,
+            cs_transform: dict[str, dict] | None = None,
+            model_class: list[type[AbstractPredictor]] = [
                 RandomForestClassifierWrapper,
                 XGBoostClassifierWrapper,
             ],
             pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
             **kwargs,
-        ) -> Tuple[ConfigurationSpace, Dict[str, dict]]:
+        ) -> tuple[ConfigurationSpace, dict[str, dict]]:
             """
             Get the configuration space for the predictor.
 
@@ -218,7 +217,7 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
         @staticmethod
         def get_from_configuration(
             configuration: Configuration,
-            cs_transform: Dict[str, dict],
+            cs_transform: dict[str, dict],
             pre_prefix: str = "",
             **kwargs,
         ) -> partial:

@@ -1,5 +1,3 @@
-from typing import Optional
-
 import numpy as np
 from scipy.stats import norm
 
@@ -12,7 +10,7 @@ def schmee_hahn_impute(
     em_tol: float = 1e-3,
     em_min_sigma: float = 1e-6,
     budget: float = 300.0,
-) -> tuple(np.ndarray, Optional[object]):
+) -> tuple[np.ndarray, object | None]:
     """
     Perform Schmee & Hahn iterative imputation on the log scale.
 

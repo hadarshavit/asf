@@ -1,4 +1,4 @@
-from typing import Optional, Callable, Any
+from typing import Callable, Any
 from asf.selectors.abstract_selector import AbstractSelector
 from asf.presolving.presolver import AbstractPresolver
 from sklearn.pipeline import Pipeline
@@ -13,32 +13,32 @@ class SelectorPipeline:
 
     Attributes:
         selector (AbstractSelector): The main selector model to be used.
-        preprocessor (Optional[Callable]): A callable for preprocessing the input data.
-        pre_solving (Optional[Callable]): A callable for pre-solving steps.
-        feature_selector (Optional[Callable]): A callable for feature selection.
-        algorithm_pre_selector (Optional[Callable]): A callable for algorithm pre-selection.
-        feature_groups (Optional[Any]): Feature groups to be used by the selector.
+    preprocessor (Callable | None): A callable for preprocessing the input data.
+    pre_solving (Callable | None): A callable for pre-solving steps.
+    feature_selector (Callable | None): A callable for feature selection.
+    algorithm_pre_selector (Callable | None): A callable for algorithm pre-selection.
+    feature_groups (Any | None): Feature groups to be used by the selector.
     """
 
     def __init__(
         self,
         selector: AbstractSelector,
-        preprocessor: Optional[Any] = None,
-        pre_solving: AbstractPresolver = None,
-        feature_selector: Optional[Callable] = None,
-        algorithm_pre_selector: Optional[Callable] = None,
-        feature_groups: Optional[Any] = None,
+        preprocessor: Any | None = None,
+        pre_solving: AbstractPresolver | None = None,
+        feature_selector: Callable | None = None,
+        algorithm_pre_selector: Callable | None = None,
+        feature_groups: Any | None = None,
     ) -> None:
         """
         Initializes the SelectorPipeline.
 
         Args:
             selector (AbstractSelector): The main selector model to be used.
-            preprocessor (Optional[Callable], optional): A callable for preprocessing the input data. Defaults to None.
-            pre_solving (Optional[Callable], optional): A callable for pre-solving steps. Defaults to None.
-            feature_selector (Optional[Callable], optional): A callable for feature selection. Defaults to None.
-            algorithm_pre_selector (Optional[Callable], optional): A callable for algorithm pre-selection. Defaults to None.
-            feature_groups (Optional[Any], optional): Feature groups to be used by the selector. Defaults to None.
+            preprocessor (Callable | None, optional): A callable for preprocessing the input data. Defaults to None.
+            pre_solving (Callable | None, optional): A callable for pre-solving steps. Defaults to None.
+            feature_selector (Callable | None, optional): A callable for feature selection. Defaults to None.
+            algorithm_pre_selector (Callable | None, optional): A callable for algorithm pre-selection. Defaults to None.
+            feature_groups (Any | None, optional): Feature groups to be used by the selector. Defaults to None.
         """
         self.selector = selector
         self.pre_solving = pre_solving

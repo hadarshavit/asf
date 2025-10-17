@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Tuple, Optional, Any
 from asf.selectors.abstract_selector import AbstractSelector
 from asf.utils.g_means import GMeans
 
@@ -26,8 +25,8 @@ class ISAC(AbstractSelector):
 
     def __init__(
         self,
-        clusterer: Optional[Any] = GMeans,
-        clusterer_kwargs: Optional[dict] = None,
+        clusterer: object | None = GMeans,
+        clusterer_kwargs: dict | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -73,8 +72,8 @@ class ISAC(AbstractSelector):
 
     def _predict(
         self,
-        features: Optional[pd.DataFrame] = None,
-    ) -> Dict[str, List[Tuple[str, float]]]:
+        features: pd.DataFrame | None = None,
+    ) -> dict[str, list[tuple[str, float]]]:
         """
         Predict the best algorithm for each instance based on its cluster.
 

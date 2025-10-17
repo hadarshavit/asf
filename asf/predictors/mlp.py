@@ -10,7 +10,7 @@ from sklearn.neural_network import MLPClassifier, MLPRegressor
 
 from asf.predictors.sklearn_wrapper import SklearnWrapper
 
-from typing import Optional, Dict, Any
+from typing import Any
 
 from functools import partial
 
@@ -23,7 +23,7 @@ class MLPClassifierWrapper(SklearnWrapper):
 
     PREFIX = "mlp_classifier"
 
-    def __init__(self, init_params: Optional[Dict[str, Any]] = None):
+    def __init__(self, init_params: dict[str, Any] | None = None):
         """
         Initialize the MLPClassifierWrapper.
 
@@ -35,7 +35,7 @@ class MLPClassifierWrapper(SklearnWrapper):
         super().__init__(MLPClassifier, init_params or {})
 
     def fit(
-        self, X: Any, Y: Any, sample_weight: Optional[Any] = None, **kwargs: Any
+        self, X: Any, Y: Any, sample_weight: Any | None = None, **kwargs: Any
     ) -> None:
         """
         Fit the model to the data.
@@ -60,10 +60,10 @@ class MLPClassifierWrapper(SklearnWrapper):
 
         @staticmethod
         def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
+            cs: ConfigurationSpace | None = None,
             pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
         ) -> ConfigurationSpace:
             """
             Get the configuration space for the MLP Classifier.
@@ -180,7 +180,7 @@ class MLPRegressorWrapper(SklearnWrapper):
 
     PREFIX = "mlp_regressor"
 
-    def __init__(self, init_params: Optional[Dict[str, Any]] = None):
+    def __init__(self, init_params: dict[str, Any] | None = None):
         """
         Initialize the MLPRegressorWrapper.
 
@@ -192,7 +192,7 @@ class MLPRegressorWrapper(SklearnWrapper):
         super().__init__(MLPRegressor, init_params or {})
 
     def fit(
-        self, X: Any, Y: Any, sample_weight: Optional[Any] = None, **kwargs: Any
+        self, X: Any, Y: Any, sample_weight: Any | None = None, **kwargs: Any
     ) -> None:
         """
         Fit the model to the data.
@@ -217,10 +217,10 @@ class MLPRegressorWrapper(SklearnWrapper):
 
         @staticmethod
         def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
+            cs: ConfigurationSpace | None = None,
             pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
         ) -> ConfigurationSpace:
             """
             Get the configuration space for the MLP Regressor.

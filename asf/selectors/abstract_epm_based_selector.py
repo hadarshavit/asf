@@ -1,5 +1,4 @@
 from asf.selectors.abstract_selector import AbstractSelector
-from typing import Any, Union
 from pathlib import Path
 import joblib
 
@@ -17,13 +16,13 @@ class AbstractEPMBasedSelector(AbstractSelector):
             `SklearnWrapper`.
 
     Methods:
-        save(path: Union[str, Path]) -> None:
+        save(path: str | Path) -> None:
             Saves the current instance of the selector to the specified file path.
-        load(path: Union[str, Path]) -> "AbstractEPMBasedSelector":
+        load(path: str | Path) -> "AbstractEPMBasedSelector":
             Loads a previously saved instance of the selector from the specified file path.
     """
 
-    def __init__(self, epm_kwargs: dict = None, **kwargs: Any) -> None:
+    def __init__(self, epm_kwargs: dict = None, **kwargs) -> None:
         """
         Initializes the AbstractEPMBasedSelector.
 
@@ -40,22 +39,22 @@ class AbstractEPMBasedSelector(AbstractSelector):
             epm_kwargs = {}
         self.epm_kwargs = epm_kwargs
 
-    def save(self, path: Union[str, Path]) -> None:
+    def save(self, path: str | Path) -> None:
         """
         Saves the selector instance to the specified file path.
 
         Args:
-            path (Union[str, Path]): The file path to save the selector.
+            path (str | Path): The file path to save the selector.
         """
         joblib.dump(self, path)
 
     @staticmethod
-    def load(path: Union[str, Path]) -> "AbstractEPMBasedSelector":
+    def load(path: str | Path) -> "AbstractEPMBasedSelector":
         """
         Loads a selector instance from the specified file path.
 
         Args:
-            path (Union[str, Path]): The file path to load the selector from.
+            path (str | Path): The file path to load the selector from.
 
         Returns:
             AbstractEPMBasedSelector: The loaded selector instance.

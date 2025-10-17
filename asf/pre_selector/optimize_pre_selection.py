@@ -1,7 +1,7 @@
 from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
 import pandas as pd
 import numpy as np
-from typing import Union, Callable
+from typing import Callable
 
 try:
     import scipy.optimize
@@ -21,7 +21,7 @@ class OptimizePreSelection(AbstractPreSelector):
         metric (Callable): A function to evaluate the performance of the selected algorithms.
         n_algorithms (int): The number of algorithms to select.
         maximize (bool): Whether to maximize or minimize the performance metric.
-        fmin_function (Union[str, Callable]): Optimization function or method name (e.g., "SLSQP").
+    fmin_function (str | Callable): Optimization function or method name (e.g., "SLSQP").
     """
 
     def __init__(
@@ -39,7 +39,7 @@ class OptimizePreSelection(AbstractPreSelector):
             metric (Callable): A function to evaluate the performance of the selected algorithms.
             n_algorithms (int): The number of algorithms to select.
             maximize (bool, optional): Whether to maximize the performance metric. Defaults to False.
-            fmin_function (Union[str, Callable], optional): Optimization function or method name.
+            fmin_function (str | Callable, optional): Optimization function or method name.
                 Defaults to "SLSQP".
             **kwargs: Additional arguments passed to the parent class.
 
@@ -62,18 +62,18 @@ class OptimizePreSelection(AbstractPreSelector):
             self.fmin_function = fmin_function
 
     def fit_transform(
-        self, performance: Union[pd.DataFrame, np.ndarray]
-    ) -> Union[pd.DataFrame, np.ndarray]:
+        self, performance: pd.DataFrame | np.ndarray
+    ) -> pd.DataFrame | np.ndarray:
         """
         Selects the best subset of algorithms based on the performance data.
 
         Args:
-            performance (Union[pd.DataFrame, np.ndarray]): A DataFrame or NumPy array
+            performance (pd.DataFrame | np.ndarray): A DataFrame or NumPy array
                 containing the performance data of algorithms. Rows represent instances,
                 and columns represent algorithms.
 
         Returns:
-            Union[pd.DataFrame, np.ndarray]: A DataFrame or NumPy array containing the
+            pd.DataFrame | np.ndarray: A DataFrame or NumPy array containing the
                 performance data of the selected algorithms.
 
         Raises:

@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Tuple, Optional
 from sklearn.neighbors import NearestNeighbors
 from asf.selectors.abstract_selector import AbstractSelector
 
@@ -12,14 +11,14 @@ class SNNAP(AbstractSelector):
     Args:
       k (int): number of neighbors to use (default 5).
       metric (str): distance metric for NearestNeighbors (default 'euclidean').
-      random_state (Optional[int]): Random seed for reproducibility.
+    random_state (int | None): Random seed for reproducibility.
     """
 
     def __init__(
         self,
         k: int = 5,
         metric: str = "euclidean",
-        random_state: Optional[int] = None,
+        random_state: int | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -27,9 +26,9 @@ class SNNAP(AbstractSelector):
         self.metric = metric
         self.random_state = random_state
 
-        self.features: Optional[pd.DataFrame] = None
-        self.performance: Optional[pd.DataFrame] = None
-        self.nn_model: Optional[NearestNeighbors] = None
+        self.features: pd.DataFrame | None = None
+        self.performance: pd.DataFrame | None = None
+        self.nn_model: NearestNeighbors | None = None
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
         """
@@ -48,8 +47,8 @@ class SNNAP(AbstractSelector):
 
     def _predict(
         self,
-        features: Optional[pd.DataFrame] = None,
-    ) -> Dict[str, List[Tuple[Optional[str], float]]]:
+        features: pd.DataFrame | None = None,
+    ) -> dict[str, list[tuple[str | None, float]]]:
         """
         Predict the single best algorithm for each instance using majority vote among k neighbors.
 
@@ -61,15 +60,15 @@ class SNNAP(AbstractSelector):
         if self.nn_model is None or self.features is None or self.performance is None:
             raise RuntimeError("SNNAPSelector must be fitted before prediction.")
 
-        predictions: Dict[str, List[Tuple[Optional[str], float]]] = {}
+        predictions: dict[str, list[tuple[str | None, float]]] = {}
         for idx, instance in enumerate(features.index):
             x = features.loc[instance].values.reshape(1, -1)
             n_neighbors = min(self.k, len(self.features))
             dists, neighbor_idxs = self.nn_model.kneighbors(x, n_neighbors=n_neighbors)
             neighbor_idxs = neighbor_idxs.flatten()
 
-            votes: Dict[str, int] = {}
-            runtimes_for_candidates: Dict[str, List[float]] = {}
+            votes: dict[str, int] = {}
+            runtimes_for_candidates: dict[str, list[float]] = {}
 
             for ni in neighbor_idxs:
                 neighbor_perf = self.performance.iloc[ni]

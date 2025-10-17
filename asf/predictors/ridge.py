@@ -1,4 +1,5 @@
 from asf.predictors.sklearn_wrapper import SklearnWrapper
+from typing import Any
 from sklearn.linear_model import Ridge, RidgeClassifier
 
 try:
@@ -14,7 +15,6 @@ except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
 from functools import partial
-from typing import Optional, Dict, Any
 
 
 class RidgeRegressorWrapper(SklearnWrapper):
@@ -24,17 +24,17 @@ class RidgeRegressorWrapper(SklearnWrapper):
 
     PREFIX = "ridge_regressor"
 
-    def __init__(self, init_params: Dict[str, Any] = {}):
+    def __init__(self, init_params: dict[str, Any] = {}):
         super().__init__(Ridge, init_params)
 
     if CONFIGSPACE_AVAILABLE:
 
         @staticmethod
         def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
+            cs: ConfigurationSpace | None = None,
             pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
         ) -> ConfigurationSpace:
             if pre_prefix != "":
                 prefix = f"{pre_prefix}:{RidgeRegressorWrapper.PREFIX}:"
@@ -79,7 +79,7 @@ class RidgeRegressorWrapper(SklearnWrapper):
 
         @staticmethod
         def get_from_configuration(
-            configuration: Dict[str, Any], pre_prefix: str = "", **kwargs
+            configuration: dict[str, Any], pre_prefix: str = "", **kwargs
         ) -> partial:
             if pre_prefix != "":
                 prefix = f"{pre_prefix}:{RidgeRegressorWrapper.PREFIX}:"
@@ -102,17 +102,17 @@ class RidgeClassifierWrapper(SklearnWrapper):
 
     PREFIX = "ridge_classifier"
 
-    def __init__(self, init_params: Dict[str, Any] = {}):
+    def __init__(self, init_params: dict[str, Any] = {}):
         super().__init__(RidgeClassifier, init_params)
 
     if CONFIGSPACE_AVAILABLE:
 
         @staticmethod
         def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
+            cs: ConfigurationSpace | None = None,
             pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
         ) -> ConfigurationSpace:
             if pre_prefix != "":
                 prefix = f"{pre_prefix}:{RidgeClassifierWrapper.PREFIX}:"
@@ -152,7 +152,7 @@ class RidgeClassifierWrapper(SklearnWrapper):
 
         @staticmethod
         def get_from_configuration(
-            configuration: Dict[str, Any], pre_prefix: str = "", **kwargs
+            configuration: dict[str, Any], pre_prefix: str = "", **kwargs
         ) -> partial:
             if pre_prefix != "":
                 prefix = f"{pre_prefix}:{RidgeClassifierWrapper.PREFIX}:"

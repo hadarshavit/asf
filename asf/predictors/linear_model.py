@@ -11,7 +11,7 @@ from sklearn.linear_model import SGDClassifier, SGDRegressor, Ridge
 from asf.predictors.sklearn_wrapper import SklearnWrapper
 
 from functools import partial
-from typing import Optional, Dict, Any
+from typing import Any
 
 
 class LinearClassifierWrapper(SklearnWrapper):
@@ -22,7 +22,7 @@ class LinearClassifierWrapper(SklearnWrapper):
 
     PREFIX = "linear_classifier"
 
-    def __init__(self, init_params: Optional[Dict[str, Any]] = None):
+    def __init__(self, init_params: dict[str, Any] | None = None):
         """
         Initialize the LinearClassifierWrapper.
 
@@ -37,10 +37,10 @@ class LinearClassifierWrapper(SklearnWrapper):
 
         @staticmethod
         def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
+            cs: ConfigurationSpace | None = None,
             pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
         ) -> ConfigurationSpace:
             """
             Get the configuration space for the Linear Classifier.
@@ -99,7 +99,7 @@ class LinearClassifierWrapper(SklearnWrapper):
 
         @staticmethod
         def get_from_configuration(
-            configuration: Dict[str, Any], pre_prefix: str = "", **kwargs
+            configuration: dict[str, Any], pre_prefix: str = "", **kwargs
         ) -> partial:
             """
             Create a partial function to initialize LinearClassifierWrapper with parameters from a configuration.
@@ -140,7 +140,7 @@ class LinearRegressorWrapper(SklearnWrapper):
 
     PREFIX = "linear_regressor"
 
-    def __init__(self, init_params: Optional[Dict[str, Any]] = None):
+    def __init__(self, init_params: dict[str, Any] | None = None):
         """
         Initialize the LinearRegressorWrapper.
 
@@ -155,10 +155,10 @@ class LinearRegressorWrapper(SklearnWrapper):
 
         @staticmethod
         def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
+            cs: ConfigurationSpace | None = None,
             pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
         ) -> ConfigurationSpace:
             """
             Get the configuration space for the Linear Regressor.
@@ -214,7 +214,7 @@ class LinearRegressorWrapper(SklearnWrapper):
 
         @staticmethod
         def get_from_configuration(
-            configuration: Dict[str, Any], pre_prefix: str = "", **kwargs
+            configuration: dict[str, Any], pre_prefix: str = "", **kwargs
         ) -> partial:
             """
             Create a partial function to initialize LinearRegressorWrapper with parameters from a configuration.
@@ -250,5 +250,5 @@ class RidgeRegressorWrapper(SklearnWrapper):
 
     PREFIX = "ridge_regressor"
 
-    def __init__(self, init_params: Optional[Dict[str, Any]] = None):
+    def __init__(self, init_params: dict[str, Any] | None = None):
         super().__init__(Ridge, init_params or {})

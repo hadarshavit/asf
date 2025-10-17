@@ -1,5 +1,3 @@
-from typing import Type, Union, Optional
-
 import pandas as pd
 import numpy as np
 from sklearn.base import TransformerMixin
@@ -25,21 +23,21 @@ from asf.predictors.abstract_predictor import AbstractPredictor
 def tune_epm(
     X: np.ndarray,
     y: np.ndarray,
-    model_class: Type[AbstractPredictor],
-    normalization_class: Type[AbstractNormalization] = LogNormalization,
-    features_preprocessing: Union[str, TransformerMixin] = "default",
-    categorical_features: Optional[list] = None,
-    numerical_features: Optional[list] = None,
-    groups: Optional[np.ndarray] = None,
+    model_class: type[AbstractPredictor],
+    normalization_class: type[AbstractNormalization] = LogNormalization,
+    features_preprocessing: str | TransformerMixin = "default",
+    categorical_features: list | None = None,
+    numerical_features: list | None = None,
+    groups: np.ndarray | None = None,
     cv: int = 5,
     timeout: int = 3600,
     runcount_limit: int = 100,
     output_dir: str = "./smac_output",
     seed: int = 0,
     smac_metric: callable = mean_squared_error,  # Fixed incorrect import
-    smac_scenario_kwargs: Optional[dict] = {},
-    smac_kwargs: Optional[dict] = {},
-    predictor_kwargs: Optional[dict] = {},
+    smac_scenario_kwargs: dict | None = {},
+    smac_kwargs: dict | None = {},
+    predictor_kwargs: dict | None = {},
 ) -> EPM:
     """
     Tune the Empirical Performance Model (EPM) using SMAC (Sequential Model-based Algorithm Configuration).

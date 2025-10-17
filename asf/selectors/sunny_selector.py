@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Tuple, Optional
 from asf.selectors.abstract_model_based_selector import AbstractSelector
 from sklearn.neighbors import NearestNeighbors
 from sklearn.model_selection import KFold
@@ -128,9 +127,9 @@ class SunnySelector(AbstractSelector):
         self,
         neighbor_perf: pd.DataFrame,
         cutoff: int,
-        already_selected: Optional[List[str]] = None,
-        already_covered: Optional[set] = None,
-    ) -> List[str]:
+        already_selected: list[str] | None = None,
+        already_covered: set | None = None,
+    ) -> list[str]:
         """
         Recursive greedy set cover to identify a portfolio of solvers.
         Tie-break by minimum total runtime on solved instances.
@@ -192,7 +191,7 @@ class SunnySelector(AbstractSelector):
 
     def _construct_sunny_schedule(
         self, neighbor_perf: pd.DataFrame
-    ) -> List[Tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """
         Construct a SUNNY schedule for a given neighborhood.
 
@@ -247,8 +246,8 @@ class SunnySelector(AbstractSelector):
 
     def _predict(
         self,
-        features: Optional[pd.DataFrame] = None,
-    ) -> Dict[str, List[Tuple[str, float]]]:
+        features: pd.DataFrame | None = None,
+    ) -> dict[str, list[tuple[str, float]]]:
         """
         Predict a SUNNY schedule for each instance in the provided features.
 

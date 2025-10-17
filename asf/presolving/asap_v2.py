@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 from scipy.optimize import differential_evolution
-from typing import List, Dict, Tuple, Optional
 
 from asf.presolving.presolver import AbstractPresolver
 
@@ -34,12 +33,12 @@ class ASAPv2(AbstractPresolver):
         self.verbosity = verbosity
 
         # Will be set during fit
-        self.algorithms: List[str] = []
+        self.algorithms: list[str] = []
         self.numAlg: int = 0
         self.runtimes_preschedule: np.ndarray = None
         self.features = None
         self.performance = None
-        self.schedule: List[Tuple[str, float]] = []
+        self.schedule: list[tuple[str, float]] = []
 
     def fit(self, features: pd.DataFrame, performance: pd.DataFrame):
         """Train the ASAP v2 presolver"""
@@ -235,8 +234,8 @@ class ASAPv2(AbstractPresolver):
             print("+ " * 40)
 
     def predict(
-        self, features: Optional[pd.DataFrame] = None
-    ) -> Dict[str, List[Tuple[str, float]]]:
+        self, features: pd.DataFrame | None = None
+    ) -> dict[str, list[tuple[str, float]]]:
         """
         Returns the optimized preschedule (same for all features).
         """
@@ -247,13 +246,13 @@ class ASAPv2(AbstractPresolver):
             return {"default": self.schedule}
 
         # Return same schedule for all instances
-        result = {}
+        result: dict[str, list[tuple[str, float]]] = {}
         for instance_id in features.index:
             result[instance_id] = self.schedule.copy()
 
         return result
 
-    def get_preschedule_config(self) -> Dict[str, float]:
+    def get_preschedule_config(self) -> dict[str, float]:
         """Get the optimized preschedule configuration (only non-zero times)"""
         if self.algorithms and self.runtimes_preschedule is not None:
             return {
@@ -263,7 +262,7 @@ class ASAPv2(AbstractPresolver):
             }
         return {}
 
-    def get_configuration(self) -> Dict:
+    def get_configuration(self) -> dict:
         """Return configuration for compatibility with ASF selectors"""
         return {
             "algorithms": self.algorithms,
