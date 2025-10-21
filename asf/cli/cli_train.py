@@ -148,7 +148,11 @@ def parser_function() -> argparse.ArgumentParser:
 
 
 def build_cli_command(
-    selectors: List[Union[selectors.AbstractSelector, AbstractModelBasedSelector]],
+    selector: Union[
+        selectors.AbstractSelector,
+        AbstractModelBasedSelector,
+        List[Union[selectors.AbstractSelector, AbstractModelBasedSelector]],
+    ],
     feature_data: Path,
     performance_data: Path,
     destination: Path,
@@ -160,24 +164,40 @@ def build_cli_command(
     presolvers: Optional[List[object]] = None,
     presolver_budget: Optional[float] = None,
 ) -> List[str]:
-    """
-    Build CLI command.
+    """Build CLI command from selector objects."""
+    if isinstance(selector, (list, tuple)):
+        sel_list = list(selector)
+    else:
+        sel_list = [selector]
 
-    Accepts selector class/instance or list/tuple of such objects (NOT strings).
-    Keeps original CLI flag names and style: --selector (can accept multiple values)
-    and --tuning for enabling multiple selectors.
-    """
+    for s in sel_list:
+        if isinstance(s, type):
+            ok = issubclass(s, (selectors.AbstractSelector, AbstractModelBasedSelector))
+        else:
+            ok = isinstance(s, (selectors.AbstractSelector, AbstractModelBasedSelector))
+        if not ok:
+            raise TypeError(
+                "selector must be an AbstractSelector or AbstractModelBasedSelector "
+                "class/instance, or a list/tuple of such objects"
+            )
 
     sel_names = []
-    for s in selectors:
+    for s in sel_list:
         sel_names.append(s.__name__ if isinstance(s, type) else type(s).__name__)
 
-    cmd: List[str] = ["python", str(Path(__file__).absolute()), "--selectors"] + sel_names
+    cmd: List[str] = [
+        "python",
+        str(Path(__file__).absolute()),
+        "--selectors",
+    ] + sel_names
+    if tuning:
+        cmd.append("--tuning")
 
+    model_name: Optional[str] = None
     if model is not None:
-        cmd += ["--model", model.__name__ if hasattr(model, "__name__") else str(model)]
+        model_name = model.__name__ if hasattr(model, "__name__") else str(model)
     else:
-        first = selectors[0] if len(selectors) > 0 else None
+        first = sel_list[0] if len(sel_list) > 0 else None
         if first is not None:
             try:
                 mc = (
@@ -186,29 +206,31 @@ def build_cli_command(
                     else getattr(first, "model_class", None)
                 )
                 if mc is not None and hasattr(mc, "__name__"):
-                    cmd += ["--model", mc.__name__]
+                    model_name = mc.__name__
             except Exception:
                 pass
+    if model_name is not None:
+        cmd += ["--model", model_name]
 
     if budget is not None:
         cmd += ["--budget", str(budget)]
     else:
         try:
-            first = selectors[0] if len(selectors) > 0 else None
+            first = sel_list[0] if len(sel_list) > 0 else None
             if first is not None:
-                cmd += ["--budget", str(first.budget)]
+                b = getattr(first, "budget", None)
+                if b is not None:
+                    cmd += ["--budget", str(b)]
         except Exception:
             pass
 
     if maximize is not None:
-        if maximize:
-            cmd += ["--maximize"]
+        cmd += ["--maximize", str(bool(maximize))]
     else:
         try:
-            first = selectors[0] if len(selectors) > 0 else None
+            first = sel_list[0] if len(sel_list) > 0 else None
             if first is not None:
-                if first.maximize is not None:
-                    cmd += ["--maximize"]
+                cmd += ["--maximize", str(bool(getattr(first, "maximize", False)))]
         except Exception:
             pass
 
@@ -219,14 +241,18 @@ def build_cli_command(
         str(performance_data),
         "--model-path",
         str(destination),
-        "--tuning" if tuning else "",
     ]
 
-    if preprocessors:
-        proc_names = [p.__name__ if isinstance(p, type) else type(p).__name__ for p in preprocessors]
+    if preprocessors and len(preprocessors) > 0:
+        proc_names = [
+            p.__name__ if isinstance(p, type) else type(p).__name__
+            for p in preprocessors
+        ]
         cmd += ["--preprocessors"] + proc_names
-    if presolvers:
-        pres_names = [p.__name__ if isinstance(p, type) else type(p).__name__ for p in presolvers]
+    if presolvers and len(presolvers) > 0:
+        pres_names = [
+            p.__name__ if isinstance(p, type) else type(p).__name__ for p in presolvers
+        ]
         cmd += ["--presolvers"] + pres_names
     if presolver_budget is not None:
         cmd += ["--presolver-budget", str(presolver_budget)]
@@ -254,6 +280,12 @@ if __name__ == "__main__":
 
     budget = args.budget
     presolver_ratio = args.presolver_budget
+    selector_budget = budget
+    presolver_budget = 0
+
+    if presolver_ratio > 0.0:
+        selector_budget = int(budget * (1.0 - presolver_ratio))
+        presolver_budget = budget - selector_budget
 
     selector_classes = [getattr(selectors, name) for name in selector_names]
     print("Selector classes:", selector_classes)
@@ -262,7 +294,7 @@ if __name__ == "__main__":
     print("Model class:", model_class)
 
     presolver_classes = [
-        getattr(presolving, name)(budget=presolver_ratio * budget)
+        getattr(presolving, name)(budget=presolver_budget / len(presolver_names))
         for name in presolver_names
     ]
     print("Presolver classes:", presolver_classes)
@@ -287,12 +319,12 @@ if __name__ == "__main__":
             selector = selector_class(
                 model_class,
                 maximize=args.maximize,
-                budget=args.budget,
+                budget=selector_budget,
             )
         else:
             selector = selector_class(
                 maximize=args.maximize,
-                budget=args.budget,
+                budget=selector_budget,
             )
 
         presolver = presolver_classes[0] if len(presolver_classes) > 0 else None
@@ -311,7 +343,7 @@ if __name__ == "__main__":
             features,
             performance,
             selector_class=selector_classes,
-            budget=args.budget,
+            budget=budget,
             runcount_limit=10,
             preprocessing_class=preprocessing_steps
             if len(preprocessing_steps) > 0
@@ -319,4 +351,5 @@ if __name__ == "__main__":
             pre_solving_class=presolver_classes if len(presolver_classes) > 0 else None,
         )
 
+        selector.fit(features, performance)
         selector.save(args.model_path)
