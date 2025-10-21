@@ -1,14 +1,9 @@
 from asf.selectors.abstract_selector import AbstractSelector
-from asf.predictors import SklearnWrapper
-from sklearn.base import ClassifierMixin, RegressorMixin
-from asf.predictors.abstract_predictor import AbstractPredictor
-from functools import partial
-from typing import Callable, Any
 from pathlib import Path
 import joblib
 
 
-class AbstractModelBasedSelector(AbstractSelector):
+class AbstractEPMBasedSelector(AbstractSelector):
     """
     An abstract base class for selectors that utilize a machine learning model
     for selection purposes. This class provides functionality to initialize
@@ -23,16 +18,16 @@ class AbstractModelBasedSelector(AbstractSelector):
     Methods:
         save(path: str | Path) -> None:
             Saves the current instance of the selector to the specified file path.
-        load(path: str | Path) -> "AbstractModelBasedSelector":
+        load(path: str | Path) -> "AbstractEPMBasedSelector":
             Loads a previously saved instance of the selector from the specified file path.
     """
 
-    def __init__(self, model_class: type[AbstractPredictor], **kwargs: Any) -> None:
+    def __init__(self, epm_kwargs: dict = None, **kwargs) -> None:
         """
-        Initializes the AbstractModelBasedSelector.
+        Initializes the AbstractEPMBasedSelector.
 
         Args:
-            model_class (type | Callable): The model class or a callable
+            model_class (Union[Type, Callable]): The model class or a callable
                 that returns a model instance. If a scikit-learn compatible
                 class is provided, it's wrapped with SklearnWrapper.
             **kwargs (Any): Additional keyword arguments passed to the
@@ -40,12 +35,9 @@ class AbstractModelBasedSelector(AbstractSelector):
         """
         super().__init__(**kwargs)
 
-        if isinstance(model_class, type) and issubclass(
-            model_class, (ClassifierMixin, RegressorMixin)
-        ):
-            self.model_class: Callable = partial(SklearnWrapper, model_class)
-        else:
-            self.model_class: Callable = model_class
+        if epm_kwargs is None:
+            epm_kwargs = {}
+        self.epm_kwargs = epm_kwargs
 
     def save(self, path: str | Path) -> None:
         """
@@ -57,7 +49,7 @@ class AbstractModelBasedSelector(AbstractSelector):
         joblib.dump(self, path)
 
     @staticmethod
-    def load(path: str | Path) -> "AbstractModelBasedSelector":
+    def load(path: str | Path) -> "AbstractEPMBasedSelector":
         """
         Loads a selector instance from the specified file path.
 
@@ -65,6 +57,6 @@ class AbstractModelBasedSelector(AbstractSelector):
             path (str | Path): The file path to load the selector from.
 
         Returns:
-            AbstractModelBasedSelector: The loaded selector instance.
+            AbstractEPMBasedSelector: The loaded selector instance.
         """
         return joblib.load(path)

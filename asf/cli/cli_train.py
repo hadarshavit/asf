@@ -32,7 +32,7 @@ from asf.selectors.selector_pipeline import SelectorPipeline
 
 
 # Mapping of file extensions to pandas read functions
-pandas_read_map: Dict[str, Callable] = {
+pandas_read_map: dict[str, Callable] = {
     ".csv": pd.read_csv,
     ".parquet": pd.read_parquet,
     ".json": pd.read_json,

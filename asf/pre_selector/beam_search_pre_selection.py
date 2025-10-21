@@ -1,7 +1,7 @@
 from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
 import pandas as pd
 import numpy as np
-from typing import Union, Callable
+from typing import Callable
 
 
 class BeamSearchPreSelector(AbstractPreSelector):
@@ -20,8 +20,8 @@ class BeamSearchPreSelector(AbstractPreSelector):
         self.beam_width = beam_width
 
     def fit_transform(
-        self, performance: Union[pd.DataFrame, np.ndarray]
-    ) -> Union[pd.DataFrame, np.ndarray]:
+        self, performance: pd.DataFrame | np.ndarray
+    ) -> pd.DataFrame | np.ndarray:
         if isinstance(performance, np.ndarray):
             performance_frame = pd.DataFrame(
                 performance,

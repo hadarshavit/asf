@@ -2,20 +2,20 @@ from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
-from typing import Optional, Union, List, Callable
+from typing import Callable
 
 
 def get_default_preprocessor(
-    categorical_features: Optional[Union[List[str], Callable]] = None,
-    numerical_features: Optional[Union[List[str], Callable]] = None,
+    categorical_features: list[str] | Callable | None = None,
+    numerical_features: list[str] | Callable | None = None,
 ) -> ColumnTransformer:
     """
     Creates a default preprocessor for handling categorical and numerical features.
 
     Args:
-        categorical_features (Optional[Union[List[str], Callable]]):
+        categorical_features (list[str] | Callable | None):
             List of categorical feature names or a callable selector. Defaults to selecting object dtype columns.
-        numerical_features (Optional[Union[List[str], Callable]]):
+        numerical_features (list[str] | Callable | None):
             List of numerical feature names or a callable selector. Defaults to selecting numeric dtype columns.
 
     Returns:

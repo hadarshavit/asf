@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 from asf.predictors import AbstractPredictor
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
-from typing import Type
 
 
 class MultiClassClassifier(AbstractModelBasedSelector):
@@ -11,7 +10,7 @@ class MultiClassClassifier(AbstractModelBasedSelector):
     for a given set of features and performance data.
     """
 
-    def __init__(self, model_class: Type[AbstractPredictor], **kwargs):
+    def __init__(self, model_class: type[AbstractPredictor], **kwargs):
         """
         Initializes the MultiClassClassifier.
 

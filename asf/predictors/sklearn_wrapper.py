@@ -1,6 +1,6 @@
 from sklearn.base import ClassifierMixin
 from asf.predictors.abstract_predictor import AbstractPredictor
-from typing import Any, Dict
+from typing import Any
 import numpy as np
 
 
@@ -22,7 +22,7 @@ class SklearnWrapper(AbstractPredictor):
         Load the model from a file.
     """
 
-    def __init__(self, model_class: ClassifierMixin, init_params: Dict[str, Any] = {}):
+    def __init__(self, model_class: ClassifierMixin, init_params: dict[str, Any] = {}):
         """
         Initialize the wrapper with a scikit-learn model.
 

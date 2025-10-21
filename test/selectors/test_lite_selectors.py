@@ -166,6 +166,25 @@ def test_performance_model(dummy_performance, dummy_features, model_class):
     validate_predictions(predictions)
 
 
+@pytest.mark.parametrize(
+    "model_class",
+    [
+        RandomForestRegressorWrapper,
+        SVMRegressorWrapper,
+        LinearRegressorWrapper,
+        EPMRandomForest,
+        MLPRegressorWrapper,
+    ],
+)
+def test_performance_model_with_multi_target(
+    dummy_performance, dummy_features, model_class
+):
+    model = PerformanceModel(model_class=model_class, multi_target=True)
+    model.fit(dummy_features, dummy_performance)
+    predictions = model.predict(dummy_features)
+    validate_predictions(predictions)
+
+
 def save_load(dummy_performance, dummy_features):
     model = PerformanceModel(model_class=RandomForestRegressor)
     model.fit(dummy_features, dummy_performance)

@@ -1,4 +1,4 @@
-from typing import Callable, Union
+from typing import Callable
 
 import pandas as pd
 
@@ -31,8 +31,8 @@ if TORCH_AVAILABLE:
 
         def __init__(
             self,
-            model: Union[torch.nn.Module, None] = None,
-            input_size: Union[int, None] = None,
+            model: torch.nn.Module | None = None,
+            input_size: int | None = None,
             loss: Callable = bpr_loss,
             optimizer: Callable[..., Optimizer] = torch.optim.Adam,
             batch_size: int = 128,

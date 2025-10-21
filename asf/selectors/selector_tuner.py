@@ -231,7 +231,7 @@ def tune_selector(
             score = smac_metric(y_pred, y_test)
             scores.append(score)
 
-        return np.mean(scores)
+        return np.sum(scores)
 
     smac = HyperparameterOptimizationFacade(scenario, target_function, **smac_kwargs)
     best_config = smac.optimize()
