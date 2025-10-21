@@ -12,7 +12,7 @@ try:
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
-from typing import Optional, Dict, Any, Callable
+from typing import Any, Callable
 from functools import partial
 import numpy as np
 
@@ -33,7 +33,7 @@ class XGBoostClassifierWrapper(SklearnWrapper):
 
     PREFIX: str = "xgb_classifier"
 
-    def __init__(self, init_params: Optional[Dict[str, Any]] = None):
+    def __init__(self, init_params: dict[str, Any] | None = None):
         """
         Initialize the XGBoostClassifierWrapper.
 
@@ -100,10 +100,10 @@ class XGBoostClassifierWrapper(SklearnWrapper):
 
         @staticmethod
         def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
+            cs: ConfigurationSpace | None = None,
             pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
         ) -> ConfigurationSpace:
             """
             Get the configuration space for the XGBoost classifier.
@@ -199,7 +199,7 @@ class XGBoostClassifierWrapper(SklearnWrapper):
 
         @staticmethod
         def get_from_configuration(
-            configuration: Dict[str, Any],
+            configuration: dict[str, Any],
             pre_prefix: str = "",
             **kwargs: Any,
         ) -> Callable[..., "XGBoostClassifierWrapper"]:
@@ -245,7 +245,7 @@ class XGBoostRegressorWrapper(SklearnWrapper):
 
     PREFIX: str = "xgb_regressor"
 
-    def __init__(self, init_params: Optional[Dict[str, Any]] = None):
+    def __init__(self, init_params: dict[str, Any] | None = None):
         """
         Initialize the XGBoostRegressorWrapper.
 
@@ -260,10 +260,10 @@ class XGBoostRegressorWrapper(SklearnWrapper):
 
         @staticmethod
         def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
+            cs: ConfigurationSpace | None = None,
             pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
         ) -> ConfigurationSpace:
             """
             Get the configuration space for the XGBoost regressor.
@@ -358,7 +358,7 @@ class XGBoostRegressorWrapper(SklearnWrapper):
 
         @staticmethod
         def get_from_configuration(
-            configuration: Dict[str, Any],
+            configuration: dict[str, Any],
             pre_prefix: str = "",
             **kwargs,
         ) -> Callable[..., "XGBoostRegressorWrapper"]:
@@ -404,7 +404,7 @@ class XGBoostRankerWrapper(SklearnWrapper):
 
     PREFIX: str = "xgb_ranker"
 
-    def __init__(self, init_params: Optional[Dict[str, Any]] = None):
+    def __init__(self, init_params: dict[str, Any] | None = None):
         """
         Initialize the XGBoostRankerWrapper.
 
@@ -419,10 +419,10 @@ class XGBoostRankerWrapper(SklearnWrapper):
 
         @staticmethod
         def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
+            cs: ConfigurationSpace | None = None,
             pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
         ) -> ConfigurationSpace:
             """
             Get the configuration space for the XGBoost ranker.
@@ -516,7 +516,7 @@ class XGBoostRankerWrapper(SklearnWrapper):
 
         @staticmethod
         def get_from_configuration(
-            configuration: Dict[str, Any],
+            configuration: dict[str, Any],
             pre_prefix: str = "",
             **kwargs,
         ) -> Callable[..., "XGBoostRankerWrapper"]:

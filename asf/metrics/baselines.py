@@ -1,5 +1,4 @@
 import pandas as pd
-from typing import Dict, List, Tuple, Optional, Union
 import warnings
 import numpy as np
 
@@ -42,25 +41,25 @@ def virtual_best_solver(performance: pd.DataFrame, maximize: bool = False) -> fl
 
 
 def running_time_selector_performance(
-    schedules: Dict[str, List[Tuple[str, float]]],
+    schedules: dict[str, list[tuple[str, float]]],
     performance: pd.DataFrame,
     budget: float = 5000,
     par: float = 10,
-    feature_time: Optional[pd.DataFrame] = None,
-) -> Dict[str, Union[float, int]]:
+    feature_time: pd.DataFrame | None = None,
+) -> dict[str, float | int]:
     """
     Calculates the total running time for a selector based on the given schedules and performance data.
 
     Args:
-        schedules (Dict[str, List[Tuple[str, float]]]): The schedules to evaluate, where each key is an instance
+    schedules (dict[str, list[tuple[str, float]]]): The schedules to evaluate, where each key is an instance
             and the value is a list of tuples (algorithm, allocated budget).
         performance (pd.DataFrame): The performance data for the algorithms.
         budget (float): The budget for the scenario.
         par (float): The penalization factor for unsolved instances.
-        feature_time (Optional[pd.DataFrame]): The feature time data for each instance. Defaults to zero if not provided.
+    feature_time (pd.DataFrame | None): The feature time data for each instance. Defaults to zero if not provided.
 
     Returns:
-        Dict[str, Union[float, int]]: A dictionary mapping each instance to its total running time.
+    dict[str, float | int]: A dictionary mapping each instance to its total running time.
     """
     if feature_time is None:
         feature_time = pd.DataFrame(
@@ -100,7 +99,7 @@ def running_time_selector_performance(
 
 
 def running_time_closed_gap(
-    schedules: Dict[str, List[Tuple[str, float]]],
+    schedules: dict[str, list[tuple[str, float]]],
     performance: pd.DataFrame,
     budget: float,
     feature_time: pd.DataFrame,
@@ -110,7 +109,7 @@ def running_time_closed_gap(
     Calculates the closed gap metric for a given selector.
 
     Args:
-        schedules (Dict[str, List[Tuple[str, float]]]): The schedules to evaluate.
+    schedules (dict[str, list[tuple[str, float]]]): The schedules to evaluate.
         performance (pd.DataFrame): The performance data for the algorithms.
         budget (float): The budget for the scenario.
         par (float): The penalization factor for unsolved instances.

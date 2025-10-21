@@ -29,7 +29,6 @@ try:
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 from functools import partial
-from typing import Optional, List, Dict, Tuple
 
 
 class PairwiseRegressor(AbstractModelBasedSelector, AbstractFeatureGenerator):
@@ -40,7 +39,7 @@ class PairwiseRegressor(AbstractModelBasedSelector, AbstractFeatureGenerator):
 
     Attributes:
         model_class (type): The regression model class to be used for pairwise comparisons.
-        regressors (List[AbstractPredictor]): List of trained regressors for pairwise comparisons.
+    regressors (list[AbstractPredictor]): List of trained regressors for pairwise comparisons.
     """
 
     def __init__(self, model_class: type, **kwargs):
@@ -53,7 +52,7 @@ class PairwiseRegressor(AbstractModelBasedSelector, AbstractFeatureGenerator):
         """
         AbstractModelBasedSelector.__init__(self, model_class, **kwargs)
         AbstractFeatureGenerator.__init__(self)
-        self.regressors: List[AbstractPredictor] = []
+        self.regressors: list[AbstractPredictor] = []
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
         """
@@ -80,7 +79,7 @@ class PairwiseRegressor(AbstractModelBasedSelector, AbstractFeatureGenerator):
                 )
                 self.regressors.append(cur_model)
 
-    def _predict(self, features: pd.DataFrame) -> Dict[str, List[Tuple[str, float]]]:
+    def _predict(self, features: pd.DataFrame) -> dict[str, list[tuple[str, float]]]:
         """
         Predicts the best algorithm for each instance using the trained pairwise regressors.
 
@@ -88,7 +87,7 @@ class PairwiseRegressor(AbstractModelBasedSelector, AbstractFeatureGenerator):
             features (pd.DataFrame): The feature data for the instances.
 
         Returns:
-            Dict[str, List[Tuple[str, float]]]: A dictionary mapping instance names to the predicted best algorithm
+            dict[str, list[tuple[str, float]]]: A dictionary mapping instance names to the predicted best algorithm
             and the associated budget.
             Example: {instance_name: [(algorithm_name, budget)]}
         """
@@ -130,17 +129,17 @@ class PairwiseRegressor(AbstractModelBasedSelector, AbstractFeatureGenerator):
 
         @staticmethod
         def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
-            cs_transform: Optional[Dict[str, Dict[str, type]]] = None,
-            model_class: List[type[AbstractPredictor]] = [
+            cs: ConfigurationSpace | None = None,
+            cs_transform: dict[str, dict[str, type]] | None = None,
+            model_class: list[type[AbstractPredictor]] = [
                 RandomForestRegressorWrapper,
                 XGBoostRegressorWrapper,
             ],
             pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
             **kwargs,
-        ) -> Tuple[ConfigurationSpace, Dict[str, Dict[str, type]]]:
+        ) -> tuple[ConfigurationSpace, dict[str, dict[str, type]]]:
             """
             Get the configuration space for the predictor.
 
@@ -201,7 +200,7 @@ class PairwiseRegressor(AbstractModelBasedSelector, AbstractFeatureGenerator):
         @staticmethod
         def get_from_configuration(
             configuration: Configuration,
-            cs_transform: Dict[str, Dict[str, type]],
+            cs_transform: dict[str, dict[str, type]],
             pre_prefix: str = "",
             **kwargs,
         ) -> partial:

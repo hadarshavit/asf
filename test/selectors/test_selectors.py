@@ -184,7 +184,15 @@ def test_snnap_selector(dummy_performance, dummy_features):
 
 def test_satzilla_selector(dummy_performance, dummy_features):
     selector = SATzilla(budget=450)
-    selector.fit(dummy_features, dummy_performance)
+    selector.fit(
+        dummy_features,
+        dummy_performance,
+        labels=pd.DataFrame(
+            ["SAT"] * (len(dummy_features) // 2)
+            + ["UNSAT"] * (len(dummy_features) // 2),
+            index=dummy_features.index,
+        ),
+    )
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
 

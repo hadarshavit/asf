@@ -1,7 +1,7 @@
 from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
 import pandas as pd
 import numpy as np
-from typing import Union, Callable
+from typing import Callable
 
 
 class SBSPreSelector(AbstractPreSelector):
@@ -32,18 +32,18 @@ class SBSPreSelector(AbstractPreSelector):
         self.maximize = maximize
 
     def fit_transform(
-        self, performance: Union[pd.DataFrame, np.ndarray]
-    ) -> Union[pd.DataFrame, np.ndarray]:
+        self, performance: pd.DataFrame | np.ndarray
+    ) -> pd.DataFrame | np.ndarray:
         """
         Selects the best subset of algorithms based on the performance data using a sequential
         backward selection approach.
 
         Args:
-            performance (Union[pd.DataFrame, np.ndarray]): A DataFrame or NumPy array containing
+            performance (pd.DataFrame | np.ndarray): A DataFrame or NumPy array containing
                 the performance data of algorithms. Rows represent instances, and columns represent algorithms.
 
         Returns:
-            Union[pd.DataFrame, np.ndarray]: A DataFrame or NumPy array containing the performance
+            pd.DataFrame | np.ndarray: A DataFrame or NumPy array containing the performance
                 data of the selected algorithms.
         """
         if isinstance(performance, np.ndarray):

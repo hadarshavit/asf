@@ -14,7 +14,7 @@ except ImportError:
 
 from sklearn.svm import SVC, SVR
 from functools import partial
-from typing import Dict, Any, Optional
+from typing import Any
 
 from asf.predictors.sklearn_wrapper import SklearnWrapper
 
@@ -33,7 +33,7 @@ class SVMClassifierWrapper(SklearnWrapper):
 
     PREFIX = "svm_classifier"
 
-    def __init__(self, init_params: Dict[str, Any] = {}):
+    def __init__(self, init_params: dict[str, Any] = {}):
         """
         Initialize the SVMClassifierWrapper.
 
@@ -48,10 +48,10 @@ class SVMClassifierWrapper(SklearnWrapper):
 
         @staticmethod
         def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
+            cs: ConfigurationSpace | None = None,
             pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
         ) -> ConfigurationSpace:
             """
             Define the configuration space for the SVM classifier.
@@ -124,7 +124,7 @@ class SVMClassifierWrapper(SklearnWrapper):
 
         @staticmethod
         def get_from_configuration(
-            configuration: Dict[str, Any], pre_prefix: str = "", **kwargs
+            configuration: dict[str, Any], pre_prefix: str = "", **kwargs
         ) -> partial:
             """
             Create an SVMClassifierWrapper instance from a configuration.
@@ -174,7 +174,7 @@ class SVMRegressorWrapper(SklearnWrapper):
 
     PREFIX = "svm_regressor"
 
-    def __init__(self, init_params: Dict[str, Any] = {}):
+    def __init__(self, init_params: dict[str, Any] = {}):
         """
         Initialize the SVMRegressorWrapper.
 
@@ -189,10 +189,10 @@ class SVMRegressorWrapper(SklearnWrapper):
 
         @staticmethod
         def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
+            cs: ConfigurationSpace | None = None,
             pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
         ) -> ConfigurationSpace:
             """
             Define the configuration space for the SVM regressor.
@@ -265,7 +265,7 @@ class SVMRegressorWrapper(SklearnWrapper):
 
         @staticmethod
         def get_from_configuration(
-            configuration: Dict[str, Any], pre_prefix: str = "", **kwargs
+            configuration: dict[str, Any], pre_prefix: str = "", **kwargs
         ) -> partial:
             """
             Create an SVMRegressorWrapper instance from a configuration.

@@ -1,18 +1,17 @@
 from functools import partial
-from typing import Type, Union, Optional
 
-import pandas as pd
 import numpy as np
-from sklearn.base import RegressorMixin
+import pandas as pd
+from sklearn.base import RegressorMixin, TransformerMixin
 
+from asf.predictors import SklearnWrapper
+from asf.predictors.abstract_predictor import AbstractPredictor
+from asf.predictors.random_forest import RandomForestRegressorWrapper
 from asf.preprocessing.performance_scaling import (
     AbstractNormalization,
     LogNormalization,
 )
-from asf.predictors import SklearnWrapper
 from asf.preprocessing.sklearn_preprocessor import get_default_preprocessor
-from sklearn.base import TransformerMixin
-from asf.predictors.abstract_predictor import AbstractPredictor
 
 
 class EPM:
@@ -21,37 +20,40 @@ class EPM:
     that includes preprocessing, normalization, and optional inverse transformation of predictions.
 
     Attributes:
-        predictor_class (Type[AbstractPredictor] | Type[RegressorMixin]): The class of the predictor to use.
-        normalization_class (Type[AbstractNormalization]): The normalization class to apply to the target variable.
+        predictor_class (type[AbstractPredictor] | type[RegressorMixin]): The class of the predictor to use.
+        normalization_class (type[AbstractNormalization]): The normalization class to apply to the target variable.
         transform_back (bool): Whether to apply inverse transformation to predictions.
-        features_preprocessing (Union[str, TransformerMixin]): Preprocessing pipeline for features.
-        predictor_config (Optional[dict]): Configuration for the predictor.
-        predictor_kwargs (Optional[dict]): Additional keyword arguments for the predictor.
+        features_preprocessing (str | TransformerMixin): Preprocessing pipeline for features.
+        predictor_config (dict | None): Configuration for the predictor.
+        predictor_kwargs (dict | None): Additional keyword arguments for the predictor.
     """
 
     def __init__(
         self,
-        predictor_class: Union[Type[AbstractPredictor], Type[RegressorMixin]],
-        normalization_class: Type[AbstractNormalization] = LogNormalization,
+        predictor_class: (
+            type[AbstractPredictor] | type[RegressorMixin]
+        ) = RandomForestRegressorWrapper,
+        normalization_class: type[AbstractNormalization] = LogNormalization,
         transform_back: bool = True,
-        features_preprocessing: Union[str, TransformerMixin] = "default",
-        categorical_features: Optional[list] = None,
-        numerical_features: Optional[list] = None,
-        predictor_config: Optional[dict] = None,
-        predictor_kwargs: Optional[dict] = None,
+        features_preprocessing: str | TransformerMixin = "default",
+        categorical_features: list | None = None,
+        numerical_features: list | None = None,
+        predictor_config: dict | None = None,
+        predictor_kwargs: dict | None = None,
+        imputer: callable = None,
     ):
         """
         Initialize the EPM model.
 
         Parameters:
-            predictor_class (Type[AbstractPredictor] | Type[RegressorMixin]): The class of the predictor to use.
-            normalization_class (Type[AbstractNormalization]): The normalization class to apply to the target variable.
+            predictor_class (type[AbstractPredictor] | type[RegressorMixin]): The class of the predictor to use.
+            normalization_class (type[AbstractNormalization]): The normalization class to apply to the target variable.
             transform_back (bool): Whether to apply inverse transformation to predictions.
-            features_preprocessing (Union[str, TransformerMixin]): Preprocessing pipeline for features.
-            categorical_features (Optional[list]): List of categorical feature names.
-            numerical_features (Optional[list]): List of numerical feature names.
-            predictor_config (Optional[dict]): Configuration for the predictor.
-            predictor_kwargs (Optional[dict]): Additional keyword arguments for the predictor.
+            features_preprocessing (str | TransformerMixin): Preprocessing pipeline for features.
+            categorical_features (list | None): List of categorical feature names.
+            numerical_features (list | None): List of numerical feature names.
+            predictor_config (dict | None): Configuration for the predictor.
+            predictor_kwargs (dict | None): Additional keyword arguments for the predictor.
         """
         if isinstance(predictor_class, type) and issubclass(
             predictor_class, (RegressorMixin)
@@ -65,6 +67,7 @@ class EPM:
         self.transform_back = transform_back
         self.predictor_config = predictor_config
         self.predictor_kwargs = predictor_kwargs or {}
+        self.imputer = imputer
         self.numpy = False
 
         if features_preprocessing == "default":
@@ -77,17 +80,17 @@ class EPM:
 
     def fit(
         self,
-        X: Union[pd.DataFrame, pd.Series, list],
-        y: Union[pd.Series, list],
-        sample_weight: Optional[list] = None,
+        X: pd.DataFrame | pd.Series | list,
+        y: pd.Series | list,
+        sample_weight: list | None = None,
     ) -> "EPM":
         """
         Fit the EPM model to the data.
 
         Parameters:
-            X (Union[pd.DataFrame, pd.Series, list]): Features.
-            y (Union[pd.Series, list]): Target variable.
-            sample_weight (Optional[list]): Sample weights (optional).
+            X (pd.DataFrame | pd.Series | list): Features.
+            y (pd.Series | list): Target variable.
+            sample_weight (list | None): Sample weights (optional).
 
         Returns:
             EPM: The fitted EPM model.
@@ -111,22 +114,30 @@ class EPM:
         self.normalization.fit(y)
         y = self.normalization.transform(y)
 
-        if self.predictor_config is None:
-            self.predictor = self.predictor_class(**self.predictor_kwargs)
-        else:
-            self.predictor = self.predictor_class.get_from_configuration(
-                self.predictor_config, **self.predictor_kwargs
-            )()
+        if self.imputer is not None:
+            y = self.imputer(y, X)
+
+        self.predictor = self._get_predictor()
 
         self.predictor.fit(X, y, sample_weight=sample_weight)
         return self
 
-    def predict(self, X: Union[pd.DataFrame, pd.Series, list]) -> list:
+    def _get_predictor(self) -> AbstractPredictor:
+        if self.predictor_config is None:
+            predictor = self.predictor_class(**self.predictor_kwargs)
+        else:
+            predictor = self.predictor_class.get_from_configuration(
+                self.predictor_config, **self.predictor_kwargs
+            )()
+
+        return predictor
+
+    def predict(self, X: pd.DataFrame | pd.Series | list) -> list:
         """
         Predict using the fitted EPM model.
 
         Parameters:
-            X (Union[pd.DataFrame, pd.Series, list]): Features.
+            X (pd.DataFrame | pd.Series | list): Features.
 
         Returns:
             list: Predicted values.
