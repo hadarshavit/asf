@@ -1,10 +1,11 @@
-from typing import Any
+from typing import Any, Optional, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
 
 from asf.epm import EPM
 from asf.predictors.random_forest import RandomForestClassifierWrapper
+from asf.predictors.ridge import RidgeRegressorWrapper
 from asf.selectors.abstract_epm_based_selector import AbstractEPMBasedSelector
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 
@@ -45,12 +46,6 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
 
         Args:
             model_class: Callable returning a fresh model instance.
-            model_kwargs: Keyword args forwarded to model.
-            use_log10: If True, use base-10 log transform for targets.
-            random_state: Random seed for reproducibility.
-            em_max_iter: Max iterations for Schmee & Hahn imputation.
-            em_tol: Convergence tolerance for imputed target updates.
-            em_min_sigma: Minimum residual std to avoid numerical issues.
             **kwargs: Additional args passed to parent.
         """
         super().__init__(model_class=model_class, **kwargs)
@@ -68,8 +63,8 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
         Args:
             features: DataFrame of instance features (n_instances x n_features).
             performance: DataFrame of runtimes (n_instances x n_algorithms).
-            sat_labels: Optional array-like aligned with features.index containing
-                        SAT/UNSAT labels; if provided, train per-status models.
+            labels: Array-like aligned with features.index containing
+                    SAT/UNSAT labels; if provided, train per-status models.
         """
         # Normalize labels to a 1D pandas Series aligned with features/performance
         if isinstance(labels, pd.DataFrame):
@@ -163,7 +158,7 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
         def get_configuration_space(
             cs: Optional[ConfigurationSpace] = None,
             cs_transform: Optional[Dict[str, Dict[str, type]]] = None,
-            model_class: List[type] = [RidgeRegressorWrapper],
+            model_class: List[type] = None,
             pre_prefix: str = "",
             parent_param: Optional[Hyperparameter] = None,
             parent_value: Optional[str] = None,
@@ -178,6 +173,8 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
                 cs = ConfigurationSpace()
             if cs_transform is None:
                 cs_transform = {}
+            if model_class is None:
+                model_class = [RidgeRegressorWrapper]
 
             # Prefix for namespacing
             if pre_prefix != "":
