@@ -17,7 +17,7 @@ from sklearn import preprocessing
 from asf import selectors
 from asf import presolving
 from asf.selectors import tune_selector
-from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
+from asf.selectors import AbstractModelBasedSelector, AbstractSelector
 from asf.predictors.random_forest import (
     RandomForestClassifierWrapper,
     RandomForestRegressorWrapper,
@@ -266,7 +266,7 @@ if __name__ == "__main__":
 
     if not args.tuning and len(args.selectors) != 1:
         parser.error(
-            "When --tuning is not set, --selector must contain exactly one selector"
+            "When --tuning is not set, --selectors must contain exactly one selector"
         )
 
     if not args.tuning and args.presolvers and len(args.presolvers) > 1:
@@ -315,17 +315,19 @@ if __name__ == "__main__":
 
     if not args.tuning:
         selector_class = selector_classes[0]
-        if isinstance(selector_class, AbstractModelBasedSelector):
+        if issubclass(selector_class, AbstractModelBasedSelector):
             selector = selector_class(
                 model_class,
                 maximize=args.maximize,
                 budget=selector_budget,
             )
-        else:
+        elif issubclass(selector_class, AbstractSelector):
             selector = selector_class(
                 maximize=args.maximize,
                 budget=selector_budget,
             )
+        else:
+            raise TypeError("Selector must be a subclass of AbstractSelector or AbstractModelBasedSelector")
 
         presolver = presolver_classes[0] if len(presolver_classes) > 0 else None
 
