@@ -10,7 +10,7 @@ def test_parser_function_has_expected_arguments():
     parser = cli_train.parser_function()
     args = [a.dest for a in parser._actions]
     for needed in [
-        "selector",
+        "selectors",
         "model",
         "budget",
         "maximize",
@@ -58,7 +58,7 @@ def test_build_cli_command_with_partial_and_direct_model(tmp_path):
     )
     cmd1 = cli_train.build_cli_command(selector1, feat, perf, dst)
     # Ensure important flags present and values serialized
-    assert "--selector" in cmd1 and "--model" in cmd1
+    assert "--selectors" in cmd1 and "--model" in cmd1
     assert "--feature-data" in cmd1 and str(feat) in cmd1
     assert "--performance-data" in cmd1 and str(perf) in cmd1
     assert "--model-path" in cmd1 and str(dst) in cmd1

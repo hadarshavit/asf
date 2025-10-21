@@ -9,13 +9,27 @@ to train and save the selector model.
 import argparse
 from pathlib import Path
 from functools import partial
-from typing import Callable
+from typing import Dict, Callable, List, Optional, Union
 
 import pandas as pd
 
+from sklearn import preprocessing
 from asf import selectors
+from asf import presolving
+from asf.selectors import tune_selector
+from asf.selectors import AbstractModelBasedSelector, AbstractSelector
+from asf.predictors.random_forest import (
+    RandomForestClassifierWrapper,
+    RandomForestRegressorWrapper,
+)
+from asf.predictors.ridge import RidgeRegressorWrapper
+from asf.predictors.survival import RandomSurvivalForestWrapper
+from asf.predictors.svm import SVMClassifierWrapper, SVMRegressorWrapper
+from asf.predictors.xgboost import XGBoostClassifierWrapper, XGBoostRegressorWrapper
+from asf.predictors.linear_model import LinearClassifierWrapper, LinearRegressorWrapper
+from asf.predictors.mlp import MLPClassifierWrapper, MLPRegressorWrapper
+from asf.selectors.selector_pipeline import SelectorPipeline
 
-import sklearn
 
 # Mapping of file extensions to pandas read functions
 pandas_read_map: dict[str, Callable] = {
@@ -28,6 +42,31 @@ pandas_read_map: dict[str, Callable] = {
     ".xml": pd.read_xml,
 }
 
+model_list: Dict = {
+    "RandomForestClassifier": RandomForestClassifierWrapper,
+    "RandomForestRegressor": RandomForestRegressorWrapper,
+    "Ridge": RidgeRegressorWrapper,
+    "RandomSurvivalForest": RandomSurvivalForestWrapper,
+    "SVMClassifier": SVMClassifierWrapper,
+    "SVMRegressor": SVMRegressorWrapper,
+    "XGBoostClassifier": XGBoostClassifierWrapper,
+    "XGBoostRegressor": XGBoostRegressorWrapper,
+    "LinearClassifier": LinearClassifierWrapper,
+    "LinearRegressor": LinearRegressorWrapper,
+    "MLPClassifier": MLPClassifierWrapper,
+    "MLPRegressor": MLPRegressorWrapper,
+}
+
+
+def _fraction_type(val: str) -> float:
+    try:
+        f = float(val)
+    except Exception:
+        raise argparse.ArgumentTypeError("must be a float between 0 and 1")
+    if f < 0.0 or f > 1.0:
+        raise argparse.ArgumentTypeError("must be between 0 and 1")
+    return f
+
 
 def parser_function() -> argparse.ArgumentParser:
     """Define command line arguments for the CLI.
@@ -37,10 +76,17 @@ def parser_function() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--selector",
+        "--selectors",
         choices=selectors.__all__,
         required=True,
-        help="Selector to train",
+        nargs="+",
+        help="Selector(s) to train. Chooses from multiple when used with --tuning",
+    )
+    parser.add_argument(
+        "--tuning",
+        action="store_true",
+        default=False,
+        help="Enable tuning mode: allow multiple selectors to be passed via --selector",
     )
     parser.add_argument(
         "--model",
@@ -80,42 +126,115 @@ def parser_function() -> argparse.ArgumentParser:
         required=True,
         help="Path to save model",
     )
+    parser.add_argument(
+        "--preprocessors",
+        nargs="*",
+        default=None,
+        help=("Preprocessors to apply, choose from Sklearn preprocessors"),
+    )
+    parser.add_argument(
+        "--presolvers",
+        nargs="*",
+        default=None,
+        help=("Presolvers to apply"),
+    )
+    parser.add_argument(
+        "--presolver-budget",
+        type=_fraction_type,
+        default=0.0,
+        help="Fraction of total budget to allocate to presolving (float between 0 and 1).",
+    )
     return parser
 
 
 def build_cli_command(
-    selector: selectors.AbstractModelBasedSelector,
+    selector: Union[
+        selectors.AbstractSelector,
+        AbstractModelBasedSelector,
+        List[Union[selectors.AbstractSelector, AbstractModelBasedSelector]],
+    ],
     feature_data: Path,
     performance_data: Path,
     destination: Path,
-) -> list[str]:
-    """Build a CLI command from variables for async jobs.
+    model: Optional[Callable] = None,
+    tuning: bool = False,
+    budget: Optional[int] = None,
+    maximize: Optional[bool] = None,
+    preprocessors: Optional[List[object]] = None,
+    presolvers: Optional[List[object]] = None,
+    presolver_budget: Optional[float] = None,
+) -> List[str]:
+    """Build CLI command from selector objects."""
+    if isinstance(selector, (list, tuple)):
+        sel_list = list(selector)
+    else:
+        sel_list = [selector]
 
-    Args:
-        selector (selectors.AbstractModelBasedSelector): Selector to train.
-        feature_data (Path): Path to feature data DataFrame.
-        performance_data (Path): Path to performance data DataFrame.
-        destination (Path): Path to save the trained model.
+    for s in sel_list:
+        if isinstance(s, type):
+            ok = issubclass(s, (selectors.AbstractSelector, AbstractModelBasedSelector))
+        else:
+            ok = isinstance(s, (selectors.AbstractSelector, AbstractModelBasedSelector))
+        if not ok:
+            raise TypeError(
+                "selector must be an AbstractSelector or AbstractModelBasedSelector "
+                "class/instance, or a list/tuple of such objects"
+            )
 
-    Returns:
-        list[str]: A list of command-line arguments to execute the training job.
-    """
-    model_class = (
-        selector.model_class.args[0]
-        if isinstance(selector.model_class, partial)
-        else selector.model_class
-    )
-    return [
+    sel_names = []
+    for s in sel_list:
+        sel_names.append(s.__name__ if isinstance(s, type) else type(s).__name__)
+
+    cmd: List[str] = [
         "python",
         str(Path(__file__).absolute()),
-        "--selector",
-        type(selector).__name__,
-        "--model",
-        f"{model_class.__name__}",
-        "--budget",
-        str(selector.budget),
-        "--maximize",
-        str(selector.maximize),
+        "--selectors",
+    ] + sel_names
+    if tuning:
+        cmd.append("--tuning")
+
+    model_name: Optional[str] = None
+    if model is not None:
+        model_name = model.__name__ if hasattr(model, "__name__") else str(model)
+    else:
+        first = sel_list[0] if len(sel_list) > 0 else None
+        if first is not None:
+            try:
+                mc = (
+                    first.model_class.args[0]
+                    if isinstance(getattr(first, "model_class", None), partial)
+                    else getattr(first, "model_class", None)
+                )
+                if mc is not None and hasattr(mc, "__name__"):
+                    model_name = mc.__name__
+            except Exception:
+                pass
+    if model_name is not None:
+        cmd += ["--model", model_name]
+
+    if budget is not None:
+        cmd += ["--budget", str(budget)]
+    else:
+        try:
+            first = sel_list[0] if len(sel_list) > 0 else None
+            if first is not None:
+                b = getattr(first, "budget", None)
+                if b is not None:
+                    cmd += ["--budget", str(b)]
+        except Exception:
+            pass
+
+    if maximize is not None:
+        cmd += ["--maximize", str(bool(maximize))]
+    else:
+        try:
+            first = sel_list[0] if len(sel_list) > 0 else None
+            if first is not None:
+                cmd += ["--maximize", str(bool(getattr(first, "maximize", False)))]
+        except Exception:
+            pass
+
+    cmd += [
         "--feature-data",
         str(feature_data),
         "--performance-data",
@@ -124,29 +243,117 @@ def build_cli_command(
         str(destination),
     ]
 
+    if preprocessors and len(preprocessors) > 0:
+        proc_names = [
+            p.__name__ if isinstance(p, type) else type(p).__name__
+            for p in preprocessors
+        ]
+        cmd += ["--preprocessors"] + proc_names
+    if presolvers and len(presolvers) > 0:
+        pres_names = [
+            p.__name__ if isinstance(p, type) else type(p).__name__ for p in presolvers
+        ]
+        cmd += ["--presolvers"] + pres_names
+    if presolver_budget is not None:
+        cmd += ["--presolver-budget", str(presolver_budget)]
+
+    return cmd
+
 
 if __name__ == "__main__":
     parser = parser_function()
     args = parser.parse_args()
 
-    # Parse selector into variable
-    selector_class = getattr(selectors, args.selector)
-    model_class = getattr(sklearn.ensemble, args.model)
+    if not args.tuning and len(args.selectors) != 1:
+        parser.error(
+            "When --tuning is not set, --selectors must contain exactly one selector"
+        )
+
+    if not args.tuning and args.presolvers and len(args.presolvers) > 1:
+        parser.error(
+            "When --tuning is not set, --presolvers can only contain maximum one presolver"
+        )
+
+    selector_names = args.selectors
+    presolver_names = args.presolvers if args.presolvers is not None else []
+    preprocessor_names = args.preprocessors if args.preprocessors is not None else []
+
+    budget = args.budget
+    presolver_ratio = args.presolver_budget
+    selector_budget = budget
+    presolver_budget = 0
+
+    if presolver_ratio > 0.0:
+        selector_budget = int(budget * (1.0 - presolver_ratio))
+        presolver_budget = budget - selector_budget
+
+    selector_classes = [getattr(selectors, name) for name in selector_names]
+    print("Selector classes:", selector_classes)
+
+    model_class = model_list[args.model]
+    print("Model class:", model_class)
+
+    presolver_classes = [
+        getattr(presolving, name)(budget=presolver_budget / len(presolver_names))
+        for name in presolver_names
+    ]
+    print("Presolver classes:", presolver_classes)
+    print("Presolver budget fraction:", presolver_ratio)
+
+    preprocessing_steps = [
+        getattr(preprocessing, name)() for name in preprocessor_names
+    ]
+    print("Preprocessing classes:", preprocessing_steps)
 
     # Parse training data into variables
     features: pd.DataFrame = pandas_read_map[args.feature_data.suffix](
         args.feature_data, index_col=0
     )
-    performance_data: pd.DataFrame = pandas_read_map[args.performance_data.suffix](
+    performance: pd.DataFrame = pandas_read_map[args.performance_data.suffix](
         args.performance_data, index_col=0
     )
 
-    selector = selector_class(
-        model_class,
-        maximize=args.maximize,
-        budget=args.budget,
-    )
-    selector.fit(features, performance_data)
+    if not args.tuning:
+        selector_class = selector_classes[0]
+        if issubclass(selector_class, AbstractModelBasedSelector):
+            selector = selector_class(
+                model_class,
+                maximize=args.maximize,
+                budget=selector_budget,
+            )
+        elif issubclass(selector_class, AbstractSelector):
+            selector = selector_class(
+                maximize=args.maximize,
+                budget=selector_budget,
+            )
+        else:
+            raise TypeError(
+                "Selector must be a subclass of AbstractSelector or AbstractModelBasedSelector"
+            )
 
-    # Save the model to the specified path
-    selector.save(args.model_path)
+        presolver = presolver_classes[0] if len(presolver_classes) > 0 else None
+
+        pipeline = SelectorPipeline(
+            selector,
+            pre_solving=presolver,
+            preprocessor=preprocessing_steps if len(preprocessing_steps) > 0 else None,
+        )
+
+        pipeline.fit(features, performance)
+        pipeline.save(args.model_path)
+
+    else:
+        selector = tune_selector(
+            features,
+            performance,
+            selector_class=selector_classes,
+            budget=budget,
+            runcount_limit=10,
+            preprocessing_class=preprocessing_steps
+            if len(preprocessing_steps) > 0
+            else None,
+            pre_solving_class=presolver_classes if len(presolver_classes) > 0 else None,
+        )
+
+        selector.fit(features, performance)
+        selector.save(args.model_path)
