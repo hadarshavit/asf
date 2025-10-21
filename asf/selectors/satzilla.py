@@ -55,7 +55,7 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
         self,
         features: pd.DataFrame,
         performance: pd.DataFrame,
-        labels: pd.DataFrame | pd.Series | list[str] | np.ndarray,
+        labels: pd.DataFrame | pd.Series | list[str] | np.ndarray | None = None,
     ) -> None:
         """
         Fit per-algorithm models.
@@ -65,32 +65,35 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
             performance: DataFrame of runtimes (n_instances x n_algorithms).
             labels: Array-like aligned with features.index containing
                     SAT/UNSAT labels; if provided, train per-status models.
+                   If None, train a single EPM per algorithm without conditioning.
         """
-        # Normalize labels to a 1D pandas Series aligned with features/performance
-        if isinstance(labels, pd.DataFrame):
-            if labels.shape[1] != 1:
-                raise ValueError("labels DataFrame must have exactly one column")
-            labels_series = labels.squeeze(axis=1)
-        elif isinstance(labels, pd.Series):
-            labels_series = labels
+        if labels is None:
+            labels_series = pd.Series(["default"] * len(features), index=features.index)
+            self.label_classifier = None
+            self.labels = ["default"]
         else:
-            # list/ndarray -> Series with same index as features
-            labels_series = pd.Series(labels, index=features.index)
+            # Normalize labels to a 1D pandas Series aligned with features/performance
+            if isinstance(labels, pd.DataFrame):
+                if labels.shape[1] != 1:
+                    raise ValueError("labels DataFrame must have exactly one column")
+                labels_series = labels.squeeze(axis=1)
+            elif isinstance(labels, pd.Series):
+                labels_series = labels
+            else:
+                labels_series = pd.Series(labels, index=features.index)
 
-        # Ensure index alignment
-        if not labels_series.index.equals(features.index):
-            labels_series = labels_series.reindex(features.index)
+            # Ensure index alignment
+            if not labels_series.index.equals(features.index):
+                labels_series = labels_series.reindex(features.index)
 
-        # Train the label classifier (use underlying sklearn model for proba later)
-        self.label_classifier = self.model_class()
-        self.label_classifier.fit(features.values, labels_series.values)
-        # Get class order consistent with predict_proba outputs
-        if hasattr(self.label_classifier, "model_class") and hasattr(
-            self.label_classifier.model_class, "classes_"
-        ):
-            self.labels = self.label_classifier.model_class.classes_
-        else:
-            self.labels = np.unique(labels_series.values)
+            self.label_classifier = self.model_class()
+            self.label_classifier.fit(features.values, labels_series.values)
+            if hasattr(self.label_classifier, "model_class") and hasattr(
+                self.label_classifier.model_class, "classes_"
+            ):
+                self.labels = self.label_classifier.model_class.classes_
+            else:
+                self.labels = np.unique(labels_series.values)
 
         # Train per-algorithm EPMs conditioned on label
         for algo in self.algorithms:
@@ -98,7 +101,6 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
             for label in self.labels:
                 idx = labels_series == label
                 if idx.sum() == 0:
-                    # No data for this label; skip to avoid training on empty set
                     continue
                 self.epms[algo][label] = EPM(**self.epm_kwargs)
                 X_sub = features.loc[idx]
@@ -124,7 +126,10 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
         preds = np.zeros((n_instances, n_algorithms), dtype=float)
 
         # Get label probabilities once; use underlying sklearn model
-        if hasattr(self.label_classifier, "model_class") and hasattr(
+        if self.label_classifier is None:
+            # No label classifier: uniform probability for the single "default" label
+            label_probs = np.ones((n_instances, 1), dtype=float)
+        elif hasattr(self.label_classifier, "model_class") and hasattr(
             self.label_classifier.model_class, "predict_proba"
         ):
             label_probs = self.label_classifier.model_class.predict_proba(
