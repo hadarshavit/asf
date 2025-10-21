@@ -327,7 +327,9 @@ if __name__ == "__main__":
                 budget=selector_budget,
             )
         else:
-            raise TypeError("Selector must be a subclass of AbstractSelector or AbstractModelBasedSelector")
+            raise TypeError(
+                "Selector must be a subclass of AbstractSelector or AbstractModelBasedSelector"
+            )
 
         presolver = presolver_classes[0] if len(presolver_classes) > 0 else None
 
