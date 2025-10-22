@@ -201,6 +201,7 @@ def _run_cli_and_validate(
     presolvers: list = None,
     presolver_budget: float = 0.0,
     budget: int = 450,
+    runcount_limit: int = None,
 ):
     """Run CLI subprocess and validate resulting pipeline."""
     feats = tmp_path / "features.csv"
@@ -221,6 +222,7 @@ def _run_cli_and_validate(
         preprocessors=preprocessors,
         presolvers=presolvers,
         presolver_budget=presolver_budget,
+        runcount_limit=runcount_limit,
     )
 
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -285,4 +287,5 @@ def test_cli_tuning(tmp_path: Path):
         presolvers=[ASAPv2()],
         presolver_budget=0.15,
         budget=500,
+        runcount_limit=5,
     )
