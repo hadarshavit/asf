@@ -144,6 +144,12 @@ def parser_function() -> argparse.ArgumentParser:
         default=0.0,
         help="Fraction of total budget to allocate to presolving (float between 0 and 1).",
     )
+    parser.add_argument(
+        "--runcount-limit",
+        type=int,
+        default=100,
+        help="Maximum number of SMAC evaluations when tuning is enabled (default: 100).",
+    )
     return parser
 
 
@@ -163,6 +169,7 @@ def build_cli_command(
     preprocessors: Optional[List[object]] = None,
     presolvers: Optional[List[object]] = None,
     presolver_budget: Optional[float] = None,
+    runcount_limit: Optional[int] = None,
 ) -> List[str]:
     """Build CLI command from selector objects."""
     if isinstance(selector, (list, tuple)):
@@ -256,6 +263,8 @@ def build_cli_command(
         cmd += ["--presolvers"] + pres_names
     if presolver_budget is not None:
         cmd += ["--presolver-budget", str(presolver_budget)]
+    if runcount_limit is not None and tuning:
+        cmd += ["--runcount-limit", str(runcount_limit)]
 
     return cmd
 
@@ -348,7 +357,7 @@ if __name__ == "__main__":
             performance,
             selector_class=selector_classes,
             budget=budget,
-            runcount_limit=10,
+            runcount_limit=args.runcount_limit,
             preprocessing_class=preprocessing_steps
             if len(preprocessing_steps) > 0
             else None,
