@@ -6,11 +6,26 @@ from asf.predictors.survival import RandomSurvivalForestWrapper, SKSURV_AVAILABL
 if SKSURV_AVAILABLE:
     from sksurv.util import Surv
 
+    try:
+        from ConfigSpace import (
+            ConfigurationSpace,
+            Categorical,
+            Configuration,
+            EqualsCondition,
+        )
+        from ConfigSpace.hyperparameters import Hyperparameter
+
+        CONFIGSPACE_AVAILABLE = True
+    except ImportError:
+        CONFIGSPACE_AVAILABLE = False
+
     class SurvivalAnalysisSelector(AbstractModelBasedSelector):
         """
         Selects the best algorithm for a given problem instance using survival analysis.
         Tries to maximize the probability of finishing within a given time budget.
         """
+
+        PREFIX = "survival"
 
         def __init__(
             self,
@@ -23,12 +38,11 @@ if SKSURV_AVAILABLE:
             Initializes the SurvivalAnalysisSelector.
 
             Args:
-                cutoff_time (float): The time budget for the decision-making policy.
-                model_params (Optional[Dict]): Parameters for the Random Survival Forest model.
+                model_class: Wrapper class for survival model (default: RandomSurvivalForestWrapper).
                 **kwargs: Additional arguments for the parent classes.
 
             Raises:
-                ValueError: If cutoff_time is not a positive number.
+                ValueError: If budget is not a positive number.
             """
             super().__init__(model_class=model_class, **kwargs)
 
@@ -128,6 +142,120 @@ if SKSURV_AVAILABLE:
                 predictions[instance] = [(best_algo, self.budget)]
 
             return predictions
+
+        if CONFIGSPACE_AVAILABLE:
+
+            @staticmethod
+            def get_configuration_space(
+                cs: ConfigurationSpace | None = None,
+                cs_transform: dict[str, dict] | None = None,
+                model_class: list[type] | None = None,
+                pre_prefix: str = "",
+                parent_param: Hyperparameter | None = None,
+                parent_value: str | None = None,
+                **kwargs,
+            ) -> tuple[ConfigurationSpace, dict[str, dict]]:
+                """
+                Get the configuration space for SurvivalAnalysisSelector.
+
+                Args:
+                    cs: The configuration space to use. If None, a new one will be created.
+                    cs_transform: A dictionary for transforming configuration space parameters.
+                    model_class: List of survival model wrapper classes to choose from.
+                    pre_prefix: Prefix for parameter names.
+                    parent_param: Parent parameter for conditional configuration.
+                    parent_value: Value of parent parameter that activates these hyperparameters.
+                    **kwargs: Additional keyword arguments.
+
+                Returns:
+                    Tuple[ConfigurationSpace, Dict[str, dict]]: The configuration space and its transformation dictionary.
+                """
+                if cs is None:
+                    cs = ConfigurationSpace()
+
+                if cs_transform is None:
+                    cs_transform = dict()
+
+                if model_class is None:
+                    model_class = [RandomSurvivalForestWrapper]
+
+                if pre_prefix != "":
+                    prefix = f"{pre_prefix}:{SurvivalAnalysisSelector.PREFIX}"
+                else:
+                    prefix = SurvivalAnalysisSelector.PREFIX
+
+                model_class_param = Categorical(
+                    name=f"{prefix}:model_class",
+                    items=[str(c.__name__) for c in model_class],
+                )
+
+                cs_transform[f"{prefix}:model_class"] = {
+                    str(c.__name__): c for c in model_class
+                }
+
+                params = [model_class_param]
+
+                if parent_param is not None:
+                    conditions = [
+                        EqualsCondition(
+                            child=param,
+                            parent=parent_param,
+                            value=parent_value,
+                        )
+                        for param in params
+                    ]
+                else:
+                    conditions = []
+
+                cs.add(params + conditions)
+
+                for mc in model_class:
+                    mc.get_configuration_space(
+                        cs=cs,
+                        pre_prefix=f"{prefix}:model_class",
+                        parent_param=model_class_param,
+                        parent_value=str(mc.__name__),
+                        **kwargs,
+                    )
+
+                return cs, cs_transform
+
+            @staticmethod
+            def get_from_configuration(
+                configuration: Configuration,
+                cs_transform: dict[str, dict],
+                pre_prefix: str = "",
+                **kwargs,
+            ) -> "SurvivalAnalysisSelector":
+                """
+                Get the SurvivalAnalysisSelector from a given configuration.
+
+                Args:
+                    configuration: The configuration object.
+                    cs_transform: The transformation dictionary for the configuration space.
+                    pre_prefix: Prefix for parameter names.
+                    **kwargs: Additional keyword arguments for SurvivalAnalysisSelector initialization.
+
+                Returns:
+                    SurvivalAnalysisSelector: An instance configured according to the given configuration.
+                """
+                if pre_prefix != "":
+                    prefix = f"{pre_prefix}:{SurvivalAnalysisSelector.PREFIX}"
+                else:
+                    prefix = SurvivalAnalysisSelector.PREFIX
+
+                model_cls = cs_transform[f"{prefix}:model_class"][
+                    configuration[f"{prefix}:model_class"]
+                ]
+                model_ctor = model_cls.get_from_configuration(
+                    configuration, pre_prefix=f"{prefix}:model_class"
+                )
+
+                return SurvivalAnalysisSelector(
+                    model_class=model_ctor,
+                    **kwargs,
+                )
+
 else:
 
     class SurvivalAnalysisSelector:
