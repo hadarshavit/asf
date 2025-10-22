@@ -3,6 +3,20 @@ import pandas as pd
 from sklearn.neighbors import NearestNeighbors
 from asf.selectors.abstract_selector import AbstractSelector
 
+try:
+    from ConfigSpace import (
+        ConfigurationSpace,
+        Categorical,
+        Integer,
+        Configuration,
+        EqualsCondition,
+    )
+    from ConfigSpace.hyperparameters import Hyperparameter
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
+
 
 class SNNAP(AbstractSelector):
     """
@@ -13,6 +27,8 @@ class SNNAP(AbstractSelector):
       metric (str): distance metric for NearestNeighbors (default 'euclidean').
     random_state (int | None): Random seed for reproducibility.
     """
+
+    PREFIX = "snnap"
 
     def __init__(
         self,
@@ -109,3 +125,103 @@ class SNNAP(AbstractSelector):
                 predictions[instance] = [(chosen, self.budget)]
 
         return predictions
+
+    if CONFIGSPACE_AVAILABLE:
+
+        @staticmethod
+        def get_configuration_space(
+            cs: ConfigurationSpace | None = None,
+            cs_transform: dict[str, dict] | None = None,
+            pre_prefix: str = "",
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
+            **kwargs,
+        ) -> tuple[ConfigurationSpace, dict[str, dict]]:
+            """
+            Get the configuration space for SNNAP.
+
+            Args:
+                cs (Optional[ConfigurationSpace]): The configuration space to use. If None, a new one will be created.
+                cs_transform (Optional[Dict[str, dict]]): A dictionary for transforming configuration space parameters.
+                pre_prefix (str): Prefix for parameter names.
+                parent_param (Optional[Hyperparameter]): Parent parameter for conditional configuration.
+                parent_value (Optional[str]): Value of parent parameter that activates these hyperparameters.
+                **kwargs: Additional keyword arguments.
+
+            Returns:
+                Tuple[ConfigurationSpace, Dict[str, dict]]: The configuration space and its transformation dictionary.
+            """
+            if cs is None:
+                cs = ConfigurationSpace()
+
+            if cs_transform is None:
+                cs_transform = dict()
+
+            if pre_prefix != "":
+                prefix = f"{pre_prefix}:{SNNAP.PREFIX}"
+            else:
+                prefix = SNNAP.PREFIX
+
+            k_param = Integer(
+                name=f"{prefix}:k",
+                bounds=(1, 50),
+                default=5,
+            )
+
+            metric_param = Categorical(
+                name=f"{prefix}:metric",
+                items=["euclidean", "manhattan", "minkowski", "cosine"],
+                default="euclidean",
+            )
+
+            params = [k_param, metric_param]
+
+            # e.g. parent_param could be "selector_class" with parent_value "SNNAP"
+            if parent_param is not None:
+                conditions = [
+                    EqualsCondition(
+                        child=param,
+                        parent=parent_param,
+                        value=parent_value,
+                    )
+                    for param in params
+                ]
+            else:
+                conditions = []
+
+            cs.add(params + conditions)
+
+            return cs, cs_transform
+
+        @staticmethod
+        def get_from_configuration(
+            configuration: Configuration,
+            cs_transform: dict[str, dict],
+            pre_prefix: str = "",
+            **kwargs,
+        ) -> "SNNAP":
+            """
+            Get the SNNAP selector from a given configuration.
+
+            Args:
+                configuration (Configuration): The configuration object.
+                cs_transform (Dict[str, dict]): The transformation dictionary for the configuration space.
+                pre_prefix (str): Prefix for parameter names.
+                **kwargs: Additional keyword arguments for SNNAP initialization.
+
+            Returns:
+                SNNAP: An instance of SNNAP configured according to the given configuration.
+            """
+            if pre_prefix != "":
+                prefix = f"{pre_prefix}:{SNNAP.PREFIX}"
+            else:
+                prefix = SNNAP.PREFIX
+
+            k = configuration[f"{prefix}:k"]
+            metric = configuration[f"{prefix}:metric"]
+
+            return SNNAP(
+                k=k,
+                metric=metric,
+                **kwargs,
+            )

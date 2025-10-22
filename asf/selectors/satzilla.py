@@ -181,13 +181,11 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
             if model_class is None:
                 model_class = [RidgeRegressorWrapper]
 
-            # Prefix for namespacing
             if pre_prefix != "":
                 prefix = f"{pre_prefix}:{SATzilla.PREFIX}"
             else:
                 prefix = SATzilla.PREFIX
 
-            # Model class choice
             model_class_param = Categorical(
                 name=f"{prefix}:model_class",
                 items=[str(c.__name__) for c in model_class],
@@ -196,7 +194,6 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
                 str(c.__name__): c for c in model_class
             }
 
-            # SATzilla-specific params
             use_log10 = Categorical(
                 f"{prefix}:use_log10",
                 [True, False],
@@ -237,7 +234,6 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
 
             cs.add(params + conditions)
 
-            # Add nested model space under the model_class choice
             for mc in model_class:
                 mc.get_configuration_space(
                     cs=cs,
@@ -264,7 +260,6 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
             else:
                 prefix = SATzilla.PREFIX
 
-            # Resolve model class wrapper and its constructor from configuration
             model_cls = cs_transform[f"{prefix}:model_class"][
                 configuration[f"{prefix}:model_class"]
             ]
@@ -272,7 +267,6 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
                 configuration, pre_prefix=f"{prefix}:model_class"
             )
 
-            # Read SATzilla-specific params
             use_log10 = configuration[f"{prefix}:use_log10"]
             em_max_iter = configuration[f"{prefix}:em_max_iter"]
             em_tol = configuration[f"{prefix}:em_tol"]
