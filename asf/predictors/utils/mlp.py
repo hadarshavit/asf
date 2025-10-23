@@ -11,7 +11,7 @@ def get_mlp(
     output_size: int,
     hidden_sizes: list[int] = [128, 64],
     dropout: float = 0.0,
-    output_activation: str = None,
+    output_activation: torch.nn.Module = None,
     compile: bool = False,
 ):
     layers = [torch.nn.Linear(input_size, hidden_sizes[0]), torch.nn.ReLU()]

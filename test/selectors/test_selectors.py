@@ -10,6 +10,7 @@ from asf.predictors import (
     XGBoostClassifierWrapper,
     XGBoostRegressorWrapper,
 )
+from asf.predictors.ranking_mlp import RankingMLP
 from asf.predictors.utils.mlp import get_mlp
 from asf.selectors import (
     JointRanking,
@@ -23,13 +24,12 @@ from asf.selectors import (
 from asf.selectors.collaborative_filtering_selector import (
     CollaborativeFilteringSelector,
 )
+from asf.selectors.isac import ISAC
+from asf.selectors.satzilla import SATzilla
 from asf.selectors.selector_pipeline import SelectorPipeline
 from asf.selectors.selector_tuner import tune_selector
-from asf.selectors.sunny_selector import SunnySelector
-from asf.selectors.satzilla import SATzilla
-from asf.selectors.isac import ISAC
 from asf.selectors.snnap import SNNAP
-from build.lib.asf.predictors.ranking_mlp import RankingMLP
+from asf.selectors.sunny_selector import SunnySelector
 
 
 @pytest.fixture
