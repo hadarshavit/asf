@@ -11,6 +11,8 @@ def get_mlp(
     output_size: int,
     hidden_sizes: list[int] = [128, 64],
     dropout: float = 0.0,
+    output_activation: str = None,
+    compile: bool = False,
 ):
     layers = [torch.nn.Linear(input_size, hidden_sizes[0]), torch.nn.ReLU()]
 
@@ -21,6 +23,19 @@ def get_mlp(
     layers.append(torch.nn.Dropout(dropout))
     layers.append(torch.nn.Linear(hidden_sizes[-1], output_size))
 
+    if output_activation is not None:
+        layers.append(output_activation)
+
     model = torch.nn.Sequential(*layers)
 
+    if compile:
+        model = torch.compile(model)
     return model
+
+
+class ExpActivation(torch.nn.Module):
+    def __init__(self):
+        super(ExpActivation, self).__init__()
+
+    def forward(self, x):
+        return torch.exp(x)

@@ -12,10 +12,18 @@ if TORCH_AVAILABLE:
 
     class RegressionDataset(torch.utils.data.Dataset):
         def __init__(self, features, performance, dtype=torch.float32):
-            self.features = torch.from_numpy(features.sort_index().to_numpy()).to(dtype)
-            self.performance = torch.from_numpy(performance.sort_index().to_numpy()).to(
-                dtype
-            )
+            if isinstance(features, pd.DataFrame) and isinstance(
+                performance, pd.DataFrame
+            ):
+                self.features = torch.from_numpy(features.sort_index().to_numpy()).to(
+                    dtype
+                )
+                self.performance = torch.from_numpy(
+                    performance.sort_index().to_numpy()
+                ).to(dtype)
+            else:
+                self.features = torch.tensor(features, dtype=dtype)
+                self.performance = torch.tensor(performance, dtype=dtype)
 
         def __len__(self):
             return len(self.features)
