@@ -9,12 +9,10 @@ class XGBDistNet:
         self,
         xgb_kwargs: dict = {},
         loss_function=lognorm_loss,
-        n_feats: int = 1,
         n_loss_params: int = 2,
     ):
         self.xgb_kwargs = xgb_kwargs
         self.loss_function = loss_function
-        self.n_feats = n_feats
         self.n_loss_params = n_loss_params
 
     def objective(self, data, preds):
