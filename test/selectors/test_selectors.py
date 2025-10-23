@@ -29,6 +29,7 @@ from asf.selectors.satzilla import SATzilla
 from asf.selectors.selector_pipeline import SelectorPipeline
 from asf.selectors.selector_tuner import tune_selector
 from asf.selectors.snnap import SNNAP
+from functools import partial
 from asf.selectors.sunny_selector import SunnySelector
 
 
@@ -123,7 +124,8 @@ def test_joint_ranking(dummy_performance, dummy_features):
     selector = JointRanking(
         model=RankingMLP(
             input_size=3 + 3, epochs=2, model=get_mlp(6, 1, hidden_sizes=[8])
-        )
+        ),
+        budget=450.0,
     )
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
@@ -256,7 +258,7 @@ def test_multi_class_classifier(dummy_performance, dummy_features, model_class):
 
 @pytest.mark.parametrize(
     "model_class",
-    [XGBoostRegressorWrapper, RegressionMLP],
+    [XGBoostRegressorWrapper, partial(RegressionMLP, epochs=1)],
 )
 def test_pairwise_regressor(dummy_performance, dummy_features, model_class):
     regressor = PairwiseRegressor(model_class=model_class, budget=450.0)
@@ -267,7 +269,7 @@ def test_pairwise_regressor(dummy_performance, dummy_features, model_class):
 
 @pytest.mark.parametrize(
     "model_class",
-    [XGBoostRegressorWrapper, RegressionMLP],
+    [XGBoostRegressorWrapper, partial(RegressionMLP, epochs=1)],
 )
 def test_performance_model(dummy_performance, dummy_features, model_class):
     model = PerformanceModel(model_class=model_class, budget=450.0)

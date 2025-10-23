@@ -13,7 +13,7 @@ if TORCH_AVAILABLE:
     class RegressionDataset(torch.utils.data.Dataset):
         def __init__(self, features, performance, dtype=torch.float32):
             if isinstance(features, pd.DataFrame) and isinstance(
-                performance, pd.DataFrame
+                performance, (pd.DataFrame, pd.Series)
             ):
                 self.features = torch.from_numpy(features.sort_index().to_numpy()).to(
                     dtype
