@@ -6,10 +6,10 @@ import torch
 from torch.nn import Module
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
-from asf.predictors.utils.losses import lognorm_loss
+
 from asf.predictors.utils.datasets import RegressionDataset
-from asf.predictors.utils.mlp import get_mlp
-from asf.predictors.utils.mlp import ExpActivation
+from asf.predictors.utils.losses import lognorm_loss
+from asf.predictors.utils.mlp import ExpActivation, get_mlp
 
 
 class DistNet:
@@ -21,6 +21,7 @@ class DistNet:
         n_feats: int = 1,
         n_loss_params: int = 2,
         epochs: int = 10,
+        gradient_clip: float = 1e-2,
         batch_size: int = 16,
         device=torch.device("cpu"),
     ):
@@ -40,6 +41,7 @@ class DistNet:
         self.device = device
         self.epochs = epochs
         self.batch_size = batch_size
+        self.gradient_clip = gradient_clip
         self.logger = logging.getLogger(__name__)
 
     def fit(
@@ -62,6 +64,12 @@ class DistNet:
                 loss = self.loss_function(target, outputs)
                 total_epoch_loss += loss.sum().item()
                 loss.backward(create_graph=create_graph)
+
+                if self.gradient_clip is not None:
+                    torch.nn.utils.clip_grad_norm_(
+                        self.model.parameters(), self.gradient_clip
+                    )
+
                 self.optimizer.step()
             self.logger.debug(
                 f"Epoch {epoch}, Total Loss: {total_epoch_loss / len(dataset)}"
