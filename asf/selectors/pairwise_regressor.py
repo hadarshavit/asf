@@ -156,6 +156,9 @@ class PairwiseRegressor(AbstractModelBasedSelector, AbstractFeatureGenerator):
             if cs is None:
                 cs = ConfigurationSpace()
 
+            if cs_transform is None:
+                cs_transform = {}
+
             if pre_prefix != "":
                 prefix = f"{pre_prefix}:{PairwiseRegressor.PREFIX}"
             else:

@@ -1,16 +1,39 @@
+import inspect
+
 import numpy as np
 import pandas as pd
-import inspect
-from asf.predictors import RandomForestRegressorWrapper
-from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
+
 from asf.preprocessing.performance_scaling import (
-    LogNormalization,
     AbstractNormalization,
+    LogNormalization,
+)
+from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
+
+try:
+    from ConfigSpace import (
+        Categorical,
+        Configuration,
+        ConfigurationSpace,
+        EqualsCondition,
+    )
+    from ConfigSpace.hyperparameters import Hyperparameter
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
+
+from functools import partial
+
+from asf.predictors import (
+    AbstractPredictor,
+    RandomForestRegressorWrapper,
+    XGBoostRegressorWrapper,
 )
 from asf.selectors.feature_generator import AbstractFeatureGenerator
 
 
 class PerformanceModel(AbstractModelBasedSelector, AbstractFeatureGenerator):
+    PREFIX = "performance_model "
     """
     PerformanceModel is a class that predicts the performance of algorithms
     based on given features. It can handle both single-target and multi-target
@@ -155,46 +178,113 @@ class PerformanceModel(AbstractModelBasedSelector, AbstractFeatureGenerator):
 
         return predictions
 
-    @classmethod
-    def get_configuration_space(
-        cls, cs, cs_transform, parent_param, parent_value, **kwargs
-    ):
-        """
-        Adds the configuration space for the PerformanceModel using RandomForestRegressorWrapper.
-        """
-        cs = RandomForestRegressorWrapper.get_configuration_space(
-            cs=cs,
-            pre_prefix=cls.__name__,
-            parent_param=parent_param,
-            parent_value=parent_value,
-        )
+    if CONFIGSPACE_AVAILABLE:
 
-        def constructor(config, cs_transform, **init_kwargs):
-            # Make sure that the random forests get random state from the init_kwargs for reproducibility
-            model_init_args = {
-                k: init_kwargs[k] for k in ["random_state"] if k in init_kwargs
-            }
+        @staticmethod
+        def get_configuration_space(
+            cs: ConfigurationSpace | None = None,
+            cs_transform: dict[str, dict[str, type]] | None = None,
+            model_class: list[type[AbstractPredictor]] = [
+                RandomForestRegressorWrapper,
+                XGBoostRegressorWrapper,
+            ],
+            pre_prefix: str = "",
+            parent_param: Hyperparameter | None = None,
+            parent_value: str | None = None,
+            **kwargs,
+        ) -> tuple[ConfigurationSpace, dict[str, dict[str, type]]]:
+            """
+            Get the configuration space for the predictor.
 
-            # Build model constructor with model-related kwargs
-            model_constructor = RandomForestRegressorWrapper.get_from_configuration(
-                config, pre_prefix=cls.__name__, **model_init_args
+            Args:
+                cs (Optional[ConfigurationSpace]): The configuration space to use. If None, a new one will be created.
+                cs_transform (Optional[Dict[str, Dict[str, type]]]): A dictionary for transforming configuration space values.
+                model_class (List[type]): The list of model classes to use. Defaults to [RandomForestRegressorWrapper, XGBoostRegressorWrapper].
+                hierarchical_generator (Optional[List[AbstractFeatureGenerator]]): List of hierarchical feature generators.
+                kwargs: Additional keyword arguments to pass to the model class.
+
+            Returns:
+                Tuple[ConfigurationSpace, Dict[str, Dict[str, type]]]: The configuration space and its transformation dictionary.
+            """
+            if cs is None:
+                cs = ConfigurationSpace()
+
+            if cs_transform is None:
+                cs_transform = {}
+
+            if pre_prefix != "":
+                prefix = f"{pre_prefix}:{PerformanceModel.PREFIX}"
+            else:
+                prefix = PerformanceModel.PREFIX
+
+            model_class_param = Categorical(
+                name=f"{prefix}:model_class",
+                items=[str(c.__name__) for c in model_class],
             )
 
-            # Only pass the kwargs intended for PerformanceModel init (not model-specific)
-            model_related_keys = ["random_state"]
-            selector_kwargs = {
-                k: v for k, v in init_kwargs.items() if k not in model_related_keys
+            cs_transform[f"{prefix}:model_class"] = {
+                str(c.__name__): c for c in model_class
             }
 
-            return cls(model_class=model_constructor, **selector_kwargs)
+            params = [model_class_param]
 
-        cs_transform[parent_value] = constructor
-        return cs, cs_transform
+            if parent_param is not None:
+                conditions = [
+                    EqualsCondition(
+                        child=param,
+                        parent=parent_param,
+                        value=parent_value,
+                    )
+                    for param in params
+                ]
+            else:
+                conditions = []
 
-    @classmethod
-    def get_from_configuration(cls, config, cs_transform, **kwargs):
-        """
-        Instantiates the PerformanceModel from a ConfigSpace configuration.
-        """
-        constructor = cs_transform[str(cls.__name__)]
-        return constructor(config, cs_transform, **kwargs)
+            cs.add(params + conditions)
+
+            for model in model_class:
+                model.get_configuration_space(
+                    cs=cs,
+                    pre_prefix=f"{prefix}:model_class",
+                    parent_param=model_class_param,
+                    parent_value=str(model.__name__),
+                    **kwargs,
+                )
+
+            return cs, cs_transform
+
+        @staticmethod
+        def get_from_configuration(
+            configuration: Configuration,
+            cs_transform: dict[str, dict[str, type]],
+            pre_prefix: str = "",
+            **kwargs,
+        ) -> partial:
+            """
+            Get the configuration space for the predictor.
+
+            Args:
+                configuration (Configuration): The configuration object.
+                cs_transform (Dict[str, Dict[str, type]]): The transformation dictionary for the configuration space.
+
+            Returns:
+                partial: A partial function to initialize the PerformanceModel with the given configuration.
+            """
+            if pre_prefix != "":
+                prefix = f"{pre_prefix}:{PerformanceModel.PREFIX}"
+            else:
+                prefix = PerformanceModel.PREFIX
+
+            model_class = cs_transform[f"{prefix}:model_class"][
+                configuration[f"{prefix}:model_class"]
+            ]
+
+            model = model_class.get_from_configuration(
+                configuration, pre_prefix=f"{prefix}:model_class"
+            )
+
+            return PerformanceModel(
+                model_class=model,
+                hierarchical_generator=None,
+                **kwargs,
+            )
