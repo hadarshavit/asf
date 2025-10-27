@@ -1,4 +1,6 @@
 import pandas as pd
+import numpy as np
+from scipy.optimize import differential_evolution
 
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 from asf.predictors.survival import RandomSurvivalForestWrapper, SKSURV_AVAILABLE
@@ -23,6 +25,7 @@ if SKSURV_AVAILABLE:
         """
         Selects the best algorithm for a given problem instance using survival analysis.
         Tries to maximize the probability of finishing within a given time budget.
+        Can optionally build a schedule of multiple algorithms using RunAndSchedule2Survive logic.
         """
 
         PREFIX = "survival"
@@ -32,6 +35,12 @@ if SKSURV_AVAILABLE:
             model_class: type[
                 RandomSurvivalForestWrapper
             ] = RandomSurvivalForestWrapper,
+            use_schedule: bool = False,
+            max_schedule_length: int | None = None,
+            popsize: int = 20,
+            maxiter: int = 150,
+            tol: float = 0.01,
+            dominance_resolution: int = 100,
             **kwargs,
         ):
             """
@@ -39,12 +48,25 @@ if SKSURV_AVAILABLE:
 
             Args:
                 model_class: Wrapper class for survival model (default: RandomSurvivalForestWrapper).
+                use_schedule (bool): If True, build a schedule using an optimization-based approach.
+                                   If False, select the single best algorithm.
+                max_schedule_length (Optional[int]): The maximum number of algorithms in a schedule.
+                popsize (int): Population size for differential_evolution.
+                maxiter (int): Max iterations for differential_evolution.
+                tol (float): Tolerance for convergence for differential_evolution.
+                dominance_resolution (int): Number of points for the time grid in dominance analysis.
                 **kwargs: Additional arguments for the parent classes.
 
             Raises:
                 ValueError: If budget is not a positive number.
             """
             super().__init__(model_class=model_class, **kwargs)
+            self.use_schedule = use_schedule
+            self.max_schedule_length = max_schedule_length
+            self.popsize = popsize
+            self.maxiter = maxiter
+            self.tol = tol
+            self.dominance_resolution = dominance_resolution
 
             if not isinstance(self.budget, (int, float)) or self.budget <= 0:
                 raise ValueError(
@@ -118,9 +140,7 @@ if SKSURV_AVAILABLE:
 
             predictions = {}
             for instance, instance_features in features.iterrows():
-                best_algo = None
-                best_prob = -1.0
-
+                surv_funcs = {}
                 for algo in self.algorithms:
                     pred_row = pd.DataFrame(
                         [{**instance_features.to_dict(), "algorithm": algo}]
@@ -131,17 +151,165 @@ if SKSURV_AVAILABLE:
                     pred_row = pred_row.reindex(
                         columns=self.survival_features, fill_value=0
                     )
+                    surv_funcs[algo] = self.model.predict_survival_function(pred_row)[0]
 
-                    surv_func = self.model.predict_survival_function(pred_row)[0]
-                    completion_prob = 1.0 - surv_func(self.budget)
-
-                    if completion_prob > best_prob:
-                        best_prob = completion_prob
-                        best_algo = algo
-
-                predictions[instance] = [(best_algo, self.budget)]
+                if not self.use_schedule:
+                    # Original logic: find the single best algorithm
+                    best_algo = None
+                    best_prob = -1.0
+                    for algo, surv_func in surv_funcs.items():
+                        completion_prob = 1.0 - surv_func(self.budget)
+                        if completion_prob > best_prob:
+                            best_prob = completion_prob
+                            best_algo = algo
+                    predictions[instance] = [(best_algo, self.budget)]
+                else:
+                    # Build schedule using differential evolution
+                    schedule = self._find_optimal_schedule(surv_funcs)
+                    predictions[instance] = (
+                        schedule if schedule else [(None, self.budget)]
+                    )
 
             return predictions
+
+        def _eval_schedule(
+            self, x: np.ndarray, all_algos: list, surv_funcs: dict
+        ) -> float:
+            """
+            Evaluates the sequential success probability of a schedule encoded by the optimizer's vector `x`.
+            This is the fitness function for the optimizer.
+
+            The vector `x` encodes inclusion flags and normalized end times for all algorithms.
+
+            Args:
+                x: The vector from the optimizer.
+                all_algos: The complete list of algorithm names.
+                surv_funcs: A dictionary mapping algorithm names to their survival functions.
+
+            Returns:
+                The negative success probability (since optimizers minimize).
+            """
+            n_algorithms = len(all_algos)
+
+            inclusion_flags = x[:n_algorithms]
+            normalized_end_times = x[n_algorithms:]
+
+            n_included = np.sum(inclusion_flags >= 0.5)
+            if n_included == 0:
+                return 0.0
+            if (
+                self.max_schedule_length is not None
+                and n_included > self.max_schedule_length
+            ):
+                return 1.0
+
+            included_schedule_info = []
+            for i, algo in enumerate(all_algos):
+                if inclusion_flags[i] >= 0.5:
+                    included_schedule_info.append((algo, normalized_end_times[i]))
+
+            included_schedule_info.sort(key=lambda item: item[1])
+
+            total_success_prob = 0.0
+            prob_of_reaching_step = 1.0
+            last_actual_end_time = 0.0
+
+            for i, (algo, norm_end_time) in enumerate(included_schedule_info):
+                if i == len(included_schedule_info) - 1:
+                    time_slice = self.budget - last_actual_end_time
+                else:
+                    actual_end_time = norm_end_time * self.budget
+                    time_slice = actual_end_time - last_actual_end_time
+
+                if time_slice <= 1e-6:
+                    continue
+
+                surv_func = surv_funcs[algo]
+                prob_solve_at_this_step = 1.0 - surv_func(time_slice)
+
+                total_success_prob += prob_of_reaching_step * prob_solve_at_this_step
+                prob_of_reaching_step *= surv_func(time_slice)
+
+                last_actual_end_time += time_slice
+
+            return -total_success_prob
+
+        def _find_optimal_schedule(self, surv_funcs: dict) -> list:
+            """
+            Performs dominance analysis and then uses differential evolution
+            to find the optimal schedule on the non-dominated set of algorithms.
+            """
+            # Dominance Analysis
+            time_grid = np.linspace(0, self.budget, self.dominance_resolution)
+            prob_matrix = np.array(
+                [surv_funcs[algo](time_grid) for algo in self.algorithms]
+            )
+
+            # Case 1: Check for a single, globally dominant algorithm
+            for i, algo in enumerate(self.algorithms):
+                is_dominant = np.all(prob_matrix[i, :] <= prob_matrix)
+                if is_dominant:
+                    return [(algo, self.budget)]
+
+            # Case 2: Filter out algorithms that are dominated by others
+            lower_envelope = np.min(prob_matrix, axis=0)
+            non_dominated_algos = []
+            for i, algo in enumerate(self.algorithms):
+                # An algorithm is non-dominated if its curve touches the lower envelope at any point
+                if np.any(np.isclose(prob_matrix[i, :], lower_envelope)):
+                    non_dominated_algos.append(algo)
+
+            if len(non_dominated_algos) <= 1:
+                if non_dominated_algos:
+                    return [(non_dominated_algos[0], self.budget)]
+                else:
+                    return []
+
+            # Optimization
+            n_algorithms_to_optimize = len(non_dominated_algos)
+            bounds = [(0, 1)] * (2 * n_algorithms_to_optimize)
+
+            result = differential_evolution(
+                func=self._eval_schedule,
+                bounds=bounds,
+                args=(non_dominated_algos, surv_funcs),
+                popsize=self.popsize,
+                maxiter=self.maxiter,
+                tol=self.tol,
+                seed=42,
+            )
+
+            # Post-process the best vector found by the optimizer
+            best_x = result.x
+            inclusion_flags = best_x[:n_algorithms_to_optimize]
+            normalized_end_times = best_x[n_algorithms_to_optimize:]
+
+            included_schedule_info = []
+            for i, algo in enumerate(non_dominated_algos):
+                if inclusion_flags[i] >= 0.5:
+                    included_schedule_info.append((algo, normalized_end_times[i]))
+
+            if not included_schedule_info:
+                return []
+
+            included_schedule_info.sort(key=lambda item: item[1])
+
+            # Convert to the final schedule format with actual time slices
+            schedule = []
+            last_actual_end_time = 0.0
+            for i, (algo, norm_end_time) in enumerate(included_schedule_info):
+                # The last algorithm in the schedule runs for the remaining budget
+                if i == len(included_schedule_info) - 1:
+                    time_slice = self.budget - last_actual_end_time
+                else:
+                    actual_end_time = norm_end_time * self.budget
+                    time_slice = actual_end_time - last_actual_end_time
+
+                if time_slice > 1e-6:
+                    schedule.append((algo, time_slice))
+                last_actual_end_time += time_slice
+
+            return schedule
 
         if CONFIGSPACE_AVAILABLE:
 
