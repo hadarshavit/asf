@@ -96,6 +96,12 @@ class RandomForestClassifierWrapper(SklearnWrapper):
                 items=[True, False],
                 default=False,
             )
+            max_depth = Integer(
+                f"{prefix}max_depth",
+                (1, 100),
+                log=False,
+                default=13,
+            )
 
             params = [
                 n_estimators,
@@ -103,6 +109,7 @@ class RandomForestClassifierWrapper(SklearnWrapper):
                 min_samples_leaf,
                 max_features,
                 bootstrap,
+                max_depth
             ]
             if parent_param is not None:
                 conditions = [
@@ -150,6 +157,7 @@ class RandomForestClassifierWrapper(SklearnWrapper):
                 "min_samples_leaf": configuration[f"{prefix}min_samples_leaf"],
                 "max_features": configuration[f"{prefix}max_features"],
                 "bootstrap": configuration[f"{prefix}bootstrap"],
+                "max_depth": configuration[f"{prefix}max_depth"]
                 **kwargs,
             }
 
@@ -234,12 +242,20 @@ class RandomForestRegressorWrapper(SklearnWrapper):
                 items=[True, False],
                 default=False,
             )
+            max_depth = Integer(
+                f"{prefix}max_depth",
+                (1, 100),
+                log=False,
+                default=13,
+            )
+            
             params = [
                 n_estimators,
                 min_samples_split,
                 min_samples_leaf,
                 max_features,
                 bootstrap,
+                max_depth
             ]
             if parent_param is not None:
                 conditions = [
@@ -287,6 +303,7 @@ class RandomForestRegressorWrapper(SklearnWrapper):
                 "min_samples_leaf": configuration[f"{prefix}min_samples_leaf"],
                 "max_features": configuration[f"{prefix}max_features"],
                 "bootstrap": configuration[f"{prefix}bootstrap"],
+                "max_depth": configuration[f"{prefix}max_depth"]
                 **kwargs,
             }
 
