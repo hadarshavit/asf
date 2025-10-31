@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from asf.predictors.sklearn_wrapper import SklearnWrapper
 from typing import Any
 from sklearn.linear_model import Ridge, RidgeClassifier
@@ -7,6 +9,7 @@ try:
         ConfigurationSpace,
         Float,
         Categorical,
+        EqualsCondition,
     )
     from ConfigSpace.hyperparameters import Hyperparameter
 
@@ -27,72 +30,74 @@ class RidgeRegressorWrapper(SklearnWrapper):
     def __init__(self, init_params: dict[str, Any] = {}):
         super().__init__(Ridge, init_params)
 
-    if CONFIGSPACE_AVAILABLE:
-
-        @staticmethod
-        def get_configuration_space(
-            cs: ConfigurationSpace | None = None,
-            pre_prefix: str = "",
-            parent_param: Hyperparameter | None = None,
-            parent_value: str | None = None,
-        ) -> ConfigurationSpace:
-            if pre_prefix != "":
-                prefix = f"{pre_prefix}:{RidgeRegressorWrapper.PREFIX}:"
-            else:
-                prefix = RidgeRegressorWrapper.PREFIX
-
-            if cs is None:
-                cs = ConfigurationSpace(name="RidgeRegressor")
-
-            alpha = Float(
-                f"{prefix}alpha",
-                (1e-6, 100.0),
-                log=True,
-                default=1.0,
+    @staticmethod
+    def get_configuration_space(
+        cs: ConfigurationSpace | None = None,
+        pre_prefix: str = "",
+        parent_param: Hyperparameter | None = None,
+        parent_value: str | None = None,
+    ) -> ConfigurationSpace:
+        if not CONFIGSPACE_AVAILABLE:
+            raise RuntimeError(
+                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
             )
-            fit_intercept = Categorical(
-                f"{prefix}fit_intercept",
-                [True, False],
-                default=True,
+        if pre_prefix != "":
+            prefix = f"{pre_prefix}:{RidgeRegressorWrapper.PREFIX}:"
+        else:
+            prefix = RidgeRegressorWrapper.PREFIX
+
+        if cs is None:
+            cs = ConfigurationSpace(name="RidgeRegressor")
+
+        alpha = Float(
+            f"{prefix}alpha",
+            (1e-6, 100.0),
+            log=True,
+            default=1.0,
+        )
+        fit_intercept = Categorical(
+            f"{prefix}fit_intercept",
+            [True, False],
+            default=True,
+        )
+        solver = Categorical(
+            f"{prefix}solver",
+            ["auto", "svd", "cholesky", "lsqr", "sparse_cg", "sag", "saga"],
+            default="auto",
+        )
+
+        params = [alpha, fit_intercept, solver]
+        if parent_param is not None:
+            conditions = [
+                EqualsCondition(child=param, parent=parent_param, value=parent_value)
+                for param in params
+            ]
+        else:
+            conditions = []
+
+        cs.add(params + conditions)
+        return cs
+
+    @staticmethod
+    def get_from_configuration(
+        configuration: dict[str, Any], pre_prefix: str = "", **kwargs
+    ) -> partial:
+        if not CONFIGSPACE_AVAILABLE:
+            raise RuntimeError(
+                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
             )
-            solver = Categorical(
-                f"{prefix}solver",
-                ["auto", "svd", "cholesky", "lsqr", "sparse_cg", "sag", "saga"],
-                default="auto",
-            )
+        if pre_prefix != "":
+            prefix = f"{pre_prefix}:{RidgeRegressorWrapper.PREFIX}:"
+        else:
+            prefix = RidgeRegressorWrapper.PREFIX
 
-            params = [alpha, fit_intercept, solver]
-            if parent_param is not None:
-                from ConfigSpace.conditions import EqualsCondition
-
-                conditions = [
-                    EqualsCondition(
-                        child=param, parent=parent_param, value=parent_value
-                    )
-                    for param in params
-                ]
-            else:
-                conditions = []
-
-            cs.add(params + conditions)
-            return cs
-
-        @staticmethod
-        def get_from_configuration(
-            configuration: dict[str, Any], pre_prefix: str = "", **kwargs
-        ) -> partial:
-            if pre_prefix != "":
-                prefix = f"{pre_prefix}:{RidgeRegressorWrapper.PREFIX}:"
-            else:
-                prefix = RidgeRegressorWrapper.PREFIX
-
-            params = {
-                "alpha": configuration[f"{prefix}alpha"],
-                "fit_intercept": configuration[f"{prefix}fit_intercept"],
-                "solver": configuration[f"{prefix}solver"],
-                **kwargs,
-            }
-            return partial(RidgeRegressorWrapper, init_params=params)
+        params = {
+            "alpha": configuration[f"{prefix}alpha"],
+            "fit_intercept": configuration[f"{prefix}fit_intercept"],
+            "solver": configuration[f"{prefix}solver"],
+            **kwargs,
+        }
+        return partial(RidgeRegressorWrapper, init_params=params)
 
 
 class RidgeClassifierWrapper(SklearnWrapper):
@@ -105,63 +110,65 @@ class RidgeClassifierWrapper(SklearnWrapper):
     def __init__(self, init_params: dict[str, Any] = {}):
         super().__init__(RidgeClassifier, init_params)
 
-    if CONFIGSPACE_AVAILABLE:
-
-        @staticmethod
-        def get_configuration_space(
-            cs: ConfigurationSpace | None = None,
-            pre_prefix: str = "",
-            parent_param: Hyperparameter | None = None,
-            parent_value: str | None = None,
-        ) -> ConfigurationSpace:
-            if pre_prefix != "":
-                prefix = f"{pre_prefix}:{RidgeClassifierWrapper.PREFIX}:"
-            else:
-                prefix = RidgeClassifierWrapper.PREFIX
-
-            if cs is None:
-                cs = ConfigurationSpace(name="RidgeClassifier")
-
-            alpha = Float(
-                f"{prefix}alpha",
-                (1e-6, 100.0),
-                log=True,
-                default=1.0,
+    @staticmethod
+    def get_configuration_space(
+        cs: ConfigurationSpace | None = None,
+        pre_prefix: str = "",
+        parent_param: Hyperparameter | None = None,
+        parent_value: str | None = None,
+    ) -> ConfigurationSpace:
+        if not CONFIGSPACE_AVAILABLE:
+            raise RuntimeError(
+                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
             )
-            solver = Categorical(
-                f"{prefix}solver",
-                ["auto", "svd", "cholesky", "lsqr", "sparse_cg", "sag", "saga"],
-                default="auto",
+        if pre_prefix != "":
+            prefix = f"{pre_prefix}:{RidgeClassifierWrapper.PREFIX}:"
+        else:
+            prefix = RidgeClassifierWrapper.PREFIX
+
+        if cs is None:
+            cs = ConfigurationSpace(name="RidgeClassifier")
+
+        alpha = Float(
+            f"{prefix}alpha",
+            (1e-6, 100.0),
+            log=True,
+            default=1.0,
+        )
+        solver = Categorical(
+            f"{prefix}solver",
+            ["auto", "svd", "cholesky", "lsqr", "sparse_cg", "sag", "saga"],
+            default="auto",
+        )
+
+        params = [alpha, solver]
+        if parent_param is not None:
+            conditions = [
+                EqualsCondition(child=param, parent=parent_param, value=parent_value)
+                for param in params
+            ]
+        else:
+            conditions = []
+
+        cs.add(params + conditions)
+        return cs
+
+    @staticmethod
+    def get_from_configuration(
+        configuration: dict[str, Any], pre_prefix: str = "", **kwargs
+    ) -> partial:
+        if not CONFIGSPACE_AVAILABLE:
+            raise RuntimeError(
+                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
             )
+        if pre_prefix != "":
+            prefix = f"{pre_prefix}:{RidgeClassifierWrapper.PREFIX}:"
+        else:
+            prefix = RidgeClassifierWrapper.PREFIX
 
-            params = [alpha, solver]
-            if parent_param is not None:
-                from ConfigSpace.conditions import EqualsCondition
-
-                conditions = [
-                    EqualsCondition(
-                        child=param, parent=parent_param, value=parent_value
-                    )
-                    for param in params
-                ]
-            else:
-                conditions = []
-
-            cs.add(params + conditions)
-            return cs
-
-        @staticmethod
-        def get_from_configuration(
-            configuration: dict[str, Any], pre_prefix: str = "", **kwargs
-        ) -> partial:
-            if pre_prefix != "":
-                prefix = f"{pre_prefix}:{RidgeClassifierWrapper.PREFIX}:"
-            else:
-                prefix = RidgeClassifierWrapper.PREFIX
-
-            params = {
-                "alpha": configuration[f"{prefix}alpha"],
-                "solver": configuration[f"{prefix}solver"],
-                **kwargs,
-            }
-            return partial(RidgeClassifierWrapper, init_params=params)
+        params = {
+            "alpha": configuration[f"{prefix}alpha"],
+            "solver": configuration[f"{prefix}solver"],
+            **kwargs,
+        }
+        return partial(RidgeClassifierWrapper, init_params=params)
