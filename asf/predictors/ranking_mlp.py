@@ -31,7 +31,7 @@ class RankingMLP(AbstractPredictor):
         self,
         model: Any | None = None,
         input_size: int | None = None,
-        loss: Callable = bpr_loss,
+        loss: Callable = None,
         optimizer: Callable[..., Any] | None = None,
         batch_size: int = 128,
         epochs: int = 500,
@@ -60,7 +60,7 @@ class RankingMLP(AbstractPredictor):
         self.model.to(device)
         self.device = device
 
-        self.loss = loss
+        self.loss = loss or bpr_loss
         self.batch_size = batch_size
         self.optimizer = optimizer or torch.optim.Adam
         self.epochs = epochs
