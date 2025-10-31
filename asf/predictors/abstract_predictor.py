@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any
 
 try:
@@ -95,9 +97,6 @@ class AbstractPredictor(ABC):
         """
         pass
 
-
-if CONFIGSPACE_AVAILABLE:
-
     @staticmethod
     def get_configuration_space(
         cs: ConfigurationSpace | None = None,
@@ -106,23 +105,29 @@ if CONFIGSPACE_AVAILABLE:
         parent_value: str | None = None,
     ) -> Any:
         """
-            Get the configuration space for the predictor.
+        Get the configuration space for the predictor.
 
-            Parameters
-            ----------
+        Parameters
+        ----------
         cs : Any | None, optional
-                The configuration space to add the parameters to. If None, a new configuration space will be created.
+            The configuration space to add the parameters to. If None, a new configuration space will be created.
 
-            Returns
-            -------
-            Any
-                The configuration space for the predictor.
+        Returns
+        -------
+        Any
+            The configuration space for the predictor.
 
-            Raises
-            ------
-            NotImplementedError
-                If the method is not implemented for the predictor.
+        Raises
+        ------
+        RuntimeError
+            If ConfigSpace is not installed.
+        NotImplementedError
+            If the method is not implemented for the predictor.
         """
+        if not CONFIGSPACE_AVAILABLE:
+            raise RuntimeError(
+                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
+            )
         raise NotImplementedError(
             "get_configuration_space() is not implemented for this predictor"
         )
@@ -146,9 +151,15 @@ if CONFIGSPACE_AVAILABLE:
 
         Raises
         ------
+        RuntimeError
+            If ConfigSpace is not installed.
         NotImplementedError
             If the method is not implemented for the predictor.
         """
+        if not CONFIGSPACE_AVAILABLE:
+            raise RuntimeError(
+                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
+            )
         raise NotImplementedError(
             "get_from_configuration() is not implemented for this predictor"
         )
