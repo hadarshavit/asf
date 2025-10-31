@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 try:
     import torch
 
@@ -12,6 +14,10 @@ def get_mlp(
     hidden_sizes: list[int] = [128, 64],
     dropout: float = 0.0,
 ):
+    if not TORCH_AVAILABLE:
+        raise RuntimeError(
+            "PyTorch is not installed. Install it with: pip install torch"
+        )
     layers = [torch.nn.Linear(input_size, hidden_sizes[0]), torch.nn.ReLU()]
 
     for i in range(len(hidden_sizes) - 1):

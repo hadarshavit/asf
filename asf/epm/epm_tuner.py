@@ -84,9 +84,8 @@ def tune_epm(
     EPM
         The tuned Empirical Performance Model instance.
     """
-    assert SMAC_AVAILABLE, (
-        "SMAC is not installed. Please install it to use this function."
-    )
+    if not SMAC_AVAILABLE:
+        raise RuntimeError("SMAC is not installed. Install it with: pip install smac")
 
     if isinstance(X, np.ndarray) and isinstance(y, np.ndarray):
         X = pd.DataFrame(

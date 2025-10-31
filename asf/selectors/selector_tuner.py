@@ -21,11 +21,17 @@ try:
         ConfigurationSpace,
         UniformFloatHyperparameter,
     )
-    from smac import HyperparameterOptimizationFacade, Scenario
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
+
+try:
+    from smac import HyperparameterOptimizationFacade, Scenario
+
+    SMAC_AVAILABLE = True
+except ImportError:
+    SMAC_AVAILABLE = False
 from sklearn.model_selection import KFold
 
 
@@ -89,9 +95,12 @@ def tune_selector(
     Returns:
         SelectorPipeline: A pipeline with the best-tuned selector and preprocessing steps.
     """
-    assert CONFIGSPACE_AVAILABLE, (
-        "SMAC is not installed. Please install it to use this function via pip install asf-lib[tune]."
-    )
+    if not SMAC_AVAILABLE:
+        raise RuntimeError("SMAC is not installed. Install it with: pip install smac")
+    if not CONFIGSPACE_AVAILABLE:
+        raise RuntimeError(
+            "ConfigSpace is not installed. Install it with: pip install ConfigSpace"
+        )
 
     if pre_solving_class is not None and len(pre_solving_class) > 0 and budget is None:
         raise ValueError(
