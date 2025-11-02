@@ -259,7 +259,13 @@ class SVMRegressorWrapper(SklearnWrapper):
             items=[True, False],
             default=True,
         )
-        params = [kernel, degree, coef0, tol, gamma, C, shrinking]
+        epsilon = Float(
+            f"{prefix}:epsilon",
+            (0.01, 0.99),
+            log=True,
+            default=0.00251,
+        )
+        params = [kernel, degree, coef0, tol, gamma, C, shrinking, epsilon]
         if parent_param is not None:
             conditions = [
                 EqualsCondition(
@@ -313,6 +319,7 @@ class SVMRegressorWrapper(SklearnWrapper):
             "gamma": configuration[f"{prefix}:gamma"],
             "C": configuration[f"{prefix}:C"],
             "shrinking": configuration[f"{prefix}:shrinking"],
+            "epsilon": configuration[f"{prefix}:epsilon"],
             **kwargs,
         }
 
