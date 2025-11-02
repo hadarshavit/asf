@@ -98,6 +98,7 @@ def tune_epm(
             index=range(len(y)),
         )
 
+    cs_kwargs = {}
     if model_class is tuple:
         cs_kwargs = model_class[1]
         model_class = model_class[0]
