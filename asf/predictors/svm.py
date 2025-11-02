@@ -263,7 +263,7 @@ class SVMRegressorWrapper(SklearnWrapper):
             f"{prefix}:epsilon",
             (0.01, 0.99),
             log=True,
-            default=0.00251,
+            default=0.0251,
         )
         params = [kernel, degree, coef0, tol, gamma, C, shrinking, epsilon]
         if parent_param is not None:
