@@ -229,6 +229,7 @@ class MLPRegressorWrapper(SklearnWrapper):
         pre_prefix: str = "",
         parent_param: Hyperparameter | None = None,
         parent_value: str | None = None,
+        dataset_size: str = "small",
     ) -> ConfigurationSpace:
         """
         Get the configuration space for the MLP Regressor.
@@ -260,12 +261,31 @@ class MLPRegressorWrapper(SklearnWrapper):
 
         width = Integer(f"{prefix}:width", (16, 1024), default=64, log=True)
 
-        batch_size = Integer(
-            f"{prefix}:batch_size",
-            (256, 1024),
-            default=256,
-            log=True,
-        )
+        if dataset_size == "small":
+            batch_size = Integer(
+                f"{prefix}:batch_size",
+                (4, 256),
+                default=64,
+                log=True,
+            )
+        elif dataset_size == "medium":
+            batch_size = Integer(
+                f"{prefix}:batch_size",
+                (64, 512),
+                default=128,
+                log=True,
+            )
+        elif dataset_size == "large":
+            batch_size = Integer(
+                f"{prefix}:batch_size",
+                (256, 1024),
+                default=256,
+                log=True,
+            )
+        else:
+            raise ValueError(
+                f"Invalid dataset_size: {dataset_size}. Choose from 'small', 'medium', 'large'."
+            )
 
         alpha = Float(
             f"{prefix}:alpha",

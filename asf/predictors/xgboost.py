@@ -299,7 +299,7 @@ class XGBoostRegressorWrapper(SklearnWrapper):
         booster = Constant(f"{prefix}:booster", "gbtree")
         max_depth = Integer(
             f"{prefix}:max_depth",
-            (1, 20),
+            (1, 15),
             log=False,
             default=13,
         )

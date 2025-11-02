@@ -23,7 +23,7 @@ from asf.predictors.abstract_predictor import AbstractPredictor
 def tune_epm(
     X: np.ndarray,
     y: np.ndarray,
-    model_class: type[AbstractPredictor],
+    model_class: type[AbstractPredictor] | tuple,
     normalization_class: type[AbstractNormalization] = LogNormalization,
     features_preprocessing: str | TransformerMixin = "default",
     categorical_features: list | None = None,
@@ -98,8 +98,12 @@ def tune_epm(
             index=range(len(y)),
         )
 
+    if model_class is tuple:
+        cs_kwargs = model_class[1]
+        model_class = model_class[0]
+
     scenario = Scenario(
-        configspace=model_class.get_configuration_space(),
+        configspace=model_class.get_configuration_space(**cs_kwargs),
         n_trials=runcount_limit,
         walltime_limit=timeout,
         deterministic=True,
