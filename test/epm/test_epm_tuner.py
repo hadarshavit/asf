@@ -17,7 +17,7 @@ def test_tune_epm_requires_smac(monkeypatch):
             # minimal callable to satisfy access in tune_epm body (not reached when SMAC unavailable)
             return None
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(RuntimeError):
         tuner.tune_epm(X, y, model_class=DummyPredictor)
 
 

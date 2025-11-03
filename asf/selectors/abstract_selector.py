@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pandas as pd
 from asf.selectors.feature_generator import (
     AbstractFeatureGenerator,
@@ -163,95 +165,105 @@ class AbstractSelector:
         """
         pass
 
-    if CONFIGSPACE_AVAILABLE:
+    @staticmethod
+    def get_configuration_space(
+        cs: ConfigurationSpace | None = None, **kwargs
+    ) -> ConfigurationSpace:
+        """
+        Get the configuration space for the selector.
 
-        @staticmethod
-        def get_configuration_space(
-            cs: ConfigurationSpace | None = None, **kwargs
-        ) -> ConfigurationSpace:
-            """
-            Get the configuration space for the selector.
+        Parameters
+        ----------
+        cs : ConfigurationSpace or None, optional
+            The configuration space to use. If None, a new one will be created.
+        **kwargs : dict
+            Additional keyword arguments for configuration space creation.
 
-            Parameters
-            ----------
-            cs : ConfigurationSpace or None, optional
-                The configuration space to use. If None, a new one will be created.
-            **kwargs : dict
-                Additional keyword arguments for configuration space creation.
+        Returns
+        -------
+        ConfigurationSpace
+            The configuration space for the selector.
 
-            Returns
-            -------
-            ConfigurationSpace
-                The configuration space for the selector.
-
-            Raises
-            ------
-            NotImplementedError
-                If the method is not implemented in a subclass.
-            """
-            raise NotImplementedError(
-                "get_configuration_space() is not implemented for this selector"
+        Raises
+        ------
+        NotImplementedError
+            If the method is not implemented in a subclass.
+        """
+        if not CONFIGSPACE_AVAILABLE:
+            raise RuntimeError(
+                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
             )
+        raise NotImplementedError(
+            "get_configuration_space() is not implemented for this selector"
+        )
 
-        @staticmethod
-        def get_from_configuration(configuration: Configuration) -> "AbstractSelector":
-            """
-            Create a selector instance from a configuration.
+    @staticmethod
+    def get_from_configuration(configuration: Configuration) -> "AbstractSelector":
+        """
+        Create a selector instance from a configuration.
 
-            Parameters
-            ----------
-            configuration : Configuration
-                The configuration object.
+        Parameters
+        ----------
+        configuration : Configuration
+            The configuration object.
 
-            Returns
-            -------
-            AbstractSelector
-                The selector instance.
+        Returns
+        -------
+        AbstractSelector
+            The selector instance.
 
-            Raises
-            ------
-            NotImplementedError
-                If the method is not implemented in a subclass.
-            """
-            raise NotImplementedError(
-                "get_from_configuration() is not implemented for this selector"
+        Raises
+        ------
+        NotImplementedError
+            If the method is not implemented in a subclass.
+        """
+        if not CONFIGSPACE_AVAILABLE:
+            raise RuntimeError(
+                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
             )
+        raise NotImplementedError(
+            "get_from_configuration() is not implemented for this selector"
+        )
 
-        @staticmethod
-        def _add_hierarchical_generator_space(
-            cs: ConfigurationSpace,
-            hierarchical_generator: list[AbstractFeatureGenerator] | None = None,
-            **kwargs,
-        ) -> ConfigurationSpace:
-            """
-            Add the hierarchical generator space to the configuration space.
+    @staticmethod
+    def _add_hierarchical_generator_space(
+        cs: ConfigurationSpace,
+        hierarchical_generator: list[AbstractFeatureGenerator] | None = None,
+        **kwargs,
+    ) -> ConfigurationSpace:
+        """
+        Add the hierarchical generator space to the configuration space.
 
-            Parameters
-            ----------
-            cs : ConfigurationSpace
-                The configuration space to use.
-            hierarchical_generator : list[AbstractFeatureGenerator] or None, optional
-                The list of hierarchical generators to add. Defaults to None.
-            **kwargs : dict
-                Additional keyword arguments to pass to the model class.
+        Parameters
+        ----------
+        cs : ConfigurationSpace
+            The configuration space to use.
+        hierarchical_generator : list[AbstractFeatureGenerator] or None, optional
+            The list of hierarchical generators to add. Defaults to None.
+        **kwargs : dict
+            Additional keyword arguments to pass to the model class.
 
-            Returns
-            -------
-            ConfigurationSpace
-                The updated configuration space.
-            """
-            if hierarchical_generator is not None:
-                if "hierarchical_generator" in cs:
-                    return
+        Returns
+        -------
+        ConfigurationSpace
+            The updated configuration space.
+        """
+        if not CONFIGSPACE_AVAILABLE:
+            raise RuntimeError(
+                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
+            )
+        if hierarchical_generator is not None:
+            if "hierarchical_generator" in cs:
+                return cs
 
-                cs.add(
-                    Categorical(
-                        name="hierarchical_generator",
-                        items=hierarchical_generator,
-                    )
+            cs.add(
+                Categorical(
+                    name="hierarchical_generator",
+                    items=hierarchical_generator,
                 )
+            )
 
-                for generator in hierarchical_generator:
-                    generator.get_configuration_space(cs=cs, **kwargs)
+            for generator in hierarchical_generator:
+                generator.get_configuration_space(cs=cs, **kwargs)
 
-            return cs
+        return cs
