@@ -130,6 +130,23 @@ def test_survival_analysis(dummy_performance, dummy_features):
     validate_predictions(predictions)
 
 
+def test_survival_analysis_schedule(dummy_performance, dummy_features):
+    budget = 450.0
+    selector = SurvivalAnalysisSelector(budget=budget, use_schedule=True)
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+
+    assert len(predictions) == len(dummy_features)
+    for sched in predictions.values():
+        assert isinstance(sched, list)
+        assert all(isinstance(x, tuple) and len(x) == 2 for x in sched)
+        assert all(
+            isinstance(x[0], str) and isinstance(x[1], (float, np.floating))
+            for x in sched
+        )
+        assert np.isclose(sum(x[1] for x in sched), budget)
+
+
 def test_collaborative_filtering_selector(dummy_performance, dummy_features):
     # Insert some NaNs into the performance matrix to simulate missing data
     perf = dummy_performance.copy()
