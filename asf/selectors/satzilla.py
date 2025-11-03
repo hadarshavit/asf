@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, Optional, Dict, List, Tuple
 
 import numpy as np
@@ -9,7 +11,7 @@ from asf.predictors.ridge import RidgeRegressorWrapper
 from asf.selectors.abstract_epm_based_selector import AbstractEPMBasedSelector
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 
-# Add optional ConfigSpace import (like other selectors)
+# Optional ConfigSpace import (consistent with other modules)
 try:
     from ConfigSpace import (
         ConfigurationSpace,
@@ -157,126 +159,132 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
             results[inst] = [(algo, self.budget)]
         return results
 
-    if CONFIGSPACE_AVAILABLE:
-
-        @staticmethod
-        def get_configuration_space(
-            cs: Optional[ConfigurationSpace] = None,
-            cs_transform: Optional[Dict[str, Dict[str, type]]] = None,
-            model_class: List[type] = None,
-            pre_prefix: str = "",
-            parent_param: Optional[Hyperparameter] = None,
-            parent_value: Optional[str] = None,
-            **kwargs,
-        ) -> Tuple[ConfigurationSpace, Dict[str, Dict[str, type]]]:
-            """
-            Build ConfigSpace for SATzilla, including:
-            - model_class choice (wrappers) with nested model hyperparams
-            - SATzilla-specific EM/log parameters
-            """
-            if cs is None:
-                cs = ConfigurationSpace()
-            if cs_transform is None:
-                cs_transform = {}
-            if model_class is None:
-                model_class = [RidgeRegressorWrapper]
-
-            if pre_prefix != "":
-                prefix = f"{pre_prefix}:{SATzilla.PREFIX}"
-            else:
-                prefix = SATzilla.PREFIX
-
-            model_class_param = Categorical(
-                name=f"{prefix}:model_class",
-                items=[str(c.__name__) for c in model_class],
+    @staticmethod
+    def get_configuration_space(
+        cs: Optional[ConfigurationSpace] = None,
+        cs_transform: Optional[Dict[str, Dict[str, type]]] = None,
+        model_class: List[type] = None,
+        pre_prefix: str = "",
+        parent_param: Optional[Hyperparameter] = None,
+        parent_value: Optional[str] = None,
+        **kwargs,
+    ) -> Tuple[ConfigurationSpace, Dict[str, Dict[str, type]]]:
+        """
+        Build ConfigSpace for SATzilla, including:
+        - model_class choice (wrappers) with nested model hyperparams
+        - SATzilla-specific EM/log parameters
+        """
+        if not CONFIGSPACE_AVAILABLE:
+            raise RuntimeError(
+                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
             )
-            cs_transform[f"{prefix}:model_class"] = {
-                str(c.__name__): c for c in model_class
-            }
+        if cs is None:
+            cs = ConfigurationSpace()
+        if cs_transform is None:
+            cs_transform = {}
+        if model_class is None:
+            model_class = [RidgeRegressorWrapper]
 
-            use_log10 = Categorical(
-                f"{prefix}:use_log10",
-                [True, False],
-                default=True,
-            )
-            em_max_iter = Integer(
-                f"{prefix}:em_max_iter",
-                (5, 50),
-                default=20,
-            )
-            em_tol = Float(
-                f"{prefix}:em_tol",
-                (1e-6, 1e-2),
-                log=True,
-                default=1e-3,
-            )
-            em_min_sigma = Float(
-                f"{prefix}:em_min_sigma",
-                (1e-8, 1e-1),
-                log=True,
-                default=1e-6,
-            )
+        if pre_prefix != "":
+            prefix = f"{pre_prefix}:{SATzilla.PREFIX}"
+        else:
+            prefix = SATzilla.PREFIX
 
-            params = [model_class_param, use_log10, em_max_iter, em_tol, em_min_sigma]
+        model_class_param = Categorical(
+            name=f"{prefix}:model_class",
+            items=[str(c.__name__) for c in model_class],
+        )
+        cs_transform[f"{prefix}:model_class"] = {
+            str(c.__name__): c for c in model_class
+        }
 
-            # Activate these params only when the parent selector is SATzilla
-            if parent_param is not None:
-                conditions = [
-                    EqualsCondition(
-                        child=param,
-                        parent=parent_param,
-                        value=parent_value,
-                    )
-                    for param in params
-                ]
-            else:
-                conditions = []
+        use_log10 = Categorical(
+            f"{prefix}:use_log10",
+            [True, False],
+            default=True,
+        )
+        em_max_iter = Integer(
+            f"{prefix}:em_max_iter",
+            (5, 50),
+            default=20,
+        )
+        em_tol = Float(
+            f"{prefix}:em_tol",
+            (1e-6, 1e-2),
+            log=True,
+            default=1e-3,
+        )
+        em_min_sigma = Float(
+            f"{prefix}:em_min_sigma",
+            (1e-8, 1e-1),
+            log=True,
+            default=1e-6,
+        )
 
-            cs.add(params + conditions)
+        params = [model_class_param, use_log10, em_max_iter, em_tol, em_min_sigma]
 
-            for mc in model_class:
-                mc.get_configuration_space(
-                    cs=cs,
-                    pre_prefix=f"{prefix}:model_class",
-                    parent_param=model_class_param,
-                    parent_value=str(mc.__name__),
-                    **kwargs,
+        # Activate these params only when the parent selector is SATzilla
+        if parent_param is not None:
+            conditions = [
+                EqualsCondition(
+                    child=param,
+                    parent=parent_param,
+                    value=parent_value,
                 )
-
-            return cs, cs_transform
-
-        @staticmethod
-        def get_from_configuration(
-            configuration: Configuration,
-            cs_transform: Dict[str, Dict[str, type]],
-            pre_prefix: str = "",
-            **kwargs,
-        ):
-            """
-            Instantiate SATzilla from a ConfigSpace configuration.
-            """
-            if pre_prefix != "":
-                prefix = f"{pre_prefix}:{SATzilla.PREFIX}"
-            else:
-                prefix = SATzilla.PREFIX
-
-            model_cls = cs_transform[f"{prefix}:model_class"][
-                configuration[f"{prefix}:model_class"]
+                for param in params
             ]
-            model_ctor = model_cls.get_from_configuration(
-                configuration, pre_prefix=f"{prefix}:model_class"
-            )
+        else:
+            conditions = []
 
-            use_log10 = configuration[f"{prefix}:use_log10"]
-            em_max_iter = configuration[f"{prefix}:em_max_iter"]
-            em_tol = configuration[f"{prefix}:em_tol"]
-            em_min_sigma = configuration[f"{prefix}:em_min_sigma"]
+        cs.add(params + conditions)
 
-            return SATzilla(
-                model_class=model_ctor,
-                use_log10=use_log10,
-                em_max_iter=em_max_iter,
-                em_tol=em_tol,
-                em_min_sigma=em_min_sigma,
+        for mc in model_class:
+            mc.get_configuration_space(
+                cs=cs,
+                pre_prefix=f"{prefix}:model_class",
+                parent_param=model_class_param,
+                parent_value=str(mc.__name__),
                 **kwargs,
             )
+
+        return cs, cs_transform
+
+    @staticmethod
+    def get_from_configuration(
+        configuration: Configuration,
+        cs_transform: Dict[str, Dict[str, type]],
+        pre_prefix: str = "",
+        **kwargs,
+    ):
+        """
+        Instantiate SATzilla from a ConfigSpace configuration.
+        """
+        if not CONFIGSPACE_AVAILABLE:
+            raise RuntimeError(
+                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
+            )
+        if pre_prefix != "":
+            prefix = f"{pre_prefix}:{SATzilla.PREFIX}"
+        else:
+            prefix = SATzilla.PREFIX
+
+        model_cls = cs_transform[f"{prefix}:model_class"][
+            configuration[f"{prefix}:model_class"]
+        ]
+        model_ctor = model_cls.get_from_configuration(
+            configuration, pre_prefix=f"{prefix}:model_class"
+        )
+
+        use_log10 = configuration[f"{prefix}:use_log10"]
+        em_max_iter = configuration[f"{prefix}:em_max_iter"]
+        em_tol = configuration[f"{prefix}:em_tol"]
+        em_min_sigma = configuration[f"{prefix}:em_min_sigma"]
+
+        return SATzilla(
+            model_class=model_ctor,
+            use_log10=use_log10,
+            em_max_iter=em_max_iter,
+            em_tol=em_tol,
+            em_min_sigma=em_min_sigma,
+            **kwargs,
+        )

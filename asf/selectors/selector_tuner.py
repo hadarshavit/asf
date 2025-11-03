@@ -21,11 +21,17 @@ try:
         ConfigurationSpace,
         UniformFloatHyperparameter,
     )
-    from smac import HyperparameterOptimizationFacade, Scenario
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
+
+try:
+    from smac import HyperparameterOptimizationFacade, Scenario
+
+    SMAC_AVAILABLE = True
+except ImportError:
+    SMAC_AVAILABLE = False
 from sklearn.model_selection import KFold
 
 
@@ -52,7 +58,7 @@ def tune_selector(
     feature_groups: list = None,
     output_dir: str = "./smac_output",
     smac_metric: callable = running_time_selector_performance,
-    smac_kwargs: dict = {},
+    smac_kwargs: callable = None,
     smac_scenario_kwargs: dict = {},
     runcount_limit: int = 100,
     timeout: float = np.inf,
@@ -78,7 +84,7 @@ def tune_selector(
         feature_groups (list, optional): Feature groups to consider. Defaults to None.
         output_dir (str): Directory to store SMAC output. Defaults to "./smac_output".
         smac_metric (callable): Metric function to evaluate the selector's performance. Defaults to `running_time_selector_performance`.
-        smac_kwargs (dict): Additional arguments for SMAC's optimization facade.
+        smac_kwargs (callable): Additional arguments for SMAC's optimization facade.
         smac_scenario_kwargs (dict): Additional arguments for SMAC's scenario configuration.
         runcount_limit (int): Maximum number of function evaluations. Defaults to 100.
         timeout (float): Maximum wall-clock time for optimization. Defaults to np.inf.
@@ -89,9 +95,12 @@ def tune_selector(
     Returns:
         SelectorPipeline: A pipeline with the best-tuned selector and preprocessing steps.
     """
-    assert CONFIGSPACE_AVAILABLE, (
-        "SMAC is not installed. Please install it to use this function via pip install asf-lib[tune]."
-    )
+    if not SMAC_AVAILABLE:
+        raise RuntimeError("SMAC is not installed. Install it with: pip install smac")
+    if not CONFIGSPACE_AVAILABLE:
+        raise RuntimeError(
+            "ConfigSpace is not installed. Install it with: pip install ConfigSpace"
+        )
 
     if pre_solving_class is not None and len(pre_solving_class) > 0 and budget is None:
         raise ValueError(
@@ -233,6 +242,7 @@ def tune_selector(
 
         return np.sum(scores)
 
+    smac_kwargs = smac_kwargs(scenario) if smac_kwargs is not None else {}
     smac = HyperparameterOptimizationFacade(scenario, target_function, **smac_kwargs)
     best_config = smac.optimize()
 
