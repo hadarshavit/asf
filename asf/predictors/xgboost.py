@@ -131,7 +131,7 @@ class XGBoostClassifierWrapper(SklearnWrapper):
             prefix = XGBoostClassifierWrapper.PREFIX
 
         booster = Constant(f"{prefix}:booster", "gbtree")
-        n_estimators = Constant(f"{prefix}:n_estimators", 20000)
+        n_estimators = Constant(f"{prefix}:n_estimators", 2000)
         max_depth = Integer(
             f"{prefix}:max_depth",
             (1, 20),
@@ -300,7 +300,7 @@ class XGBoostRegressorWrapper(SklearnWrapper):
             prefix = XGBoostRegressorWrapper.PREFIX
 
         booster = Constant(f"{prefix}:booster", "gbtree")
-        n_estimators = Constant(f"{prefix}:n_estimators", 20000)
+        n_estimators = Constant(f"{prefix}:n_estimators", 2000)
         max_depth = Integer(
             f"{prefix}:max_depth",
             (1, 15),
