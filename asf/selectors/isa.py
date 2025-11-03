@@ -87,6 +87,9 @@ class ISA(AbstractSelector):
         """
         Find the best k using cross-validation on the reduced instance set.
         """
+        if len(self.reduced_features) < self.n_folds:
+            return self.k
+
         best_k = self.k
         best_score = float("inf")
         kf = KFold(n_splits=self.n_folds, shuffle=True, random_state=self.random_state)

@@ -33,26 +33,26 @@ from asf.selectors.isa import ISA
 def dummy_performance():
     data = np.array(
         [
-            [120, 100, 110],
-            [140, 150, 130],
-            [180, 170, 190],
-            [160, 150, 140],
-            [250, 240, 260],
+            [800, 250, 5],
+            [200, 800, 130],
+            [120, 170, 500],
+            [160, 150, 700],
+            [2750, 240, 260],
             [230, 220, 210],
-            [300, 310, 320],
-            [280, 290, 270],
-            [350, 340, 360],
-            [330, 320, 310],
-            [400, 390, 410],
-            [380, 370, 360],
-            [450, 440, 460],
-            [430, 420, 410],
-            [500, 490, 510],
-            [480, 470, 460],
-            [550, 540, 560],
-            [530, 520, 510],
-            [600, 590, 610],
-            [580, 570, 560],
+            [300, 100, 600],
+            [550, 12, 270],
+            [350, 3490, 20],
+            [100, 320, 310],
+            [400, 33, 410],
+            [12, 370, 360],
+            [6, 440, 460],
+            [430, 42, 410],
+            [500, 200, 20],
+            [480, 470, 100],
+            [100, 540, 560],
+            [530, 100, 330],
+            [25, 250, 610],
+            [580, 200, 10],
         ]
     )
     return pd.DataFrame(data, columns=["algo1", "algo2", "algo3"])
@@ -149,7 +149,7 @@ def test_survival_analysis_schedule(dummy_performance, dummy_features):
 
 def test_isa_selector(dummy_performance, dummy_features):
     budget = 450.0
-    selector = ISA(k=3, use_k_tuning=False, budget=budget)
+    selector = ISA(k=3, use_k_tuning=True, budget=budget)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
 
