@@ -26,7 +26,7 @@ from asf.selectors.sunny_selector import SunnySelector
 from asf.selectors.satzilla import SATzilla
 from asf.selectors.isac import ISAC
 from asf.selectors.snnap import SNNAP
-from asf.selectors.isa import ISA, CLINGO_AVAIL
+from asf.selectors.isa import ISA
 
 
 @pytest.fixture

@@ -19,7 +19,7 @@ class ISA(AbstractSelector):
         k: int = 10,
         use_k_tuning: bool = True,
         n_folds: int = 5,
-        k_candidates: list[int] | None = [3, 5, 10, 20, 40],
+        k_candidates: list[int] | None = None,
         aspeed_cutoff: int = 30,
         cores: int = 1,
         random_state: int = 42,
@@ -44,7 +44,7 @@ class ISA(AbstractSelector):
         self.k = k
         self.use_k_tuning = use_k_tuning
         self.n_folds = n_folds
-        self.k_candidates = k_candidates
+        self.k_candidates = [3, 5, 10, 15, 20] if k_candidates is None else k_candidates
         self.aspeed_cutoff = aspeed_cutoff
         self.cores = cores
         self.random_state = random_state
