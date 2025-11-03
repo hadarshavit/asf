@@ -9,6 +9,7 @@ try:
         Float,
         InCondition,
         Integer,
+        AndConjunction,
     )
     from ConfigSpace.hyperparameters import Hyperparameter
 
@@ -128,19 +129,31 @@ class SVMClassifierWrapper(SklearnWrapper):
             values=["poly"],
         )
         cur_conds = [gamma_cond, degree_cond]
+
         if parent_param is not None:
-            conditions = [
-                EqualsCondition(
-                    child=param,
-                    parent=parent_param,
-                    value=parent_value,
-                )
-                for param in params
+            simple_params = [p for p in params if p not in (gamma, degree)]
+            simple_equals = [
+                EqualsCondition(child=param, parent=parent_param, value=parent_value)
+                for param in simple_params
             ]
+
+            gamma_eq = EqualsCondition(
+                child=gamma, parent=parent_param, value=parent_value
+            )
+            degree_eq = EqualsCondition(
+                child=degree, parent=parent_param, value=parent_value
+            )
+
+            # AndConjunction expects variadic condition arguments, not a list
+            gamma_and = AndConjunction(gamma_eq, gamma_cond)
+            degree_and = AndConjunction(degree_eq, degree_cond)
+
+            conditions = simple_equals + [gamma_and, degree_and]
+
+            cs.add(params + conditions)
         else:
             conditions = []
-
-        cs.add(params + conditions + cur_conds)
+            cs.add(params + conditions + cur_conds)
 
         return cs
 
@@ -305,18 +318,29 @@ class SVMRegressorWrapper(SklearnWrapper):
         cur_conds = [gamma_cond, degree_cond]
 
         if parent_param is not None:
-            conditions = [
-                EqualsCondition(
-                    child=param,
-                    parent=parent_param,
-                    value=parent_value,
-                )
-                for param in params
+            simple_params = [p for p in params if p not in (gamma, degree)]
+            simple_equals = [
+                EqualsCondition(child=param, parent=parent_param, value=parent_value)
+                for param in simple_params
             ]
+
+            gamma_eq = EqualsCondition(
+                child=gamma, parent=parent_param, value=parent_value
+            )
+            degree_eq = EqualsCondition(
+                child=degree, parent=parent_param, value=parent_value
+            )
+
+            # AndConjunction expects variadic condition arguments, not a list
+            gamma_and = AndConjunction(gamma_eq, gamma_cond)
+            degree_and = AndConjunction(degree_eq, degree_cond)
+
+            conditions = simple_equals + [gamma_and, degree_and]
+
+            cs.add(params + conditions)
         else:
             conditions = []
-
-        cs.add(params + conditions + cur_conds)
+            cs.add(params + conditions + cur_conds)
 
         return cs
 
