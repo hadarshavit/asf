@@ -120,12 +120,12 @@ class SVMClassifierWrapper(SklearnWrapper):
         gamma_cond = InCondition(
             child=gamma,
             parent=kernel,
-            value=["rbf", "poly", "sigmoid"],
+            values=["rbf", "poly", "sigmoid"],
         )
         degree_cond = InCondition(
             child=degree,
             parent=kernel,
-            value=["poly"],
+            values=["poly"],
         )
         cur_conds = [gamma_cond, degree_cond]
         if parent_param is not None:
@@ -295,12 +295,12 @@ class SVMRegressorWrapper(SklearnWrapper):
         gamma_cond = InCondition(
             child=gamma,
             parent=kernel,
-            value=["rbf", "poly", "sigmoid"],
+            values=["rbf", "poly", "sigmoid"],
         )
         degree_cond = InCondition(
             child=degree,
             parent=kernel,
-            value=["poly"],
+            values=["poly"],
         )
         cur_conds = [gamma_cond, degree_cond]
 
