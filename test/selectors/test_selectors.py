@@ -26,6 +26,7 @@ from asf.selectors.sunny_selector import SunnySelector
 from asf.selectors.satzilla import SATzilla
 from asf.selectors.isac import ISAC
 from asf.selectors.snnap import SNNAP
+from asf.selectors.isa import ISA, CLINGO_AVAIL
 
 
 @pytest.fixture
@@ -144,6 +145,23 @@ def test_survival_analysis_schedule(dummy_performance, dummy_features):
             for x in sched
         )
         assert np.isclose(sum(x[1] for x in sched), budget)
+
+
+def test_isa_selector(dummy_performance, dummy_features):
+    budget = 450.0
+    selector = ISA(k=3, use_k_tuning=False, budget=budget)
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+
+    assert len(predictions) == len(dummy_features)
+    for sched in predictions.values():
+        assert isinstance(sched, list)
+        assert all(isinstance(x, tuple) and len(x) == 2 for x in sched)
+        assert all(
+            isinstance(x[0], str) and isinstance(x[1], (float, np.floating, int))
+            for x in sched
+        )
+        assert sum(x[1] for x in sched) == budget
 
 
 def test_collaborative_filtering_selector(dummy_performance, dummy_features):
