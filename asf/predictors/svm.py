@@ -175,15 +175,18 @@ class SVMClassifierWrapper(SklearnWrapper):
 
         svm_params = {
             "kernel": configuration[f"{prefix}:kernel"],
-            "degree": configuration[f"{prefix}:degree"],
             "coef0": configuration[f"{prefix}:coef0"],
             "tol": configuration[f"{prefix}:tol"],
-            "gamma": configuration[f"{prefix}:gamma"],
             "C": configuration[f"{prefix}:C"],
             "shrinking": configuration[f"{prefix}:shrinking"],
             "max_iter": configuration[f"{prefix}:max_iter"],
             **kwargs,
         }
+
+        if svm_params["kernel"] == "poly":
+            svm_params["degree"] = configuration[f"{prefix}:degree"]
+        if svm_params["kernel"] in ["rbf", "poly", "sigmoid"]:
+            svm_params["gamma"] = configuration[f"{prefix}:gamma"]
 
         return partial(SVMClassifierWrapper, init_params=svm_params)
 
@@ -348,15 +351,18 @@ class SVMRegressorWrapper(SklearnWrapper):
 
         svr_params = {
             "kernel": configuration[f"{prefix}:kernel"],
-            "degree": configuration[f"{prefix}:degree"],
             "coef0": configuration[f"{prefix}:coef0"],
             "tol": configuration[f"{prefix}:tol"],
-            "gamma": configuration[f"{prefix}:gamma"],
             "C": configuration[f"{prefix}:C"],
             "shrinking": configuration[f"{prefix}:shrinking"],
             "epsilon": configuration[f"{prefix}:epsilon"],
             "max_iter": configuration[f"{prefix}:max_iter"],
             **kwargs,
         }
+
+        if svr_params["kernel"] == "poly":
+            svr_params["degree"] = configuration[f"{prefix}:degree"]
+        if svr_params["kernel"] in ["rbf", "poly", "sigmoid"]:
+            svr_params["gamma"] = configuration[f"{prefix}:gamma"]
 
         return partial(SVMRegressorWrapper, init_params=svr_params)
