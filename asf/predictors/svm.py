@@ -14,6 +14,7 @@ try:
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
+from ConfigSpace import Constant, InCondition
 from sklearn.svm import SVC, SVR
 from functools import partial
 from typing import Any
@@ -73,7 +74,10 @@ class SVMClassifierWrapper(SklearnWrapper):
             prefix = f"{pre_prefix}:{SVMClassifierWrapper.PREFIX}"
         else:
             prefix = SVMClassifierWrapper.PREFIX
-
+        max_iter = Constant(
+            f"{prefix}:max_iter",
+            20000,
+        )
         kernel = Categorical(
             f"{prefix}:kernel",
             items=["linear", "rbf", "poly", "sigmoid"],
@@ -109,8 +113,19 @@ class SVMClassifierWrapper(SklearnWrapper):
             default=True,
         )
 
-        params = [kernel, degree, coef0, tol, gamma, C, shrinking]
+        params = [kernel, degree, coef0, tol, gamma, C, shrinking, max_iter]
 
+        gamma_cond = InCondition(
+            child=gamma,
+            parent=kernel,
+            value=["rbf", "poly", "sigmoid"],
+        )
+        degree_cond = InCondition(
+            child=degree,
+            parent=kernel,
+            value=["poly"],
+        )
+        cur_conds = [gamma_cond, degree_cond]
         if parent_param is not None:
             conditions = [
                 EqualsCondition(
@@ -123,7 +138,7 @@ class SVMClassifierWrapper(SklearnWrapper):
         else:
             conditions = []
 
-        cs.add(params + conditions)
+        cs.add(params + conditions + cur_conds)
 
         return cs
 
@@ -164,6 +179,7 @@ class SVMClassifierWrapper(SklearnWrapper):
             "gamma": configuration[f"{prefix}:gamma"],
             "C": configuration[f"{prefix}:C"],
             "shrinking": configuration[f"{prefix}:shrinking"],
+            "max_iter": configuration[f"{prefix}:max_iter"],
             **kwargs,
         }
 
@@ -230,6 +246,10 @@ class SVMRegressorWrapper(SklearnWrapper):
         if cs is None:
             cs = ConfigurationSpace(name="SVM Regressor")
 
+        max_iter = Constant(
+            f"{prefix}:max_iter",
+            20000,
+        )
         kernel = Categorical(
             f"{prefix}:kernel",
             items=["linear", "rbf", "poly", "sigmoid"],
@@ -265,7 +285,20 @@ class SVMRegressorWrapper(SklearnWrapper):
             log=True,
             default=0.0251,
         )
-        params = [kernel, degree, coef0, tol, gamma, C, shrinking, epsilon]
+        params = [kernel, degree, coef0, tol, gamma, C, shrinking, epsilon, max_iter]
+
+        gamma_cond = InCondition(
+            child=gamma,
+            parent=kernel,
+            value=["rbf", "poly", "sigmoid"],
+        )
+        degree_cond = InCondition(
+            child=degree,
+            parent=kernel,
+            value=["poly"],
+        )
+        cur_conds = [gamma_cond, degree_cond]
+
         if parent_param is not None:
             conditions = [
                 EqualsCondition(
@@ -278,7 +311,7 @@ class SVMRegressorWrapper(SklearnWrapper):
         else:
             conditions = []
 
-        cs.add(params + conditions)
+        cs.add(params + conditions + cur_conds)
 
         return cs
 
@@ -320,6 +353,7 @@ class SVMRegressorWrapper(SklearnWrapper):
             "C": configuration[f"{prefix}:C"],
             "shrinking": configuration[f"{prefix}:shrinking"],
             "epsilon": configuration[f"{prefix}:epsilon"],
+            "max_iter": configuration[f"{prefix}:max_iter"],
             **kwargs,
         }
 

@@ -264,14 +264,14 @@ class MLPRegressorWrapper(SklearnWrapper):
         if dataset_size == "small":
             batch_size = Integer(
                 f"{prefix}:batch_size",
-                (4, 256),
+                (16, 256),
                 default=64,
                 log=True,
             )
         elif dataset_size == "medium":
             batch_size = Integer(
                 f"{prefix}:batch_size",
-                (64, 512),
+                (128, 512),
                 default=128,
                 log=True,
             )

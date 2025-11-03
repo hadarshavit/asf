@@ -131,6 +131,8 @@ class XGBoostClassifierWrapper(SklearnWrapper):
             prefix = XGBoostClassifierWrapper.PREFIX
 
         booster = Constant(f"{prefix}:booster", "gbtree")
+        n_estimators = Constant(f"{prefix}:n_estimators", 20000)
+        early_stopping_rounds = Constant(f"{prefix}:early_stopping_rounds", 100)
         max_depth = Integer(
             f"{prefix}:max_depth",
             (1, 20),
@@ -183,6 +185,8 @@ class XGBoostClassifierWrapper(SklearnWrapper):
             lambda_param,
             alpha,
             learning_rate,
+            n_estimators,
+            early_stopping_rounds,
         ]
 
         if parent_param is not None:
@@ -240,6 +244,8 @@ class XGBoostClassifierWrapper(SklearnWrapper):
             "lambda": configuration[f"{prefix}:lambda"],
             "alpha": configuration[f"{prefix}:alpha"],
             "learning_rate": configuration[f"{prefix}:learning_rate"],
+            "n_estimators": configuration[f"{prefix}:n_estimators"],
+            "early_stopping_rounds": configuration[f"{prefix}:early_stopping_rounds"],
             **kwargs,
         }
 
@@ -297,6 +303,8 @@ class XGBoostRegressorWrapper(SklearnWrapper):
             prefix = XGBoostRegressorWrapper.PREFIX
 
         booster = Constant(f"{prefix}:booster", "gbtree")
+        n_estimators = Constant(f"{prefix}:n_estimators", 20000)
+        early_stopping_rounds = Constant(f"{prefix}:early_stopping_rounds", 100)
         max_depth = Integer(
             f"{prefix}:max_depth",
             (1, 15),
@@ -349,6 +357,8 @@ class XGBoostRegressorWrapper(SklearnWrapper):
             lambda_param,
             alpha,
             learning_rate,
+            n_estimators,
+            early_stopping_rounds,
         ]
         if parent_param is not None:
             conditions = [
@@ -405,6 +415,8 @@ class XGBoostRegressorWrapper(SklearnWrapper):
             "lambda": configuration[f"{prefix}:lambda"],
             "alpha": configuration[f"{prefix}:alpha"],
             "learning_rate": configuration[f"{prefix}:learning_rate"],
+            "n_estimators": configuration[f"{prefix}:n_estimators"],
+            "early_stopping_rounds": configuration[f"{prefix}:early_stopping_rounds"],
             **kwargs,
         }
 
