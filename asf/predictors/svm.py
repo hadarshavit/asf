@@ -4,9 +4,12 @@ try:
     from ConfigSpace import (
         Categorical,
         ConfigurationSpace,
-        Float,
-        Integer,
+        Constant,
         EqualsCondition,
+        Float,
+        InCondition,
+        Integer,
+        AndConjunction,
     )
     from ConfigSpace.hyperparameters import Hyperparameter
 
@@ -14,9 +17,10 @@ try:
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
-from sklearn.svm import SVC, SVR
 from functools import partial
 from typing import Any
+
+from sklearn.svm import SVC, SVR
 
 from asf.predictors.sklearn_wrapper import SklearnWrapper
 
@@ -73,7 +77,10 @@ class SVMClassifierWrapper(SklearnWrapper):
             prefix = f"{pre_prefix}:{SVMClassifierWrapper.PREFIX}"
         else:
             prefix = SVMClassifierWrapper.PREFIX
-
+        max_iter = Constant(
+            f"{prefix}:max_iter",
+            20000,
+        )
         kernel = Categorical(
             f"{prefix}:kernel",
             items=["linear", "rbf", "poly", "sigmoid"],
@@ -109,21 +116,44 @@ class SVMClassifierWrapper(SklearnWrapper):
             default=True,
         )
 
-        params = [kernel, degree, coef0, tol, gamma, C, shrinking]
+        params = [kernel, degree, coef0, tol, gamma, C, shrinking, max_iter]
+
+        gamma_cond = InCondition(
+            child=gamma,
+            parent=kernel,
+            values=["rbf", "poly", "sigmoid"],
+        )
+        degree_cond = InCondition(
+            child=degree,
+            parent=kernel,
+            values=["poly"],
+        )
+        cur_conds = [gamma_cond, degree_cond]
 
         if parent_param is not None:
-            conditions = [
-                EqualsCondition(
-                    child=param,
-                    parent=parent_param,
-                    value=parent_value,
-                )
-                for param in params
+            simple_params = [p for p in params if p not in (gamma, degree)]
+            simple_equals = [
+                EqualsCondition(child=param, parent=parent_param, value=parent_value)
+                for param in simple_params
             ]
+
+            gamma_eq = EqualsCondition(
+                child=gamma, parent=parent_param, value=parent_value
+            )
+            degree_eq = EqualsCondition(
+                child=degree, parent=parent_param, value=parent_value
+            )
+
+            # AndConjunction expects variadic condition arguments, not a list
+            gamma_and = AndConjunction(gamma_eq, gamma_cond)
+            degree_and = AndConjunction(degree_eq, degree_cond)
+
+            conditions = simple_equals + [gamma_and, degree_and]
+
+            cs.add(params + conditions)
         else:
             conditions = []
-
-        cs.add(params + conditions)
+            cs.add(params + conditions + cur_conds)
 
         return cs
 
@@ -158,14 +188,18 @@ class SVMClassifierWrapper(SklearnWrapper):
 
         svm_params = {
             "kernel": configuration[f"{prefix}:kernel"],
-            "degree": configuration[f"{prefix}:degree"],
             "coef0": configuration[f"{prefix}:coef0"],
             "tol": configuration[f"{prefix}:tol"],
-            "gamma": configuration[f"{prefix}:gamma"],
             "C": configuration[f"{prefix}:C"],
             "shrinking": configuration[f"{prefix}:shrinking"],
+            "max_iter": configuration[f"{prefix}:max_iter"],
             **kwargs,
         }
+
+        if svm_params["kernel"] == "poly":
+            svm_params["degree"] = configuration[f"{prefix}:degree"]
+        if svm_params["kernel"] in ["rbf", "poly", "sigmoid"]:
+            svm_params["gamma"] = configuration[f"{prefix}:gamma"]
 
         return partial(SVMClassifierWrapper, init_params=svm_params)
 
@@ -230,6 +264,10 @@ class SVMRegressorWrapper(SklearnWrapper):
         if cs is None:
             cs = ConfigurationSpace(name="SVM Regressor")
 
+        max_iter = Constant(
+            f"{prefix}:max_iter",
+            20000,
+        )
         kernel = Categorical(
             f"{prefix}:kernel",
             items=["linear", "rbf", "poly", "sigmoid"],
@@ -265,20 +303,44 @@ class SVMRegressorWrapper(SklearnWrapper):
             log=True,
             default=0.0251,
         )
-        params = [kernel, degree, coef0, tol, gamma, C, shrinking, epsilon]
+        params = [kernel, degree, coef0, tol, gamma, C, shrinking, epsilon, max_iter]
+
+        gamma_cond = InCondition(
+            child=gamma,
+            parent=kernel,
+            values=["rbf", "poly", "sigmoid"],
+        )
+        degree_cond = InCondition(
+            child=degree,
+            parent=kernel,
+            values=["poly"],
+        )
+        cur_conds = [gamma_cond, degree_cond]
+
         if parent_param is not None:
-            conditions = [
-                EqualsCondition(
-                    child=param,
-                    parent=parent_param,
-                    value=parent_value,
-                )
-                for param in params
+            simple_params = [p for p in params if p not in (gamma, degree)]
+            simple_equals = [
+                EqualsCondition(child=param, parent=parent_param, value=parent_value)
+                for param in simple_params
             ]
+
+            gamma_eq = EqualsCondition(
+                child=gamma, parent=parent_param, value=parent_value
+            )
+            degree_eq = EqualsCondition(
+                child=degree, parent=parent_param, value=parent_value
+            )
+
+            # AndConjunction expects variadic condition arguments, not a list
+            gamma_and = AndConjunction(gamma_eq, gamma_cond)
+            degree_and = AndConjunction(degree_eq, degree_cond)
+
+            conditions = simple_equals + [gamma_and, degree_and]
+
+            cs.add(params + conditions)
         else:
             conditions = []
-
-        cs.add(params + conditions)
+            cs.add(params + conditions + cur_conds)
 
         return cs
 
@@ -313,14 +375,18 @@ class SVMRegressorWrapper(SklearnWrapper):
 
         svr_params = {
             "kernel": configuration[f"{prefix}:kernel"],
-            "degree": configuration[f"{prefix}:degree"],
             "coef0": configuration[f"{prefix}:coef0"],
             "tol": configuration[f"{prefix}:tol"],
-            "gamma": configuration[f"{prefix}:gamma"],
             "C": configuration[f"{prefix}:C"],
             "shrinking": configuration[f"{prefix}:shrinking"],
             "epsilon": configuration[f"{prefix}:epsilon"],
+            "max_iter": configuration[f"{prefix}:max_iter"],
             **kwargs,
         }
+
+        if svr_params["kernel"] == "poly":
+            svr_params["degree"] = configuration[f"{prefix}:degree"]
+        if svr_params["kernel"] in ["rbf", "poly", "sigmoid"]:
+            svr_params["gamma"] = configuration[f"{prefix}:gamma"]
 
         return partial(SVMRegressorWrapper, init_params=svr_params)

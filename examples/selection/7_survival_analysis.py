@@ -3,7 +3,7 @@ import numpy as np
 from asf.selectors.survival_analysis import SurvivalAnalysisSelector
 
 
-def generate_complex_data(n_instances=100, n_algorithms=6, cutoff_time=150.0, seed=42):
+def generate_complex_data(n_instances=100, n_algorithms=6, budget=150.0, seed=42):
     """
     Generates synthetic data to demonstrate the value of survival analysis.
 
@@ -51,7 +51,7 @@ def generate_complex_data(n_instances=100, n_algorithms=6, cutoff_time=150.0, se
             perf_timeouts = np.random.choice(
                 [True, False], size=n_instances, p=[0.5, 0.5]
             )
-            perf[perf_timeouts] = cutoff_time
+            perf[perf_timeouts] = budget
 
         # "Slow but Reliable" algorithm -> Should be chosen often
         elif algo == 5:
@@ -59,7 +59,7 @@ def generate_complex_data(n_instances=100, n_algorithms=6, cutoff_time=150.0, se
             perf_timeouts = np.random.choice(
                 [True, False], size=n_instances, p=[0.05, 0.95]
             )
-            perf[perf_timeouts] = cutoff_time
+            perf[perf_timeouts] = budget
 
         # Apply timeouts based on problem type
         else:
@@ -68,7 +68,7 @@ def generate_complex_data(n_instances=100, n_algorithms=6, cutoff_time=150.0, se
                 timeouts = np.random.choice(
                     [True, False], size=mask.sum(), p=[prob, 1 - prob]
                 )
-                perf[mask] = np.where(timeouts, cutoff_time, perf[mask])
+                perf[mask] = np.where(timeouts, budget, perf[mask])
 
         performance[f"algo{algo + 1}"] = perf
 
@@ -78,7 +78,8 @@ def generate_complex_data(n_instances=100, n_algorithms=6, cutoff_time=150.0, se
 
 
 if __name__ == "__main__":
-    features, performance, types = generate_complex_data()
+    BUDGET = 150.0
+    features, performance, types = generate_complex_data(budget=BUDGET)
 
     n_train = int(0.7 * len(features))
     train_idx = features.index[:n_train]
@@ -89,12 +90,44 @@ if __name__ == "__main__":
     test_features = features.loc[test_idx]
     test_types = types[n_train:]
 
-    selector = SurvivalAnalysisSelector(cutoff_time=150.0)
+    # --- 1. Single Best Algorithm Prediction ---
+    print("--- Single Best Algorithm Predictions ---")
+    selector = SurvivalAnalysisSelector(budget=BUDGET)
     selector.fit(train_features, train_performance)
     predictions = selector.predict(test_features)
 
-    print("Predicted best algorithms and cutoff time for each test instance:")
+    print("Predicted best algorithm for each test instance:")
     for i, instance in enumerate(test_features.index):
-        algo, cutoff = predictions[instance][0]
+        algo, _ = predictions[instance][0]
         true_type = test_types[i]
         print(f"{instance}: {algo} (true type: {true_type})")
+
+    print("\n" + "=" * 60 + "\n")
+
+    # --- 2. Algorithm Schedule Prediction ---
+    print("--- Algorithm Schedule Predictions ---")
+    schedule_selector = SurvivalAnalysisSelector(
+        budget=BUDGET,
+        use_schedule=True,
+        max_schedule_length=3,  # Limit schedules to a max of 3 algorithms
+        popsize=15,
+        maxiter=100,
+    )
+    schedule_selector.fit(train_features, train_performance)
+    schedule_predictions = schedule_selector.predict(test_features)
+
+    print("Predicted algorithm schedules for each test instance:")
+    for i, instance in enumerate(test_features.index):
+        schedule = schedule_predictions[instance]
+        true_type = test_types[i]
+
+        # Format the schedule for printing
+        if schedule:
+            schedule_str = " -> ".join(
+                [f"{algo}({time:.1f}s)" for algo, time in schedule]
+            )
+        else:
+            schedule_str = "No schedule found"
+
+        print(f"{instance} (true type: {true_type}):")
+        print(f"  Schedule: {schedule_str}")
