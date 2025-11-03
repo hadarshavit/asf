@@ -4,9 +4,11 @@ try:
     from ConfigSpace import (
         Categorical,
         ConfigurationSpace,
-        Float,
-        Integer,
+        Constant,
         EqualsCondition,
+        Float,
+        InCondition,
+        Integer,
     )
     from ConfigSpace.hyperparameters import Hyperparameter
 
@@ -14,10 +16,10 @@ try:
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
-from ConfigSpace import Constant, InCondition
-from sklearn.svm import SVC, SVR
 from functools import partial
 from typing import Any
+
+from sklearn.svm import SVC, SVR
 
 from asf.predictors.sklearn_wrapper import SklearnWrapper
 
