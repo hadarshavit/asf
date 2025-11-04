@@ -197,7 +197,7 @@ def test_sunny_selector(dummy_performance, dummy_features):
     assert isinstance(cs, ConfigurationSpace)
     SUNNY.get_from_configuration(cs.get_default_configuration(), cs_transform)
 
-    selector = SUNNY(k=3, use_v2=True, budget=budget)
+    selector = SUNNY(k=3, use_v2=True, use_tsunny=True, budget=budget)
 
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
