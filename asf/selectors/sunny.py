@@ -20,7 +20,7 @@ except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
 
-class SunnySelector(AbstractSelector):
+class SUNNY(AbstractSelector):
     """
     SUNNY/SUNNY-AS2 algorithm selector.
 
@@ -36,6 +36,8 @@ class SunnySelector(AbstractSelector):
         n_folds: int = 5,
         k_candidates: list[int] = [3, 5, 7, 10, 20, 50],
         random_state: int = 42,
+        use_tsunny: bool = False,
+        algorithm_limit: int | None = None,
         **kwargs,
     ):
         """
@@ -48,6 +50,8 @@ class SunnySelector(AbstractSelector):
             k_candidates (list[int]): Candidate k values to consider when tuning.
             budget (float): Total time budget for the schedule.
             random_state (int): Random seed.
+            use_tsunny (bool): If True, tune the max number of algorithms via cross-validation.
+            algorithm_limit (int): If set, cap the number of algorithms in each schedule.
             **kwargs: Additional arguments for the parent class.
         """
         super().__init__(**kwargs)
@@ -59,6 +63,9 @@ class SunnySelector(AbstractSelector):
         self.knn = None
         self.n_folds = n_folds
         self.k_candidates = k_candidates
+        self.use_tsunny = use_tsunny
+        self.algorithm_limit = algorithm_limit
+        self.tuned_algorithm_limit: int | None = None
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
         """
@@ -66,6 +73,7 @@ class SunnySelector(AbstractSelector):
 
         Caps all performance values above the budget as unsolved (NaN).
         If use_v2 is True, tunes k using internal cross-validation.
+        If use_tsunny is True, tunes the max number of algorithms.
 
         Args:
             features (pd.DataFrame): Training features (instances x features).
@@ -76,71 +84,158 @@ class SunnySelector(AbstractSelector):
         perf[perf > self.budget] = np.nan
         self.performance = perf
 
-        # SUNNY-AS2: tune k using cross-validation if requested
+        # SUNNY-AS2: tune k
         if self.use_v2:
-            best_k = self.k
-            best_score = float("inf")
-            kf = KFold(
-                n_splits=self.n_folds, shuffle=True, random_state=self.random_state
-            )
-            instance_indices = np.arange(len(self.features))
+            self.k = self._tune_k()
 
-            for candidate_k in self.k_candidates:
-                fold_scores = []
-                for train_idx, val_idx in kf.split(instance_indices):
-                    train_features = self.features.iloc[train_idx]
-                    train_perf = self.performance.iloc[train_idx]
-                    val_features = self.features.iloc[val_idx]
-                    val_perf = self.performance.iloc[val_idx]
+        # TSunny: tune the max number of algorithms
+        if self.use_tsunny and self.algorithm_limit is None:
+            self.tuned_algorithm_limit = self._tune_algorithm_limit()
 
-                    knn = NearestNeighbors(
-                        n_neighbors=min(candidate_k, len(train_features)),
-                        metric="euclidean",
-                    )
-                    knn.fit(train_features.values)
-
-                    # For each validation instance, get schedule and compute achieved runtime
-                    total_runtime = 0.0
-                    n_instances = 0
-                    for idx, instance in enumerate(val_features.index):
-                        x = val_features.loc[instance].values.reshape(1, -1)
-                        dists, neighbor_idxs = knn.kneighbors(
-                            x, n_neighbors=min(candidate_k, len(train_features))
-                        )
-                        neighbor_idxs = neighbor_idxs.flatten()
-                        neighbor_perf = train_perf.iloc[neighbor_idxs]
-                        schedule = self._construct_sunny_schedule(neighbor_perf)
-
-                        # Evaluate: take the first algorithm in the schedule that solves the instance, or assign budget if none solve it
-                        instance_perf = val_perf.loc[instance]
-                        solved = False
-                        for algo, _ in schedule:
-                            runtime = instance_perf[algo]
-                            if not np.isnan(runtime) and runtime <= self.budget:
-                                total_runtime += runtime
-                                solved = True
-                                break
-                        if not solved:
-                            total_runtime += self.budget
-                        n_instances += 1
-
-                    avg_runtime = (
-                        total_runtime / n_instances if n_instances > 0 else float("inf")
-                    )
-                    fold_scores.append(avg_runtime)
-
-                mean_score = np.mean(fold_scores)
-                if mean_score < best_score:
-                    best_score = mean_score
-                    best_k = candidate_k
-
-            self.k = best_k
-
-        # Fit final model with optimal k
+        # Fit final model with chosen k
         self.knn = NearestNeighbors(
             n_neighbors=min(self.k, len(self.features)), metric="euclidean"
         )
         self.knn.fit(self.features.values)
+
+    def _tune_k(self) -> int:
+        """
+        Tune the neighborhood size k via cross-validation.
+
+        Returns:
+            int: The best k value found.
+        """
+        best_k = self.k
+        best_score = float("inf")
+        n_splits = min(self.n_folds, max(2, len(self.features)))
+
+        if n_splits < 2:
+            return best_k
+
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=self.random_state)
+        instance_indices = np.arange(len(self.features))
+
+        for candidate_k in self.k_candidates:
+            fold_scores = []
+            for train_idx, val_idx in kf.split(instance_indices):
+                train_features = self.features.iloc[train_idx]
+                train_perf = self.performance.iloc[train_idx]
+                val_features = self.features.iloc[val_idx]
+                val_perf = self.performance.iloc[val_idx]
+
+                if len(train_features) == 0:
+                    continue
+
+                knn = NearestNeighbors(
+                    n_neighbors=min(candidate_k, len(train_features)),
+                    metric="euclidean",
+                )
+                knn.fit(train_features.values)
+
+                total_runtime = 0.0
+                n_instances = 0
+                for instance in val_features.index:
+                    x = val_features.loc[instance].values.reshape(1, -1)
+                    _, neighbor_idxs = knn.kneighbors(
+                        x, n_neighbors=min(candidate_k, len(train_features))
+                    )
+                    neighbor_perf = train_perf.iloc[neighbor_idxs.flatten()]
+                    schedule = self._construct_sunny_schedule(neighbor_perf)
+
+                    instance_perf = val_perf.loc[instance]
+                    solved = False
+                    for algo, _ in schedule:
+                        runtime = instance_perf[algo]
+                        if not np.isnan(runtime) and runtime <= self.budget:
+                            total_runtime += runtime
+                            solved = True
+                            break
+                    if not solved:
+                        total_runtime += self.budget
+                    n_instances += 1
+
+                avg_runtime = (
+                    total_runtime / n_instances if n_instances > 0 else float("inf")
+                )
+                fold_scores.append(avg_runtime)
+
+            mean_score = np.mean(fold_scores) if fold_scores else float("inf")
+            if mean_score < best_score:
+                best_score = mean_score
+                best_k = candidate_k
+
+        return best_k
+
+    def _tune_algorithm_limit(self) -> int:
+        """
+        Tune the maximum number of algorithms in the schedule (lambda) via cross-validation.
+        Searches over 1..#solvers.
+        """
+        n_solvers = len(self.performance.columns)
+        if n_solvers <= 1:
+            return n_solvers
+
+        n_splits = min(self.n_folds, max(2, len(self.features)))
+        if n_splits < 2:
+            return n_solvers
+
+        best_lam = n_solvers
+        best_score = float("inf")
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=self.random_state)
+        instance_indices = np.arange(len(self.features))
+
+        for lam in range(1, n_solvers + 1):
+            fold_scores = []
+            for train_idx, val_idx in kf.split(instance_indices):
+                train_features = self.features.iloc[train_idx]
+                train_perf = self.performance.iloc[train_idx]
+                val_features = self.features.iloc[val_idx]
+                val_perf = self.performance.iloc[val_idx]
+
+                if len(train_features) == 0:
+                    continue
+
+                knn = NearestNeighbors(
+                    n_neighbors=min(self.k, len(train_features)), metric="euclidean"
+                )
+                knn.fit(train_features.values)
+
+                total_runtime = 0.0
+                n_instances = 0
+                for instance in val_features.index:
+                    x = val_features.loc[instance].values.reshape(1, -1)
+                    _, neighbor_idxs = knn.kneighbors(
+                        x, n_neighbors=min(self.k, len(train_features))
+                    )
+                    neighbor_perf = train_perf.iloc[neighbor_idxs.flatten()]
+
+                    schedule = self._construct_sunny_schedule(
+                        neighbor_perf, lam_limit=lam
+                    )
+
+                    instance_perf = val_perf.loc[instance]
+                    solved = False
+                    for algo, _ in schedule:
+                        runtime = instance_perf[algo]
+                        if not np.isnan(runtime) and runtime <= self.budget:
+                            total_runtime += runtime
+                            solved = True
+                            break
+                    if not solved:
+                        total_runtime += self.budget
+                    n_instances += 1
+
+                avg_runtime = (
+                    total_runtime / n_instances if n_instances > 0 else float("inf")
+                )
+                fold_scores.append(avg_runtime)
+
+            mean_score = np.mean(fold_scores) if fold_scores else float("inf")
+            if mean_score < best_score:
+                best_score = mean_score
+                best_lam = lam
+
+        return best_lam
 
     def _mine_solvers(
         self,
@@ -209,7 +304,7 @@ class SunnySelector(AbstractSelector):
         )
 
     def _construct_sunny_schedule(
-        self, neighbor_perf: pd.DataFrame
+        self, neighbor_perf: pd.DataFrame, lam_limit: int | None = None
     ) -> list[tuple[str, float]]:
         """
         Construct a SUNNY schedule for a given neighborhood.
@@ -223,8 +318,19 @@ class SunnySelector(AbstractSelector):
         Returns:
             List[Tuple[str, float]]: List of (algorithm, allocated_time) tuples, sorted by average runtime.
         """
+        if lam_limit is not None:
+            lam = lam_limit
+        elif self.algorithm_limit is not None:
+            lam = self.algorithm_limit
+        elif self.tuned_algorithm_limit is not None:
+            lam = self.tuned_algorithm_limit
+        else:
+            lam = len(self.algorithms)
+
+        lam = max(1, min(lam, len(self.algorithms)))
+
         # 1. H_sel: Select portfolio using recursive greedy set cover
-        cutoff = min(self.k, len(self.algorithms))
+        cutoff = min(self.k, lam, len(self.algorithms))
         best_pfolio = self._mine_solvers(neighbor_perf, cutoff)
 
         # Count solved/unsolved instances for each selected solver
@@ -249,17 +355,33 @@ class SunnySelector(AbstractSelector):
             t = self.budget * (slots[algo] / total_slots)
             schedule.append((algo, t))
 
-        # If there are unsolved instances, allocate remaining time to backup solver
-        time_used = sum(t for _, t in schedule)
-        if n_unsolved > 0:
-            backup_time = self.budget - time_used
-            if backup_time > 0:
-                backup_algo = solved_mask.sum(axis=0).idxmax()
-                schedule.append((backup_algo, backup_time))
-
         # 3. H_sch: Sort by average runtime (ascending) among neighbors
         avg_times = neighbor_perf[[algo for algo, _ in schedule]].mean(axis=0).to_dict()
         schedule.sort(key=lambda x: avg_times.get(x[0], float("inf")))
+
+        # Handle remaining time (backup or extending last solver)
+        time_used = sum(t for _, t in schedule)
+        backup_time = max(0.0, self.budget - time_used)
+        if n_unsolved > 0 and backup_time > 0:
+            backup_algo = solved_mask.sum(axis=0).idxmax()
+
+            # If backup solver is already in schedule, extend its time
+            for i, (a, t) in enumerate(schedule):
+                if a == backup_algo:
+                    schedule[i] = (a, t + backup_time)
+                    break
+            else:
+                if len(schedule) < lam:
+                    schedule.append((backup_algo, backup_time))
+                    avg_times[backup_algo] = (
+                        float(neighbor_perf[backup_algo].mean())
+                        if backup_algo in neighbor_perf.columns
+                        else float("inf")
+                    )
+                    schedule.sort(key=lambda x: avg_times.get(x[0], float("inf")))
+                else:
+                    algo_last, t_last = schedule[-1]
+                    schedule[-1] = (algo_last, t_last + backup_time)
 
         return schedule
 
@@ -323,9 +445,9 @@ class SunnySelector(AbstractSelector):
                 cs_transform = dict()
 
             if pre_prefix != "":
-                prefix = f"{pre_prefix}:{SunnySelector.PREFIX}"
+                prefix = f"{pre_prefix}:{SUNNY.PREFIX}"
             else:
-                prefix = SunnySelector.PREFIX
+                prefix = SUNNY.PREFIX
 
             use_v2_param = Categorical(
                 name=f"{prefix}:use_v2",
@@ -392,7 +514,7 @@ class SunnySelector(AbstractSelector):
             cs_transform: dict[str, dict],
             pre_prefix: str = "",
             **kwargs,
-        ) -> "SunnySelector":
+        ) -> "SUNNY":
             """
             Get the SUNNY selector from a given configuration.
 
@@ -403,12 +525,12 @@ class SunnySelector(AbstractSelector):
                 **kwargs: Additional keyword arguments for SUNNY initialization.
 
             Returns:
-                SunnySelector: An instance of SUNNY configured according to the given configuration.
+                Sunny: An instance of SUNNY configured according to the given configuration.
             """
             if pre_prefix != "":
-                prefix = f"{pre_prefix}:{SunnySelector.PREFIX}"
+                prefix = f"{pre_prefix}:{SUNNY.PREFIX}"
             else:
-                prefix = SunnySelector.PREFIX
+                prefix = SUNNY.PREFIX
 
             use_v2 = configuration[f"{prefix}:use_v2"]
             k = configuration[f"{prefix}:k"]
@@ -422,7 +544,7 @@ class SunnySelector(AbstractSelector):
                 n_folds = 5
                 k_candidates = [3, 5, 7, 10, 20, 50]
 
-            return SunnySelector(
+            return SUNNY(
                 k=k,
                 use_v2=use_v2,
                 n_folds=n_folds,

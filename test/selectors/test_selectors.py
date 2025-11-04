@@ -23,7 +23,7 @@ import shutil
 from asf.selectors.collaborative_filtering_selector import (
     CollaborativeFilteringSelector,
 )
-from asf.selectors.sunny_selector import SunnySelector
+from asf.selectors.sunny import SUNNY
 from asf.selectors.satzilla import SATzilla
 from asf.selectors.isac import ISAC
 from asf.selectors.snnap import SNNAP
@@ -193,11 +193,11 @@ def test_collaborative_filtering_selector(dummy_performance, dummy_features):
 def test_sunny_selector(dummy_performance, dummy_features):
     budget = 500
 
-    cs, cs_transform = SunnySelector.get_configuration_space()
+    cs, cs_transform = SUNNY.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    SunnySelector.get_from_configuration(cs.get_default_configuration(), cs_transform)
+    SUNNY.get_from_configuration(cs.get_default_configuration(), cs_transform)
 
-    selector = SunnySelector(k=3, use_v2=True, budget=budget)
+    selector = SUNNY(k=3, use_v2=True, use_tsunny=True, budget=budget)
 
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
