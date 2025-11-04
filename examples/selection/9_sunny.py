@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from asf.selectors.sunny_selector import SunnySelector
+from asf.selectors.sunny import SUNNY
 
 
 def generate_simple_data(n_instances=80, seed=0):
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     print("\nTest performance matrix (no NaNs):")
     print(test_performance.head())
 
-    selector = SunnySelector(k=5, use_v2=False, budget=budget)
+    selector = SUNNY(k=5, use_v2=False, budget=budget)
     selector.fit(train_features, train_performance)
 
     predictions = selector.predict(test_features)
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     print_sunny_schedules(predictions, test_performance, budget, n=10)
 
     print("\nUsing v2")
-    selector = SunnySelector(k=5, use_v2=True, budget=budget)
+    selector = SUNNY(k=5, use_v2=True, budget=budget)
     selector.fit(train_features, train_performance)
     predictions = selector.predict(test_features)
     print("K = ", selector.k)
