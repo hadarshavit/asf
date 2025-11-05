@@ -12,7 +12,7 @@ from asf.selectors import (
     PairwiseRegressor,
     SimpleRanking,
     JointRanking,
-    SurvivalAnalysisSelector,
+    SurvivalAnalysis,
     MultiClassClassifier,
     PerformanceModel,
 )
@@ -125,7 +125,7 @@ def test_joint_ranking(dummy_performance, dummy_features):
 
 
 def test_survival_analysis(dummy_performance, dummy_features):
-    selector = SurvivalAnalysisSelector(budget=450.0)
+    selector = SurvivalAnalysis(budget=450.0)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
@@ -133,7 +133,7 @@ def test_survival_analysis(dummy_performance, dummy_features):
 
 def test_survival_analysis_schedule(dummy_performance, dummy_features):
     budget = 450.0
-    selector = SurvivalAnalysisSelector(budget=budget, use_schedule=True)
+    selector = SurvivalAnalysis(budget=budget, use_schedule=True)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
 
