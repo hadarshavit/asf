@@ -44,7 +44,9 @@ class MetaSelector(AbstractSelector):
 
         for sel in base_selectors:
             if sel.RETURN_TYPE != "single":
-                raise ValueError(f"Base selector {sel.__class__.__name__} must have RETURN_TYPE 'single'.")
+                raise ValueError(
+                    f"Base selector {sel.__class__.__name__} must have RETURN_TYPE 'single'."
+                )
 
         if meta_selector.RETURN_TYPE != "single":
             raise ValueError("Meta selector must have RETURN_TYPE 'single'.")
@@ -55,8 +57,12 @@ class MetaSelector(AbstractSelector):
         self.n_folds = int(n_folds)
         self.random_state = int(random_state)
 
-        self.selector_names = [f"{s.__class__.__name__}_{i}" for i, s in enumerate(self.base_selectors)]
-        self._selector_map = {name: sel for name, sel in zip(self.selector_names, self.base_selectors)}
+        self.selector_names = [
+            f"{s.__class__.__name__}_{i}" for i, s in enumerate(self.base_selectors)
+        ]
+        self._selector_map = {
+            name: sel for name, sel in zip(self.selector_names, self.base_selectors)
+        }
         self.base_selectors_ = None
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
@@ -69,7 +75,9 @@ class MetaSelector(AbstractSelector):
         """
         penalty = float(self.budget) * float(self.par_factor)
         n_instances = len(features)
-        meta_performance = pd.DataFrame(index=features.index, columns=self.selector_names, dtype=float)
+        meta_performance = pd.DataFrame(
+            index=features.index, columns=self.selector_names, dtype=float
+        )
         meta_performance[:] = np.nan
 
         n_splits = min(self.n_folds, max(2, n_instances))
@@ -115,7 +123,9 @@ class MetaSelector(AbstractSelector):
             sel_full.fit(features, performance)
             self.base_selectors_.append(sel_full)
 
-        self._selector_map = {name: sel for name, sel in zip(self.selector_names, self.base_selectors_)}
+        self._selector_map = {
+            name: sel for name, sel in zip(self.selector_names, self.base_selectors_)
+        }
 
         self.meta_selector.fit(features, meta_performance)
 
