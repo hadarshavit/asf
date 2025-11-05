@@ -28,11 +28,13 @@ from asf.predictors import (
 
 
 class MultiClassClassifier(AbstractModelBasedSelector):
-    PREFIX = "multi_class_classifier"
     """
     A selector that uses a multi-class classification model to predict the best algorithm
     for a given set of features and performance data.
     """
+
+    PREFIX = "multi_class_classifier"
+    RETURN_TYPE = "single"
 
     def __init__(self, model_class: type[AbstractPredictor], **kwargs):
         """

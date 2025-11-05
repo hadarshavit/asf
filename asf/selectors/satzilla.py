@@ -37,6 +37,7 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
     """
 
     PREFIX = "satzilla"
+    RETURN_TYPE = "single"
 
     def __init__(
         self,

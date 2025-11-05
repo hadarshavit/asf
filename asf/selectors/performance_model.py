@@ -33,7 +33,6 @@ from asf.selectors.feature_generator import AbstractFeatureGenerator
 
 
 class PerformanceModel(AbstractModelBasedSelector, AbstractFeatureGenerator):
-    PREFIX = "performance_model "
     """
     PerformanceModel is a class that predicts the performance of algorithms
     based on given features. It can handle both single-target and multi-target
@@ -49,6 +48,9 @@ class PerformanceModel(AbstractModelBasedSelector, AbstractFeatureGenerator):
         maximize (bool): Whether to maximize or minimize the performance metric.
         budget (float): Budget associated with the predictions.
     """
+
+    PREFIX = "performance_model"
+    RETURN_TYPE = "single"
 
     def __init__(
         self,

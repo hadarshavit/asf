@@ -27,7 +27,6 @@ from functools import partial
 
 
 class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
-    PREFIX = "pairwise_classifier"
     """
     PairwiseClassifier is a selector that uses pairwise comparison of algorithms
     to predict the best algorithm for a given instance.
@@ -37,6 +36,9 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
         classifiers (List[AbstractPredictor]): List of trained classifiers for pairwise comparisons.
         use_weights (bool): Whether to use weights based on performance differences.
     """
+
+    PREFIX = "pairwise_classifier"
+    RETURN_TYPE = "single"
 
     def __init__(
         self, model_class: type[AbstractPredictor], use_weights: bool = True, **kwargs

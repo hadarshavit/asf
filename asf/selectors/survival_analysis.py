@@ -29,6 +29,7 @@ if SKSURV_AVAILABLE:
         """
 
         PREFIX = "survival"
+        RETURN_TYPE = "mixed"
 
         def __init__(
             self,
