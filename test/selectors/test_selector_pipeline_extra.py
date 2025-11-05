@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from asf.selectors.selector_pipeline import SelectorPipeline
-from asf.selectors.mutli_class import MultiClassClassifier
+from asf.selectors.multi_class import MultiClassClassifier
 from asf.predictors.random_forest import RandomForestClassifierWrapper
 
 
