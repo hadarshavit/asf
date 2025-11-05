@@ -6,7 +6,7 @@ from asf.selectors.meta_selector import MetaSelector
 from asf.selectors.snnap import SNNAP
 from asf.selectors.satzilla import SATzilla
 from asf.selectors.isac import ISAC
-from asf.selectors.mutli_class import MultiClassClassifier
+from asf.selectors.multi_class import MultiClassClassifier
 from asf.selectors.survival_analysis import SurvivalAnalysis
 
 BASE_CLASSES = [SNNAP, SATzilla, ISAC]
