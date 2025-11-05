@@ -134,9 +134,9 @@ class XGBoostClassifierWrapper(SklearnWrapper):
         n_estimators = Constant(f"{prefix}:n_estimators", 2000)
         max_depth = Integer(
             f"{prefix}:max_depth",
-            (1, 20),
+            (1, 11),
             log=False,
-            default=13,
+            default=8,
         )
         min_child_weight = Integer(
             f"{prefix}:min_child_weight",
@@ -303,9 +303,9 @@ class XGBoostRegressorWrapper(SklearnWrapper):
         n_estimators = Constant(f"{prefix}:n_estimators", 2000)
         max_depth = Integer(
             f"{prefix}:max_depth",
-            (1, 15),
+            (1, 11),
             log=False,
-            default=13,
+            default=8,
         )
         min_child_weight = Integer(
             f"{prefix}:min_child_weight",
