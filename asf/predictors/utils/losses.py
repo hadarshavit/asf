@@ -42,6 +42,7 @@ def tml_loss(y_pred, y_pred_s, y_pred_l, yc, ys, yl, margin=1.0, p=2):
 
 @torch.jit.script
 def lognorm_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
+    y_true = torch.reshape(y_true, [-1, 1])
     s = y_pred[:, 0]
     s = torch.reshape(s, [-1, 1])
 
@@ -56,7 +57,6 @@ def lognorm_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 
     # add terms (not multiplying them)
     lh = -torch.log(s) - log_true - help1
-
     return -lh.mean()
 
 

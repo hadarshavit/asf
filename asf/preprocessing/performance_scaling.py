@@ -3,6 +3,7 @@ from sklearn.base import OneToOneFeatureMixin, TransformerMixin, BaseEstimator
 from sklearn.preprocessing import MinMaxScaler, PowerTransformer, StandardScaler
 import scipy.stats
 import scipy.special
+import pandas as pd
 
 
 class AbstractNormalization(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
@@ -28,6 +29,13 @@ class AbstractNormalization(OneToOneFeatureMixin, TransformerMixin, BaseEstimato
         Returns:
             AbstractNormalization: The fitted normalization instance.
         """
+        if isinstance(X, list):
+            X = np.asarray(X)
+
+        if isinstance(X, pd.Series):
+            X = X.to_numpy()
+
+        self._fit(X, y, sample_weight)
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
@@ -40,7 +48,13 @@ class AbstractNormalization(OneToOneFeatureMixin, TransformerMixin, BaseEstimato
         Returns:
             np.ndarray: Transformed data.
         """
-        raise NotImplementedError
+        if isinstance(X, list):
+            X = np.asarray(X)
+
+        if isinstance(X, pd.Series):
+            X = X.to_numpy()
+
+        return self._transform(X)
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
@@ -52,7 +66,13 @@ class AbstractNormalization(OneToOneFeatureMixin, TransformerMixin, BaseEstimato
         Returns:
             np.ndarray: Original data.
         """
-        raise NotImplementedError
+        if isinstance(X, list):
+            X = np.asarray(X)
+
+        if isinstance(X, pd.Series):
+            X = X.to_numpy()
+
+        return self._inverse_transform(X)
 
 
 class MinMaxNormalization(AbstractNormalization):
@@ -70,7 +90,7 @@ class MinMaxNormalization(AbstractNormalization):
         super().__init__()
         self.feature_range = feature_range
 
-    def fit(
+    def _fit(
         self, X: np.ndarray, y: np.ndarray = None, sample_weight: np.ndarray = None
     ) -> "MinMaxNormalization":
         """
@@ -88,7 +108,7 @@ class MinMaxNormalization(AbstractNormalization):
         self.min_max_scale.fit(X.reshape(-1, 1))
         return self
 
-    def transform(self, X: np.ndarray) -> np.ndarray:
+    def _transform(self, X: np.ndarray) -> np.ndarray:
         """
         Transform the input data using Min-Max scaling.
 
@@ -100,7 +120,7 @@ class MinMaxNormalization(AbstractNormalization):
         """
         return self.min_max_scale.transform(X.reshape(-1, 1)).reshape(-1)
 
-    def inverse_transform(self, X: np.ndarray) -> np.ndarray:
+    def _inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
         Inverse transform the data back to the original scale.
 
@@ -121,7 +141,7 @@ class ZScoreNormalization(AbstractNormalization):
     def __init__(self) -> None:
         super().__init__()
 
-    def fit(
+    def _fit(
         self, X: np.ndarray, y: np.ndarray = None, sample_weight: np.ndarray = None
     ) -> "ZScoreNormalization":
         """
@@ -139,7 +159,7 @@ class ZScoreNormalization(AbstractNormalization):
         self.scaler.fit(X.reshape(-1, 1))
         return self
 
-    def transform(self, X: np.ndarray) -> np.ndarray:
+    def _transform(self, X: np.ndarray) -> np.ndarray:
         """
         Transform the input data using Z-Score scaling.
 
@@ -151,7 +171,7 @@ class ZScoreNormalization(AbstractNormalization):
         """
         return self.scaler.transform(X.reshape(-1, 1)).reshape(-1)
 
-    def inverse_transform(self, X: np.ndarray) -> np.ndarray:
+    def _inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
         Inverse transform the data back to the original scale.
 
@@ -181,7 +201,7 @@ class LogNormalization(AbstractNormalization):
         self.base = base
         self.eps = eps
 
-    def fit(
+    def _fit(
         self, X: np.ndarray, y: np.ndarray = None, sample_weight: np.ndarray = None
     ) -> "LogNormalization":
         """
@@ -204,7 +224,7 @@ class LogNormalization(AbstractNormalization):
 
         return self
 
-    def transform(self, X: np.ndarray) -> np.ndarray:
+    def _transform(self, X: np.ndarray) -> np.ndarray:
         """
         Transform the input data using logarithmic scaling.
 
@@ -217,7 +237,7 @@ class LogNormalization(AbstractNormalization):
         X = X - self.min_val + self.eps
         return np.log(X) / np.log(self.base)
 
-    def inverse_transform(self, X: np.ndarray) -> np.ndarray:
+    def _inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
         Inverse transform the data back to the original scale.
 
@@ -248,7 +268,7 @@ class SqrtNormalization(AbstractNormalization):
         super().__init__()
         self.eps = eps
 
-    def fit(
+    def _fit(
         self, X: np.ndarray, y: np.ndarray = None, sample_weight: np.ndarray = None
     ) -> "SqrtNormalization":
         """
@@ -270,7 +290,7 @@ class SqrtNormalization(AbstractNormalization):
             self.min_val = 0
         return self
 
-    def transform(self, X: np.ndarray) -> np.ndarray:
+    def _transform(self, X: np.ndarray) -> np.ndarray:
         """
         Transform the input data using square root scaling.
 
@@ -307,7 +327,7 @@ class InvSigmoidNormalization(AbstractNormalization):
     def __init__(self) -> None:
         super().__init__()
 
-    def fit(
+    def _fit(
         self, X: np.ndarray, y: np.ndarray = None, sample_weight: np.ndarray = None
     ) -> "InvSigmoidNormalization":
         """
@@ -325,7 +345,7 @@ class InvSigmoidNormalization(AbstractNormalization):
         self.min_max_scale.fit(np.asarray(X).reshape(-1, 1))
         return self
 
-    def transform(self, X: np.ndarray) -> np.ndarray:
+    def _transform(self, X: np.ndarray) -> np.ndarray:
         """
         Transform the input data using inverse sigmoid scaling.
 
@@ -338,7 +358,7 @@ class InvSigmoidNormalization(AbstractNormalization):
         X = self.min_max_scale.transform(X.reshape(-1, 1)).reshape(-1)
         return np.log(X / (1 - X))
 
-    def inverse_transform(self, X: np.ndarray) -> np.ndarray:
+    def _inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
         Inverse transform the data back to the original scale.
 
@@ -360,7 +380,7 @@ class NegExpNormalization(AbstractNormalization):
     def __init__(self) -> None:
         super().__init__()
 
-    def fit(
+    def _fit(
         self, X: np.ndarray, y: np.ndarray = None, sample_weight: np.ndarray = None
     ) -> "NegExpNormalization":
         """
@@ -376,7 +396,7 @@ class NegExpNormalization(AbstractNormalization):
         """
         return self
 
-    def transform(self, X: np.ndarray) -> np.ndarray:
+    def _transform(self, X: np.ndarray) -> np.ndarray:
         """
         Transform the input data using negative exponential scaling.
 
@@ -388,7 +408,7 @@ class NegExpNormalization(AbstractNormalization):
         """
         return np.exp(-X)
 
-    def inverse_transform(self, X: np.ndarray) -> np.ndarray:
+    def _inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
         Inverse transform the data back to the original scale.
 
@@ -425,7 +445,7 @@ class DummyNormalization(AbstractNormalization):
         """
         return self
 
-    def transform(self, X: np.ndarray) -> np.ndarray:
+    def _transform(self, X: np.ndarray) -> np.ndarray:
         """
         Transform the input data (no change).
 
@@ -437,7 +457,7 @@ class DummyNormalization(AbstractNormalization):
         """
         return X
 
-    def inverse_transform(self, X: np.ndarray) -> np.ndarray:
+    def _inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
         Inverse transform the data (no change).
 
@@ -476,7 +496,7 @@ class BoxCoxNormalization(AbstractNormalization):
         self.box_cox.fit(X.reshape(-1, 1))
         return self
 
-    def transform(self, X: np.ndarray) -> np.ndarray:
+    def _transform(self, X: np.ndarray) -> np.ndarray:
         """
         Transform the input data using Box-Cox transformation.
 
@@ -488,7 +508,7 @@ class BoxCoxNormalization(AbstractNormalization):
         """
         return self.box_cox.transform(X.reshape(-1, 1)).reshape(-1)
 
-    def inverse_transform(self, X: np.ndarray) -> np.ndarray:
+    def _inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
         Inverse transform the data back to the original scale.
 

@@ -3,7 +3,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from asf.epm import EPM
+from asf.epm.single_value_epm import SingleValueEPM as EPM
 from asf.predictors.random_forest import RandomForestClassifierWrapper
 from asf.selectors.abstract_epm_based_selector import AbstractEPMBasedSelector
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector

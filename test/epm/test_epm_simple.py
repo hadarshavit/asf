@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from asf.epm.epm import EPM
+from asf.epm.single_value_epm import SingleValueEPM as EPM
 
 
 class DummyPredictor:

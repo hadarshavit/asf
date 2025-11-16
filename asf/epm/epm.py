@@ -1,12 +1,6 @@
-from functools import partial
-
 import numpy as np
 import pandas as pd
-from sklearn.base import RegressorMixin, TransformerMixin
-
-from asf.predictors import SklearnWrapper
-from asf.predictors.abstract_predictor import AbstractPredictor
-from asf.predictors.random_forest import RandomForestRegressorWrapper
+from sklearn.base import TransformerMixin
 from asf.preprocessing.performance_scaling import (
     AbstractNormalization,
     LogNormalization,
@@ -14,7 +8,7 @@ from asf.preprocessing.performance_scaling import (
 from asf.preprocessing.sklearn_preprocessor import get_default_preprocessor
 
 
-class EPM:
+class AbstractEPM:
     """
     The EPM (Empirical Performance Model) class is a wrapper for machine learning models
     that includes preprocessing, normalization, and optional inverse transformation of predictions.
@@ -30,9 +24,6 @@ class EPM:
 
     def __init__(
         self,
-        predictor_class: (
-            type[AbstractPredictor] | type[RegressorMixin]
-        ) = RandomForestRegressorWrapper,
         normalization_class: type[AbstractNormalization] = LogNormalization,
         transform_back: bool = True,
         features_preprocessing: str | TransformerMixin = "default",
@@ -55,14 +46,6 @@ class EPM:
             predictor_config (dict | None): Configuration for the predictor.
             predictor_kwargs (dict | None): Additional keyword arguments for the predictor.
         """
-        if isinstance(predictor_class, type) and issubclass(
-            predictor_class, (RegressorMixin)
-        ):
-            self.model_class = partial(SklearnWrapper, predictor_class)
-        else:
-            self.model_class = predictor_class
-
-        self.predictor_class = predictor_class
         self.normalization_class = normalization_class
         self.transform_back = transform_back
         self.predictor_config = predictor_config
@@ -83,7 +66,7 @@ class EPM:
         X: pd.DataFrame | pd.Series | list,
         y: pd.Series | list,
         sample_weight: list | None = None,
-    ) -> "EPM":
+    ) -> "AbstractEPM":
         """
         Fit the EPM model to the data.
 
@@ -117,20 +100,12 @@ class EPM:
         if self.imputer is not None:
             y = self.imputer(y, X)
 
-        self.predictor = self._get_predictor()
+        self._fit(X, y, sample_weight)
 
-        self.predictor.fit(X, y, sample_weight=sample_weight)
         return self
 
-    def _get_predictor(self) -> AbstractPredictor:
-        if self.predictor_config is None:
-            predictor = self.predictor_class(**self.predictor_kwargs)
-        else:
-            predictor = self.predictor_class.get_from_configuration(
-                self.predictor_config, **self.predictor_kwargs
-            )()
-
-        return predictor
+    def _fit(self, X: pd.DataFrame, y: pd.Series, sample_weight: list | None):
+        raise NotImplementedError("Subclasses must implement this method.")
 
     def predict(self, X: pd.DataFrame | pd.Series | list) -> list:
         """
@@ -153,9 +128,12 @@ class EPM:
         if self.features_preprocessing is not None:
             X = self.features_preprocessing.transform(X)
 
-        y_pred = self.predictor.predict(X)
+        y_pred = self._predict(X)
 
         if self.transform_back:
             y_pred = self.normalization.inverse_transform(y_pred)
 
         return y_pred
+
+    def _predict(self, X: pd.DataFrame) -> list:
+        raise NotImplementedError("Subclasses must implement this method.")

@@ -12,7 +12,7 @@ except ImportError:
     SMAC_AVAILABLE = False
 from asf.utils.groupkfoldshuffle import GroupKFoldShuffle
 
-from asf.epm.epm import EPM
+from asf.epm.single_value_epm import SingleValueEPM as EPM
 from asf.preprocessing.performance_scaling import (
     AbstractNormalization,
     LogNormalization,

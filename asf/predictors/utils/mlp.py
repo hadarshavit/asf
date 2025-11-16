@@ -11,14 +11,24 @@ def get_mlp(
     output_size: int,
     hidden_sizes: list[int] = [128, 64],
     dropout: float = 0.0,
+    activation_cls: type[torch.nn.Module] = torch.nn.ReLU,
     output_activation: torch.nn.Module = None,
     compile: bool = False,
+    use_batchnorm: bool = True,
 ):
-    layers = [torch.nn.Linear(input_size, hidden_sizes[0]), torch.nn.ReLU()]
+    layers = [
+        torch.nn.Linear(input_size, hidden_sizes[0]),
+        activation_cls(),
+    ]
+    if use_batchnorm:
+        layers.append(torch.nn.BatchNorm1d(hidden_sizes[0]))
 
     for i in range(len(hidden_sizes) - 1):
+        layers.append(torch.nn.Dropout(dropout))
         layers.append(torch.nn.Linear(hidden_sizes[i], hidden_sizes[i + 1]))
-        layers.append(torch.nn.ReLU())
+        layers.append(activation_cls())
+        if use_batchnorm:
+            layers.append(torch.nn.BatchNorm1d(hidden_sizes[i + 1]))
 
     layers.append(torch.nn.Dropout(dropout))
     layers.append(torch.nn.Linear(hidden_sizes[-1], output_size))
