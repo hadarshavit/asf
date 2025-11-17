@@ -43,12 +43,11 @@ class MetaSelector(AbstractSelector):
             raise ValueError("`meta_selector` cannot be None.")
 
         for sel in base_selectors:
-            if sel.RETURN_TYPE != "single":
+            if getattr(sel, "RETURN_TYPE", None) != "single":
                 raise ValueError(
                     f"Base selector {sel.__class__.__name__} must have RETURN_TYPE 'single'."
                 )
-
-        if meta_selector.RETURN_TYPE != "single":
+        if getattr(meta_selector, "RETURN_TYPE", None) != "single":
             raise ValueError("Meta selector must have RETURN_TYPE 'single'.")
 
         self.base_selectors = base_selectors
