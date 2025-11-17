@@ -2,8 +2,10 @@ from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
-try: 
+
+try:
     import pulp
+
     _HAS_PULP = True
 except ImportError:
     _HAS_PULP = False
@@ -112,12 +114,16 @@ class Static3S(AbstractPresolver):
                 prob += pulp.lpSum(terms) >= 1
 
             # Resource constraint
-            prob += pulp.lpSum([t * var for (s, t), var in x_vars.items()]) <= self.budget
+            prob += (
+                pulp.lpSum([t * var for (s, t), var in x_vars.items()]) <= self.budget
+            )
 
             # Solver selection constraints
             for s in self.algorithms:
                 solver_x_vars = [
-                    var for (solver_name, time), var in x_vars.items() if solver_name == s
+                    var
+                    for (solver_name, time), var in x_vars.items()
+                    if solver_name == s
                 ]
                 prob += pulp.lpSum(solver_x_vars) <= 1, f"One_selection_{s}"
 
