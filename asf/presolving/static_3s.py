@@ -2,7 +2,11 @@ from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
-import pulp
+try: 
+    import pulp
+    _HAS_PULP = True
+except ImportError:
+    _HAS_PULP = False
 
 from asf.presolving.presolver import AbstractPresolver
 
@@ -67,72 +71,76 @@ class Static3S(AbstractPresolver):
             self.schedule = []
             return
 
-        # Build IP
-        prob = pulp.LpProblem("static_schedule_rcscp", pulp.LpMinimize)
-        x_vars = {}
-        for s, times in candidates.items():
-            for t in times:
-                var = pulp.LpVariable(
-                    f"x_{s}_{t:.4f}".replace(".", "_"), cat=pulp.LpBinary
-                )
-                x_vars[(s, t)] = var
+        if not _HAS_PULP:
+            raise ImportError(
+                "pulp is required to use Static3S presolver. Please install pulp."
+            )
+        else:
+            prob = pulp.LpProblem("static_schedule_rcscp", pulp.LpMinimize)
+            x_vars = {}
+            for s, times in candidates.items():
+                for t in times:
+                    var = pulp.LpVariable(
+                        f"x_{s}_{t:.4f}".replace(".", "_"), cat=pulp.LpBinary
+                    )
+                    x_vars[(s, t)] = var
 
-        y_vars = {}
-        for i in instances:
-            y_vars[i] = pulp.LpVariable(f"y_{i}", cat=pulp.LpBinary)
+            y_vars = {}
+            for i in instances:
+                y_vars[i] = pulp.LpVariable(f"y_{i}", cat=pulp.LpBinary)
 
-        # Objective: (C+1)*sum y_i + sum t * x_{s,t}
-        bigC = self.budget + 1.0
-        prob += bigC * pulp.lpSum([y_vars[i] for i in instances]) + pulp.lpSum(
-            [t * var for (s, t), var in x_vars.items()]
-        )
+            # Objective: (C+1)*sum y_i + sum t * x_{s,t}
+            bigC = self.budget + 1.0
+            prob += bigC * pulp.lpSum([y_vars[i] for i in instances]) + pulp.lpSum(
+                [t * var for (s, t), var in x_vars.items()]
+            )
 
-        # Covering constraints
-        for i in instances:
-            terms = [y_vars[i]]
+            # Covering constraints
+            for i in instances:
+                terms = [y_vars[i]]
+                for (s, t), var in x_vars.items():
+                    # if solver s solves instance i within time t
+                    rt = perf.at[i, s]
+                    if pd.isna(rt):
+                        continue
+                    try:
+                        rt_f = float(rt)
+                    except Exception:
+                        continue
+                    if rt_f <= t:
+                        terms.append(var)
+                prob += pulp.lpSum(terms) >= 1
+
+            # Resource constraint
+            prob += pulp.lpSum([t * var for (s, t), var in x_vars.items()]) <= self.budget
+
+            # Solver selection constraints
+            for s in self.algorithms:
+                solver_x_vars = [
+                    var for (solver_name, time), var in x_vars.items() if solver_name == s
+                ]
+                prob += pulp.lpSum(solver_x_vars) <= 1, f"One_selection_{s}"
+
+            prob.solve(pulp.PULP_CBC_CMD(msg=False))
+
+            chosen = []
             for (s, t), var in x_vars.items():
-                # if solver s solves instance i within time t
-                rt = perf.at[i, s]
-                if pd.isna(rt):
-                    continue
                 try:
-                    rt_f = float(rt)
+                    val = var.value()
                 except Exception:
-                    continue
-                if rt_f <= t:
-                    terms.append(var)
-            prob += pulp.lpSum(terms) >= 1
+                    val = None
+                if val is not None and float(val) > 0.5:
+                    chosen.append((s, float(t)))
+            chosen.sort(key=lambda x: x[1])
 
-        # Resource constraint
-        prob += pulp.lpSum([t * var for (s, t), var in x_vars.items()]) <= self.budget
+            total_time = sum(t for _, t in chosen)
+            if total_time < float(self.budget) and chosen:
+                remaining = float(self.budget) - total_time
+                alg, last_t = chosen[-1]
+                chosen[-1] = (alg, float(last_t + remaining))
 
-        # Solver selection constraints
-        for s in self.algorithms:
-            solver_x_vars = [
-                var for (solver_name, time), var in x_vars.items() if solver_name == s
-            ]
-            prob += pulp.lpSum(solver_x_vars) <= 1, f"One_selection_{s}"
-
-        prob.solve(pulp.PULP_CBC_CMD(msg=False))
-
-        chosen = []
-        for (s, t), var in x_vars.items():
-            try:
-                val = var.value()
-            except Exception:
-                val = None
-            if val is not None and float(val) > 0.5:
-                chosen.append((s, float(t)))
-        chosen.sort(key=lambda x: x[1])
-
-        total_time = sum(t for _, t in chosen)
-        if total_time < float(self.budget):
-            remaining = float(self.budget) - total_time
-            alg, last_t = chosen[-1]
-            chosen[-1] = (alg, float(last_t + remaining))
-
-        self.schedule = chosen
-        return
+            self.schedule = chosen
+            return
 
     def predict(
         self, features: pd.DataFrame | None = None
