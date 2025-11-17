@@ -27,7 +27,7 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
     """
 
     PREFIX = "collaborative_filtering"
-    RETURN_TYPE = "schedule"
+    RETURN_TYPE = "single"
 
     def __init__(
         self,
