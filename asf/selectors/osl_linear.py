@@ -49,7 +49,14 @@ class OSLLinearSelector(AbstractSelector):
         self.algorithms: list[str] = []
 
     # --- OSL objective + gradient for one algorithm ---
-    def _osl_obj_grad(self, theta: np.ndarray, X: np.ndarray, y: np.ndarray, censored_mask: np.ndarray, C: float):
+    def _osl_obj_grad(
+        self,
+        theta: np.ndarray,
+        X: np.ndarray,
+        y: np.ndarray,
+        censored_mask: np.ndarray,
+        C: float,
+    ):
         """
         Compute loss and gradient for parameters theta.
 
@@ -62,24 +69,30 @@ class OSLLinearSelector(AbstractSelector):
         precise_mask = ~censored_mask & ~np.isnan(y)
         cens_pred_mask = censored_mask & (preds < C)
 
-        loss_precise = ((y[precise_mask] - preds[precise_mask]) ** 2).sum() if precise_mask.any() else 0.0
-        loss_cens = (((C - preds[cens_pred_mask]) ** 2).sum()) if cens_pred_mask.any() else 0.0
+        loss_precise = (
+            ((y[precise_mask] - preds[precise_mask]) ** 2).sum()
+            if precise_mask.any()
+            else 0.0
+        )
+        loss_cens = (
+            (((C - preds[cens_pred_mask]) ** 2).sum()) if cens_pred_mask.any() else 0.0
+        )
         loss = loss_precise + loss_cens
 
         # L2 regularizer
         if self.reg:
-            loss += 0.5 * self.reg * np.sum(theta ** 2)
+            loss += 0.5 * self.reg * np.sum(theta**2)
 
         # gradient
         grad = np.zeros_like(theta)
         if precise_mask.any():
             # derivative: d/dtheta (y - p)^2 = -2 * X^T (y - p)
-            resid = (y[precise_mask] - preds[precise_mask])
+            resid = y[precise_mask] - preds[precise_mask]
             grad_prec = -2.0 * (X[precise_mask].T.dot(resid))
             grad += grad_prec
         if cens_pred_mask.any():
             # derivative: d/dtheta (C - p)^2 = -2 * X^T (C - p)
-            diff = (C - preds[cens_pred_mask])
+            diff = C - preds[cens_pred_mask]
             grad_cens = -2.0 * (X[cens_pred_mask].T.dot(diff))
             grad += grad_cens
 

@@ -20,7 +20,7 @@ def make_data(n_instances=200, n_algorithms=5, seed=1, budget=200.0):
         runtimes = np.clip((features.values @ coeff) + bias + noise, 1.0, None)
         timeout_mask = rng.rand(n_instances) < (0.12 + 0.03 * (a % 3))
         runtimes[timeout_mask] = budget * 2
-        perf[f"algo{a+1}"] = runtimes
+        perf[f"algo{a + 1}"] = runtimes
     return features, perf
 
 
@@ -48,7 +48,9 @@ def main():
     X_train, X_test = X.iloc[:n_train], X.iloc[n_train:]
     Y_train, Y_test = Y.iloc[:n_train], Y.iloc[n_train:]
 
-    sel = OSLLinearSelector(budget=budget, reg=1e-3, optimizer_method="L-BFGS-B", maxiter=500)
+    sel = OSLLinearSelector(
+        budget=budget, reg=1e-3, optimizer_method="L-BFGS-B", maxiter=500
+    )
     sel.fit(X_train, Y_train)
 
     preds = sel.predict(X_test)

@@ -380,7 +380,9 @@ def test_performance_model(dummy_performance, dummy_features, model_class):
 
 
 def test_osl_linear_selector(dummy_performance, dummy_features):
-    selector = OSLLinearSelector(budget=450.0, reg=1e-3, optimizer_method="L-BFGS-B", maxiter=200)
+    selector = OSLLinearSelector(
+        budget=450.0, reg=1e-3, optimizer_method="L-BFGS-B", maxiter=200
+    )
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
 
