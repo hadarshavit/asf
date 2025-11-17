@@ -29,6 +29,7 @@ from asf.selectors.isac import ISAC
 from asf.selectors.snnap import SNNAP
 from asf.selectors.isa import ISA
 from asf.selectors.meta_selector import MetaSelector
+from asf.selectors.osl_linear import OSLLinearSelector
 
 
 @pytest.fixture
@@ -376,3 +377,17 @@ def test_performance_model(dummy_performance, dummy_features, model_class):
     model.fit(dummy_features, dummy_performance)
     predictions = model.predict(dummy_features)
     validate_predictions(predictions)
+
+
+def test_osl_linear_selector(dummy_performance, dummy_features):
+    selector = OSLLinearSelector(budget=450.0, reg=1e-3, optimizer_method="L-BFGS-B", maxiter=200)
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+
+    assert len(predictions) == len(dummy_features)
+    for pred in predictions.values():
+        assert isinstance(pred, list) and len(pred) == 1
+        algo, score = pred[0]
+        assert algo in ["algo1", "algo2", "algo3"] or algo is None
+        assert isinstance(score, (int, float, np.floating, np.integer))
+        assert score >= 0

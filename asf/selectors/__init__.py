@@ -17,6 +17,7 @@ from asf.selectors.isac import ISAC
 from asf.selectors.snnap import SNNAP
 from asf.selectors.selector_tuner import tune_selector
 from asf.selectors.satzilla import SATzilla
+from asf.selectors.osl_linear import OSLLinearSelector
 
 __all__ = [
     "PairwiseClassifier",
@@ -37,4 +38,5 @@ __all__ = [
     "SATzilla",
     "ISAC",
     "SNNAP",
+    "OSLLinearSelector",
 ]
