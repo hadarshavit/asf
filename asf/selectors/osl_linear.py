@@ -173,8 +173,5 @@ class OSLLinearSelector(AbstractSelector):
                 if val < best_val:
                     best_val = val
                     best_algo = algo
-            if best_val is None or np.isnan(best_val):
-                best_val = float(self.budget)
-            best_val = max(0.0, float(best_val))
             out[idx] = [(best_algo, self.budget)]
         return out
