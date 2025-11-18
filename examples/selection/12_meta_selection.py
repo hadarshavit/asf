@@ -91,10 +91,16 @@ def main():
         base_selectors, train_X, train_Y, test_X, test_Y, budget
     )
 
-    # build & evaluate meta selector
+    meta_base_selectors = [
+        SNNAP(),
+        SATzilla(),
+        SurvivalAnalysis(budget=budget),
+        MultiClassClassifier(model_class=RandomForestClassifier),
+    ]
     meta = MetaSelector(
-        base_selectors=base_selectors, meta_selector=ISAC(), budget=budget
+        base_selectors=meta_base_selectors, meta_selector=ISAC(), budget=budget
     )
+
     meta.fit(train_X, train_Y)
     meta_preds = meta.predict(test_X)
     meta_avg_rt, meta_solve_rate = evaluate_predictions(meta_preds, test_Y, budget)
