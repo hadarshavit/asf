@@ -19,6 +19,9 @@ class JointRanking(AbstractSelector, AbstractFeatureGenerator):
         Ortuzk et al. (2022)
     """
 
+    PREFIX = "joint_ranking"
+    RETURN_TYPE = "single"
+
     def __init__(
         self,
         model: RankingMLP = None,

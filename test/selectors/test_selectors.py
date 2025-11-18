@@ -12,7 +12,7 @@ from asf.selectors import (
     PairwiseRegressor,
     SimpleRanking,
     JointRanking,
-    SurvivalAnalysisSelector,
+    SurvivalAnalysis,
     MultiClassClassifier,
     PerformanceModel,
 )
@@ -28,6 +28,7 @@ from asf.selectors.satzilla import SATzilla
 from asf.selectors.isac import ISAC
 from asf.selectors.snnap import SNNAP
 from asf.selectors.isa import ISA
+from asf.selectors.meta_selector import MetaSelector
 
 
 @pytest.fixture
@@ -125,7 +126,7 @@ def test_joint_ranking(dummy_performance, dummy_features):
 
 
 def test_survival_analysis(dummy_performance, dummy_features):
-    selector = SurvivalAnalysisSelector(budget=450.0)
+    selector = SurvivalAnalysis(budget=450.0)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
@@ -133,7 +134,7 @@ def test_survival_analysis(dummy_performance, dummy_features):
 
 def test_survival_analysis_schedule(dummy_performance, dummy_features):
     budget = 450.0
-    selector = SurvivalAnalysisSelector(budget=budget, use_schedule=True)
+    selector = SurvivalAnalysis(budget=budget, use_schedule=True)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
 
@@ -249,6 +250,37 @@ def test_satzilla_selector(dummy_performance, dummy_features):
     )
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
+
+
+def test_meta_selector(dummy_performance, dummy_features):
+    budget = 450.0
+
+    base_selectors = [
+        SNNAP(k=3, budget=budget),
+        SATzilla(budget=budget),
+        ISAC(budget=budget),
+    ]
+    meta_sel = SimpleRanking(model_class=XGBRanker, budget=budget)
+
+    meta = MetaSelector(
+        base_selectors=base_selectors, meta_selector=meta_sel, budget=budget, n_folds=2
+    )
+    meta.fit(dummy_features, dummy_performance)
+    predictions = meta.predict(dummy_features)
+
+    validate_predictions(predictions)
+
+
+def test_meta_selector_rejects_schedule_base(dummy_performance, dummy_features):
+    budget = 450.0
+
+    # ISA is a schedule-returning selector; MetaSelector should reject it as a base
+    with pytest.raises(ValueError):
+        MetaSelector(
+            base_selectors=[SNNAP(k=3, budget=budget), ISA(budget=budget)],
+            meta_selector=SimpleRanking(model_class=XGBRanker, budget=budget),
+            budget=budget,
+        )
 
 
 def test_selector_tuner(dummy_performance, dummy_features):

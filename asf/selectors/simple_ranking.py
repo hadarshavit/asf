@@ -15,9 +15,12 @@ class SimpleRanking(AbstractModelBasedSelector):
         classifier: The trained classification model.
     """
 
+    PREFIX = "simple_ranking"
+    RETURN_TYPE = "single"
+
     def __init__(self, model_class: AbstractPredictor, **kwargs):
         """
-        Initializes the MultiClassClassifier with the given parameters.
+        Initializes the SimpleRanking with the given parameters.
 
         Args:
             model_class: The class of the classification model to be used. Assumes XGBoost API.

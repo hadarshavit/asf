@@ -40,6 +40,7 @@ class ISAC(AbstractSelector):
     """
 
     PREFIX = "isac"
+    RETURN_TYPE = "single"
 
     def __init__(
         self,

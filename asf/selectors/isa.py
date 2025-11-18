@@ -13,6 +13,7 @@ class ISA(AbstractSelector):
     """
 
     PREFIX = "isa"
+    RETURN_TYPE = "schedule"
 
     def __init__(
         self,

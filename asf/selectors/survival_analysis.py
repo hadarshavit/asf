@@ -21,7 +21,7 @@ if SKSURV_AVAILABLE:
     except ImportError:
         CONFIGSPACE_AVAILABLE = False
 
-    class SurvivalAnalysisSelector(AbstractModelBasedSelector):
+    class SurvivalAnalysis(AbstractModelBasedSelector):
         """
         Selects the best algorithm for a given problem instance using survival analysis.
         Tries to maximize the probability of finishing within a given time budget.
@@ -29,6 +29,7 @@ if SKSURV_AVAILABLE:
         """
 
         PREFIX = "survival"
+        RETURN_TYPE = "single"
 
         def __init__(
             self,
@@ -44,7 +45,7 @@ if SKSURV_AVAILABLE:
             **kwargs,
         ):
             """
-            Initializes the SurvivalAnalysisSelector.
+            Initializes the SurvivalAnalysis.
 
             Args:
                 model_class: Wrapper class for survival model (default: RandomSurvivalForestWrapper).
@@ -67,6 +68,9 @@ if SKSURV_AVAILABLE:
             self.maxiter = maxiter
             self.tol = tol
             self.dominance_resolution = dominance_resolution
+
+            if use_schedule:
+                self.RETURN_TYPE = "schedule"
 
             if not isinstance(self.budget, (int, float)) or self.budget <= 0:
                 raise ValueError(
@@ -324,7 +328,7 @@ if SKSURV_AVAILABLE:
                 **kwargs,
             ) -> tuple[ConfigurationSpace, dict[str, dict]]:
                 """
-                Get the configuration space for SurvivalAnalysisSelector.
+                Get the configuration space for SurvivalAnalysis.
 
                 Args:
                     cs: The configuration space to use. If None, a new one will be created.
@@ -348,9 +352,9 @@ if SKSURV_AVAILABLE:
                     model_class = [RandomSurvivalForestWrapper]
 
                 if pre_prefix != "":
-                    prefix = f"{pre_prefix}:{SurvivalAnalysisSelector.PREFIX}"
+                    prefix = f"{pre_prefix}:{SurvivalAnalysis.PREFIX}"
                 else:
-                    prefix = SurvivalAnalysisSelector.PREFIX
+                    prefix = SurvivalAnalysis.PREFIX
 
                 model_class_param = Categorical(
                     name=f"{prefix}:model_class",
@@ -394,23 +398,23 @@ if SKSURV_AVAILABLE:
                 cs_transform: dict[str, dict],
                 pre_prefix: str = "",
                 **kwargs,
-            ) -> "SurvivalAnalysisSelector":
+            ) -> "SurvivalAnalysis":
                 """
-                Get the SurvivalAnalysisSelector from a given configuration.
+                Get the SurvivalAnalysis from a given configuration.
 
                 Args:
                     configuration: The configuration object.
                     cs_transform: The transformation dictionary for the configuration space.
                     pre_prefix: Prefix for parameter names.
-                    **kwargs: Additional keyword arguments for SurvivalAnalysisSelector initialization.
+                    **kwargs: Additional keyword arguments for SurvivalAnalysis initialization.
 
                 Returns:
-                    SurvivalAnalysisSelector: An instance configured according to the given configuration.
+                    SurvivalAnalysis: An instance configured according to the given configuration.
                 """
                 if pre_prefix != "":
-                    prefix = f"{pre_prefix}:{SurvivalAnalysisSelector.PREFIX}"
+                    prefix = f"{pre_prefix}:{SurvivalAnalysis.PREFIX}"
                 else:
-                    prefix = SurvivalAnalysisSelector.PREFIX
+                    prefix = SurvivalAnalysis.PREFIX
 
                 model_cls = cs_transform[f"{prefix}:model_class"][
                     configuration[f"{prefix}:model_class"]
@@ -419,15 +423,15 @@ if SKSURV_AVAILABLE:
                     configuration, pre_prefix=f"{prefix}:model_class"
                 )
 
-                return SurvivalAnalysisSelector(
+                return SurvivalAnalysis(
                     model_class=model_ctor,
                     **kwargs,
                 )
 
 else:
 
-    class SurvivalAnalysisSelector:
+    class SurvivalAnalysis:
         def __init__(self, *args, **kwargs):
             raise ImportError(
-                "sksurv is not installed. Please install sksurv to use SurvivalAnalysisSelector."
+                "sksurv is not installed. Please install sksurv to use SurvivalAnalysis."
             )

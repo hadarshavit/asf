@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from asf.selectors.survival_analysis import SurvivalAnalysisSelector
+from asf.selectors.survival_analysis import SurvivalAnalysis
 
 
 def generate_complex_data(n_instances=100, n_algorithms=6, budget=150.0, seed=42):
@@ -92,7 +92,7 @@ if __name__ == "__main__":
 
     # --- 1. Single Best Algorithm Prediction ---
     print("--- Single Best Algorithm Predictions ---")
-    selector = SurvivalAnalysisSelector(budget=BUDGET)
+    selector = SurvivalAnalysis(budget=BUDGET)
     selector.fit(train_features, train_performance)
     predictions = selector.predict(test_features)
 
@@ -106,7 +106,7 @@ if __name__ == "__main__":
 
     # --- 2. Algorithm Schedule Prediction ---
     print("--- Algorithm Schedule Predictions ---")
-    schedule_selector = SurvivalAnalysisSelector(
+    schedule_selector = SurvivalAnalysis(
         budget=BUDGET,
         use_schedule=True,
         max_schedule_length=3,  # Limit schedules to a max of 3 algorithms

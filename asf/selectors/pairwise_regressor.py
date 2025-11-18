@@ -34,7 +34,6 @@ from functools import partial
 
 
 class PairwiseRegressor(AbstractModelBasedSelector, AbstractFeatureGenerator):
-    PREFIX = "pairwise_regressor"
     """
     PairwiseRegressor is a selector that uses pairwise regression of algorithms
     to predict the best algorithm for a given instance.
@@ -43,6 +42,9 @@ class PairwiseRegressor(AbstractModelBasedSelector, AbstractFeatureGenerator):
         model_class (type): The regression model class to be used for pairwise comparisons.
     regressors (list[AbstractPredictor]): List of trained regressors for pairwise comparisons.
     """
+
+    PREFIX = "pairwise_regressor"
+    RETURN_TYPE = "single"
 
     def __init__(self, model_class: type, **kwargs):
         """

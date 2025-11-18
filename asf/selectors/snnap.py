@@ -29,6 +29,7 @@ class SNNAP(AbstractSelector):
     """
 
     PREFIX = "snnap"
+    RETURN_TYPE = "single"
 
     def __init__(
         self,

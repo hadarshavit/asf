@@ -28,6 +28,7 @@ class SUNNY(AbstractSelector):
     """
 
     PREFIX = "sunny"
+    RETURN_TYPE = "schedule"
 
     def __init__(
         self,
