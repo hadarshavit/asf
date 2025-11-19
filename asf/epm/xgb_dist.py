@@ -136,17 +136,29 @@ class XGBDistNet:
             
         if isinstance(y, pd.DataFrame) or isinstance(y, pd.Series):
             y = y.values
-        X = np.concatenate([[x for i in range(100)] for x in X])
+        X = np.concatenate([[x for i in range(y.shape[1])] for x in X])
         y = y.flatten()
+
+        def _eval_metric(y_true_np: np.ndarray, y_pred_np: np.ndarray) -> float:
+            if self.n_loss_params == 1:
+                y_pred_np = y_pred_np.reshape(-1, 1)
+            else:
+                y_pred_np = y_pred_np.reshape(-1, self.n_loss_params)
+            y_true_t = torch.from_numpy(y_true_np.astype(np.float32)).reshape(-1, 1)
+            y_pred_t = torch.from_numpy(y_pred_np.astype(np.float32))
+            activated = self.output_activation(y_pred_t)
+
+            return float(self.loss_function(y_true_t, activated))
+        
         self.model = xgb.XGBRegressor(
             objective=self.objective,
-            eval_metric=self.loss_function,
+            eval_metric=_eval_metric,
             num_target=self.n_loss_params,
             
             **self.kwargs,
         )
 
-        self.model.fit(X, y, eval_set=[(X, y)])
+        self.model.fit(X, y, eval_set=[(X, y)], verbose=False)
 
     def predict(self, X: pd.DataFrame | pd.Series | list) -> torch.Tensor:
         if isinstance(X, pd.DataFrame) or isinstance(X, pd.Series):
@@ -158,8 +170,7 @@ class XGBDistNet:
         preds_tensor = torch.clamp(preds_tensor, min=1e-12)
         predictions = preds_tensor.numpy()
 
-        print(predictions.shape)
-        print(self.n_loss_params)
+
         if self.n_loss_params == 1:
             predictions = predictions.reshape(-1, 1)
 
