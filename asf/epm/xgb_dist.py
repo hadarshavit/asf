@@ -142,10 +142,11 @@ class XGBDistNet:
             objective=self.objective,
             eval_metric=self.loss_function,
             num_target=self.n_loss_params,
+            
             **self.kwargs,
         )
 
-        self.model.fit(X, y)
+        self.model.fit(X, y, eval_set=[(X, y)])
 
     def predict(self, X: pd.DataFrame | pd.Series | list) -> torch.Tensor:
         if isinstance(X, pd.DataFrame) or isinstance(X, pd.Series):
