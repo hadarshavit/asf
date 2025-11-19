@@ -1,17 +1,31 @@
 import math
 
+import numpy as np
 import pytest
 import torch
+from scipy import stats
 
-from asf.predictors.utils.losses import lognorm_loss, exp_loss, invgauss_loss
+from asf.predictors.utils.losses import (
+    exp_loss,
+    invgauss_loss,
+    lognorm_loss,
+    weibull_loss,
+    normal_loss,
+    gamma_loss,
+    cauchy_loss,
+    levy_loss,
+    beta_loss,
+)
 
 
 def _rand_pos(shape, low=0.1, high=3.0):
     return (high - low) * torch.rand(shape) + low
 
 
-def test_lognorm_loss_matches_torch_up_to_constant():
-    torch.manual_seed(0)
+def test_lognorm_loss_matches_scipy():
+    """Test that lognorm_loss matches scipy.stats.lognorm up to constants."""
+    torch.manual_seed(42)
+    np.random.seed(42)
 
     N = 256
     y_true = _rand_pos((N, 1), low=0.1, high=5.0)
@@ -23,17 +37,27 @@ def test_lognorm_loss_matches_torch_up_to_constant():
 
     ours = float(lognorm_loss(y_true, y_pred))
 
-    loc = torch.log(scale).squeeze(-1)
-    ref = torch.distributions.LogNormal(loc, s.squeeze(-1))
-    torch_ll = float(-ref.log_prob(y_true.squeeze(-1)).mean())
+    # scipy.stats.lognorm parameterization: lognorm(s, loc=0, scale=scale)
+    # where s is the shape parameter (sigma) and scale relates to the median
+    # scipy's scale is exp(mu), which matches our scale parameter
+    y_true_np = y_true.numpy().flatten()
+    s_np = s.numpy().flatten()
+    scale_np = scale.numpy().flatten()
 
-    # Our loss omits the constant 0.5*log(2*pi)
-    expected_diff = 0.5 * math.log(2.0 * math.pi)
-    assert abs((torch_ll - ours) - expected_diff) < 1e-4
+    # Compute negative log-likelihood using scipy
+    scipy_nll = 0.0
+    for i in range(N):
+        logpdf = stats.lognorm.logpdf(y_true_np[i], s=s_np[i], scale=scale_np[i])
+        scipy_nll -= logpdf
+    scipy_nll /= N
+
+    assert abs((scipy_nll - ours)) < 1e-5
 
 
-def test_exp_loss_matches_torch_exact():
-    torch.manual_seed(0)
+def test_exp_loss_matches_scipy():
+    """Test that exp_loss matches scipy.stats.expon exactly."""
+    torch.manual_seed(42)
+    np.random.seed(42)
 
     N = 256
     y_true = _rand_pos((N, 1), low=0.0, high=5.0)
@@ -41,36 +65,235 @@ def test_exp_loss_matches_torch_exact():
 
     ours = float(exp_loss(y_true, scale_param))
 
-    rate = 1.0 / scale_param.squeeze(-1)
-    ref = torch.distributions.Exponential(rate)
-    torch_ll = float(-ref.log_prob(y_true.squeeze(-1)).mean())
+    # Our implementation: takes scale_param as input, then computes rate = 1/scale_param
+    # Then uses: log(rate) - y * rate = -log(scale_param) - y / scale_param
+    # scipy.stats.expon uses scale parameter directly (scale = 1/rate)
+    y_true_np = y_true.numpy().flatten()
+    scale_np = scale_param.numpy().flatten()
 
-    assert abs(torch_ll - ours) < 1e-6
+    # Compute negative log-likelihood using scipy
+    scipy_nll = 0.0
+    for i in range(N):
+        # Our scale_param is the input, and we compute 1/scale_param as the rate
+        # scipy's scale = 1/rate, so scipy_scale = scale_param
+        scipy_scale = scale_np[i]
+        logpdf = stats.expon.logpdf(y_true_np[i], scale=scipy_scale)
+        scipy_nll -= logpdf
+    scipy_nll /= N
+
+    assert abs(scipy_nll - ours) < 1e-5
 
 
-@pytest.mark.skipif(
-    not hasattr(torch.distributions, "InverseGaussian"),
-    reason="PyTorch InverseGaussian not available in this environment",
-)
-def test_invgauss_loss_matches_torch_with_param_mapping():
-    torch.manual_seed(0)
+def test_invgauss_loss_matches_scipy():
+    """Test that invgauss_loss matches scipy.stats.invgauss up to constants."""
+    torch.manual_seed(42)
+    np.random.seed(42)
 
     N = 256
     y_true = _rand_pos((N, 1), low=0.1, high=5.0)
 
-    # Our parameterization: y_pred[:,0] = mu (>0), y_pred[:,1] = scale (= lambda >0)
+    # Our parameterization: y_pred[:,0] = mu (>0), y_pred[:,1] = scale = lambda (>0)
+    # Looking at the code:
+    # help1 = log(scale)  <- this is log(lambda), but standard form has 0.5*log(lambda)
+    # help3 = scale * (y-mu)^2 / (2*y*mu^2)  <- this is lambda * (y-mu)^2 / (2*y*mu^2)
+    # So scale = lambda directly
+    # Our log-likelihood omits: 0.5*log(lambda) term and 0.5*log(2*pi) constant
     mu = _rand_pos((N, 1), low=0.2, high=3.0)
-    lam = _rand_pos((N, 1), low=0.5, high=4.0)
+    lam = _rand_pos((N, 1), low=0.5, high=4.0)  # lambda parameter
     y_pred = torch.cat([mu, lam], dim=1)
 
     ours = float(invgauss_loss(y_true, y_pred))
 
-    # Mapping to torch: mean = mu * lam, scale = lam
-    mean_param = (mu * lam).squeeze(-1)
-    scale_param = lam.squeeze(-1)
+    # scipy.stats.invgauss(mu, loc=0, scale) gives inverse Gaussian with:
+    # - mean = scale * mu
+    # - For standard form with mean=M and shape=lambda: use invgauss(mu=M/lambda, scale=lambda)
+    y_true_np = y_true.numpy().flatten()
+    mu_np = mu.numpy().flatten()
+    lam_np = lam.numpy().flatten()
 
-    ref = torch.distributions.InverseGaussian(mean_param, scale_param)
-    torch_ll = float(-ref.log_prob(y_true.squeeze(-1)).mean())
+    # Compute negative log-likelihood using scipy
+    scipy_nll = 0.0
+    for i in range(N):
+        logpdf = stats.invgauss.logpdf(
+            y_true_np[i], mu=mu_np[i] / lam_np[i], scale=lam_np[i]
+        )
+        scipy_nll -= logpdf
+    scipy_nll /= N
 
-    # Our implementation retains all non-constant terms, so it should match exactly
-    assert abs(torch_ll - ours) < 1e-5
+    # Our implementation differs from scipy by: 0.5*log(lambda) + 0.5*log(2*pi) per sample
+    # Since lambda varies per sample, compute the average offset
+    expected_offset = np.mean(0.5 * np.log(lam_np) + 0.5 * np.log(2.0 * np.pi))
+    diff = scipy_nll - ours
+
+    assert abs(diff - expected_offset) < 1e-5
+
+
+def test_weibull_loss_matches_scipy():
+    """Test that weibull_loss matches scipy.stats.weibull_min."""
+    torch.manual_seed(42)
+    np.random.seed(42)
+
+    N = 256
+    y_true = _rand_pos((N, 1), low=0.1, high=5.0)
+
+    # Our parameterization: y_pred[:,0] = c (shape>0), y_pred[:,1] = scale (scale>0)
+    c = _rand_pos((N, 1), low=0.5, high=3.0)
+    scale = _rand_pos((N, 1), low=0.5, high=3.0)
+    y_pred = torch.cat([c, scale], dim=1)
+
+    ours = float(weibull_loss(y_true, y_pred))
+
+    # scipy.stats.weibull_min parameterization: weibull_min(c, loc=0, scale=scale)
+    # where c is the shape parameter and scale is the scale parameter
+    y_true_np = y_true.numpy().flatten()
+    c_np = c.numpy().flatten()
+    scale_np = scale.numpy().flatten()
+
+    # Compute negative log-likelihood using scipy
+    scipy_nll = 0.0
+    for i in range(N):
+        logpdf = stats.weibull_min.logpdf(y_true_np[i], c=c_np[i], scale=scale_np[i])
+        scipy_nll -= logpdf
+    scipy_nll /= N
+
+    # Should match exactly as both use the same formula
+    assert abs(scipy_nll - ours) < 1e-5
+
+
+def test_normal_loss_matches_scipy():
+    """Test that normal_loss matches scipy.stats.norm."""
+    torch.manual_seed(42)
+    np.random.seed(42)
+
+    N = 256
+    # Sample y_true in a symmetric interval
+    y_true = 4.0 * torch.rand((N, 1)) - 2.0  # in [-2,2]
+    mu = 4.0 * torch.rand((N, 1)) - 2.0
+    sigma = _rand_pos((N, 1), low=0.2, high=2.0)
+    y_pred = torch.cat([mu, sigma], dim=1)
+
+    ours = float(normal_loss(y_true, y_pred))
+
+    y_true_np = y_true.numpy().flatten()
+    mu_np = mu.numpy().flatten()
+    sigma_np = sigma.numpy().flatten()
+
+    scipy_nll = 0.0
+    for i in range(N):
+        logpdf = stats.norm.logpdf(y_true_np[i], loc=mu_np[i], scale=sigma_np[i])
+        scipy_nll -= logpdf
+    scipy_nll /= N
+
+    assert abs(scipy_nll - ours) < 1e-5
+
+
+def test_gamma_loss_matches_scipy():
+    """Test that gamma_loss matches scipy.stats.gamma."""
+    torch.manual_seed(42)
+    np.random.seed(42)
+
+    N = 256
+    y_true = _rand_pos((N, 1), low=0.05, high=5.0)
+    k = _rand_pos((N, 1), low=0.5, high=5.0)  # shape
+    theta = _rand_pos((N, 1), low=0.3, high=3.0)  # scale
+    y_pred = torch.cat([k, theta], dim=1)
+
+    ours = float(gamma_loss(y_true, y_pred))
+
+    y_true_np = y_true.numpy().flatten()
+    k_np = k.numpy().flatten()
+    theta_np = theta.numpy().flatten()
+
+    scipy_nll = 0.0
+    for i in range(N):
+        logpdf = stats.gamma.logpdf(y_true_np[i], a=k_np[i], scale=theta_np[i])
+        scipy_nll -= logpdf
+    scipy_nll /= N
+
+    assert abs(scipy_nll - ours) < 1e-5
+
+
+def test_cauchy_loss_matches_scipy():
+    """Test that cauchy_loss matches scipy.stats.cauchy."""
+    torch.manual_seed(42)
+    np.random.seed(42)
+
+    N = 256
+    y_true = 6.0 * torch.rand((N, 1)) - 3.0  # in [-3,3]
+    loc = torch.zeros((N, 1))
+    scale = _rand_pos((N, 1), low=0.2, high=3.0)
+    y_pred = torch.cat([ scale], dim=1)
+
+    ours = float(cauchy_loss(y_true, y_pred))
+
+    y_true_np = y_true.numpy().flatten()
+    loc_np = loc.numpy().flatten()
+    scale_np = scale.numpy().flatten()
+
+    scipy_nll = 0.0
+    for i in range(N):
+        logpdf = stats.cauchy.logpdf(y_true_np[i], loc=loc_np[i], scale=scale_np[i])
+        scipy_nll -= logpdf
+    scipy_nll /= N
+
+    assert abs(scipy_nll - ours) < 1e-5
+
+
+def test_levy_loss_matches_scipy():
+    """Test that levy_loss matches scipy.stats.levy."""
+    torch.manual_seed(42)
+    np.random.seed(42)
+
+    N = 256
+    loc = torch.zeros((N, 1))
+    # Ensure y_true > loc
+    delta = _rand_pos((N, 1), low=0.1, high=5.0)
+    y_true = loc + delta
+    scale = _rand_pos((N, 1), low=0.1, high=3.0)
+    y_pred = torch.cat([scale], dim=1)
+
+    ours = float(levy_loss(y_true, y_pred))
+
+    y_true_np = y_true.numpy().flatten()
+    loc_np = loc.numpy().flatten()
+    scale_np = scale.numpy().flatten()
+
+    scipy_nll = 0.0
+    for i in range(N):
+        logpdf = stats.levy.logpdf(y_true_np[i], loc=loc_np[i], scale=scale_np[i])
+        scipy_nll -= logpdf
+    scipy_nll /= N
+
+    assert abs(scipy_nll - ours) < 1e-5
+
+
+def test_beta_loss_matches_scipy():
+    """Test that beta_loss matches scipy.stats.beta."""
+    torch.manual_seed(42)
+    np.random.seed(42)
+
+    N = 256
+    # Sample parameters and y_true consistent with support y in (0, scale)
+    alpha = _rand_pos((N, 1), low=0.5, high=5.0)
+    beta = _rand_pos((N, 1), low=0.5, high=5.0)
+    scale = _rand_pos((N, 1), low=0.1, high=3.0)
+    # Sample u in (0,1) away from boundaries, then y = scale * u
+    u = torch.clamp(torch.rand((N, 1)), 1e-6, 1.0 - 1e-6)
+    y_true = scale * u
+    y_pred = torch.cat([scale, alpha, beta], dim=1)
+
+    ours = float(beta_loss(y_true, y_pred))
+
+    y_true_np = y_true.numpy().flatten()
+    a_np = alpha.numpy().flatten()
+    b_np = beta.numpy().flatten()
+    scale_np = scale.numpy().flatten()
+
+    scipy_nll = 0.0
+    for i in range(N):
+        logpdf = stats.beta.logpdf(y_true_np[i], a=a_np[i], b=b_np[i], scale=scale_np[i])
+        scipy_nll -= logpdf
+    scipy_nll /= N
+
+    assert abs(scipy_nll - ours) < 1e-5
+

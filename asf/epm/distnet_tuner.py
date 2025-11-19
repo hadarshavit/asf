@@ -6,6 +6,7 @@ from sklearn.model_selection import KFold
 
 try:
     from smac import HyperparameterOptimizationFacade, Scenario
+    from smac.facade import AbstractFacade
 
     SMAC_AVAILABLE = True
 except ImportError:  # pragma: no cover - optional dependency
@@ -49,6 +50,7 @@ def tune_distnet(
     output_dir: str = "./smac_output",
     seed: int = 0,
     metric: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] | None = None,
+    smac_facade: AbstractFacade = HyperparameterOptimizationFacade,
     smac_scenario_kwargs: dict | None = None,
     smac_kwargs: dict | None = None,
     distnet_kwargs: dict | None = None,
@@ -102,7 +104,7 @@ def tune_distnet(
             X, index=range(len(X)), columns=[f"f_{i}" for i in range(X.shape[1])]
         )
     if isinstance(y, np.ndarray):
-        y = pd.Series(y, index=range(len(y)))
+        y = pd.DataFrame(y, index=range(len(y)))
 
     cs = model.get_configuration_space()
 
@@ -131,15 +133,9 @@ def tune_distnet(
             y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
             dn = model.get_from_configuration(
-                input_size=X.shape[1],
-                config=config,
-                extra_kwargs={
-                    "features_preprocessing": features_preprocessing,
-                    "categorical_features": categorical_features,
-                    "numerical_features": numerical_features,
-                    **distnet_kwargs,
-                },
+                input_size=X.shape[1], configuration=config, **distnet_kwargs
             )
+            dn = dn()
 
             # Fit
             dn.fit(X_train, y_train)
@@ -158,19 +154,12 @@ def tune_distnet(
 
         return float(np.mean(fold_losses))
 
-    smac = HyperparameterOptimizationFacade(scenario, target_function, **smac_kwargs)
+    smac = smac_facade(scenario, target_function, **smac_kwargs)
     best_config = smac.optimize()
 
     # Build best DistNet (unfitted), mirroring epm_tuner behavior
     best_dn = model.get_from_configuration(
-        input_size=X.shape[1],
-        config=best_config,
-        extra_kwargs={
-            "features_preprocessing": features_preprocessing,
-            "categorical_features": categorical_features,
-            "numerical_features": numerical_features,
-            **distnet_kwargs,
-        },
+        input_size=X.shape[1], configuration=best_config, **distnet_kwargs
     )
 
     return best_dn

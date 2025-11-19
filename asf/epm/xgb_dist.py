@@ -1,27 +1,51 @@
-from asf.predictors.utils.losses import lognorm_loss
-import xgboost as xgb
+from functools import partial
+from typing import Any, Callable
+
+import numpy as np
 import pandas as pd
 import torch
+import xgboost as xgb
+
+from asf.predictors.utils.losses import lognorm_loss
 from asf.predictors.utils.mlp import ExpActivation
-import numpy as np
+
+try:
+    from ConfigSpace import (
+        ConfigurationSpace,
+        Constant,
+        EqualsCondition,
+        Float,
+        Integer,
+        Categorical
+    )
+    from ConfigSpace.hyperparameters import Hyperparameter
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
 
 
 class XGBDistNet:
+    PREFIX = "xgb_distnet"
+
     def __init__(
         self,
-        xgb_kwargs: dict = {},
         loss_function=lognorm_loss,
         n_loss_params: int = 2,
         batch_size: int | None = 1000,
         output_activation=ExpActivation(),
+        **kwargs
     ):
-        self.xgb_kwargs = xgb_kwargs
         self.loss_function = loss_function
         self.n_loss_params = n_loss_params
         self.batch_size = batch_size
         self.output_activation = output_activation
+        self.kwargs = kwargs
 
     def objective(self, data, preds):
+        if self.n_loss_params == 1:
+            preds = preds.reshape(-1, 1)
+
         if self.batch_size is None:
             # Compute gradients and Hessians w.r.t. raw margins (pre-activation)
             raw = torch.from_numpy(preds).requires_grad_(True).float()
@@ -107,13 +131,18 @@ class XGBDistNet:
         X: pd.DataFrame | pd.Series | list,
         y: pd.Series | list,
     ):
+        if isinstance(X, pd.DataFrame) or isinstance(X, pd.Series):
+            X = X.values
+            
+        if isinstance(y, pd.DataFrame) or isinstance(y, pd.Series):
+            y = y.values
         X = np.concatenate([[x for i in range(100)] for x in X])
         y = y.flatten()
         self.model = xgb.XGBRegressor(
             objective=self.objective,
             eval_metric=self.loss_function,
             num_target=self.n_loss_params,
-            **self.xgb_kwargs,
+            **self.kwargs,
         )
 
         self.model.fit(X, y)
@@ -127,4 +156,183 @@ class XGBDistNet:
         preds_tensor = self.output_activation(torch.from_numpy(predictions))
         preds_tensor = torch.clamp(preds_tensor, min=1e-12)
         predictions = preds_tensor.numpy()
+
+        print(predictions.shape)
+        print(self.n_loss_params)
+        if self.n_loss_params == 1:
+            predictions = predictions.reshape(-1, 1)
+
         return predictions
+    
+    def save(self, path: str):
+        """Save the XGBDistNet model to a file.
+
+        Parameters
+        ----------
+        path : str
+            The file path where the model will be saved.
+        """
+        self.model.save_model(path)
+
+    def load(self, path: str):
+        """Load the XGBDistNet model from a file.
+
+        Parameters
+        ----------
+        path : str
+            The file path from which the model will be loaded.
+        """
+        self.model = xgb.XGBRegressor()
+        self.model.load_model(path)
+
+    @staticmethod
+    def get_configuration_space(
+        cs: ConfigurationSpace | None = None,
+        pre_prefix: str = "",
+        parent_param: Hyperparameter | None = None,
+        parent_value: str | None = None,
+    ) -> ConfigurationSpace:
+        """
+        Get the configuration space for the XGBoost regressor.
+
+        Parameters
+        ----------
+        cs : ConfigurationSpace, optional
+        The configuration space to add the parameters to. If None, a new ConfigurationSpace will be created.
+
+        Returns
+        -------
+        ConfigurationSpace
+        The configuration space with the XGBoost parameters.
+        """
+        if cs is None:
+            cs = ConfigurationSpace(name="XGBoostRegressor")
+
+        if pre_prefix != "":
+            prefix = f"{pre_prefix}:{XGBDistNet.PREFIX}"
+        else:
+            prefix = XGBDistNet.PREFIX
+
+        booster = Constant(f"{prefix}:booster", "gbtree")
+        n_estimators = Integer(
+            f"{prefix}:n_estimators",
+            (10, 2000),
+            log=True,
+            default=100,
+        )
+        max_depth = Integer(
+            f"{prefix}:max_depth",
+            (1, 20),
+            log=False,
+            default=13,
+        )
+        min_child_weight = Integer(
+            f"{prefix}:min_child_weight",
+            (1, 100),
+            log=True,
+            default=39,
+        )
+        colsample_bytree = Float(
+            f"{prefix}:colsample_bytree",
+            (0.0, 1.0),
+            log=False,
+            default=0.2545374925231651,
+        )
+        colsample_bylevel = Float(
+            f"{prefix}:colsample_bylevel",
+            (0.0, 1.0),
+            log=False,
+            default=0.6909224923784677,
+        )
+        lambda_param = Float(
+            f"{prefix}:lambda",
+            (0.001, 1000),
+            log=True,
+            default=31.393252465064943,
+        )
+        alpha = Float(
+            f"{prefix}:alpha",
+            (0.001, 1000),
+            log=True,
+            default=0.24167936088332426,
+        )
+        learning_rate = Float(
+            f"{prefix}:learning_rate",
+            (0.001, 0.1),
+            log=True,
+            default=0.008237525103357958,
+        )
+        multi_strategy = Categorical(
+            f"{prefix}:multi_strategy", ["one_output_per_tree", "multi_output_tree"]
+        )
+
+        params = [
+            booster,
+            n_estimators,
+            max_depth,
+            min_child_weight,
+            colsample_bytree,
+            colsample_bylevel,
+            lambda_param,
+            alpha,
+            learning_rate,
+            multi_strategy
+        ]
+        if parent_param is not None:
+            conditions = [
+                EqualsCondition(
+                    child=param,
+                    parent=parent_param,
+                    value=parent_value,
+                )
+                for param in params
+            ]
+        else:
+            conditions = []
+
+        cs.add(params + conditions)
+
+        return cs
+
+    @staticmethod
+    def get_from_configuration(
+        configuration: dict[str, Any],
+        pre_prefix: str = "",
+        input_size: int = None,
+        **kwargs,
+    ) -> Callable[..., "XGBDistNet"]:
+        """
+        Create an XGBoostRegressorWrapper from a configuration.
+
+        Parameters
+        ----------
+        configuration : dict
+        The configuration dictionary.
+        additional_params : dict, optional
+        Additional parameters to include in the configuration.
+
+        Returns
+        -------
+        Callable[..., XGBoostRegressorWrapper]
+        A callable that initializes the wrapper with the given configuration.
+        """
+        if pre_prefix != "":
+            prefix = f"{pre_prefix}:{XGBDistNet.PREFIX}"
+        else:
+            prefix = XGBDistNet.PREFIX
+
+        xgb_params = {
+            "booster": configuration[f"{prefix}:booster"],
+            "n_estimators": configuration[f"{prefix}:n_estimators"],
+            "max_depth": configuration[f"{prefix}:max_depth"],
+            "min_child_weight": configuration[f"{prefix}:min_child_weight"],
+            "colsample_bytree": configuration[f"{prefix}:colsample_bytree"],
+            "colsample_bylevel": configuration[f"{prefix}:colsample_bylevel"],
+            "lambda": configuration[f"{prefix}:lambda"],
+            "alpha": configuration[f"{prefix}:alpha"],
+            "learning_rate": configuration[f"{prefix}:learning_rate"],
+            "multi_strategy": configuration[f"{prefix}:multi_strategy"],
+            **kwargs,
+        }
+
+        return partial(XGBDistNet, **xgb_params)

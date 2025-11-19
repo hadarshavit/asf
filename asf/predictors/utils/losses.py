@@ -5,6 +5,16 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
+LOGNORM_N_PARAMS = 2  # mu, sigma
+EXP_N_PARAMS = 1  # scale
+WEIBULL_N_PARAMS = 2  # c, scale
+INVGAUSS_N_PARAMS = 2  # mu, lambda
+GAMMA_N_PARAMS = 2  # k, theta
+CAUCHY_N_PARAMS = 1  # loc, scale
+LEVY_N_PARAMS = 1  # scale
+BETA_N_PARAMS = 3  # alpha, beta
+NORM_N_PARAMS = 2  # mu, sigma
+
 
 def wmse(input, target, weights):
     return torch.mean(
@@ -56,7 +66,8 @@ def lognorm_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     help1 = 0.5 * torch.pow(help1 / s, 2)
 
     # add terms (not multiplying them)
-    lh = -torch.log(s) - log_true - help1
+    lh = -torch.log(s) - log_true - help1 - 0.5 * torch.log(2.0 * torch.pi)
+
     return -lh.mean()
 
 
@@ -68,22 +79,10 @@ def invgauss_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     scale = y_pred[:, 1]
     scale = torch.reshape(scale, [-1, 1])
 
-    tmp_true = torch.zeros_like(y_true)
-    y_true = tmp_true + y_true
-
-    # Compute logged lh (removed constants)
-    help1 = 0.5 * torch.log(scale)
-    help2 = 3.0 / 2.0 * torch.log(y_true)
-
-    tmp = y_true / scale
-
-    help3 = torch.pow(tmp - mu, 2)
-    lower = 2 * tmp * torch.pow(mu, 2)
-    help3 = help3 / lower
-
-    # add terms (not multiplying them)
+    help1 = torch.log(scale)  # corresponds to sqrt(lambda) term
+    help2 = 1.5 * torch.log(y_true)  # corresponds to x
+    help3 = scale * torch.pow(y_true - mu, 2) / (2 * y_true * torch.pow(mu, 2))
     lh = help1 - help2 - help3
-
     return -lh.mean()
 
 
@@ -101,12 +100,99 @@ def exp_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     return -lh.mean()
 
 
-# def weibull_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
-#     shape = y_pred[:, 0]
-#     shape = torch.reshape(shape, [-1, 1])
+def weibull_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
+    c = y_pred[:, 0]  # shape parameter
+    c = torch.reshape(c, [-1, 1])
 
-#     scale = y_pred[:, 1]
-#     scale = torch.reshape(scale, [-1, 1])
+    scale = y_pred[:, 1]  # scale parameter
+    scale = torch.reshape(scale, [-1, 1])
+
+    log_c = torch.log(c)
+    log_scale = torch.log(scale)
+    log_true = torch.log(y_true)
+
+    help1 = torch.pow(y_true / scale, c)
+    
+    lh = (log_c - c * log_scale + (c - 1) * log_true - help1)
+    
+    return -lh.mean()
 
 
-#     return -lh
+@torch.jit.script
+def normal_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
+    # y_pred[:,0] = mu (real), y_pred[:,1] = sigma (>0)
+    mu = y_pred[:, 0]
+    mu = torch.reshape(mu, [-1, 1])
+    sigma = y_pred[:, 1]
+    sigma = torch.reshape(sigma, [-1, 1])
+    # logpdf = -0.5*log(2*pi) - log(sigma) - (y-mu)^2/(2*sigma^2)
+    diff = y_true - mu
+    logpdf = -0.5 * torch.log(2.0 * torch.pi) - torch.log(sigma) - torch.pow(diff, 2) / (2.0 * torch.pow(sigma, 2))
+    return -logpdf.mean()
+
+
+@torch.jit.script
+def gamma_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
+    # y_pred[:,0] = k (shape>0), y_pred[:,1] = theta (scale>0)
+    k = y_pred[:, 0]
+    k = torch.reshape(k, [-1, 1])
+    theta = y_pred[:, 1]
+    theta = torch.reshape(theta, [-1, 1])
+    # logpdf = (k-1)*log(x) - x/theta - k*log(theta) - log(Gamma(k))
+    log_x = torch.log(y_true)
+    lgamma_k = torch.lgamma(k)
+    logpdf = (k - 1.0) * log_x - y_true / theta - k * torch.log(theta) - lgamma_k
+    return -logpdf.mean()
+
+
+@torch.jit.script
+def cauchy_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
+
+    scale = y_pred[:, 0]
+    scale = torch.reshape(scale, [-1, 1])
+    # logpdf = -log(pi) - log(scale) - log(1 + ((x-loc)/scale)^2)
+    z = (y_true) / scale
+    logpdf = -torch.log(torch.pi) - torch.log(scale) - torch.log(1.0 + torch.pow(z, 2))
+    return -logpdf.mean()
+
+
+@torch.jit.script
+def levy_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
+    # y_pred[:,0] = loc (real), y_pred[:,1] = scale (>0) ; support y_true > loc
+
+    scale = y_pred[:, 0]
+    scale = torch.reshape(scale, [-1, 1])
+    shifted = y_true
+    # To avoid log of non-positive due to numerical issues, clamp shifted
+    shifted = torch.clamp(shifted, min=1e-12)
+    # logpdf = 0.5*log(scale) - 0.5*log(2*pi) - scale/(2*shifted) - 1.5*log(shifted)
+    logpdf = 0.5 * torch.log(scale) - 0.5 * torch.log(torch.tensor(2.0 * torch.pi)) - scale / (2.0 * shifted) - 1.5 * torch.log(shifted)
+    return -logpdf.mean()
+
+
+@torch.jit.script
+def beta_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
+    # y_pred[:,0] = scale (>0), y_pred[:,1] = alpha (>0), y_pred[:,2] = beta (>0)
+    # Support: y_true in (0, scale)
+    scale = y_pred[:, 0]
+    scale = torch.reshape(scale, [-1, 1])
+    alpha = y_pred[:, 1]
+    alpha = torch.reshape(alpha, [-1, 1])
+    beta = y_pred[:, 2]
+    beta = torch.reshape(beta, [-1, 1])
+
+    # Transform to standard Beta support via x = y/scale
+    eps = 1e-12
+    x = y_true / scale
+    x = torch.clamp(x, eps, 1.0 - eps)
+
+    # logpdf_beta_scaled(y; a,b,scale) = -log(scale) + logpdf_beta(x; a,b)
+    logpdf = (
+        -torch.log(scale)
+        + (alpha - 1.0) * torch.log(x)
+        + (beta - 1.0) * torch.log(1.0 - x)
+        - torch.lgamma(alpha)
+        - torch.lgamma(beta)
+        + torch.lgamma(alpha + beta)
+    )
+    return -logpdf.mean()
