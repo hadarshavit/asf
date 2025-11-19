@@ -126,14 +126,10 @@ class CosineSelector(AbstractSelector):
         self._alg_feats = alg_df
 
         X_inst = features.fillna(0.0).to_numpy(dtype=float)
-        X_alg = alg_df.fillna(0.0).to_numpy(dtype=float)
 
         if self.normalize_features:
             self._scaler_inst = StandardScaler().fit(X_inst)
             X_inst = self._scaler_inst.transform(X_inst)
-
-            self._scaler_alg = StandardScaler().fit(X_alg)
-            X_alg = self._scaler_alg.transform(X_alg)
 
         # Interaction-matrix SVD (learn shared latent space from performance Y)
         # Align performance rows with features and columns with algorithms
@@ -163,6 +159,8 @@ class CosineSelector(AbstractSelector):
                 if "init_params" in sig.parameters and "init_params" not in kwargs:
                     kwargs = {"init_params": kwargs}
             except Exception:
+                # Safely ignore any exception when inspecting the __init__ signature,
+                # as not all classes may have a standard signature or may not be inspectable.
                 pass
             proj = self._projection_model(**kwargs)
         else:
@@ -172,7 +170,6 @@ class CosineSelector(AbstractSelector):
         self._proj = proj
 
         self._alg_matrix = self._normalize_rows(alg_emb)
-        self._inst_matrix = self._normalize_rows(inst_emb)
 
     def _predict(self, features: pd.DataFrame) -> Dict[str, list[tuple[str, float]]]:
         """
