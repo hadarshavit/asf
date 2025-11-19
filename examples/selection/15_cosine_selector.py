@@ -58,7 +58,7 @@ def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
     baseline_preds = {idx: [(best, budget)] for idx in X_test.index}
     base_sr = evaluate_solve_rate(baseline_preds, Y_test, budget)
 
-    oracle_hits = (Y_test.min(axis=1) <= budget)
+    oracle_hits = Y_test.min(axis=1) <= budget
     oracle_sr = float(oracle_hits.mean())
 
     print("=" * 60)
