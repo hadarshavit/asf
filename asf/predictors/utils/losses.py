@@ -13,6 +13,8 @@ GAMMA_N_PARAMS = 2  # k, theta
 CAUCHY_N_PARAMS = 1  # loc, scale
 LEVY_N_PARAMS = 1  # scale
 BETA_N_PARAMS = 3  # alpha, beta
+BETAPRIME_N_PARAMS = 3  # alpha, beta, scale
+LOMAX_N_PARAMS = 2  # alpha, scale
 NORM_N_PARAMS = 2  # mu, sigma
 
 
@@ -195,4 +197,46 @@ def beta_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
         - torch.lgamma(beta)
         + torch.lgamma(alpha + beta)
     )
+    return -logpdf.mean()
+
+
+@torch.jit.script
+def betaprime_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
+    # y_pred[:,0] = scale (>0), y_pred[:,1] = alpha (>0), y_pred[:,2] = beta (>0)
+    # Support: y_true > 0
+    scale = y_pred[:, 0]
+    scale = torch.reshape(scale, [-1, 1])
+    alpha = y_pred[:, 1]
+    alpha = torch.reshape(alpha, [-1, 1])
+    beta = y_pred[:, 2]
+    beta = torch.reshape(beta, [-1, 1])
+
+    eps = 1e-12
+    x = y_true / scale
+    x = torch.clamp(x, min=eps)
+
+    # logpdf_scaled(x*scale) = -log(scale) + (alpha-1)*log(x) - (alpha+beta)*log(1+x) - lgamma(alpha) - lgamma(beta) + lgamma(alpha+beta)
+    logpdf = (
+        -torch.log(scale)
+        + (alpha - 1.0) * torch.log(x)
+        - (alpha + beta) * torch.log1p(x)
+        - torch.lgamma(alpha)
+        - torch.lgamma(beta)
+        + torch.lgamma(alpha + beta)
+    )
+    return -logpdf.mean()
+
+
+@torch.jit.script
+def lomax_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
+    # y_pred[:,0] = alpha (>0), y_pred[:,1] = scale (>0); support y_true >= 0
+    alpha = y_pred[:, 0]
+    alpha = torch.reshape(alpha, [-1, 1])
+    scale = y_pred[:, 1]
+    scale = torch.reshape(scale, [-1, 1])
+
+    z = y_true / scale
+    z = torch.clamp(z, min=0.0)
+    # logpdf = log(alpha) - log(scale) - (alpha+1)*log(1+z)
+    logpdf = torch.log(alpha) - torch.log(scale) - (alpha + 1.0) * torch.log1p(z)
     return -logpdf.mean()

@@ -15,6 +15,8 @@ from asf.predictors.utils.losses import (
     cauchy_loss,
     levy_loss,
     beta_loss,
+    betaprime_loss,
+    lomax_loss,
 )
 
 
@@ -292,6 +294,62 @@ def test_beta_loss_matches_scipy():
     scipy_nll = 0.0
     for i in range(N):
         logpdf = stats.beta.logpdf(y_true_np[i], a=a_np[i], b=b_np[i], scale=scale_np[i])
+        scipy_nll -= logpdf
+    scipy_nll /= N
+
+    assert abs(scipy_nll - ours) < 1e-5
+
+
+def test_betaprime_loss_matches_scipy():
+    """Test that betaprime_loss matches scipy.stats.betaprime with scaling."""
+    torch.manual_seed(42)
+    np.random.seed(42)
+
+    N = 256
+    y_true = _rand_pos((N, 1), low=0.05, high=5.0)
+    alpha = _rand_pos((N, 1), low=0.5, high=5.0)
+    beta = _rand_pos((N, 1), low=0.5, high=5.0)
+    scale = _rand_pos((N, 1), low=0.2, high=3.0)
+    y_pred = torch.cat([scale, alpha, beta], dim=1)
+
+    ours = float(betaprime_loss(y_true, y_pred))
+
+    y_true_np = y_true.numpy().flatten()
+    alpha_np = alpha.numpy().flatten()
+    beta_np = beta.numpy().flatten()
+    scale_np = scale.numpy().flatten()
+
+    scipy_nll = 0.0
+    for i in range(N):
+        z = y_true_np[i] / scale_np[i]
+        logpdf_std = stats.betaprime.logpdf(z, a=alpha_np[i], b=beta_np[i])
+        logpdf_scaled = logpdf_std - math.log(scale_np[i])
+        scipy_nll -= logpdf_scaled
+    scipy_nll /= N
+
+    assert abs(scipy_nll - ours) < 1e-5
+
+
+def test_lomax_loss_matches_scipy():
+    """Test that lomax_loss matches scipy.stats.lomax exactly."""
+    torch.manual_seed(42)
+    np.random.seed(42)
+
+    N = 256
+    y_true = _rand_pos((N, 1), low=0.0, high=5.0)  # support x>=0
+    alpha = _rand_pos((N, 1), low=0.5, high=5.0)  # shape
+    scale = _rand_pos((N, 1), low=0.2, high=3.0)  # scale
+    y_pred = torch.cat([alpha, scale], dim=1)
+
+    ours = float(lomax_loss(y_true, y_pred))
+
+    y_true_np = y_true.numpy().flatten()
+    alpha_np = alpha.numpy().flatten()
+    scale_np = scale.numpy().flatten()
+
+    scipy_nll = 0.0
+    for i in range(N):
+        logpdf = stats.lomax.logpdf(y_true_np[i], c=alpha_np[i], scale=scale_np[i])
         scipy_nll -= logpdf
     scipy_nll /= N
 
