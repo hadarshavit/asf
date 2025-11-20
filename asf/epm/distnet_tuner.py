@@ -149,6 +149,7 @@ def tune_distnet(
                     else np.asarray(y_test),
                     dtype=torch.float32,
                 )
+
                 loss_val = loss_fn(y_true, preds).item()
             fold_losses.append(loss_val)
 

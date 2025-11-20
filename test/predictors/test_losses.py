@@ -117,17 +117,14 @@ def test_invgauss_loss_matches_scipy():
     scipy_nll = 0.0
     for i in range(N):
         logpdf = stats.invgauss.logpdf(
-            y_true_np[i], mu=mu_np[i] / lam_np[i], scale=lam_np[i]
+            y_true_np[i], mu=mu_np[i], scale=lam_np[i]
         )
         scipy_nll -= logpdf
     scipy_nll /= N
 
-    # Our implementation differs from scipy by: 0.5*log(lambda) + 0.5*log(2*pi) per sample
-    # Since lambda varies per sample, compute the average offset
-    expected_offset = np.mean(0.5 * np.log(lam_np) + 0.5 * np.log(2.0 * np.pi))
     diff = scipy_nll - ours
 
-    assert abs(diff - expected_offset) < 1e-5
+    assert abs(diff) < 1e-5
 
 
 def test_weibull_loss_matches_scipy():
@@ -323,8 +320,7 @@ def test_betaprime_loss_matches_scipy():
     for i in range(N):
         z = y_true_np[i] / scale_np[i]
         logpdf_std = stats.betaprime.logpdf(z, a=alpha_np[i], b=beta_np[i])
-        logpdf_scaled = logpdf_std - math.log(scale_np[i])
-        scipy_nll -= logpdf_scaled
+        scipy_nll -= logpdf_std
     scipy_nll /= N
 
     assert abs(scipy_nll - ours) < 1e-5

@@ -68,24 +68,43 @@ def lognorm_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     help1 = 0.5 * torch.pow(help1 / s, 2)
 
     # add terms (not multiplying them)
-    lh = -torch.log(s) - log_true - help1 - 0.5 * torch.log(2.0 * torch.pi)
+    lh = -torch.log(s) - log_true - help1 - 0.5 * torch.log(torch.tensor(2.0) * torch.pi)
 
     return -lh.mean()
 
 
 @torch.jit.script
 def invgauss_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
-    mu = y_pred[:, 0]
-    mu = torch.reshape(mu, [-1, 1])
+    # y_pred[:,0] = mu_scipy (>0), y_pred[:,1] = scale (lambda >0)
+    # Reference: scipy.stats.invgauss with parameters mu_scipy and scale_scipy such that
+    # mean = scale_scipy * mu_scipy and shape (lambda) = scale_scipy.
+    # We match scipy parameterization: y_pred[:,0] is mu_scipy, so mean = y_pred[:,0] * y_pred[:,1].
+    nu = y_pred[:, 0]
+    lam = y_pred[:, 1]
+    mu = nu * lam  # mean
+    y = y_true[:, 0]
 
-    scale = y_pred[:, 1]
-    scale = torch.reshape(scale, [-1, 1])
+    # Ensure positivity to avoid numerical issues
+    eps = 1e-12
+    mu = torch.clamp(mu, min=eps)
+    lam = torch.clamp(lam, min=eps)
+    y = torch.clamp(y, min=eps)
 
-    help1 = torch.log(scale)  # corresponds to sqrt(lambda) term
-    help2 = 1.5 * torch.log(y_true)  # corresponds to x
-    help3 = scale * torch.pow(y_true - mu, 2) / (2 * y_true * torch.pow(mu, 2))
-    lh = help1 - help2 - help3
-    return -lh.mean()
+    # Negative log-likelihood of inverse Gaussian (per-sample):
+    # 0.5*log(2*pi) - 0.5*log(lambda) + 1.5*log(y)
+    #   + lambda * (y - mu)^2 / (2 * mu^2 * y)
+    # However scipy.stats.invgauss uses a different parameterization.
+    # Derive the formula consistent with scipy's logpdf for invgauss when
+    # calling stats.invgauss.logpdf(x, mu=scipy_mu, scale=scipy_scale)
+    # For our parameterization (mu_mean, lambda_shape):
+    # The pdf is: sqrt(lambda / (2*pi*y^3)) * exp(-lambda * (y - mu)^2 / (2 * mu^2 * y))
+    # So negative log-likelihood per sample is:
+    # 0.5 * (math.log(2*pi) - torch.log(lam) + 3*torch.log(y)) + lam * (y - mu)**2 / (2 * mu**2 * y)
+    # Simplify and implement with torch
+    const_term = 0.5 * (torch.log(torch.tensor(2.0)) + torch.log(torch.tensor(torch.pi)))
+    nll = const_term - 0.5 * torch.log(lam) + 1.5 * torch.log(y) + lam * (y - mu) ** 2 / (2.0 * mu ** 2 * y)
+
+    return torch.mean(nll)
 
 
 @torch.jit.script
@@ -101,7 +120,7 @@ def exp_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 
     return -lh.mean()
 
-
+@torch.jit.script
 def weibull_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     c = y_pred[:, 0]  # shape parameter
     c = torch.reshape(c, [-1, 1])
@@ -129,7 +148,7 @@ def normal_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     sigma = torch.reshape(sigma, [-1, 1])
     # logpdf = -0.5*log(2*pi) - log(sigma) - (y-mu)^2/(2*sigma^2)
     diff = y_true - mu
-    logpdf = -0.5 * torch.log(2.0 * torch.pi) - torch.log(sigma) - torch.pow(diff, 2) / (2.0 * torch.pow(sigma, 2))
+    logpdf = -0.5 * torch.log(torch.tensor(2.0 * torch.pi)) - torch.log(sigma) - torch.pow(diff, 2) / (2.0 * torch.pow(sigma, 2))
     return -logpdf.mean()
 
 
@@ -154,7 +173,7 @@ def cauchy_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     scale = torch.reshape(scale, [-1, 1])
     # logpdf = -log(pi) - log(scale) - log(1 + ((x-loc)/scale)^2)
     z = (y_true) / scale
-    logpdf = -torch.log(torch.pi) - torch.log(scale) - torch.log(1.0 + torch.pow(z, 2))
+    logpdf = -torch.log(torch.tensor(torch.pi)) - torch.log(scale) - torch.log(1.0 + torch.pow(z, 2))
     return -logpdf.mean()
 
 
@@ -217,8 +236,7 @@ def betaprime_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 
     # logpdf_scaled(x*scale) = -log(scale) + (alpha-1)*log(x) - (alpha+beta)*log(1+x) - lgamma(alpha) - lgamma(beta) + lgamma(alpha+beta)
     logpdf = (
-        -torch.log(scale)
-        + (alpha - 1.0) * torch.log(x)
+        (alpha - 1.0) * torch.log(x)
         - (alpha + beta) * torch.log1p(x)
         - torch.lgamma(alpha)
         - torch.lgamma(beta)
