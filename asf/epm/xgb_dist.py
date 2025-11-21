@@ -35,6 +35,7 @@ class XGBDistNet:
         batch_size: int | None = 1000,
         output_activation=ExpActivation(),
         stabilization: str = "MAD",
+        use_start_values: bool = True,
         **kwargs
     ):
         self.loss_function = loss_function
@@ -42,6 +43,7 @@ class XGBDistNet:
         self.batch_size = batch_size
         self.output_activation = output_activation
         self.stabilization = stabilization
+        self.use_start_values = use_start_values
         self.kwargs = kwargs
 
     def stabilize_derivative(self, input_der: torch.Tensor, type: str = "MAD") -> torch.Tensor:
@@ -280,9 +282,13 @@ class XGBDistNet:
         X = np.concatenate([[x for i in range(y.shape[1])] for x in X])
         y = y.flatten()
         
-        # Calculate optimal starting values
-        start_values = self.calculate_start_values(y, max_iter=50)
-        print(f"Calculated start values (pre-activation): {start_values}")
+        # Calculate optimal starting values if enabled
+        if self.use_start_values:
+            start_values = self.calculate_start_values(y, max_iter=50)
+            print(f"Calculated start values (pre-activation): {start_values}")
+        else:
+            start_values = np.zeros(self.n_loss_params)
+            print(f"Using zero initialization (start values disabled)")
         
         # Set base_margin: replicate start values for all samples
         # Shape should be (n_samples, n_targets) for multi-output or (n_samples,) for single output
@@ -441,6 +447,14 @@ class XGBDistNet:
         multi_strategy = Categorical(
             f"{prefix}:multi_strategy", ["one_output_per_tree", "multi_output_tree"]
         )
+        stabilization = Categorical(
+            f"{prefix}:stabilization", ["None", "MAD", "L2"],
+            default="MAD"
+        )
+        use_start_values = Categorical(
+            f"{prefix}:use_start_values", [True, False],
+            default=True
+        )
 
         params = [
             booster,
@@ -452,7 +466,9 @@ class XGBDistNet:
             lambda_param,
             alpha,
             learning_rate,
-            multi_strategy
+            multi_strategy,
+            stabilization,
+            use_start_values
         ]
         if parent_param is not None:
             conditions = [
@@ -508,6 +524,8 @@ class XGBDistNet:
             "alpha": configuration[f"{prefix}:alpha"],
             "learning_rate": configuration[f"{prefix}:learning_rate"],
             "multi_strategy": configuration[f"{prefix}:multi_strategy"],
+            "stabilization": configuration[f"{prefix}:stabilization"],
+            "use_start_values": configuration[f"{prefix}:use_start_values"],
             **kwargs,
         }
 
