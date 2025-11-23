@@ -279,7 +279,7 @@ def test_beta_loss_matches_scipy():
     # Sample u in (0,1) away from boundaries, then y = scale * u
     u = torch.clamp(torch.rand((N, 1)), 1e-6, 1.0 - 1e-6)
     y_true = scale * u
-    y_pred = torch.cat([scale, alpha, beta], dim=1)
+    y_pred = torch.cat([alpha, beta, scale], dim=1)
 
     ours = float(beta_loss(y_true, y_pred))
 
@@ -307,7 +307,7 @@ def test_betaprime_loss_matches_scipy():
     alpha = _rand_pos((N, 1), low=0.5, high=5.0)
     beta = _rand_pos((N, 1), low=0.5, high=5.0)
     scale = _rand_pos((N, 1), low=0.2, high=3.0)
-    y_pred = torch.cat([scale, alpha, beta], dim=1)
+    y_pred = torch.cat([alpha, beta, scale], dim=1)
 
     ours = float(betaprime_loss(y_true, y_pred))
 

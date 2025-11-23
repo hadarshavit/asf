@@ -398,7 +398,7 @@ class XGBDistNet:
         booster = Constant(f"{prefix}:booster", "gbtree")
         n_estimators = Integer(
             f"{prefix}:n_estimators",
-            (10, 2000),
+            (8, 128),
             log=True,
             default=100,
         )
@@ -406,7 +406,7 @@ class XGBDistNet:
             f"{prefix}:max_depth",
             (1, 20),
             log=False,
-            default=13,
+            default=5,
         )
         min_child_weight = Integer(
             f"{prefix}:min_child_weight",
@@ -428,19 +428,19 @@ class XGBDistNet:
         )
         lambda_param = Float(
             f"{prefix}:lambda",
-            (0.001, 1000),
+            (0.001, 100),
             log=True,
             default=31.393252465064943,
         )
         alpha = Float(
             f"{prefix}:alpha",
-            (0.001, 1000),
+            (0.001, 100),
             log=True,
             default=0.24167936088332426,
         )
         learning_rate = Float(
             f"{prefix}:learning_rate",
-            (0.001, 0.1),
+            (0.001, 0.3),
             log=True,
             default=0.008237525103357958,
         )

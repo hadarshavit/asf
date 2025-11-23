@@ -195,12 +195,12 @@ def levy_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 def beta_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     # y_pred[:,0] = scale (>0), y_pred[:,1] = alpha (>0), y_pred[:,2] = beta (>0)
     # Support: y_true in (0, scale)
-    scale = y_pred[:, 0]
-    scale = torch.reshape(scale, [-1, 1])
-    alpha = y_pred[:, 1]
+    alpha = y_pred[:, 0]
     alpha = torch.reshape(alpha, [-1, 1])
-    beta = y_pred[:, 2]
+    beta = y_pred[:, 1]
     beta = torch.reshape(beta, [-1, 1])
+    scale = y_pred[:, 2]
+    scale = torch.reshape(scale, [-1, 1])
 
     # Transform to standard Beta support via x = y/scale
     eps = 1e-12
@@ -223,12 +223,12 @@ def beta_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 def betaprime_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     # y_pred[:,0] = scale (>0), y_pred[:,1] = alpha (>0), y_pred[:,2] = beta (>0)
     # Support: y_true > 0
-    scale = y_pred[:, 0]
-    scale = torch.reshape(scale, [-1, 1])
-    alpha = y_pred[:, 1]
+    alpha = y_pred[:, 0]
     alpha = torch.reshape(alpha, [-1, 1])
-    beta = y_pred[:, 2]
+    beta = y_pred[:, 1]
     beta = torch.reshape(beta, [-1, 1])
+    scale = y_pred[:, 2]
+    scale = torch.reshape(scale, [-1, 1])
 
     eps = 1e-12
     x = y_true / scale
