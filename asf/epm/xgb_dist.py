@@ -11,12 +11,12 @@ from asf.predictors.utils.mlp import ExpActivation
 
 try:
     from ConfigSpace import (
+        Categorical,
         ConfigurationSpace,
         Constant,
         EqualsCondition,
         Float,
         Integer,
-        Categorical
     )
     from ConfigSpace.hyperparameters import Hyperparameter
 
@@ -36,7 +36,7 @@ class XGBDistNet:
         output_activation=ExpActivation(),
         stabilization: str = "MAD",
         use_start_values: bool = True,
-        **kwargs
+        **kwargs,
     ):
         self.loss_function = loss_function
         self.n_loss_params = n_loss_params
@@ -46,21 +46,23 @@ class XGBDistNet:
         self.use_start_values = use_start_values
         self.kwargs = kwargs
 
-    def stabilize_derivative(self, input_der: torch.Tensor, type: str = "MAD") -> torch.Tensor:
+    def stabilize_derivative(
+        self, input_der: torch.Tensor, type: str = "MAD"
+    ) -> torch.Tensor:
         """
         Stabilize Gradients and Hessians to ensure they are comparable in magnitude.
-        
-        As XGBoost updates parameter estimates by optimizing Gradients and Hessians, 
+
+        As XGBoost updates parameter estimates by optimizing Gradients and Hessians,
         it is important that these are comparable in magnitude for all distributional parameters.
         Due to imbalances regarding the ranges, the estimation might become unstable.
-        
+
         Parameters
         ----------
         input_der : torch.Tensor
             Input derivative, either Gradient or Hessian.
         type: str
             Stabilization method. Can be either "None", "MAD" or "L2".
-        
+
         Returns
         -------
         stab_der : torch.Tensor
@@ -79,7 +81,7 @@ class XGBDistNet:
             stab_der = input_der / div
         else:  # type == "None"
             stab_der = torch.nan_to_num(input_der, nan=float(torch.nanmean(input_der)))
-        
+
         return stab_der
 
     def objective(self, data, preds):
@@ -116,12 +118,20 @@ class XGBDistNet:
             # Apply stabilization
             if self.stabilization != "None":
                 if grad_raw.dim() == 1:
-                    grad_raw = self.stabilize_derivative(grad_raw, type=self.stabilization)
-                    hess_raw = self.stabilize_derivative(hess_raw, type=self.stabilization)
+                    grad_raw = self.stabilize_derivative(
+                        grad_raw, type=self.stabilization
+                    )
+                    hess_raw = self.stabilize_derivative(
+                        hess_raw, type=self.stabilization
+                    )
                 else:
                     for d in range(grad_raw.shape[1]):
-                        grad_raw[:, d] = self.stabilize_derivative(grad_raw[:, d], type=self.stabilization)
-                        hess_raw[:, d] = self.stabilize_derivative(hess_raw[:, d], type=self.stabilization)
+                        grad_raw[:, d] = self.stabilize_derivative(
+                            grad_raw[:, d], type=self.stabilization
+                        )
+                        hess_raw[:, d] = self.stabilize_derivative(
+                            hess_raw[:, d], type=self.stabilization
+                        )
 
             # Return 2D shapes (n_samples, n_targets) as required by XGBoost 2.1+
             grad = grad_raw.detach().numpy()
@@ -177,8 +187,12 @@ class XGBDistNet:
                     hess = self.stabilize_derivative(hess, type=self.stabilization)
                 else:
                     for d in range(grad.shape[1]):
-                        grad[:, d] = self.stabilize_derivative(grad[:, d], type=self.stabilization)
-                        hess[:, d] = self.stabilize_derivative(hess[:, d], type=self.stabilization)
+                        grad[:, d] = self.stabilize_derivative(
+                            grad[:, d], type=self.stabilization
+                        )
+                        hess[:, d] = self.stabilize_derivative(
+                            hess[:, d], type=self.stabilization
+                        )
 
             # Return 2D arrays
             grad = grad.numpy()
@@ -191,17 +205,17 @@ class XGBDistNet:
     ) -> np.ndarray:
         """
         Calculate optimal starting values for distributional parameters.
-        
+
         Fits unconditional distribution parameters using L-BFGS optimization
         to provide good initialization for XGBoost.
-        
+
         Parameters
         ----------
         target : np.ndarray
             Flattened target values
         max_iter : int
             Maximum iterations for L-BFGS optimizer
-            
+
         Returns
         -------
         start_values : np.ndarray
@@ -209,64 +223,68 @@ class XGBDistNet:
         """
         from torch.optim import LBFGS
         from torch.optim.lr_scheduler import ReduceLROnPlateau
-        
+
         # Convert target to tensor
         target_tensor = torch.tensor(target, dtype=torch.float32).reshape(-1, 1)
-        
+
         # Initialize parameters in pre-activation space (all start at 0.5)
-        params = [torch.tensor(0.5, requires_grad=True) for _ in range(self.n_loss_params)]
-        
+        params = [
+            torch.tensor(0.5, requires_grad=True) for _ in range(self.n_loss_params)
+        ]
+
         # Setup optimizer
         optimizer = LBFGS(
             params,
             lr=0.1,
             max_iter=np.min([int(max_iter / 4), 20]),
-            line_search_fn="strong_wolfe"
+            line_search_fn="strong_wolfe",
         )
         lr_scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=10)
-        
+
         # Define closure for L-BFGS
         def closure():
             optimizer.zero_grad()
-            
+
             # Handle NaN/Inf
             params_stack = torch.stack(params)
             nan_inf_idx = torch.isnan(params_stack) | torch.isinf(params_stack)
             params_clean = torch.where(nan_inf_idx, torch.tensor(0.5), params_stack)
-            
+
             # Apply activation function
             params_activated = [
                 self.output_activation(params_clean[i].reshape(-1, 1))
                 for i in range(self.n_loss_params)
             ]
-            
+
             # Stack to shape (1, n_loss_params) for loss function
             if self.n_loss_params == 1:
                 params_tensor = params_activated[0]
             else:
                 params_tensor = torch.cat(params_activated, dim=1)
-            
+
             # Replicate for all targets
             params_replicated = params_tensor.repeat(len(target_tensor), 1)
-            
+
             # Compute loss
             loss = self.loss_function(target_tensor, params_replicated)
             loss.backward()
             return loss
-        
+
         # Optimize
         loss_vals = []
         for epoch in range(max_iter):
             loss = optimizer.step(closure)
             lr_scheduler.step(loss)
             loss_vals.append(loss.item())
-        
+
         # Extract final start values (in pre-activation space)
-        start_values = np.array([params[i].detach().numpy() for i in range(self.n_loss_params)])
-        
+        start_values = np.array(
+            [params[i].detach().numpy() for i in range(self.n_loss_params)]
+        )
+
         # Replace any remaining NaN/Inf with 0.5
         start_values = np.nan_to_num(start_values, nan=0.5, posinf=0.5, neginf=0.5)
-        
+
         return start_values
 
     def fit(
@@ -276,12 +294,12 @@ class XGBDistNet:
     ):
         if isinstance(X, pd.DataFrame) or isinstance(X, pd.Series):
             X = X.values
-            
+
         if isinstance(y, pd.DataFrame) or isinstance(y, pd.Series):
             y = y.values
         X = np.concatenate([[x for i in range(y.shape[1])] for x in X])
         y = y.flatten()
-        
+
         # Calculate optimal starting values if enabled
         if self.use_start_values:
             start_values = self.calculate_start_values(y, max_iter=50)
@@ -289,14 +307,14 @@ class XGBDistNet:
         else:
             start_values = np.zeros(self.n_loss_params)
             print(f"Using zero initialization (start values disabled)")
-        
+
         # Set base_margin: replicate start values for all samples
         # Shape should be (n_samples, n_targets) for multi-output or (n_samples,) for single output
         if self.n_loss_params == 1:
             base_margin = np.full(len(y), start_values[0])
         else:
             base_margin = np.tile(start_values, (len(y), 1))
-        
+
         def _eval_metric(y_true_np: np.ndarray, y_pred_np: np.ndarray) -> float:
             if self.n_loss_params == 1:
                 y_pred_np = y_pred_np.reshape(-1, 1)
@@ -307,15 +325,14 @@ class XGBDistNet:
             activated = self.output_activation(y_pred_t)
 
             return float(self.loss_function(y_true_t, activated))
-        
+
         self.model = xgb.XGBRegressor(
             objective=self.objective,
             eval_metric=_eval_metric,
             num_target=self.n_loss_params,
-            
             **self.kwargs,
         )
-        
+
         # Store start values for prediction
         self.start_values = start_values
 
@@ -333,19 +350,18 @@ class XGBDistNet:
             base_margin_pred = np.full(n_samples, self.start_values[0])
         else:
             base_margin_pred = np.tile(self.start_values, (n_samples, 1))
-        
+
         predictions = self.model.predict(X, base_margin=base_margin_pred)
         # Ensure strictly positive, numerically stable distribution parameters
         preds_tensor = self.output_activation(torch.from_numpy(predictions))
         preds_tensor = torch.clamp(preds_tensor, min=1e-12)
         predictions = preds_tensor.numpy()
 
-
         if self.n_loss_params == 1:
             predictions = predictions.reshape(-1, 1)
 
         return predictions
-    
+
     def save(self, path: str):
         """Save the XGBDistNet model to a file.
 
@@ -396,12 +412,7 @@ class XGBDistNet:
             prefix = XGBDistNet.PREFIX
 
         booster = Constant(f"{prefix}:booster", "gbtree")
-        n_estimators = Integer(
-            f"{prefix}:n_estimators",
-            (8, 128),
-            log=True,
-            default=100,
-        )
+        n_estimators = Constant(f"{prefix}:n_estimators", 2000)
         max_depth = Integer(
             f"{prefix}:max_depth",
             (1, 20),
@@ -448,12 +459,10 @@ class XGBDistNet:
             f"{prefix}:multi_strategy", ["one_output_per_tree", "multi_output_tree"]
         )
         stabilization = Categorical(
-            f"{prefix}:stabilization", ["None", "MAD", "L2"],
-            default="MAD"
+            f"{prefix}:stabilization", ["None", "MAD", "L2"], default="MAD"
         )
         use_start_values = Categorical(
-            f"{prefix}:use_start_values", [True, False],
-            default=True
+            f"{prefix}:use_start_values", [True, False], default=True
         )
 
         params = [
@@ -468,7 +477,7 @@ class XGBDistNet:
             learning_rate,
             multi_strategy,
             stabilization,
-            use_start_values
+            use_start_values,
         ]
         if parent_param is not None:
             conditions = [
