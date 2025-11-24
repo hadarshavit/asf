@@ -96,11 +96,17 @@ class CSHCSelector(AbstractSelector):
                     runtime = Y_val.at[inst_name, chosen_algo]
 
                     inst_feature_df = X_val.loc[[inst_name]]
-
                     guardian_for_choice = fold_guardians.get(chosen_algo)
 
                     if guardian_for_choice:
-                        prob = guardian_for_choice.predict_proba(inst_feature_df)[0, 1]
+                        if len(guardian_for_choice.classes_) == 1:
+                            class_val = guardian_for_choice.classes_[0]
+                            prob = 1.0 if class_val == 1 else 0.0
+                        else:
+                            prob = guardian_for_choice.predict_proba(inst_feature_df)[
+                                0, 1
+                            ]
+
                         oof_probs.append(prob)
                         oof_true_success.append(
                             1 if pd.notna(runtime) and runtime <= self.budget else 0
@@ -156,13 +162,17 @@ class CSHCSelector(AbstractSelector):
             chosen_algo_primary = pred_list[0][0]
 
             guardian_for_choice = self.guardians.get(chosen_algo_primary)
-            prob_success = (
-                guardian_for_choice.predict_proba(inst_feature_df)[0, 1]
-                if guardian_for_choice
-                else 0.0
-            )
+            prob_success = 0.0
+            if guardian_for_choice:
+                if len(guardian_for_choice.classes_) == 1:
+                    prob_success = 1.0 if guardian_for_choice.classes_[0] == 1 else 0.0
+                else:
+                    prob_success = guardian_for_choice.predict_proba(inst_feature_df)[
+                        0, 1
+                    ]
 
             if prob_success >= self.threshold:
+                # Trust primary
                 final_preds[inst_name] = [(chosen_algo_primary, self.budget)]
             elif self.backup_selector:
                 backup_pred = self.backup_selector.predict(inst_feature_df)
@@ -173,7 +183,10 @@ class CSHCSelector(AbstractSelector):
                 best_algo = chosen_algo_primary
                 max_prob = -1.0
                 for algo, guardian in self.guardians.items():
-                    prob = guardian.predict_proba(inst_feature_df)[0, 1]
+                    if len(guardian.classes_) == 1:
+                        prob = 1.0 if guardian.classes_[0] == 1 else 0.0
+                    else:
+                        prob = guardian.predict_proba(inst_feature_df)[0, 1]
                     if prob > max_prob:
                         max_prob = prob
                         best_algo = algo
