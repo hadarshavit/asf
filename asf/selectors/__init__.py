@@ -18,6 +18,8 @@ from asf.selectors.snnap import SNNAP
 from asf.selectors.selector_tuner import tune_selector
 from asf.selectors.satzilla import SATzilla
 from asf.selectors.osl_linear import OSLLinearSelector
+from asf.selectors.cshc import CSHCSelector
+from asf.selectors.cosine_selector import CosineSelector
 
 __all__ = [
     "PairwiseClassifier",
@@ -39,4 +41,6 @@ __all__ = [
     "ISAC",
     "SNNAP",
     "OSLLinearSelector",
+    "CSHCSelector",
+    "CosineSelector",
 ]

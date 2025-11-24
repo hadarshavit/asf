@@ -31,6 +31,7 @@ from asf.selectors.isa import ISA
 from asf.selectors.meta_selector import MetaSelector
 from asf.selectors.osl_linear import OSLLinearSelector
 from asf.selectors.cosine_selector import CosineSelector
+from asf.selectors.cshc import CSHCSelector
 from asf.predictors.random_forest import RandomForestRegressorWrapper
 
 
@@ -284,6 +285,43 @@ def test_meta_selector_rejects_schedule_base(dummy_performance, dummy_features):
             meta_selector=SimpleRanking(model_class=XGBRanker, budget=budget),
             budget=budget,
         )
+
+
+def test_cshc_selector_with_backup(dummy_performance, dummy_features):
+    budget = 450.0
+
+    primary_selector = SNNAP(k=3, budget=budget)
+    backup_selector = ISAC(budget=budget)
+
+    selector = CSHCSelector(
+        primary_selector=primary_selector,
+        backup_selector=backup_selector,
+        budget=budget,
+        n_folds=2,
+        random_state=42,
+    )
+
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+    validate_predictions(predictions)
+
+
+def test_cshc_selector_no_backup(dummy_performance, dummy_features):
+    budget = 450.0
+
+    primary_selector = SNNAP(k=3, budget=budget)
+
+    selector = CSHCSelector(
+        primary_selector=primary_selector,
+        backup_selector=None,
+        budget=budget,
+        n_folds=2,
+        random_state=42,
+    )
+
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+    validate_predictions(predictions)
 
 
 def test_selector_tuner(dummy_performance, dummy_features):
