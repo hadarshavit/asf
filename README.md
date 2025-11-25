@@ -13,7 +13,7 @@ ASF is a modular framework that allows easy extensions to tailor made an algorit
 While ASF includes several built-in machine learning models through scikit-learn and XGBoost, it supports every model that complies with the scikit-learn API.
 ASF also implements empirical performance prediction, allowing to use different performance scalings.
 
-ASF is written in Python 3 and is intended to use with Python 3.10+. It requires only scikit-learn, NumPy as Pandas as basic requirements. More advanced features (such as hyperparameter optimisation) requires additional dependencies. 
+ASF is written in Python 3 and is intended to use with Python 3.10+. It requires only scikit-learn, NumPy and Pandas as basic requirements. More advanced features (such as hyperparameter optimisation) requires additional dependencies. 
 
 You can find full documentation in: https://hadarshavit.github.io/asf/
 ## Installation
@@ -40,7 +40,7 @@ Additional options include:
 
 The first step is to define a the data. It can be either NumPy array or Pandas DataFrame.
 The data contains of (at least) two matrices. The first defines the instance features with a row for every instance and each column defines one feature.
-The second is the performance data, which for which every row describes an instance and each column the performance of a single algorithm.
+The second is the performance data, for which every row describes an instance and each column the performance of a single algorithm.
 
 Here, we define some toy data on three instances, three features and three algorithms.
 
