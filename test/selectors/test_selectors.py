@@ -30,6 +30,8 @@ from asf.selectors.snnap import SNNAP
 from asf.selectors.isa import ISA
 from asf.selectors.meta_selector import MetaSelector
 from asf.selectors.osl_linear import OSLLinearSelector
+from asf.selectors.cosine_selector import CosineSelector
+from asf.predictors.random_forest import RandomForestRegressorWrapper
 
 
 @pytest.fixture
@@ -393,3 +395,44 @@ def test_osl_linear_selector(dummy_performance, dummy_features):
         assert algo in ["algo1", "algo2", "algo3"] or algo is None
         assert isinstance(score, (int, float, np.floating, np.integer))
         assert score >= 0
+
+
+def test_cosine_selector_default_ridge(dummy_performance, dummy_features):
+    # simple algorithm feature matrix matching performance columns
+    alg_df = pd.DataFrame(
+        [
+            [1.0, 0.0],
+            [0.0, 1.0],
+            [0.5, 0.5],
+        ],
+        index=["algo1", "algo2", "algo3"],
+        columns=["af1", "af2"],
+    )
+
+    sel = CosineSelector(shared_latent_dim=2, normalize_features=True, budget=450.0)
+    sel.fit(dummy_features, dummy_performance, alg_df)
+    preds = sel.predict(dummy_features)
+    validate_predictions(preds)
+
+
+def test_cosine_selector_random_forest(dummy_performance, dummy_features):
+    alg_df = pd.DataFrame(
+        [
+            [1.0, 0.0],
+            [0.0, 1.0],
+            [0.5, 0.5],
+        ],
+        index=["algo1", "algo2", "algo3"],
+        columns=["af1", "af2"],
+    )
+
+    sel = CosineSelector(
+        shared_latent_dim=2,
+        normalize_features=True,
+        projection_model=RandomForestRegressorWrapper,
+        projection_model_kwargs={"n_estimators": 10, "random_state": 42},
+        budget=450.0,
+    )
+    sel.fit(dummy_features, dummy_performance, alg_df)
+    preds = sel.predict(dummy_features)
+    validate_predictions(preds)
