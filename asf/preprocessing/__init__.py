@@ -10,6 +10,10 @@ from asf.preprocessing.performance_scaling import (
     DummyNormalization,
     BoxCoxNormalization,
 )
+from asf.preprocessing.feature_group_selector import (
+    FeatureGroupSelector,
+    MissingPrerequisiteGroupError,
+)
 
 
 __all__ = [
@@ -23,4 +27,6 @@ __all__ = [
     "NegExpNormalization",
     "DummyNormalization",
     "BoxCoxNormalization",
+    "FeatureGroupSelector",
+    "MissingPrerequisiteGroupError",
 ]

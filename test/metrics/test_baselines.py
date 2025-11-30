@@ -2,8 +2,10 @@ import math
 import warnings
 
 import pandas as pd
+import pytest
 
 from asf.metrics import baselines as m
+from asf.preprocessing.feature_group_selector import MissingPrerequisiteGroupError
 
 
 def test_single_best_solver_minimize_and_maximize():
@@ -130,3 +132,211 @@ def test_precision_regret_behaviors():
         res = m.precision_regret({"z": [("C", 1.0)]}, perf)
         assert math.isinf(res)
         assert any("No valid schedules" in str(w.message) for w in wlist)
+
+
+# ============================================================================
+# Feature Group Prerequisite Validation Tests
+# ============================================================================
+
+
+class TestSchedulePrerequisiteValidation:
+    """Tests for feature group prerequisite validation in schedules."""
+
+    @pytest.fixture
+    def feature_groups_with_prereqs(self):
+        """Feature groups with prerequisite dependencies."""
+        return {
+            "Pre": {"provides": ["f1", "f2"]},
+            "Basic": {"provides": ["f3", "f4"], "requires": ["Pre"]},
+            "CG": {"provides": ["f5", "f6"], "requires": ["Pre"]},
+            "Advanced": {"provides": ["f7"], "requires": ["Pre", "Basic"]},
+        }
+
+    @pytest.fixture
+    def performance(self):
+        """Sample performance data."""
+        return pd.DataFrame(
+            {
+                "algo1": [10.0, 20.0],
+                "algo2": [15.0, 10.0],
+            },
+            index=["inst1", "inst2"],
+        )
+
+    @pytest.fixture
+    def feature_time(self):
+        """Sample feature time data."""
+        return pd.DataFrame(
+            {
+                "Pre": [1.0, 1.0],
+                "Basic": [2.0, 2.0],
+                "CG": [3.0, 3.0],
+            },
+            index=["inst1", "inst2"],
+        )
+
+    def test_validate_schedule_valid_prereqs_first(self, feature_groups_with_prereqs):
+        """Valid schedule with prerequisites computed first."""
+        schedules = {
+            "inst1": ["Pre", "Basic", ("algo1", 100)],
+            "inst2": ["Pre", "CG", ("algo2", 100)],
+        }
+        # Should not raise
+        m._validate_schedule_prerequisites(schedules, feature_groups_with_prereqs)
+
+    def test_validate_schedule_missing_prereq(self, feature_groups_with_prereqs):
+        """Schedule with missing prerequisite should raise error."""
+        schedules = {
+            "inst1": ["Basic", ("algo1", 100)],  # Basic requires Pre
+        }
+        with pytest.raises(MissingPrerequisiteGroupError) as exc_info:
+            m._validate_schedule_prerequisites(schedules, feature_groups_with_prereqs)
+
+        assert "Basic" in str(exc_info.value)
+        assert "Pre" in str(exc_info.value)
+        assert "inst1" in str(exc_info.value)
+
+    def test_validate_schedule_prereq_after_dependent(
+        self, feature_groups_with_prereqs
+    ):
+        """Schedule with prerequisite appearing after dependent should raise."""
+        schedules = {
+            "inst1": ["Basic", "Pre", ("algo1", 100)],  # Pre must come before Basic
+        }
+        with pytest.raises(MissingPrerequisiteGroupError) as exc_info:
+            m._validate_schedule_prerequisites(schedules, feature_groups_with_prereqs)
+
+        assert "Basic" in str(exc_info.value)
+        assert "Pre" in str(exc_info.value)
+
+    def test_validate_schedule_no_feature_groups(self, feature_groups_with_prereqs):
+        """Schedule without feature groups should pass validation."""
+        schedules = {
+            "inst1": [("algo1", 100)],
+            "inst2": [("algo2", 50)],
+        }
+        # Should not raise
+        m._validate_schedule_prerequisites(schedules, feature_groups_with_prereqs)
+
+    def test_validate_schedule_chained_prereqs(self, feature_groups_with_prereqs):
+        """Schedule with chained prerequisites should validate correctly."""
+        # Advanced requires both Pre and Basic
+
+        # Valid: Pre -> Basic -> Advanced
+        valid_schedules = {
+            "inst1": ["Pre", "Basic", "Advanced", ("algo1", 100)],
+        }
+        m._validate_schedule_prerequisites(valid_schedules, feature_groups_with_prereqs)
+
+        # Invalid: Pre -> Advanced (missing Basic)
+        invalid_schedules = {
+            "inst1": ["Pre", "Advanced", ("algo1", 100)],
+        }
+        with pytest.raises(MissingPrerequisiteGroupError):
+            m._validate_schedule_prerequisites(
+                invalid_schedules, feature_groups_with_prereqs
+            )
+
+    def test_validate_schedule_unknown_group(self, feature_groups_with_prereqs):
+        """Unknown feature groups in schedule should be handled gracefully."""
+        schedules = {
+            "inst1": ["UnknownGroup", "Pre", ("algo1", 100)],
+        }
+        # Should not raise - unknown groups are ignored
+        m._validate_schedule_prerequisites(schedules, feature_groups_with_prereqs)
+
+
+class TestClosedGapPrerequisiteValidation:
+    """Tests for prerequisite validation in running_time_closed_gap."""
+
+    @pytest.fixture
+    def feature_groups_with_prereqs(self):
+        return {
+            "Pre": {"provides": ["f1"]},
+            "Basic": {"provides": ["f2"], "requires": ["Pre"]},
+        }
+
+    @pytest.fixture
+    def performance(self):
+        return pd.DataFrame(
+            {
+                "algo1": [10.0, 20.0],
+                "algo2": [15.0, 10.0],
+            },
+            index=["inst1", "inst2"],
+        )
+
+    @pytest.fixture
+    def feature_time(self):
+        return pd.DataFrame(
+            {
+                "Pre": [1.0, 1.0],
+                "Basic": [2.0, 2.0],
+            },
+            index=["inst1", "inst2"],
+        )
+
+    def test_closed_gap_valid_schedule(
+        self, feature_groups_with_prereqs, performance, feature_time
+    ):
+        """closed_gap with valid schedule should compute result."""
+        schedules = {
+            "inst1": ["Pre", "Basic", ("algo1", 100)],
+            "inst2": ["Pre", ("algo2", 100)],
+        }
+        result = m.running_time_closed_gap(
+            schedules,
+            performance,
+            budget=100,
+            feature_time=feature_time,
+            feature_groups=feature_groups_with_prereqs,
+        )
+        assert isinstance(result, float)
+
+    def test_closed_gap_invalid_schedule(
+        self, feature_groups_with_prereqs, performance, feature_time
+    ):
+        """closed_gap with invalid schedule should raise error."""
+        schedules = {
+            "inst1": ["Basic", ("algo1", 100)],  # Missing Pre
+            "inst2": ["Pre", ("algo2", 100)],
+        }
+        with pytest.raises(MissingPrerequisiteGroupError):
+            m.running_time_closed_gap(
+                schedules,
+                performance,
+                budget=100,
+                feature_time=feature_time,
+                feature_groups=feature_groups_with_prereqs,
+            )
+
+    def test_closed_gap_no_feature_groups_no_validation(
+        self, performance, feature_time
+    ):
+        """closed_gap without feature_groups should skip validation."""
+        # Invalid schedule that would fail validation
+        schedules = {
+            "inst1": ["Basic", ("algo1", 100)],
+            "inst2": [("algo2", 100)],
+        }
+        # Should not raise when feature_groups is None
+        result = m.running_time_closed_gap(
+            schedules,
+            performance,
+            budget=100,
+            feature_time=feature_time,
+            feature_groups=None,
+        )
+        assert isinstance(result, float)
+
+    def test_closed_gap_backward_compatible(self, performance, feature_time):
+        """closed_gap should work without feature_groups parameter (backward compat)."""
+        schedules = {
+            "inst1": [("algo1", 100)],
+            "inst2": [("algo2", 100)],
+        }
+        # Should work without feature_groups
+        result = m.running_time_closed_gap(
+            schedules, performance, budget=100, feature_time=feature_time
+        )
+        assert isinstance(result, float)
