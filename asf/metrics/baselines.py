@@ -3,7 +3,12 @@ import warnings
 import numpy as np
 
 
-def single_best_solver(performance: pd.DataFrame, maximize: bool = False) -> float:
+def single_best_solver(
+    performance: pd.DataFrame,
+    maximize: bool = False,
+    budget: float = 5000.0,
+    par: float = 10,
+) -> float:
     """
     Selects the single best solver across all instances based on the aggregated performance.
 
@@ -15,14 +20,22 @@ def single_best_solver(performance: pd.DataFrame, maximize: bool = False) -> flo
     Returns:
         float: The best aggregated performance value across all instances.
     """
-    perf_sum = performance.sum(axis=0)
+    if budget is not None and par is not None:
+        performance = np.where(performance <= budget, performance, budget * par)
+
+    perf_sum = np.sum(performance, axis=0)
     if maximize:
-        return perf_sum.max()
+        return np.max(perf_sum)
     else:
-        return perf_sum.min()
+        return np.min(perf_sum)
 
 
-def virtual_best_solver(performance: pd.DataFrame, maximize: bool = False) -> float:
+def virtual_best_solver(
+    performance: pd.DataFrame,
+    maximize: bool = False,
+    budget: float = 5000.0,
+    par: float = 10,
+) -> float:
     """
     Selects the virtual best solver for each instance by choosing the best performance per instance.
 
@@ -34,10 +47,13 @@ def virtual_best_solver(performance: pd.DataFrame, maximize: bool = False) -> fl
     Returns:
         float: The sum of the best performance values for each instance.
     """
+    if budget is not None and par is not None:
+        performance = np.where(performance <= budget, performance, budget * par)
+
     if maximize:
-        return performance.max(axis=1).sum()
+        return np.max(performance, axis=1).sum()
     else:
-        return performance.min(axis=1).sum()
+        return np.min(performance, axis=1).sum()
 
 
 def running_time_selector_performance(
@@ -78,7 +94,7 @@ def running_time_selector_performance(
             remaining_time_to_solve = performance.loc[instance, algorithm] - (
                 algo_budget + allocated_times[algorithm]
             )
-            if remaining_time_to_solve < 0:
+            if remaining_time_to_solve <= 0:
                 allocated_times[algorithm] = performance.loc[instance, algorithm]
                 solved = True
                 break
@@ -119,8 +135,8 @@ def running_time_closed_gap(
         float: The closed gap value, representing the improvement of the selector over the single best solver
         relative to the virtual best solver.
     """
-    sbs_val = single_best_solver(performance, False)
-    vbs_val = virtual_best_solver(performance, False)
+    sbs_val = single_best_solver(performance, False, budget, par)
+    vbs_val = virtual_best_solver(performance, False, budget, par)
     s_val = running_time_selector_performance(
         schedules, performance, budget, par, feature_time
     )
