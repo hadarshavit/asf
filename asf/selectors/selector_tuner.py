@@ -14,12 +14,14 @@ Dependencies:
 
 import numpy as np
 import pandas as pd
+import copy
 
 try:
     from ConfigSpace import (
         Categorical,
         ConfigurationSpace,
         UniformFloatHyperparameter,
+        UniformIntegerHyperparameter,
         ForbiddenAndConjunction,
         ForbiddenEqualsClause,
     )
@@ -51,6 +53,7 @@ def tune_selector(
     selector_class: list[AbstractSelector]
     | AbstractSelector
     | list[tuple[AbstractSelector, dict]],
+    algorithm_features=None,
     selector_kwargs: dict = {},
     preprocessing_class: list[TransformerMixin] = None,
     pre_solving_class: list[object] = None,
@@ -209,6 +212,15 @@ def tune_selector(
 
         cs_transform["feature_groups"] = feature_groups
 
+    if algorithm_pre_selector is not None:
+        n_algos_param = UniformIntegerHyperparameter(
+            name="algorithm_pre_selector_n_algorithms",
+            lower=1,
+            upper=y.shape[1],
+            default_value=min(5, y.shape[1]),
+        )
+        cs.add(n_algos_param)
+
     scenario = Scenario(
         configspace=cs,
         n_trials=runcount_limit,
@@ -268,6 +280,16 @@ def tune_selector(
                     X_train_filtered = fg_selector.fit_transform(X_train)
                     X_test_filtered = fg_selector.transform(X_test)
 
+            # Algorithm pre-selector configuration
+            current_algorithm_pre_selector = algorithm_pre_selector
+            if (
+                algorithm_pre_selector is not None
+                and "algorithm_pre_selector_n_algorithms" in config
+            ):
+                current_algorithm_pre_selector = algorithm_pre_selector(
+                    n_algorithms=config["algorithm_pre_selector_n_algorithms"]
+                )
+
             selector = SelectorPipeline(
                 selector=cs_transform["selector"][
                     config["selector"]
@@ -284,10 +306,12 @@ def tune_selector(
                 preprocessor=preprocessors,
                 pre_solving=presolver,
                 feature_selector=feature_selector,
-                algorithm_pre_selector=algorithm_pre_selector,
+                algorithm_pre_selector=current_algorithm_pre_selector,
                 feature_groups=selected_feature_groups,
             )
-            selector.fit(X_train_filtered, y_train)
+            selector.fit(
+                X_train_filtered, y_train, algorithm_features=algorithm_features
+            )
 
             y_pred = selector.predict(X_test_filtered)
             score = smac_metric(y_pred, y_test)
@@ -327,6 +351,17 @@ def tune_selector(
             cs_transform["feature_groups"], best_config
         )
 
+    # Algorithm pre-selector configuration
+    current_algorithm_pre_selector = algorithm_pre_selector
+    if (
+        algorithm_pre_selector is not None
+        and "algorithm_pre_selector_n_algorithms" in best_config
+    ):
+        current_algorithm_pre_selector = copy.deepcopy(algorithm_pre_selector)
+        current_algorithm_pre_selector.n_algorithms = best_config[
+            "algorithm_pre_selector_n_algorithms"
+        ]
+
     return SelectorPipeline(
         selector=cs_transform["selector"][
             best_config["selector"]
@@ -343,6 +378,6 @@ def tune_selector(
         preprocessor=preprocessors,
         pre_solving=presolver,
         feature_selector=feature_selector,
-        algorithm_pre_selector=algorithm_pre_selector,
+        algorithm_pre_selector=current_algorithm_pre_selector,
         feature_groups=selected_feature_groups,
     )
