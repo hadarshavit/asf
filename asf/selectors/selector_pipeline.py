@@ -58,7 +58,7 @@ class SelectorPipeline:
         self._orig_columns = None
         self._orig_index = None
 
-    def fit(self, X: Any, y: Any) -> None:
+    def fit(self, X: Any, y: Any, algorithm_features: Any) -> None:
         """
         Fits the pipeline to the input data.
 
@@ -82,7 +82,7 @@ class SelectorPipeline:
         if self.feature_selector:
             X, y = self.feature_selector.fit_transform(X, y)
 
-        self.selector.fit(X, y)
+        self.selector.fit(X, y, algorithm_features=algorithm_features)
 
     def predict(self, X: Any) -> dict:
         """

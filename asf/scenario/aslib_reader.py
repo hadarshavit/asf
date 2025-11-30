@@ -250,6 +250,7 @@ def evaluate_selector(
         feature_groups,
         maximize,
         budget,
+        algorithm_features,
     ) = read_aslib_scenario(scenario_path)
 
     # Align indices
@@ -278,7 +279,6 @@ def evaluate_selector(
             feature_groups=feature_groups,
         )
 
-        selector.fit(X_train, y_train)
     else:
         # Run HPO (should return a fitted selector)
         selector = hpo_func(
@@ -291,6 +291,8 @@ def evaluate_selector(
             algorithm_pre_selector=algorithm_pre_selector,
             **hpo_kwargs,
         )
+
+    selector.fit(X_train, y_train, algorithm_features=algorithm_features)
 
     # Predict and evaluate
     predictions = selector.predict(X_test)

@@ -1,6 +1,6 @@
+from functools import partial
 import os
 import pandas as pd
-from asf.pre_selector.knee_of_the_curve_pre_selector import KneeOfCurvePreSelector
 from asf.pre_selector import OptimizePreSelection
 from asf.scenario.aslib_reader import evaluate_selector
 from asf.metrics.baselines import virtual_best_solver
@@ -9,8 +9,8 @@ from asf.selectors import (
     MultiClassClassifier,
     PerformanceModel,
 )
-# from asf.selectors.selector_tuner import tune_selector
-# from asf.predictors import RandomForestClassifierWrapper, RandomForestRegressorWrapper
+from asf.selectors.selector_tuner import tune_selector
+from asf.predictors import RandomForestClassifierWrapper, RandomForestRegressorWrapper
 
 
 def run(selector, scenario, fold, base_path="/home/shavit/asf/paper/aslib_data"):
@@ -25,27 +25,21 @@ def run(selector, scenario, fold, base_path="/home/shavit/asf/paper/aslib_data")
     print(f"Evaluating scenario: {scenario}")
     print(f"Evaluating fold: {fold}")
 
-    knee_preselector = KneeOfCurvePreSelector(
-        metric=virtual_best_solver,
-        base_pre_selector=OptimizePreSelection,
-        maximize=False,
-        S=1.0,
-        workers=1,
-        max_algorithms=10,
-    )
     score, result_selector = evaluate_selector(
         selector_class=selector,
         scenario_path=os.path.join(base_path, scenario),
         fold=fold,
-        hpo_func=None,
-        # hpo_func=tune_selector,
-        # hpo_kwargs={
-        #     "runcount_limit": 100,
-        #     "cv": 10,
-        #     "smac_kwargs": {"overwrite": True},
-        #     "output_dir": f"smac_output/{scenario.split('/')[-1]}",
-        # },
-        algorithm_pre_selector=knee_preselector,
+        # hpo_func=None,
+        hpo_func=tune_selector,
+        hpo_kwargs={
+            "runcount_limit": 100,
+            "cv": 10,
+            "smac_kwargs": lambda scenario: {"overwrite": True},
+            "output_dir": f"/home/shavit/asf/bench/results/{scenario}_{selector_name}_fold{fold}_selector_tuning",
+        },
+        algorithm_pre_selector=partial(
+            OptimizePreSelection, metric=virtual_best_solver, maximize=False
+        ),
     )
 
     print(f"Selector: {result_selector} Test score: {score}")
@@ -59,25 +53,23 @@ def run(selector, scenario, fold, base_path="/home/shavit/asf/paper/aslib_data")
         }
     ]
 
-    if os.path.exists(
-        path := f"/home/shavit/asf/bench/results/results{scenario}_distnet_results.csv"
-    ):
+    if os.path.exists(path := f"/home/shavit/asf/bench/results/results_{scenario}.csv"):
         pd.DataFrame(results).to_csv(path, header=False, mode="a", index=False)
     else:
         pd.DataFrame(results).to_csv(path, header=True, index=False)
 
 
 if __name__ == "__main__":
-    # selectors = [
-    #     (PairwiseClassifier, {"model_class": [RandomForestClassifierWrapper]}),
-    #     (MultiClassClassifier, {"model_class": [RandomForestClassifierWrapper]}),
-    #     (PerformanceModel, {"model_class": [RandomForestRegressorWrapper]}),
-    # ]
     selectors = [
-        PairwiseClassifier,
-        MultiClassClassifier,
-        PerformanceModel,
+        (PairwiseClassifier, {"model_class": [RandomForestClassifierWrapper]}),
+        (MultiClassClassifier, {"model_class": [RandomForestClassifierWrapper]}),
+        (PerformanceModel, {"model_class": [RandomForestRegressorWrapper]}),
     ]
+    # selectors = [
+    #     PairwiseClassifier,
+    #     MultiClassClassifier,
+    #     PerformanceModel,
+    # ]
 
     scenarios = [
         "SAT12-INDU",

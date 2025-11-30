@@ -148,7 +148,7 @@ class AbstractSelector:
             return scheds
 
         return {
-            instance: tuple(self.feature_groups) + scheds[instance]
+            instance: list(self.feature_groups) + scheds[instance]
             for instance in features.index
         }
 
