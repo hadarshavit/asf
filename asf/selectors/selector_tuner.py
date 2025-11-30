@@ -20,6 +20,8 @@ try:
         Categorical,
         ConfigurationSpace,
         UniformFloatHyperparameter,
+        ForbiddenAndConjunction,
+        ForbiddenEqualsClause,
     )
 
     CONFIGSPACE_AVAILABLE = True
@@ -40,6 +42,7 @@ from sklearn.base import TransformerMixin
 from asf.selectors.abstract_selector import AbstractSelector
 from asf.selectors.selector_pipeline import SelectorPipeline
 from asf.utils.groupkfoldshuffle import GroupKFoldShuffle
+from asf.preprocessing.feature_group_selector import FeatureGroupSelector
 
 
 def tune_selector(
@@ -55,7 +58,7 @@ def tune_selector(
     algorithm_pre_selector: object = None,
     budget: float = None,
     maximize: bool = False,
-    feature_groups: list = None,
+    feature_groups: dict = None,
     output_dir: str = "./smac_output",
     smac_metric: callable = running_time_selector_performance,
     smac_kwargs: callable = None,
@@ -81,7 +84,11 @@ def tune_selector(
         algorithm_pre_selector (object, optional): Algorithm pre-selector to use. Defaults to None.
         budget (float, optional): Budget for the selector. Defaults to None.
         maximize (bool): Whether to maximize the metric. Defaults to False.
-        feature_groups (list, optional): Feature groups to consider. Defaults to None.
+        feature_groups (dict, optional): Feature groups to consider. Each key is a feature group name,
+            and the value is a dict with 'provides' key listing feature names in that group.
+            When provided, SMAC will optimize which feature groups to use by adding a boolean
+            hyperparameter for each group. Only features from selected groups will be used.
+            Defaults to None.
         output_dir (str): Directory to store SMAC output. Defaults to "./smac_output".
         smac_metric (callable): Metric function to evaluate the selector's performance. Defaults to `running_time_selector_performance`.
         smac_kwargs (callable): Additional arguments for SMAC's optimization facade.
@@ -173,6 +180,35 @@ def tune_selector(
             cs.add(preproc_param)
         cs_transform["preprocessors"] = preprocessing_class
 
+    # Add feature groups to configuration space (each can be enabled/disabled)
+    # Also add forbidden clauses for prerequisite groups
+    fg_params = {}  # Store params to create forbidden clauses
+    if feature_groups is not None and len(feature_groups) > 0:
+        # First, add all feature group parameters
+        for fg_name in feature_groups.keys():
+            fg_param = Categorical(
+                name=f"feature_group_{fg_name}",
+                items=[True, False],
+                default=True,
+            )
+            cs.add(fg_param)
+            fg_params[fg_name] = fg_param
+
+        # Then, add forbidden clauses for prerequisite requirements
+        # If a group requires another, forbid: group=True AND required=False
+        for fg_name, fg_info in feature_groups.items():
+            required_groups = fg_info.get("requires", [])
+            for required_group in required_groups:
+                if required_group in fg_params:
+                    # Forbid: fg_name=True AND required_group=False
+                    forbidden = ForbiddenAndConjunction(
+                        ForbiddenEqualsClause(fg_params[fg_name], True),
+                        ForbiddenEqualsClause(fg_params[required_group], False),
+                    )
+                    cs.add(forbidden)
+
+        cs_transform["feature_groups"] = feature_groups
+
     scenario = Scenario(
         configspace=cs,
         n_trials=runcount_limit,
@@ -215,6 +251,23 @@ def tune_selector(
                 if presolver is not None and presolver_budget is not None:
                     setattr(presolver, "budget", presolver_budget)
 
+            # Feature group selection
+            selected_feature_groups = None
+            X_train_filtered = X_train
+            X_test_filtered = X_test
+            if "feature_groups" in cs_transform:
+                selected_feature_groups = (
+                    FeatureGroupSelector.get_selected_groups_from_config(
+                        cs_transform["feature_groups"], config
+                    )
+                )
+                if selected_feature_groups:
+                    fg_selector = FeatureGroupSelector(
+                        cs_transform["feature_groups"], selected_feature_groups
+                    )
+                    X_train_filtered = fg_selector.fit_transform(X_train)
+                    X_test_filtered = fg_selector.transform(X_test)
+
             selector = SelectorPipeline(
                 selector=cs_transform["selector"][
                     config["selector"]
@@ -225,18 +278,18 @@ def tune_selector(
                     if presolver_budget is not None
                     else budget,
                     maximize=maximize,
-                    feature_groups=feature_groups,
+                    feature_groups=selected_feature_groups,
                     **selector_kwargs,
                 ),
                 preprocessor=preprocessors,
                 pre_solving=presolver,
                 feature_selector=feature_selector,
                 algorithm_pre_selector=algorithm_pre_selector,
-                feature_groups=feature_groups,
+                feature_groups=selected_feature_groups,
             )
-            selector.fit(X_train, y_train)
+            selector.fit(X_train_filtered, y_train)
 
-            y_pred = selector.predict(X_test)
+            y_pred = selector.predict(X_test_filtered)
             score = smac_metric(y_pred, y_test)
             scores.append(score)
 
@@ -267,6 +320,13 @@ def tune_selector(
         )
         setattr(presolver, "budget", presolver_budget)
 
+    # Feature group selection from best config
+    selected_feature_groups = None
+    if "feature_groups" in cs_transform:
+        selected_feature_groups = FeatureGroupSelector.get_selected_groups_from_config(
+            cs_transform["feature_groups"], best_config
+        )
+
     return SelectorPipeline(
         selector=cs_transform["selector"][
             best_config["selector"]
@@ -277,12 +337,12 @@ def tune_selector(
             if presolver_budget is not None
             else budget,
             maximize=maximize,
-            feature_groups=feature_groups,
+            feature_groups=selected_feature_groups,
             **selector_kwargs,
         ),
         preprocessor=preprocessors,
         pre_solving=presolver,
         feature_selector=feature_selector,
         algorithm_pre_selector=algorithm_pre_selector,
-        feature_groups=feature_groups,
+        feature_groups=selected_feature_groups,
     )

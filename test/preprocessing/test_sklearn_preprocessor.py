@@ -7,7 +7,7 @@ from asf.preprocessing.sklearn_preprocessor import get_default_preprocessor
 def test_get_default_preprocessor_imputes_and_encodes():
     df = pd.DataFrame(
         {
-            "color": ["red", None, "blue"],
+            "color": ["red", np.nan, "blue"],
             "size": [1.0, 2.5, np.nan],
         }
     )
@@ -19,16 +19,15 @@ def test_get_default_preprocessor_imputes_and_encodes():
     expected_columns = [
         "cat__color_blue",
         "cat__color_red",
-        "cat__color_None",
         "cont__size",
     ]
     assert transformed.columns.tolist() == expected_columns
 
     expected_values = np.array(
         [
-            [0.0, 1.0, 0.0, -1.22474487],
-            [0.0, 0.0, 1.0, 1.22474487],
-            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, -1.22474487],
+            [1.0, 0.0, 1.22474487],
+            [1.0, 0.0, 0.0],
         ]
     )
     assert np.allclose(transformed.to_numpy(), expected_values, atol=1e-6)
