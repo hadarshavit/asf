@@ -12,6 +12,7 @@ class KneeOfCurvePreSelector(AbstractPreSelector):
         maximize=False,
         S=1.0,
         workers=1,
+        max_algorithms: int | None = None,
         **kwargs,
     ):
         """
@@ -26,6 +27,7 @@ class KneeOfCurvePreSelector(AbstractPreSelector):
         self.maximize = maximize
         self.S = S
         self.workers = workers
+        self.max_algorithms = max_algorithms
 
     def fit_transform(
         self, performance: pd.DataFrame | np.ndarray
@@ -69,11 +71,18 @@ class KneeOfCurvePreSelector(AbstractPreSelector):
             pre_selected_df = base_pre_selector.fit_transform(performance_frame)
             return i, self.metric(pre_selected_df), pre_selected_df
 
+        max_algorithms = (
+            self.max_algorithms
+            if self.max_algorithms is not None
+            else performance_frame.shape[1]
+        )
+        max_algorithms = min(max_algorithms, performance_frame.shape[1])
+
         if self.workers > 1:
             from joblib import Parallel, delayed
 
             results = Parallel(n_jobs=self.workers)(
-                delayed(process)(i) for i in range(performance_frame.shape[1])
+                delayed(process)(i) for i in range(max_algorithms)
             )
             # Sort results by i to maintain order
             results.sort(key=lambda tup: tup[0])
@@ -82,7 +91,7 @@ class KneeOfCurvePreSelector(AbstractPreSelector):
                 y.append(metric_val)
                 dfs.append(pre_selected_df)
         else:
-            for i in range(performance_frame.shape[1]):
+            for i in range(max_algorithms):
                 base_pre_selector = self.base_pre_selector(
                     n_algorithms=i + 1,
                     metric=self.metric,
