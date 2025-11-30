@@ -46,7 +46,7 @@ class PairwiseRegressor(AbstractModelBasedSelector, AbstractFeatureGenerator):
     PREFIX = "pairwise_regressor"
     RETURN_TYPE = "single"
 
-    def __init__(self, model_class: type, **kwargs):
+    def __init__(self, model_class: type = RandomForestRegressorWrapper, **kwargs):
         """
         Initializes the PairwiseRegressor with a given model class and hierarchical feature generator.
 

@@ -168,7 +168,7 @@ def tune_selector(
         for i, preproc in enumerate(preprocessing_class):
             preproc_param = Categorical(
                 name=f"preprocessor_{i}",
-                items=["off", "on"],
+                items=[True, False],
             )
             cs.add(preproc_param)
         cs_transform["preprocessors"] = preprocessing_class
@@ -199,7 +199,7 @@ def tune_selector(
             if "preprocessors" in cs_transform:
                 preprocessors = []
                 for i, preproc in enumerate(cs_transform["preprocessors"]):
-                    if config.get(f"preprocessor_{i}", "off") == "on":
+                    if config.get(f"preprocessor_{i}", False):
                         preprocessors.append(preproc)
                 if len(preprocessors) == 0:
                     preprocessors = None

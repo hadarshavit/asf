@@ -41,7 +41,10 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
     RETURN_TYPE = "single"
 
     def __init__(
-        self, model_class: type[AbstractPredictor], use_weights: bool = True, **kwargs
+        self,
+        model_class: type[AbstractPredictor] = RandomForestClassifierWrapper,
+        use_weights: bool = True,
+        **kwargs,
     ):
         """
         Initializes the PairwiseClassifier with a given model class and hierarchical feature generator.
@@ -130,8 +133,12 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
         for i, algorithm in enumerate(self.algorithms):
             for j, other_algorithm in enumerate(self.algorithms[i + 1 :]):
                 prediction = self.classifiers[cnt].predict(features)
-                predictions_sum.loc[prediction, algorithm] += 1
-                predictions_sum.loc[1 - prediction, other_algorithm] += 1
+                # prediction is an array of 0s and 1s
+                # 1 means algorithm is better, 0 means other_algorithm is better
+                predictions_sum.loc[features.index[prediction == 1], algorithm] += 1
+                predictions_sum.loc[
+                    features.index[prediction == 0], other_algorithm
+                ] += 1
                 cnt += 1
 
         return predictions_sum

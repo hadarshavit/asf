@@ -54,7 +54,7 @@ class PerformanceModel(AbstractModelBasedSelector, AbstractFeatureGenerator):
 
     def __init__(
         self,
-        model_class: type,
+        model_class: type = RandomForestRegressorWrapper,
         use_multi_target: bool = False,
         normalize: AbstractNormalization = LogNormalization(),
         **kwargs,
