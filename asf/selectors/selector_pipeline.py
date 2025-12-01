@@ -1,9 +1,12 @@
-from typing import Callable, Any
-from asf.selectors.abstract_selector import AbstractSelector
-from asf.presolving.presolver import AbstractPresolver
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
+import logging
+from typing import Any, Callable
+import time
 import pandas as pd
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+
+from asf.presolving.presolver import AbstractPresolver
+from asf.selectors.abstract_selector import AbstractSelector
 
 
 class SelectorPipeline:
@@ -58,6 +61,8 @@ class SelectorPipeline:
         self._orig_columns = None
         self._orig_index = None
 
+        self._logger = logging.getLogger(__name__)
+
     def fit(self, X: Any, y: Any, algorithm_features: Any) -> None:
         """
         Fits the pipeline to the input data.
@@ -70,19 +75,44 @@ class SelectorPipeline:
             self._orig_columns = X.columns
             self._orig_index = X.index
 
+        start = time.time()
+        self._logger.debug("Starting fit process")
         if self.preprocessor:
             X = self.preprocessor.fit_transform(X)
+        self._logger.debug(
+            f"Preprocessing completed in {time.time() - start:.2f} seconds"
+        )
+        start = time.time()
 
         if self.pre_solving:
             self.pre_solving.fit(X, y)
 
+        self._logger.debug(
+            f"Pre-solving completed in {time.time() - start:.2f} seconds"
+        )
+        start = time.time()
+
         if self.algorithm_pre_selector:
             y = self.algorithm_pre_selector.fit_transform(y)
+
+        self._logger.debug(
+            f"Algorithm pre-selection completed in {time.time() - start:.2f} seconds"
+        )
+        start = time.time()
 
         if self.feature_selector:
             X, y = self.feature_selector.fit_transform(X, y)
 
+        self._logger.debug(
+            f"Feature selection completed in {time.time() - start:.2f} seconds"
+        )
+        start = time.time()
+
         self.selector.fit(X, y, algorithm_features=algorithm_features)
+
+        self._logger.debug(
+            f"Selector fitting completed in {time.time() - start:.2f} seconds"
+        )
 
     def predict(self, X: Any) -> dict:
         """

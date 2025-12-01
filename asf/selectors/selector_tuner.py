@@ -12,9 +12,10 @@ Dependencies:
 - asf (custom modules)
 """
 
+import logging
+import time
 import numpy as np
 import pandas as pd
-import copy
 
 try:
     from ConfigSpace import (
@@ -105,6 +106,8 @@ def tune_selector(
     Returns:
         SelectorPipeline: A pipeline with the best-tuned selector and preprocessing steps.
     """
+    _logger = logging.getLogger(__name__)
+
     if not SMAC_AVAILABLE:
         raise RuntimeError("SMAC is not installed. Install it with: pip install smac")
     if not CONFIGSPACE_AVAILABLE:
@@ -190,7 +193,7 @@ def tune_selector(
         # First, add all feature group parameters
         for fg_name in feature_groups.keys():
             fg_param = Categorical(
-                name=f"feature_group_{fg_name}",
+                name=f"feature_group:{fg_name}",
                 items=[True, False],
                 default=True,
             )
@@ -214,10 +217,9 @@ def tune_selector(
 
     if algorithm_pre_selector is not None:
         n_algos_param = UniformIntegerHyperparameter(
-            name="algorithm_pre_selector_n_algorithms",
-            lower=1,
-            upper=y.shape[1],
-            default_value=min(5, y.shape[1]),
+            name="algorithm_pre_selector:n_algorithms",
+            lower=2,
+            upper=5,
         )
         cs.add(n_algos_param)
 
@@ -284,10 +286,10 @@ def tune_selector(
             current_algorithm_pre_selector = algorithm_pre_selector
             if (
                 algorithm_pre_selector is not None
-                and "algorithm_pre_selector_n_algorithms" in config
+                and "algorithm_pre_selector:n_algorithms" in config
             ):
                 current_algorithm_pre_selector = algorithm_pre_selector(
-                    n_algorithms=config["algorithm_pre_selector_n_algorithms"]
+                    n_algorithms=config["algorithm_pre_selector:n_algorithms"]
                 )
 
             selector = SelectorPipeline(
@@ -314,7 +316,11 @@ def tune_selector(
             )
 
             y_pred = selector.predict(X_test_filtered)
+
+            start = time.time()
             score = smac_metric(y_pred, y_test)
+            _logger.debug(f"Scoring completed in {time.time() - start:.2f} seconds")
+
             scores.append(score)
 
         return np.sum(scores)
@@ -355,12 +361,11 @@ def tune_selector(
     current_algorithm_pre_selector = algorithm_pre_selector
     if (
         algorithm_pre_selector is not None
-        and "algorithm_pre_selector_n_algorithms" in best_config
+        and "algorithm_pre_selector:n_algorithms" in best_config
     ):
-        current_algorithm_pre_selector = copy.deepcopy(algorithm_pre_selector)
-        current_algorithm_pre_selector.n_algorithms = best_config[
-            "algorithm_pre_selector_n_algorithms"
-        ]
+        current_algorithm_pre_selector = algorithm_pre_selector(
+            n_algorithms=best_config["algorithm_pre_selector:n_algorithms"]
+        )
 
     return SelectorPipeline(
         selector=cs_transform["selector"][
