@@ -1,16 +1,22 @@
-from functools import partial
+import logging
 import os
+from functools import partial
+
 import pandas as pd
-from asf.pre_selector import OptimizePreSelection
-from asf.scenario.aslib_reader import evaluate_selector
+
 from asf.metrics.baselines import virtual_best_solver
+from asf.pre_selector import OptimizePreSelection
+from asf.predictors import RandomForestClassifierWrapper, RandomForestRegressorWrapper
+from asf.scenario.aslib_reader import evaluate_selector
 from asf.selectors import (
-    PairwiseClassifier,
     MultiClassClassifier,
+    PairwiseClassifier,
     PerformanceModel,
 )
 from asf.selectors.selector_tuner import tune_selector
-from asf.predictors import RandomForestClassifierWrapper, RandomForestRegressorWrapper
+
+# Configure logging to print debug logs for all loggers
+logging.basicConfig(level=logging.INFO, force=True)
 
 
 def run(selector, scenario, fold, base_path="/home/shavit/asf/paper/aslib_data"):
@@ -34,7 +40,7 @@ def run(selector, scenario, fold, base_path="/home/shavit/asf/paper/aslib_data")
         hpo_kwargs={
             "runcount_limit": 100,
             "cv": 10,
-            "smac_kwargs": lambda scenario: {"overwrite": True},
+            "smac_kwargs": lambda scenario: {"overwrite": True, "logging_level": False},
             "output_dir": f"/home/shavit/asf/bench/results/{scenario}_{selector_name}_fold{fold}_selector_tuning",
         },
         algorithm_pre_selector=partial(
@@ -84,6 +90,8 @@ if __name__ == "__main__":
         "MIP-2016",
         "MAXSAT19-UCMS",
         "OPENML-WEKA-2017",
+        "BNSL-2016",
+        "GRAPHS-2015",
     ]
 
     for selector in selectors:
