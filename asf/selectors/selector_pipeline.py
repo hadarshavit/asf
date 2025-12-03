@@ -129,7 +129,7 @@ class SelectorPipeline:
 
         scheds = None
         if self.pre_solving:
-            scheds = self.pre_solving.predict(X)
+            scheds = self.pre_solving.predict()
 
         if self.feature_selector:
             X = self.feature_selector.transform(X)
@@ -138,11 +138,11 @@ class SelectorPipeline:
 
         # Ensure predictions use the same index as X
         predictions = pd.Series(predictions, index=X.index)
+        final_preds = {}
         if scheds is not None:
-            for instance_id, pre_schedule in scheds.items():
-                if instance_id in predictions:
-                    predictions[instance_id] = pre_schedule + predictions[instance_id]
-        return predictions.to_dict()
+            for instance_id, prediction in predictions.items():
+                final_preds[instance_id] = scheds + prediction
+        return final_preds
 
     def save(self, path: str) -> None:
         """

@@ -1,22 +1,24 @@
 import logging
 import os
 from functools import partial
-
+import submitit
 import pandas as pd
 
 from asf.metrics.baselines import virtual_best_solver
-from asf.pre_selector import OptimizePreSelection
+from asf.pre_selector import MarginalContributionBasedPreSelector
 from asf.predictors import RandomForestClassifierWrapper, RandomForestRegressorWrapper
 from asf.scenario.aslib_reader import evaluate_selector
 from asf.selectors import (
     MultiClassClassifier,
     PairwiseClassifier,
     PerformanceModel,
+    PairwiseRegressor,
 )
+from asf.presolving import Aspeed
 from asf.selectors.selector_tuner import tune_selector
 
 # Configure logging to print debug logs for all loggers
-logging.basicConfig(level=logging.INFO, force=True)
+logging.basicConfig(level=logging.DEBUG, force=True)
 
 
 def run(selector, scenario, fold, base_path="/home/shavit/asf/paper/aslib_data"):
@@ -24,6 +26,8 @@ def run(selector, scenario, fold, base_path="/home/shavit/asf/paper/aslib_data")
         selector_name = selector.__name__
     elif hasattr(selector, "func"):  # for functools.partial
         selector_name = selector.func.__name__
+    elif isinstance(selector, tuple):
+        selector_name = selector[0].__name__
     else:
         selector_name = selector.__class__.__name__
 
@@ -42,9 +46,13 @@ def run(selector, scenario, fold, base_path="/home/shavit/asf/paper/aslib_data")
             "cv": 10,
             "smac_kwargs": lambda scenario: {"overwrite": True, "logging_level": False},
             "output_dir": f"/home/shavit/asf/bench/results/{scenario}_{selector_name}_fold{fold}_selector_tuning",
+            "max_algorithm_pre_selector": 20,
+            "pre_solving_class": Aspeed if scenario != "OPENML-WEKA-2017" else None,
         },
         algorithm_pre_selector=partial(
-            OptimizePreSelection, metric=virtual_best_solver, maximize=False
+            MarginalContributionBasedPreSelector,
+            metric=virtual_best_solver,
+            mode="forward",
         ),
     )
 
@@ -67,8 +75,9 @@ def run(selector, scenario, fold, base_path="/home/shavit/asf/paper/aslib_data")
 
 if __name__ == "__main__":
     selectors = [
-        (PairwiseClassifier, {"model_class": [RandomForestClassifierWrapper]}),
         (MultiClassClassifier, {"model_class": [RandomForestClassifierWrapper]}),
+        (PairwiseClassifier, {"model_class": [RandomForestClassifierWrapper]}),
+        (PairwiseRegressor, {"model_class": [RandomForestRegressorWrapper]}),
         (PerformanceModel, {"model_class": [RandomForestRegressorWrapper]}),
     ]
     # selectors = [
@@ -84,11 +93,8 @@ if __name__ == "__main__":
         "QBF-2016",
         "MIP-2016",
         "MAXSAT19-UCMS",
-        "IPC2018",
         "CSP-Minizinc-Time-2016",
         "ASP-POTASSCO",
-        "MIP-2016",
-        "MAXSAT19-UCMS",
         "OPENML-WEKA-2017",
         "BNSL-2016",
         "GRAPHS-2015",
