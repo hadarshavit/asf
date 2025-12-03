@@ -27,7 +27,6 @@ class Aspeed(AbstractPresolver):
 
     def __init__(
         self,
-        runcount_limit: float = 100.0,
         budget: float = 30.0,
         aspeed_cutoff: int = 60,
         maximize: bool = False,
@@ -47,9 +46,7 @@ class Aspeed(AbstractPresolver):
             raise ImportError(
                 "clingo is not installed. Please install it to use the Aspeed presolver."
             )
-        super().__init__(
-            budget=budget, runcount_limit=runcount_limit, maximize=maximize
-        )
+        super().__init__(budget=budget, maximize=maximize)
         self.cores = cores
         self.data_threshold = data_threshold  # minimal number of instances to use
         self.data_fraction = data_fraction  # fraction of instances to use

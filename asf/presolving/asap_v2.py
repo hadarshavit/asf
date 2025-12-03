@@ -21,9 +21,7 @@ class ASAPv2(AbstractPresolver):
         seed: int = 42,
         verbosity: int = 0,
     ):
-        super().__init__(
-            runcount_limit=runcount_limit, budget=budget, maximize=maximize
-        )
+        super().__init__(budget=budget, maximize=maximize)
 
         self.regularization_weight = regularization_weight
         self.penalty_factor = penalty_factor
@@ -239,18 +237,8 @@ class ASAPv2(AbstractPresolver):
         """
         Returns the optimized preschedule (same for all features).
         """
-        if self.runtimes_preschedule is None:
-            raise ValueError("Must call fit() before predict()")
 
-        if features is None:
-            return {"default": self.schedule}
-
-        # Return same schedule for all instances
-        result: dict[str, list[tuple[str, float]]] = {}
-        for instance_id in features.index:
-            result[instance_id] = self.schedule.copy()
-
-        return result
+        return self.schedule
 
     def get_preschedule_config(self) -> dict[str, float]:
         """Get the optimized preschedule configuration (only non-zero times)"""
@@ -261,14 +249,3 @@ class ASAPv2(AbstractPresolver):
                 if time > 0
             }
         return {}
-
-    def get_configuration(self) -> dict:
-        """Return configuration for compatibility with ASF selectors"""
-        return {
-            "algorithms": self.algorithms,
-            "runcount_limit": self.runcount_limit,
-            "budget": self.budget,
-            "preschedule_config": self.get_preschedule_config(),
-            "regularization_weight": self.regularization_weight,
-            "penalty_factor": self.penalty_factor,
-        }

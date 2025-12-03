@@ -35,7 +35,7 @@ class Static3S(AbstractPresolver):
         max_candidates_per_solver: int = 20,
         **kwargs,
     ):
-        super().__init__(runcount_limit=runcount_limit, budget=budget)
+        super().__init__(budget=budget)
         self.runcount_limit = float(runcount_limit)
         self.budget = float(budget)
         self.max_candidates_per_solver = int(max_candidates_per_solver)
@@ -148,17 +148,8 @@ class Static3S(AbstractPresolver):
             self.schedule = chosen
             return
 
-    def predict(
-        self, features: pd.DataFrame | None = None
-    ) -> dict[str, list[tuple[str, float]]]:
-        if self.schedule is None:
-            raise ValueError("Must call fit() before predict()")
-        if features is None:
-            return {"default": self.schedule}
-        out: dict[str, list[tuple[str, float]]] = {}
-        for instance_id in features.index:
-            out[instance_id] = list(self.schedule)
-        return out
+    def predict(self) -> dict[str, list[tuple[str, float]]]:
+        return self.schedule
 
     def get_preschedule_config(self) -> dict[str, float]:
         return {alg: time for alg, time in self.schedule}

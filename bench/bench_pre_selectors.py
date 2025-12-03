@@ -13,6 +13,7 @@ import argparse
 import logging
 import os
 import time
+import resource
 from math import comb
 import submitit
 import pandas as pd
@@ -130,8 +131,7 @@ def benchmark_pre_selector(
     pre_selector,
     performance: pd.DataFrame,
     metric,
-    maximize: bool = False,
-) -> tuple[float, float, list]:
+) -> tuple[float, float, float, list]:
     """
     Benchmark a single pre-selector on performance data.
 
@@ -142,12 +142,21 @@ def benchmark_pre_selector(
         maximize: Whether to maximize.
 
     Returns:
-        Tuple of (score, time_taken, selected_algorithms).
+        Tuple of (score, wall_time, cpu_time, selected_algorithms).
     """
-    start_time = time.time()
+    start_wall_time = time.time()
+    start_cpu_time = (
+        resource.getrusage(resource.RUSAGE_SELF).ru_utime
+        + resource.getrusage(resource.RUSAGE_SELF).ru_stime
+    )
     try:
         selected_performance = pre_selector.fit_transform(performance)
-        elapsed_time = time.time() - start_time
+        elapsed_wall_time = time.time() - start_wall_time
+        end_cpu_time = (
+            resource.getrusage(resource.RUSAGE_SELF).ru_utime
+            + resource.getrusage(resource.RUSAGE_SELF).ru_stime
+        )
+        elapsed_cpu_time = end_cpu_time - start_cpu_time
 
         # Calculate metric on selected subset
         score = metric(selected_performance)
@@ -158,12 +167,17 @@ def benchmark_pre_selector(
         else:
             selected_algorithms = []
 
-        return score, elapsed_time, selected_algorithms
+        return score, elapsed_wall_time, elapsed_cpu_time, selected_algorithms
 
     except Exception as e:
-        elapsed_time = time.time() - start_time
+        elapsed_wall_time = time.time() - start_wall_time
+        end_cpu_time = (
+            resource.getrusage(resource.RUSAGE_SELF).ru_utime
+            + resource.getrusage(resource.RUSAGE_SELF).ru_stime
+        )
+        elapsed_cpu_time = end_cpu_time - start_cpu_time
         logger.error(f"Pre-selector failed: {e}")
-        return float("nan"), elapsed_time, []
+        return float("nan"), elapsed_wall_time, elapsed_cpu_time, []
 
 
 def run_fold_benchmark(
@@ -235,7 +249,7 @@ def run_fold_benchmark(
     )
 
     # Add brute force only for small scenarios
-    if comb(n_total_algorithms, n_algorithms) <= 10000:
+    if comb(n_total_algorithms, n_algorithms) <= 10_000_000:
         pre_selectors["BruteForce"] = BruteForcePreSelector(
             metric=vbs_metric,
             n_algorithms=n_algorithms,
@@ -245,23 +259,24 @@ def run_fold_benchmark(
     for pre_selector_name, pre_selector in pre_selectors.items():
         logger.info(f"  Running {pre_selector_name}...")
 
-        score, elapsed_time, selected_algorithms = benchmark_pre_selector(
-            pre_selector,
-            train_performance,
-            vbs_metric,
-            maximize,
+        score, elapsed_wall_time, elapsed_cpu_time, selected_algorithms = (
+            benchmark_pre_selector(
+                pre_selector,
+                train_performance,
+                vbs_metric,
+            )
         )
 
         # Calculate relative performance (lower is better for minimization)
         # Normalized score: (score - VBS) / (SBS - VBS) for minimization
         if not maximize:
             if sbs_score != vbs_score:
-                normalized_score = (score - vbs_score) / (sbs_score - vbs_score)
+                normalized_score = (sbs_score - score) / (sbs_score - vbs_score)
             else:
                 normalized_score = 0.0
         else:
             if sbs_score != vbs_score:
-                normalized_score = (vbs_score - score) / (vbs_score - sbs_score)
+                normalized_score = (score - sbs_score) / (vbs_score - sbs_score)
             else:
                 normalized_score = 0.0
 
@@ -276,7 +291,8 @@ def run_fold_benchmark(
                 "vbs_score": vbs_score,
                 "sbs_score": sbs_score,
                 "normalized_score": normalized_score,
-                "time_seconds": elapsed_time,
+                "wall_time_seconds": elapsed_wall_time,
+                "cpu_time_seconds": elapsed_cpu_time,
                 "selected_algorithms": ",".join(selected_algorithms)
                 if selected_algorithms
                 else "",

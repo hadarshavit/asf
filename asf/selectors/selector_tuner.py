@@ -60,6 +60,7 @@ def tune_selector(
     pre_solving_class: list[object] = None,
     feature_selector: object = None,
     algorithm_pre_selector: object = None,
+    max_algorithm_pre_selector: int = None,
     budget: float = None,
     maximize: bool = False,
     feature_groups: dict = None,
@@ -115,7 +116,7 @@ def tune_selector(
             "ConfigSpace is not installed. Install it with: pip install ConfigSpace"
         )
 
-    if pre_solving_class is not None and len(pre_solving_class) > 0 and budget is None:
+    if pre_solving_class is not None and budget is None:
         raise ValueError(
             "If pre_solving_class is provided, you must also provide a budget."
         )
@@ -157,7 +158,10 @@ def tune_selector(
         )
 
     # Add pre-solving and budget to configuration space
-    if pre_solving_class is not None and len(pre_solving_class) > 0:
+    if pre_solving_class is not None:
+        if pre_solving_class is not list:
+            pre_solving_class = [pre_solving_class]
+
         presolver_param = Categorical(
             name="presolver",
             items=[str(type(p).__name__) for p in pre_solving_class],
@@ -170,8 +174,8 @@ def tune_selector(
         presolver_budget_param = UniformFloatHyperparameter(
             name="presolver_budget",
             lower=0.0,
-            upper=1.0,
-            default_value=0.2,
+            upper=0.3,
+            default_value=0.05,
         )
         cs.add(presolver_budget_param)
 
@@ -219,7 +223,9 @@ def tune_selector(
         n_algos_param = UniformIntegerHyperparameter(
             name="algorithm_pre_selector:n_algorithms",
             lower=2,
-            upper=5,
+            upper=y.shape[1]
+            if max_algorithm_pre_selector is None
+            else max_algorithm_pre_selector,
         )
         cs.add(n_algos_param)
 
@@ -263,7 +269,7 @@ def tune_selector(
                     config["presolver_budget"] * budget if budget is not None else None
                 )
                 if presolver is not None and presolver_budget is not None:
-                    setattr(presolver, "budget", presolver_budget)
+                    presolver = presolver(budget=presolver_budget)
 
             # Feature group selection
             selected_feature_groups = None
@@ -289,7 +295,8 @@ def tune_selector(
                 and "algorithm_pre_selector:n_algorithms" in config
             ):
                 current_algorithm_pre_selector = algorithm_pre_selector(
-                    n_algorithms=config["algorithm_pre_selector:n_algorithms"]
+                    maximize=maximize,
+                    n_algorithms=config["algorithm_pre_selector:n_algorithms"],
                 )
 
             selector = SelectorPipeline(

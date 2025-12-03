@@ -5,11 +5,9 @@ from abc import abstractmethod
 class AbstractPresolver:
     def __init__(
         self,
-        runcount_limit: float,
         budget: float,
         maximize: bool = False,
     ):
-        self.runcount_limit = runcount_limit
         self.budget = budget
         self.maximize = maximize
 
