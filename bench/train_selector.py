@@ -14,7 +14,7 @@ from asf.selectors import (
     PerformanceModel,
     PairwiseRegressor,
 )
-from asf.presolving import Aspeed
+from asf.presolving import Static3S
 from asf.selectors.selector_tuner import tune_selector
 
 # Configure logging to print debug logs for all loggers
@@ -47,7 +47,7 @@ def run(selector, scenario, fold, base_path="/home/shavit/asf/paper/aslib_data")
             "smac_kwargs": lambda scenario: {"overwrite": True, "logging_level": False},
             "output_dir": f"/home/shavit/asf/bench/results/{scenario}_{selector_name}_fold{fold}_selector_tuning",
             "max_algorithm_pre_selector": 20,
-            "pre_solving_class": Aspeed if scenario != "OPENML-WEKA-2017" else None,
+            "pre_solving_class": Static3S if scenario != "OPENML-WEKA-2017" else None,
         },
         algorithm_pre_selector=partial(
             MarginalContributionBasedPreSelector,
@@ -95,7 +95,7 @@ if __name__ == "__main__":
         "MAXSAT19-UCMS",
         "CSP-Minizinc-Time-2016",
         "ASP-POTASSCO",
-        "OPENML-WEKA-2017",
+        # "OPENML-WEKA-2017",
         "BNSL-2016",
         "GRAPHS-2015",
     ]

@@ -97,21 +97,21 @@ def get_presolvers(budget: float, maximize: bool = False) -> dict:
         ),
         # ASAP v2 variants
         "ASAPv2_small": ASAPv2(
-            runcount_limit=50.0,
+            runcount_limit=100.0,
             budget=budget,
             maximize=maximize,
             de_popsize=10,
             seed=42,
         ),
         "ASAPv2_medium": ASAPv2(
-            runcount_limit=100.0,
+            runcount_limit=500.0,
             budget=budget,
             maximize=maximize,
             de_popsize=15,
             seed=42,
         ),
         "ASAPv2_large": ASAPv2(
-            runcount_limit=200.0,
+            runcount_limit=1000.0,
             budget=budget,
             maximize=maximize,
             de_popsize=20,
