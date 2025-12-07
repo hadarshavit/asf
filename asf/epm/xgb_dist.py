@@ -36,6 +36,9 @@ class XGBDistNet:
         output_activation=ExpActivation(),
         stabilization: str = "MAD",
         use_start_values: bool = True,
+        early_stopping_rounds: int | None = None,
+        early_stopping_tolerance: float = 0.0,
+        device: str = "cpu",
         **kwargs,
     ):
         self.loss_function = loss_function
@@ -44,7 +47,31 @@ class XGBDistNet:
         self.output_activation = output_activation
         self.stabilization = stabilization
         self.use_start_values = use_start_values
+        self.early_stopping_rounds = early_stopping_rounds
+        self.early_stopping_tolerance = early_stopping_tolerance
+
+        self.device = device
+        self._is_gpu_device = str(device).lower().startswith("cuda") or str(device).lower().startswith("gpu")
         self.kwargs = kwargs
+        self.kwargs["device"] = device
+        if "callbacks" not in self.kwargs:
+            self.kwargs["callbacks"] = []
+        if self.early_stopping_rounds is not None:
+            self.kwargs["callbacks"].append(
+                xgb.callback.EarlyStopping(
+                    rounds=self.early_stopping_rounds,
+                    save_best=True,
+                    min_delta=self.early_stopping_tolerance,
+                )
+            )
+        self.kwargs[ "disable_default_eval_metric"] = True
+        if self._is_gpu_device:
+            self.kwargs.setdefault("tree_method", "hist")
+            self.kwargs.setdefault("predictor", "gpu_predictor")
+            self.kwargs.setdefault("single_precision_histogram", True)
+
+        self._objective_target_tensor: torch.Tensor | None = None
+        self._objective_target_ptr: int | None = None
 
     def stabilize_derivative(
         self, input_der: torch.Tensor, type: str = "MAD"
@@ -84,14 +111,38 @@ class XGBDistNet:
 
         return stab_der
 
+    def _clear_objective_cache(self) -> None:
+        self._objective_target_tensor = None
+        self._objective_target_ptr = None
+
+    def _get_cached_target_tensor(self, data: np.ndarray | xgb.DMatrix | Any) -> torch.Tensor:
+        if hasattr(data, "get_label"):
+            labels = data.get_label()
+        else:
+            labels = np.asarray(data)
+        ptr = int(labels.__array_interface__["data"][0])
+        if (
+            self._objective_target_tensor is None
+            or self._objective_target_ptr != ptr
+            or self._objective_target_tensor.shape[0] != labels.size
+        ):
+            target = torch.from_numpy(labels.reshape(-1, 1)).to(
+                self.device, dtype=torch.float32
+            )
+            self._objective_target_tensor = target
+            self._objective_target_ptr = ptr
+        return self._objective_target_tensor
+
     def objective(self, data, preds):
+        preds = np.asarray(preds, dtype=np.float32)
         if self.n_loss_params == 1:
             preds = preds.reshape(-1, 1)
 
+        target = self._get_cached_target_tensor(data)
+
         if self.batch_size is None:
             # Compute gradients and Hessians w.r.t. raw margins (pre-activation)
-            raw = torch.from_numpy(preds).requires_grad_(True).float()
-            target = torch.from_numpy(data.reshape(-1, 1)).float()
+            raw = torch.from_numpy(preds).requires_grad_(True).float().to(self.device)
             activated = self.output_activation(raw)
             activated = torch.clamp(activated, min=1e-12)
 
@@ -134,14 +185,15 @@ class XGBDistNet:
                         )
 
             # Return 2D shapes (n_samples, n_targets) as required by XGBoost 2.1+
-            grad = grad_raw.detach().numpy()
-            hess = hess_raw.detach().numpy()
+            grad = grad_raw.detach().cpu().numpy()
+            hess = hess_raw.detach().cpu().numpy()
 
             return grad, hess
         else:
-            n_samples = len(data)
-            grad = torch.zeros_like(torch.from_numpy(preds))
-            hess = torch.zeros_like(torch.from_numpy(preds))
+            n_samples = target.shape[0]
+            preds_tensor = torch.from_numpy(preds).to(self.device)
+            grad = torch.zeros_like(preds_tensor)
+            hess = torch.zeros_like(preds_tensor)
 
             for start_idx in range(0, n_samples, self.batch_size):
                 end_idx = min(start_idx + self.batch_size, n_samples)
@@ -151,12 +203,11 @@ class XGBDistNet:
                     torch.from_numpy(preds[start_idx:end_idx])
                     .requires_grad_(True)
                     .float()
+                    .to(self.device)
                 )
                 batch_activated = self.output_activation(batch_raw)
                 batch_activated = torch.clamp(batch_activated, min=1e-12)
-                batch_target = torch.from_numpy(
-                    data[start_idx:end_idx].reshape(-1, 1)
-                ).float()
+                batch_target = target[start_idx:end_idx]
                 batch_loss = self.loss_function(batch_target, batch_activated)
 
                 batch_grad_raw = torch.autograd.grad(
@@ -195,8 +246,8 @@ class XGBDistNet:
                         )
 
             # Return 2D arrays
-            grad = grad.numpy()
-            hess = hess.numpy()
+            grad = grad.cpu().numpy()
+            hess = hess.cpu().numpy()
 
             return grad, hess
 
@@ -225,11 +276,13 @@ class XGBDistNet:
         from torch.optim.lr_scheduler import ReduceLROnPlateau
 
         # Convert target to tensor
-        target_tensor = torch.tensor(target, dtype=torch.float32).reshape(-1, 1)
+        target_tensor = (
+            torch.tensor(target, dtype=torch.float32).reshape(-1, 1).to(self.device)
+        )
 
         # Initialize parameters in pre-activation space (all start at 0.5)
         params = [
-            torch.tensor(0.5, requires_grad=True) for _ in range(self.n_loss_params)
+            torch.tensor(0.5, requires_grad=True, device=self.device) for _ in range(self.n_loss_params)
         ]
 
         # Setup optimizer
@@ -279,7 +332,7 @@ class XGBDistNet:
 
         # Extract final start values (in pre-activation space)
         start_values = np.array(
-            [params[i].detach().numpy() for i in range(self.n_loss_params)]
+            [params[i].detach().cpu().numpy() for i in range(self.n_loss_params)]
         )
 
         # Replace any remaining NaN/Inf with 0.5
@@ -297,8 +350,15 @@ class XGBDistNet:
 
         if isinstance(y, pd.DataFrame) or isinstance(y, pd.Series):
             y = y.values
-        X = np.concatenate([[x for i in range(y.shape[1])] for x in X])
-        y = y.flatten()
+
+        X = np.asarray(X, dtype=np.float32)
+        y = np.asarray(y, dtype=np.float32)
+        X = np.concatenate([[x for i in range(y.shape[1])] for x in X]).astype(
+            np.float32, copy=False
+        )
+        y = y.flatten().astype(np.float32, copy=False)
+
+        self._clear_objective_cache()
 
         # Calculate optimal starting values if enabled
         if self.use_start_values:
@@ -306,22 +366,25 @@ class XGBDistNet:
             print(f"Calculated start values (pre-activation): {start_values}")
         else:
             start_values = np.zeros(self.n_loss_params)
-            print(f"Using zero initialization (start values disabled)")
+            print("Using zero initialization (start values disabled)")
+        start_values = start_values.astype(np.float32, copy=False)
 
         # Set base_margin: replicate start values for all samples
         # Shape should be (n_samples, n_targets) for multi-output or (n_samples,) for single output
         if self.n_loss_params == 1:
-            base_margin = np.full(len(y), start_values[0])
+            base_margin = np.full(len(y), start_values[0], dtype=np.float32)
         else:
-            base_margin = np.tile(start_values, (len(y), 1))
+            base_margin = np.tile(start_values, (len(y), 1)).astype(
+                np.float32, copy=False
+            )
 
         def _eval_metric(y_true_np: np.ndarray, y_pred_np: np.ndarray) -> float:
             if self.n_loss_params == 1:
                 y_pred_np = y_pred_np.reshape(-1, 1)
             else:
                 y_pred_np = y_pred_np.reshape(-1, self.n_loss_params)
-            y_true_t = torch.from_numpy(y_true_np.astype(np.float32)).reshape(-1, 1)
-            y_pred_t = torch.from_numpy(y_pred_np.astype(np.float32))
+            y_true_t = torch.from_numpy(y_true_np.astype(np.float32)).reshape(-1, 1)#.to(self.device)
+            y_pred_t = torch.from_numpy(y_pred_np.astype(np.float32))#.to(self.device)
             activated = self.output_activation(y_pred_t)
 
             return float(self.loss_function(y_true_t, activated))
@@ -337,25 +400,35 @@ class XGBDistNet:
         self.start_values = start_values
 
         # For multi-output with num_target, base_margin should be flattened (C-order)
-        self.model.fit(X, y, eval_set=[(X, y)], verbose=False, base_margin=base_margin)
+        self.model.fit(
+            X,
+            y,
+            eval_set=[(X, y)],
+            verbose=False,
+            base_margin=base_margin,
+        )
+        self._clear_objective_cache()
 
     def predict(self, X: pd.DataFrame | pd.Series | list) -> torch.Tensor:
         if isinstance(X, pd.DataFrame) or isinstance(X, pd.Series):
             X = X.values
+        X = np.asarray(X, dtype=np.float32)
 
         # Set base_margin for prediction using stored start values
         # XGBoost expects base_margin with shape matching the predictions
         n_samples = X.shape[0]
         if self.n_loss_params == 1:
-            base_margin_pred = np.full(n_samples, self.start_values[0])
+            base_margin_pred = np.full(n_samples, self.start_values[0], dtype=np.float32)
         else:
-            base_margin_pred = np.tile(self.start_values, (n_samples, 1))
+            base_margin_pred = np.tile(self.start_values, (n_samples, 1)).astype(
+                np.float32, copy=False
+            )
 
         predictions = self.model.predict(X, base_margin=base_margin_pred)
         # Ensure strictly positive, numerically stable distribution parameters
-        preds_tensor = self.output_activation(torch.from_numpy(predictions))
+        preds_tensor = self.output_activation(torch.from_numpy(predictions).to(self.device))
         preds_tensor = torch.clamp(preds_tensor, min=1e-12)
-        predictions = preds_tensor.numpy()
+        predictions = preds_tensor.cpu().numpy()
 
         if self.n_loss_params == 1:
             predictions = predictions.reshape(-1, 1)
@@ -456,7 +529,7 @@ class XGBDistNet:
             default=0.008237525103357958,
         )
         multi_strategy = Categorical(
-            f"{prefix}:multi_strategy", ["one_output_per_tree", "multi_output_tree"]
+            f"{prefix}:multi_strategy", ["one_output_per_tree"]#, "multi_output_tree"]
         )
         stabilization = Categorical(
             f"{prefix}:stabilization", ["None", "MAD", "L2"], default="MAD"
