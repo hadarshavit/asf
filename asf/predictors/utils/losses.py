@@ -82,13 +82,13 @@ def invgauss_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     nu = y_pred[:, 0]
     lam = y_pred[:, 1]
     mu = nu * lam  # mean
-    y = y_true[:, 0]
+    y_true = torch.reshape(y_true, [-1, 1])
 
     # Ensure positivity to avoid numerical issues
     eps = 1e-12
     mu = torch.clamp(mu, min=eps)
     lam = torch.clamp(lam, min=eps)
-    y = torch.clamp(y, min=eps)
+    y = torch.clamp(y_true, min=eps)
 
     # Negative log-likelihood of inverse Gaussian (per-sample):
     # 0.5*log(2*pi) - 0.5*log(lambda) + 1.5*log(y)
@@ -109,6 +109,7 @@ def invgauss_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 
 @torch.jit.script
 def exp_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
+    y_true = torch.reshape(y_true, [-1, 1])
     scale = y_pred[:, 0]
     scale = torch.reshape(scale, [-1, 1])
     scale = 1 / scale
@@ -122,6 +123,7 @@ def exp_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 
 @torch.jit.script
 def weibull_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
+    y_true = torch.reshape(y_true, [-1, 1])
     c = y_pred[:, 0]  # shape parameter
     c = torch.reshape(c, [-1, 1])
 
@@ -142,6 +144,7 @@ def weibull_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 @torch.jit.script
 def normal_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     # y_pred[:,0] = mu (real), y_pred[:,1] = sigma (>0)
+    y_true = torch.reshape(y_true, [-1, 1])
     mu = y_pred[:, 0]
     mu = torch.reshape(mu, [-1, 1])
     sigma = y_pred[:, 1]
@@ -155,6 +158,7 @@ def normal_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 @torch.jit.script
 def gamma_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     # y_pred[:,0] = k (shape>0), y_pred[:,1] = theta (scale>0)
+    y_true = torch.reshape(y_true, [-1, 1])
     k = y_pred[:, 0]
     k = torch.reshape(k, [-1, 1])
     theta = y_pred[:, 1]
@@ -168,7 +172,7 @@ def gamma_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 
 @torch.jit.script
 def cauchy_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
-
+    y_true = torch.reshape(y_true, [-1, 1])
     scale = y_pred[:, 0]
     scale = torch.reshape(scale, [-1, 1])
     # logpdf = -log(pi) - log(scale) - log(1 + ((x-loc)/scale)^2)
@@ -180,7 +184,7 @@ def cauchy_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 @torch.jit.script
 def levy_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     # y_pred[:,0] = loc (real), y_pred[:,1] = scale (>0) ; support y_true > loc
-
+    y_true = torch.reshape(y_true, [-1, 1])
     scale = y_pred[:, 0]
     scale = torch.reshape(scale, [-1, 1])
     shifted = y_true
@@ -195,6 +199,7 @@ def levy_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 def beta_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     # y_pred[:,0] = scale (>0), y_pred[:,1] = alpha (>0), y_pred[:,2] = beta (>0)
     # Support: y_true in (0, scale)
+    y_true = torch.reshape(y_true, [-1, 1])
     alpha = y_pred[:, 0]
     alpha = torch.reshape(alpha, [-1, 1])
     beta = y_pred[:, 1]
@@ -223,6 +228,7 @@ def beta_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 def betaprime_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     # y_pred[:,0] = scale (>0), y_pred[:,1] = alpha (>0), y_pred[:,2] = beta (>0)
     # Support: y_true > 0
+    y_true = torch.reshape(y_true, [-1, 1])
     alpha = y_pred[:, 0]
     alpha = torch.reshape(alpha, [-1, 1])
     beta = y_pred[:, 1]
@@ -248,6 +254,7 @@ def betaprime_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
 @torch.jit.script
 def lomax_loss(y_true: torch.Tensor, y_pred: torch.Tensor):
     # y_pred[:,0] = alpha (>0), y_pred[:,1] = scale (>0); support y_true >= 0
+    y_true = torch.reshape(y_true, [-1, 1])
     alpha = y_pred[:, 0]
     alpha = torch.reshape(alpha, [-1, 1])
     scale = y_pred[:, 1]

@@ -1,3 +1,4 @@
+from functools import partial
 import logging
 from typing import Type, Union
 
@@ -19,26 +20,26 @@ from ConfigSpace import (
     Categorical,
     Float,
     Integer,
+    InCondition
 )
 
 
-class DistNet(AbstractEPM):
+class DistNet:
     def __init__(
         self,
         model: Type[Module] = None,
-        optimizer: Type[Optimizer] = torch.optim.RAdam,
+        optimizer: Type[Optimizer] = torch.optim.SGD,
         loss_function=lognorm_loss,
         n_loss_params: int = 2,
-        epochs: int = 10,
+        epochs: int = 200,
         gradient_clip: float = 1e-2,
         batch_size: int = 16,
-        lr_scheduler: Type[LRScheduler] = CosineAnnealingLR,
+        lr_scheduler: Type[LRScheduler] = None,
         device=torch.device("cpu"),
         optimizer_kwargs: dict | None = None,
         **kwargs,
     ):
         # DistNet operates directly on positive runtimes; keep targets untransformed by default
-        super().__init__(normalization_class=DummyNormalization, **kwargs)
         self.n_loss_params = n_loss_params
         self.model = model
         self.optimizer = optimizer
@@ -51,7 +52,7 @@ class DistNet(AbstractEPM):
         self.lr_scheduler = lr_scheduler
         self.logger = logging.getLogger(__name__)
 
-    def _fit(
+    def fit(
         self,
         X: Union[pd.DataFrame, pd.Series, list],
         y: Union[pd.Series, list],
@@ -65,7 +66,7 @@ class DistNet(AbstractEPM):
                 output_size=self.n_loss_params,
                 hidden_sizes=[16, 16],
                 compile=True,
-                dropout=0.5,
+                dropout=0.0,
                 output_activation=ExpActivation(),
             )
 
@@ -77,11 +78,15 @@ class DistNet(AbstractEPM):
 
         if isinstance(X, pd.DataFrame) or isinstance(X, pd.Series):
             X = X.values
-        if isinstance(y, pd.Series):
+        if isinstance(y, pd.DataFrame) or isinstance(y, pd.Series):
             y = y.values
 
-        X = np.concatenate([[x for i in range(100)] for x in X])
-        y = y.flatten()
+        X = np.asarray(X, dtype=np.float32)
+        y = np.asarray(y, dtype=np.float32)
+        X = np.concatenate([[x for i in range(y.shape[1])] for x in X]).astype(
+            np.float32, copy=False
+        )
+        y = y.flatten().astype(np.float32, copy=False)
 
         dataset = RegressionDataset(X, y)
 
@@ -167,9 +172,9 @@ class DistNet(AbstractEPM):
                     "hidden_size", [8, 16, 32, 64, 128], default=16, ordered=True
                 ),
                 Float("dropout", (0.0, 0.5), default=0.0),
-                Categorical("activation", ["tanh", "relu", "gelu"], default="tanh"),
-                Categorical("use_batchnorm", [False, True], default=False),
-                Categorical("optimizer", ["adam", "radam", "sgd"], default="radam"),
+                Categorical("activation", ["relu", "tanh", "gelu"], default="relu"),
+                Categorical("use_batchnorm", [True, False], default=True),
+                Categorical("optimizer", ["sgd", "adam", "radam"], default="sgd"),
                 Float("lr", (1e-4, 1e-1), log=True, default=1e-2),
                 Float("weight_decay", (1e-6, 1e-2), log=True, default=1e-2),
                 Float("momentum", (0.0, 0.95), default=0.9),  # used for SGD only
@@ -177,9 +182,11 @@ class DistNet(AbstractEPM):
                     "batch_size", [16, 32, 64, 128, 256], default=16, ordered=True
                 ),
                 Float("gradient_clip", (1e-3, 10), log=True, default=1e-2),
-                Categorical("scheduler", ["none", "cosine"], default="cosine"),
+                Categorical("scheduler", ["none", "cosine"], default="none"),
             ]
         )
+
+        cs.add(InCondition(cs["momentum"], cs["optimizer"], ["sgd"]))
 
         return cs
 
@@ -187,24 +194,25 @@ class DistNet(AbstractEPM):
     def get_from_configuration(
         *,
         input_size: int,
-        config: dict,
+        output_size: int,
+        configuration: dict,
         **kwargs,
     ) -> "DistNet":
         """Helper to instantiate DistNet given a sampled configuration."""
-        hidden_layers = int(config.get("hidden_layers", 2))
-        hidden_size = int(config.get("hidden_size", 16))
+        hidden_layers = int(configuration.get("hidden_layers", 2))
+        hidden_size = int(configuration.get("hidden_size", 16))
         hidden_sizes = [hidden_size] * hidden_layers
 
-        activation_name = config.get("activation", "tanh")
+        activation_name = configuration.get("activation", "tanh")
         activation_cls = torch.nn.Tanh if activation_name == "tanh" else torch.nn.ReLU
 
-        dropout = float(config.get("dropout", 0.0))
-        use_batchnorm = bool(config.get("use_batchnorm", False))
+        dropout = float(configuration.get("dropout", 0.0))
+        use_batchnorm = bool(configuration.get("use_batchnorm", False))
 
         # Model
         model = get_mlp(
             input_size=input_size,
-            output_size=2,
+            output_size=output_size,
             hidden_sizes=hidden_sizes,
             dropout=dropout,
             output_activation=ExpActivation(),
@@ -214,16 +222,16 @@ class DistNet(AbstractEPM):
         )
 
         # Optimizer and kwargs
-        opt_name = config.get("optimizer", "radam")
-        lr = float(config.get("lr", 1e-2))
-        weight_decay = float(config.get("weight_decay", 0.0))
+        opt_name = configuration.get("optimizer", "radam")
+        lr = float(configuration.get("lr", 1e-2))
+        weight_decay = float(configuration.get("weight_decay", 0.0))
 
         if opt_name == "adam":
             opt_cls = torch.optim.Adam
             opt_kwargs = {"lr": lr, "weight_decay": weight_decay}
         elif opt_name == "sgd":
             opt_cls = torch.optim.SGD
-            momentum = float(config.get("momentum", 0.9))
+            momentum = float(configuration.get("momentum", 0.9))
             opt_kwargs = {
                 "lr": lr,
                 "weight_decay": weight_decay,
@@ -235,13 +243,13 @@ class DistNet(AbstractEPM):
             opt_kwargs = {"lr": lr, "weight_decay": weight_decay}
 
         # Scheduler
-        scheduler_name = config.get("scheduler", "cosine")
+        scheduler_name = configuration.get("scheduler", "cosine")
         scheduler = CosineAnnealingLR if scheduler_name == "cosine" else None
 
         # Training params
-        epochs = int(config.get("epochs", 200))
-        batch_size = int(config.get("batch_size", 16))
-        gradient_clip = float(config.get("gradient_clip", 1e-2))
+        epochs = int(configuration.get("epochs", 200))
+        batch_size = int(configuration.get("batch_size", 16))
+        gradient_clip = float(configuration.get("gradient_clip", 1e-2))
 
         dn_kwargs = {
             "model": model,
@@ -254,4 +262,12 @@ class DistNet(AbstractEPM):
             **kwargs,
         }
 
-        return DistNet(**dn_kwargs)
+        return partial(DistNet, **dn_kwargs)
+    
+    def save(self, path: str):
+        """Saves the DistNet model to the specified path."""
+        torch.save(self.model.state_dict(), path)
+        
+    def load(self, path: str):
+        """Loads the DistNet model from the specified path."""
+        self.model.load_state_dict(torch.load(path))

@@ -39,6 +39,7 @@ def tune_distnet(
     model: type[DistNet],
     X: np.ndarray | pd.DataFrame,
     y: np.ndarray | pd.Series,
+    output_size: int = 2,
     *,
     features_preprocessing: str | object = "default",
     categorical_features: list | None = None,
@@ -133,7 +134,10 @@ def tune_distnet(
             y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
             dn = model.get_from_configuration(
-                input_size=X.shape[1], configuration=config, **distnet_kwargs
+                input_size=X.shape[1],
+                output_size=output_size,
+                configuration=config,
+                **distnet_kwargs,
             )
             dn = dn()
 
@@ -160,7 +164,7 @@ def tune_distnet(
 
     # Build best DistNet (unfitted), mirroring epm_tuner behavior
     best_dn = model.get_from_configuration(
-        input_size=X.shape[1], configuration=best_config, **distnet_kwargs
+        input_size=X.shape[1], output_size=output_size, configuration=best_config, **distnet_kwargs
     )
 
     return best_dn
