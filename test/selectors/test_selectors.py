@@ -122,6 +122,16 @@ def test_simple_ranking(dummy_performance, dummy_features):
     validate_predictions(predictions)
 
 
+def test_pairwise_classifier_numpy_output(dummy_performance, dummy_features):
+    selector = PairwiseClassifier(prediction_mode="numpy", budget=450.0)
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+    import numpy as _np
+
+    assert isinstance(predictions, _np.ndarray), "Expected numpy array output"
+    assert predictions.shape == (len(dummy_features), len(selector.algorithms))
+
+
 def test_joint_ranking(dummy_performance, dummy_features):
     selector = JointRanking(budget=450.0)
     selector.fit(dummy_features, dummy_performance)

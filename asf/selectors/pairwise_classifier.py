@@ -128,6 +128,14 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
         Returns:
             pd.DataFrame: A DataFrame of predictions for each instance and algorithm pair.
         """
+        # Ensure we are working with a pandas DataFrame
+        if not isinstance(features, pd.DataFrame):
+            if hasattr(self, "features") and isinstance(self.features, list):
+                cols = self.features
+            else:
+                cols = [f"f_{i}" for i in range(features.shape[1])]
+            features = pd.DataFrame(features, index=range(len(features)), columns=cols)
+
         cnt = 0
         predictions_sum = pd.DataFrame(0, index=features.index, columns=self.algorithms)
         for i, algorithm in enumerate(self.algorithms):
