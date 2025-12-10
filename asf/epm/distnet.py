@@ -126,7 +126,7 @@ class DistNet:
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
             avg_epoch_loss = total_epoch_loss / len(dataset)
-            self.logger.info(
+            self.logger.debug(
                 f"Epoch {epoch + 1}/{self.epochs}, Train NLLH: {avg_epoch_loss:.6f}, LR {self.lr_scheduler.get_last_lr()[0] if self.lr_scheduler else 'N/A'}"
             )
 
