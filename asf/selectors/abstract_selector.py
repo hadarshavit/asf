@@ -5,6 +5,7 @@ from asf.selectors.feature_generator import (
     AbstractFeatureGenerator,
 )
 import numpy as np
+from sklearn.preprocessing import OneHotEncoder
 
 try:
     from ConfigSpace import ConfigurationSpace, Categorical, Configuration
@@ -40,6 +41,7 @@ class AbstractSelector:
         maximize: bool = False,
         feature_groups: list[str] | None = None,
         hierarchical_generator: AbstractFeatureGenerator | None = None,
+        prediction_mode: str = "aslib",
         **kwargs,
     ):
         """
@@ -61,6 +63,7 @@ class AbstractSelector:
         self.feature_groups = feature_groups
         self.hierarchical_generator = hierarchical_generator
         self.algorithm_features: pd.DataFrame | None = None
+        self.prediction_mode = prediction_mode
 
     def fit(
         self,
@@ -133,7 +136,25 @@ class AbstractSelector:
             A dictionary where keys are algorithm names and values are lists of tuples
             containing feature names and their corresponding scores.
         """
-        if self.hierarchical_generator is not None:
+        # Normalize input features to a pandas DataFrame so downstream code
+        # that relies on DataFrame operations (index/columns) will work.
+        # Accept None as a valid input for selectors that operate without
+        # instance-level input (e.g., collaborative filtering selectors).
+        if features is None:
+            # leave as-is, since some selectors only need performance
+            pass
+        elif isinstance(features, np.ndarray):
+            if hasattr(self, "features") and isinstance(self.features, list):
+                cols = self.features
+            else:
+                cols = [f"f_{i}" for i in range(features.shape[1])]
+            features = pd.DataFrame(features, index=range(len(features)), columns=cols)
+        elif not isinstance(features, pd.DataFrame):
+            raise ValueError(
+                "features must be a numpy array, pandas DataFrame, or None"
+            )
+
+        if self.hierarchical_generator is not None and features is not None:
             features = pd.concat(
                 [features, self.hierarchical_generator.generate_features(features)],
                 axis=1,
@@ -144,13 +165,25 @@ class AbstractSelector:
         else:
             scheds = self._predict(features, performance)
 
-        if self.feature_groups is None:
-            return scheds
+        if self.prediction_mode == "aslib":
+            if self.feature_groups is None:
+                return scheds
 
-        return {
-            instance: list(self.feature_groups) + scheds[instance]
-            for instance in features.index
-        }
+            return {
+                instance: list(self.feature_groups) + scheds[instance]
+                for instance in features.index
+            }
+        elif self.prediction_mode == "pandas":
+            return pd.Series(
+                {instance: scheds[instance][0][0] for instance in features.index}
+            )
+        elif self.prediction_mode == "numpy":
+            base = pd.Series(
+                {instance: scheds[instance][0][0] for instance in features.index}
+            )
+            encoder = OneHotEncoder(sparse_output=False, categories=[self.algorithms])
+            encoded = encoder.fit_transform(base.to_numpy().reshape(-1, 1))
+            return encoded
 
     def save(self, path: str) -> None:
         """

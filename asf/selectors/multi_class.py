@@ -36,7 +36,11 @@ class MultiClassClassifier(AbstractModelBasedSelector):
     PREFIX = "multi_class_classifier"
     RETURN_TYPE = "single"
 
-    def __init__(self, model_class: type[AbstractPredictor], **kwargs):
+    def __init__(
+        self,
+        model_class: type[AbstractPredictor] = RandomForestClassifierWrapper,
+        **kwargs,
+    ):
         """
         Initializes the MultiClassClassifier.
 

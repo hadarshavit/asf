@@ -115,6 +115,18 @@ def test_pairwise_classifier(dummy_performance, dummy_features, model_class):
     validate_predictions(predictions)
 
 
+def test_pairwise_classifier_handles_numpy_input(dummy_performance, dummy_features):
+    # Ensure predict() and fit() handle numpy array inputs as expected
+    from sklearn.ensemble import RandomForestClassifier
+
+    clf = PairwiseClassifier(model_class=RandomForestClassifier)
+    # Fit with numpy arrays
+    clf.fit(dummy_features.to_numpy(), dummy_performance.to_numpy())
+    # Predict with numpy array inputs
+    predictions = clf.predict(dummy_features.to_numpy())
+    validate_predictions(predictions)
+
+
 @pytest.mark.parametrize(
     "model_class",
     [
