@@ -2,6 +2,7 @@ from asf.epm.epm import AbstractEPM
 from asf.epm.single_value_epm import SingleValueEPM
 from asf.epm.distnet import DistNet
 from asf.epm.xgb_dist import XGBDistNet
+from asf.epm.ngb_dist import NGBDistNet
 from asf.epm.epm_tuner import tune_epm
 from asf.epm.distnet_tuner import tune_distnet
 
@@ -10,6 +11,7 @@ __all__ = [
     "SingleValueEPM",
     "DistNet",
     "XGBDistNet",
+    "NGBDistNet",
     "tune_epm",
     "tune_distnet",
 ]
