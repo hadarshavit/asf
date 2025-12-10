@@ -36,7 +36,6 @@ class XGBDistNet:
         output_activation=ExpActivation(),
         stabilization: str = "MAD",
         use_start_values: bool = True,
-        natural_gradient: bool = False,
         early_stopping_rounds: int | None = None,
         early_stopping_tolerance: float = 0.0,
         device: str = "cpu",
@@ -48,7 +47,6 @@ class XGBDistNet:
         self.output_activation = output_activation
         self.stabilization = stabilization
         self.use_start_values = use_start_values
-        self.natural_gradient = natural_gradient
         self.early_stopping_rounds = early_stopping_rounds
         self.early_stopping_tolerance = early_stopping_tolerance
 
@@ -154,20 +152,7 @@ class XGBDistNet:
             grad_raw = torch.autograd.grad(loss, inputs=raw, create_graph=True)[0]
 
             # Diagonal Hessian wrt raw margins
-            if self.natural_gradient and self.loss_function.__name__ == "lognorm_loss":
-                # Fisher Information for LogNormal with ExpActivation
-                # Param 0: log(sigma). Fisher = 2.0
-                # Param 1: mu. Fisher = 1/sigma^2
-                
-                sigma = activated[:, 0]
-                
-                hess_raw = torch.zeros_like(grad_raw)
-                hess_raw[:, 0] = 2.0
-                hess_raw[:, 1] = 1.0 / (sigma ** 2 + 1e-12)
-                
-                # Clamp Hessian to avoid numerical instability
-                hess_raw = torch.clamp(hess_raw, max=1e6)
-            elif grad_raw.dim() == 1:
+            if grad_raw.dim() == 1:
                 hess_raw = torch.autograd.grad(
                     grad_raw.sum(), inputs=raw, retain_graph=True
                 )[0]
@@ -182,7 +167,7 @@ class XGBDistNet:
                 hess_raw = torch.stack(h_cols, dim=1)
 
             # Apply stabilization
-            if self.stabilization != "None" and not self.natural_gradient:
+            if self.stabilization != "None":
                 if grad_raw.dim() == 1:
                     grad_raw = self.stabilize_derivative(
                         grad_raw, type=self.stabilization
@@ -552,9 +537,6 @@ class XGBDistNet:
         use_start_values = Categorical(
             f"{prefix}:use_start_values", [True, False], default=True
         )
-        natural_gradient = Categorical(
-            f"{prefix}:natural_gradient", [True, False], default=False
-        )
 
         params = [
             booster,
@@ -569,7 +551,6 @@ class XGBDistNet:
             multi_strategy,
             stabilization,
             use_start_values,
-            natural_gradient,
         ]
         if parent_param is not None:
             conditions = [
@@ -627,7 +608,6 @@ class XGBDistNet:
             "multi_strategy": configuration[f"{prefix}:multi_strategy"],
             "stabilization": configuration[f"{prefix}:stabilization"],
             "use_start_values": configuration[f"{prefix}:use_start_values"],
-            "natural_gradient": configuration[f"{prefix}:natural_gradient"],
             **kwargs,
         }
 
