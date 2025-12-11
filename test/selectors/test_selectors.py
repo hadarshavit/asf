@@ -474,3 +474,58 @@ def test_cosine_selector_random_forest(dummy_performance, dummy_features):
     sel.fit(dummy_features, dummy_performance, alg_df)
     preds = sel.predict(dummy_features)
     validate_predictions(preds)
+
+
+def test_apps_selector(dummy_performance, dummy_features):
+    """Test the APPS (Automatic Parallel Portfolio Selector)."""
+    from asf.selectors.parallel_portfolio_selector import APPS
+
+    selector = APPS(
+        model_class=RandomForestRegressorWrapper,
+        p_intersection=0.1,
+        n_estimators_for_std=3,
+        random_state=42,
+    )
+
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+
+    assert len(predictions) == len(dummy_features), "Predictions length mismatch"
+    assert all(isinstance(v, list) for v in predictions.values()), (
+        "Not all predictions are lists"
+    )
+
+    for inst_name, portfolio in predictions.items():
+        assert len(portfolio) > 0, f"Empty portfolio for {inst_name}"
+        assert all(isinstance(algo, str) for algo in portfolio), (
+            f"Portfolio for {inst_name} contains non-string elements"
+        )
+        assert all(algo in ["algo1", "algo2", "algo3"] for algo in portfolio), (
+            f"Portfolio for {inst_name} contains invalid algorithm names"
+        )
+        assert len(portfolio) >= 1, f"Portfolio size < 1 for {inst_name}"
+
+
+def test_apps_selector_different_thresholds(dummy_performance, dummy_features):
+    """Test that different p_intersection values produce different portfolio sizes."""
+    from asf.selectors.parallel_portfolio_selector import APPS
+
+    portfolios_by_p = {}
+
+    for p_val in [0.01, 0.5]:
+        selector = APPS(
+            model_class=RandomForestRegressorWrapper,
+            p_intersection=p_val,
+            n_estimators_for_std=3,
+            random_state=42,
+        )
+        selector.fit(dummy_features, dummy_performance)
+        predictions = selector.predict(dummy_features)
+
+        avg_size = np.mean([len(portfolio) for portfolio in predictions.values()])
+        portfolios_by_p[p_val] = avg_size
+
+    # Lower p_intersection should result in larger portfolios
+    assert portfolios_by_p[0.01] > portfolios_by_p[0.5], (
+        "Lower p_intersection should produce larger portfolios"
+    )
