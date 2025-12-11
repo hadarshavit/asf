@@ -138,10 +138,19 @@ class AbstractSelector:
                 [features, self.hierarchical_generator.generate_features(features)],
                 axis=1,
             )
+
         if performance is None:
-            return self._predict(features)
+            scheds = self._predict(features)
         else:
-            return self._predict(features, performance)
+            scheds = self._predict(features, performance)
+
+        if self.feature_groups is None:
+            return scheds
+
+        return {
+            instance: tuple(self.feature_groups) + scheds[instance]
+            for instance in features.index
+        }
 
     def save(self, path: str) -> None:
         """

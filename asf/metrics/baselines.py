@@ -2,8 +2,15 @@ import pandas as pd
 import warnings
 import numpy as np
 
+from asf.preprocessing.feature_group_selector import MissingPrerequisiteGroupError
 
-def single_best_solver(performance: pd.DataFrame, maximize: bool = False) -> float:
+
+def single_best_solver(
+    performance: pd.DataFrame,
+    maximize: bool = False,
+    budget: float = 5000.0,
+    par: float = 10,
+) -> float:
     """
     Selects the single best solver across all instances based on the aggregated performance.
 
@@ -15,14 +22,22 @@ def single_best_solver(performance: pd.DataFrame, maximize: bool = False) -> flo
     Returns:
         float: The best aggregated performance value across all instances.
     """
-    perf_sum = performance.sum(axis=0)
+    if budget is not None and par is not None:
+        performance = np.where(performance <= budget, performance, budget * par)
+
+    perf_sum = np.sum(performance, axis=0)
     if maximize:
-        return perf_sum.max()
+        return np.max(perf_sum)
     else:
-        return perf_sum.min()
+        return np.min(perf_sum)
 
 
-def virtual_best_solver(performance: pd.DataFrame, maximize: bool = False) -> float:
+def virtual_best_solver(
+    performance: pd.DataFrame,
+    maximize: bool = False,
+    budget: float = 5000.0,
+    par: float = 10,
+) -> float:
     """
     Selects the virtual best solver for each instance by choosing the best performance per instance.
 
@@ -34,14 +49,17 @@ def virtual_best_solver(performance: pd.DataFrame, maximize: bool = False) -> fl
     Returns:
         float: The sum of the best performance values for each instance.
     """
+    if budget is not None and par is not None:
+        performance = np.where(performance <= budget, performance, budget * par)
+
     if maximize:
-        return performance.max(axis=1).sum()
+        return np.max(performance, axis=1).sum()
     else:
-        return performance.min(axis=1).sum()
+        return np.min(performance, axis=1).sum()
 
 
 def running_time_selector_performance(
-    schedules: dict[str, list[tuple[str, float]]],
+    schedules: dict[str, list[tuple[str, float] | str]],
     performance: pd.DataFrame,
     budget: float = 5000,
     par: float = 10,
@@ -50,16 +68,26 @@ def running_time_selector_performance(
     """
     Calculates the total running time for a selector based on the given schedules and performance data.
 
+    The schedule can contain both feature groups (strings) and algorithm selections (tuples).
+    Feature groups are evaluated in order, and their computation time is only added if the
+    instance is not yet solved when the feature group appears in the schedule.
+
+    If the schedule contains no feature groups (only algorithm tuples) but feature_time is provided,
+    all feature time is added upfront for backward compatibility.
+
     Args:
-    schedules (dict[str, list[tuple[str, float]]]): The schedules to evaluate, where each key is an instance
-            and the value is a list of tuples (algorithm, allocated budget).
+        schedules (dict[str, list[tuple[str, float] | str]]): The schedules to evaluate, where each key is an instance
+            and the value is a list of items. Each item can be:
+            - A string: the name of a feature group to compute
+            - A tuple (algorithm, allocated_budget): an algorithm to run with its allocated budget
         performance (pd.DataFrame): The performance data for the algorithms.
         budget (float): The budget for the scenario.
         par (float): The penalization factor for unsolved instances.
-    feature_time (pd.DataFrame | None): The feature time data for each instance. Defaults to zero if not provided.
+        feature_time (pd.DataFrame | None): The feature time data for each instance.
+            Should have columns corresponding to feature group names. Defaults to zero if not provided.
 
     Returns:
-    dict[str, float | int]: A dictionary mapping each instance to its total running time.
+        dict[str, float | int]: A dictionary mapping each instance to its total running time.
     """
     if feature_time is None:
         feature_time = pd.DataFrame(
@@ -68,17 +96,33 @@ def running_time_selector_performance(
     total_time = {}
     for instance, schedule in schedules.items():
         allocated_times = {algorithm: 0 for algorithm in performance.columns}
+        instance_feature_time = 0.0
+        has_feature_groups_in_schedule = any(isinstance(item, str) for item in schedule)
+
+        # For backward compatibility: if no feature groups in schedule, add all feature time upfront
+        if not has_feature_groups_in_schedule:
+            instance_feature_time = feature_time.loc[instance].sum()
+            if hasattr(instance_feature_time, "item"):
+                instance_feature_time = instance_feature_time.item()
+
         solved = False
-        for algorithm, algo_budget in schedule:
+        for item in schedule:
+            # Check if item is a feature group (string) or algorithm selection (tuple)
+            if isinstance(item, str):
+                # Feature group: add its computation time if available
+                if item in feature_time.columns:
+                    instance_feature_time += feature_time.loc[instance, item]
+                continue
+
+            # Algorithm selection: (algorithm, algo_budget)
+            algorithm, algo_budget = item
             remaining_budget = (
-                budget
-                - sum(allocated_times.values())
-                - feature_time.loc[instance].sum().item()
+                budget - sum(allocated_times.values()) - instance_feature_time
             )
             remaining_time_to_solve = performance.loc[instance, algorithm] - (
                 algo_budget + allocated_times[algorithm]
             )
-            if remaining_time_to_solve < 0:
+            if remaining_time_to_solve <= 0:
                 allocated_times[algorithm] = performance.loc[instance, algorithm]
                 solved = True
                 break
@@ -88,9 +132,7 @@ def running_time_selector_performance(
                 allocated_times[algorithm] += remaining_budget
                 break
         if solved:
-            total_time[instance] = (
-                sum(allocated_times.values()) + feature_time.loc[instance].sum().item()
-            )
+            total_time[instance] = sum(allocated_times.values()) + instance_feature_time
         else:
             total_time[instance] = budget * par
 
@@ -98,29 +140,89 @@ def running_time_selector_performance(
     return total_time
 
 
+def _validate_schedule_prerequisites(
+    schedules: dict[str, list[tuple[str, float] | str]],
+    feature_groups: dict,
+) -> None:
+    """
+    Validate that feature groups in schedules have their prerequisites computed first.
+
+    For each schedule, ensures that if a feature group is used, all of its required
+    prerequisite groups appear before it in the schedule.
+
+    Args:
+        schedules: The schedules to validate.
+        feature_groups: Feature group definitions with 'requires' information.
+
+    Raises:
+        MissingPrerequisiteGroupError: If a feature group is used without its required
+            prerequisite groups appearing first in the schedule.
+    """
+    for instance, schedule in schedules.items():
+        # Extract feature groups from this schedule in order
+        schedule_feature_groups = [item for item in schedule if isinstance(item, str)]
+
+        if not schedule_feature_groups:
+            continue
+
+        # Check that prerequisites are satisfied
+        computed_groups = set()
+        for fg_name in schedule_feature_groups:
+            if fg_name not in feature_groups:
+                computed_groups.add(fg_name)
+                continue
+
+            fg_info = feature_groups[fg_name]
+            required_groups = fg_info.get("requires", [])
+
+            for required_group in required_groups:
+                if required_group not in computed_groups:
+                    raise MissingPrerequisiteGroupError(
+                        f"Feature group '{fg_name}' requires group '{required_group}' "
+                        f"to be computed first, but it was not found before '{fg_name}' "
+                        f"in the schedule for instance '{instance}'. "
+                        f"Schedule feature groups: {schedule_feature_groups}"
+                    )
+
+            computed_groups.add(fg_name)
+
+
 def running_time_closed_gap(
-    schedules: dict[str, list[tuple[str, float]]],
+    schedules: dict[str, list[tuple[str, float] | str]],
     performance: pd.DataFrame,
     budget: float,
     feature_time: pd.DataFrame,
     par: float = 10,
+    feature_groups: dict | None = None,
 ) -> float:
     """
     Calculates the closed gap metric for a given selector.
 
     Args:
-    schedules (dict[str, list[tuple[str, float]]]): The schedules to evaluate.
+        schedules (dict[str, list[tuple[str, float] | str]]): The schedules to evaluate.
+            Each schedule can contain feature groups (strings) and algorithm selections (tuples).
         performance (pd.DataFrame): The performance data for the algorithms.
         budget (float): The budget for the scenario.
         par (float): The penalization factor for unsolved instances.
         feature_time (pd.DataFrame): The feature time data for each instance.
+        feature_groups (dict | None): Feature group definitions including prerequisite information.
+            When provided, validates that schedules don't use feature groups without their
+            required prerequisites appearing first in the schedule.
 
     Returns:
         float: The closed gap value, representing the improvement of the selector over the single best solver
         relative to the virtual best solver.
+
+    Raises:
+        MissingPrerequisiteGroupError: If a schedule uses a feature group without its required
+            prerequisite groups appearing first in the schedule.
     """
-    sbs_val = single_best_solver(performance, False)
-    vbs_val = virtual_best_solver(performance, False)
+    # Validate feature group prerequisites if feature_groups is provided
+    if feature_groups is not None:
+        _validate_schedule_prerequisites(schedules, feature_groups)
+
+    sbs_val = single_best_solver(performance, False, budget, par)
+    vbs_val = virtual_best_solver(performance, False, budget, par)
     s_val = running_time_selector_performance(
         schedules, performance, budget, par, feature_time
     )
