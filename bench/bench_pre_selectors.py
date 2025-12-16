@@ -14,14 +14,12 @@ import logging
 import os
 import time
 import resource
-from math import comb
 import submitit
 import pandas as pd
 
 from asf.metrics.baselines import virtual_best_solver, single_best_solver
 from asf.pre_selector import (
     BeamSearchPreSelector,
-    BruteForcePreSelector,
     GeneticAlgorithmPreSelector,
     MarginalContributionBasedPreSelector,
     OptimizePreSelection,
@@ -182,7 +180,6 @@ def benchmark_pre_selector(
 
 def run_fold_benchmark(
     scenario_path: str,
-    fold: int,
     n_algorithms: int = 5,
     par_factor: float = 10.0,
     output: str = "results",
@@ -192,118 +189,118 @@ def run_fold_benchmark(
 
     Args:
         scenario_path: Path to ASlib scenario.
-        fold: Fold number (1-10).
         n_algorithms: Number of algorithms to select.
         par_factor: PAR factor for penalization.
 
     Returns:
         List of result dictionaries.
     """
-    scenario_name = os.path.basename(scenario_path)
+    for fold in range(1, 11):
+        scenario_name = os.path.basename(scenario_path)
 
-    # Load scenario
-    (
-        features,
-        performance,
-        features_running_time,
-        cv,
-        feature_groups,
-        maximize,
-        budget,
-        algorithm_features,
-    ) = read_aslib_scenario(scenario_path, training_par_factor=par_factor)
+        # Load scenario
+        (
+            features,
+            performance,
+            features_running_time,
+            cv,
+            feature_groups,
+            maximize,
+            budget,
+            algorithm_features,
+        ) = read_aslib_scenario(scenario_path, training_par_factor=par_factor)
 
-    # Align indices
-    common_idx = features.index.intersection(cv.index)
-    performance = performance.loc[common_idx]
-    cv = cv.loc[common_idx]
+        # Align indices
+        common_idx = features.index.intersection(cv.index)
+        performance = performance.loc[common_idx]
+        cv = cv.loc[common_idx]
 
-    # Get training performance for this fold
-    train_instance_ids = cv.index[cv["fold"] != fold].unique()
-    train_performance = performance.loc[train_instance_ids]
+        # Get training performance for this fold
+        train_instance_ids = cv.index[cv["fold"] != fold].unique()
+        train_performance = performance.loc[train_instance_ids]
 
-    # Define metric (VBS on training data)
-    def vbs_metric(perf):
-        return virtual_best_solver(
-            perf, maximize=maximize, budget=budget, par=par_factor
+        # Define metric (VBS on training data)
+        def vbs_metric(perf):
+            return virtual_best_solver(
+                perf, maximize=maximize, budget=budget, par=par_factor
+            )
+
+        # Calculate baselines on training data
+        vbs_score = vbs_metric(train_performance)
+        sbs_score = single_best_solver(
+            train_performance, maximize=maximize, budget=budget, par=par_factor
         )
 
-    # Calculate baselines on training data
-    vbs_score = vbs_metric(train_performance)
-    sbs_score = single_best_solver(
-        train_performance, maximize=maximize, budget=budget, par=par_factor
-    )
+        n_total_algorithms = len(train_performance.columns)
 
-    n_total_algorithms = len(train_performance.columns)
+        if n_algorithms > n_total_algorithms:
+            return
 
-    if n_algorithms > n_total_algorithms:
-        return
+        results = []
 
-    results = []
-
-    # Get pre-selectors
-    pre_selectors = get_pre_selectors(
-        n_algorithms=n_algorithms,
-        metric=vbs_metric,
-        maximize=maximize,
-    )
-
-    # Add brute force only for small scenarios
-    if comb(n_total_algorithms, n_algorithms) <= 10_000_000:
-        pre_selectors["BruteForce"] = BruteForcePreSelector(
-            metric=vbs_metric,
+        # Get pre-selectors
+        pre_selectors = get_pre_selectors(
             n_algorithms=n_algorithms,
+            metric=vbs_metric,
             maximize=maximize,
         )
 
-    for pre_selector_name, pre_selector in pre_selectors.items():
-        logger.info(f"  Running {pre_selector_name}...")
+        # Add brute force only for small scenarios
+        # if comb(n_total_algorithms, n_algorithms) <= 10_000_000:
+        #     pre_selectors["BruteForce"] = BruteForcePreSelector(
+        #         metric=vbs_metric,
+        #         n_algorithms=n_algorithms,
+        #         maximize=maximize,
+        #     )
 
-        score, elapsed_wall_time, elapsed_cpu_time, selected_algorithms = (
-            benchmark_pre_selector(
-                pre_selector,
-                train_performance,
-                vbs_metric,
+        for pre_selector_name, pre_selector in pre_selectors.items():
+            logger.info(f"  Running {pre_selector_name}...")
+
+            score, elapsed_wall_time, elapsed_cpu_time, selected_algorithms = (
+                benchmark_pre_selector(
+                    pre_selector,
+                    train_performance,
+                    vbs_metric,
+                )
             )
-        )
 
-        # Calculate relative performance (lower is better for minimization)
-        # Normalized score: (score - VBS) / (SBS - VBS) for minimization
-        if not maximize:
-            if sbs_score != vbs_score:
-                normalized_score = (sbs_score - score) / (sbs_score - vbs_score)
+            # Calculate relative performance (lower is better for minimization)
+            # Normalized score: (score - VBS) / (SBS - VBS) for minimization
+            if not maximize:
+                if sbs_score != vbs_score:
+                    normalized_score = (sbs_score - score) / (sbs_score - vbs_score)
+                else:
+                    normalized_score = 0.0
             else:
-                normalized_score = 0.0
+                if sbs_score != vbs_score:
+                    normalized_score = (score - sbs_score) / (vbs_score - sbs_score)
+                else:
+                    normalized_score = 0.0
+
+            results.append(
+                {
+                    "scenario": scenario_name,
+                    "fold": fold,
+                    "pre_selector": pre_selector_name,
+                    "n_algorithms_selected": n_algorithms,
+                    "n_algorithms_total": n_total_algorithms,
+                    "score": score,
+                    "vbs_score": vbs_score,
+                    "sbs_score": sbs_score,
+                    "normalized_score": normalized_score,
+                    "wall_time_seconds": elapsed_wall_time,
+                    "cpu_time_seconds": elapsed_cpu_time,
+                    "selected_algorithms": ",".join(selected_algorithms)
+                    if selected_algorithms
+                    else "",
+                    "maximize": maximize,
+                }
+            )
+
+        if os.path.exists(path := output):
+            pd.DataFrame(results).to_csv(path, header=False, mode="a", index=False)
         else:
-            if sbs_score != vbs_score:
-                normalized_score = (score - sbs_score) / (vbs_score - sbs_score)
-            else:
-                normalized_score = 0.0
-
-        results.append(
-            {
-                "scenario": scenario_name,
-                "fold": fold,
-                "pre_selector": pre_selector_name,
-                "n_algorithms_selected": n_algorithms,
-                "n_algorithms_total": n_total_algorithms,
-                "score": score,
-                "vbs_score": vbs_score,
-                "sbs_score": sbs_score,
-                "normalized_score": normalized_score,
-                "wall_time_seconds": elapsed_wall_time,
-                "cpu_time_seconds": elapsed_cpu_time,
-                "selected_algorithms": ",".join(selected_algorithms)
-                if selected_algorithms
-                else "",
-                "maximize": maximize,
-            }
-        )
-
-    if os.path.exists(path := output):
-        pd.DataFrame(results).to_csv(path, header=False, mode="a", index=False)
-    else:
-        pd.DataFrame(results).to_csv(path, header=True, index=False)
+            pd.DataFrame(results).to_csv(path, header=True, index=False)
 
 
 if __name__ == "__main__":
@@ -313,7 +310,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--base-path",
         type=str,
-        default="/home/shavit/asf/paper/aslib_data",
+        default="/home/ni574034/asf/bench/aslib_data",
         help="Base path to ASlib scenarios",
     )
     parser.add_argument(
@@ -328,7 +325,6 @@ if __name__ == "__main__":
             "MAXSAT19-UCMS",
             "CSP-Minizinc-Time-2016",
             "ASP-POTASSCO",
-            "OPENML-WEKA-2017",
             "BNSL-2016",
             "GRAPHS-2015",
         ],
@@ -350,7 +346,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output",
         type=str,
-        default="/home/shavit/asf/bench/results/pre_selector_benchmark.csv",
+        default="/home/ni574034/asf/bench/results/pre_selector_benchmark.csv",
         help="Output CSV file path",
     )
 
@@ -358,14 +354,19 @@ if __name__ == "__main__":
 
     executor = submitit.AutoExecutor("logs", "slurm")
     executor.update_parameters(
-        timeout_min=60 * 24 * 2,
-        slurm_partition="Kathleen",
+        timeout_min=60 * 24 * 1,
+        slurm_partition="c23ms",
         slurm_array_parallelism=1200,
         cpus_per_task=1,
         mem_gb=15.7 * 1,
         tasks_per_node=1,
-        slurm_job_name="DIST",
-        slurm_qos="medium",
+        slurm_job_name="PRESELECTOR_BENCH",
+        slurm_account="lect0117",
+        slurm_setup=[
+            "module load -q GCCcore/12.2.0",
+            "module load -q Python/3.10.8",
+            "source /home/ni574034/venvs/asf_env/bin/activate",
+        ],
     )
     with executor.batch():
         for scenario in args.scenarios:
@@ -373,15 +374,13 @@ if __name__ == "__main__":
 
             for n_algorithms in args.n_algorithms:
                 logger.info(f" n_algorithms={n_algorithms}")
-                for fold in range(1, 11):
-                    try:
-                        executor.submit(
-                            run_fold_benchmark,
-                            scenario_path=scenario_path,
-                            fold=fold,
-                            n_algorithms=n_algorithms,
-                            par_factor=args.par_factor,
-                            output=args.output,
-                        )
-                    except Exception as e:
-                        logger.error(f"Error on fold {fold}: {e}")
+                try:
+                    executor.submit(
+                        run_fold_benchmark,
+                        scenario_path=scenario_path,
+                        n_algorithms=n_algorithms,
+                        par_factor=args.par_factor,
+                        output=args.output,
+                    )
+                except Exception as e:
+                    logger.error(f"Error on fold {e}")

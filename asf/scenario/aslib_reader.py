@@ -63,7 +63,9 @@ def read_aslib_scenario(
     features: list[str] = description["features_deterministic"]
     feature_groups: list[str] = description["feature_steps"]
     algorithm_feature_groups: dict = description.get("algorithm_feature_steps", {})
-    maximize: bool = description["maximize"][0]
+    maximize: bool = description["maximize"]
+    if type(maximize) is not bool:
+        maximize = maximize[0]
     budget: float = description["algorithm_cutoff_time"]
 
     # Load performance data
@@ -268,6 +270,9 @@ def evaluate_selector(
     X_test = features.loc[test_instance_ids]
     y_test = performance.loc[test_instance_ids]
 
+    features_running_time_train = features_running_time.loc[train_instance_ids]
+    features_running_time_test = features_running_time.loc[test_instance_ids]
+
     if hpo_func is None:
         base_selector = selector_class(
             budget=budget, maximize=maximize, feature_groups=feature_groups
@@ -285,6 +290,8 @@ def evaluate_selector(
             selector_class=selector_class,
             X=X_train,
             y=y_train,
+            features_running_time=features_running_time_train,
+            algorithm_features=algorithm_features,
             maximize=maximize,
             budget=budget,
             feature_groups=feature_groups,
@@ -293,9 +300,10 @@ def evaluate_selector(
         )
 
     selector.fit(X_train, y_train, algorithm_features=algorithm_features)
-
     # Predict and evaluate
     predictions = selector.predict(X_test)
-    test_score = metric(predictions, y_test, budget, features_running_time)
+
+    # max_feature_time is no longer passed to metric; budgets are in the schedule itself
+    test_score = metric(predictions, y_test, budget, features_running_time_test)
 
     return test_score, selector

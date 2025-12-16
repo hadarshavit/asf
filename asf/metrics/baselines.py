@@ -62,8 +62,8 @@ def running_time_selector_performance(
     schedules: dict[str, list[tuple[str, float] | str]],
     performance: pd.DataFrame,
     budget: float = 5000,
-    par: float = 10,
     feature_time: pd.DataFrame | None = None,
+    par: float = 10,
 ) -> dict[str, float | int]:
     """
     Calculates the total running time for a selector based on the given schedules and performance data.
@@ -78,13 +78,16 @@ def running_time_selector_performance(
     Args:
         schedules (dict[str, list[tuple[str, float] | str]]): The schedules to evaluate, where each key is an instance
             and the value is a list of items. Each item can be:
-            - A string: the name of a feature group to compute
-            - A tuple (algorithm, allocated_budget): an algorithm to run with its allocated budget
+            - A string: the name of a feature group to compute (uses full actual time)
+            - A tuple (feature_group, budget): a feature group to compute with a time budget (uses min(actual_time, budget))
+            - A tuple (algorithm, budget): an algorithm to run with its allocated budget
         performance (pd.DataFrame): The performance data for the algorithms.
         budget (float): The budget for the scenario.
         par (float): The penalization factor for unsolved instances.
         feature_time (pd.DataFrame | None): The feature time data for each instance.
             Should have columns corresponding to feature group names. Defaults to zero if not provided.
+        max_feature_time (float | None): Deprecated parameter, kept for backward compatibility. No longer used.
+            Feature group budgets are now specified directly in the schedule.
 
     Returns:
         dict[str, float | int]: A dictionary mapping each instance to its total running time.
@@ -93,11 +96,21 @@ def running_time_selector_performance(
         feature_time = pd.DataFrame(
             0, index=performance.index, columns=["feature_time"]
         )
+
     total_time = {}
     for instance, schedule in schedules.items():
         allocated_times = {algorithm: 0 for algorithm in performance.columns}
         instance_feature_time = 0.0
-        has_feature_groups_in_schedule = any(isinstance(item, str) for item in schedule)
+        # Check if schedule contains feature groups (strings or tuples where name is in feature_time.columns)
+        has_feature_groups_in_schedule = any(
+            isinstance(item, str)
+            or (
+                isinstance(item, tuple)
+                and len(item) >= 2
+                and item[0] in feature_time.columns
+            )
+            for item in schedule
+        )
 
         # For backward compatibility: if no feature groups in schedule, add all feature time upfront
         if not has_feature_groups_in_schedule:
@@ -107,15 +120,47 @@ def running_time_selector_performance(
 
         solved = False
         for item in schedule:
-            # Check if item is a feature group (string) or algorithm selection (tuple)
+            # Check if item is a feature group (string or tuple) or algorithm selection (tuple)
             if isinstance(item, str):
-                # Feature group: add its computation time if available
+                # Feature group without budget: add its full computation time if available
                 if item in feature_time.columns:
-                    instance_feature_time += feature_time.loc[instance, item]
+                    ft_val = feature_time.loc[instance, item]
+                    # guard against NaN values in feature time
+                    if hasattr(ft_val, "item"):
+                        ft_val = ft_val.item()
+                    instance_feature_time += (
+                        0.0
+                        if (
+                            ft_val is None
+                            or (isinstance(ft_val, float) and np.isnan(ft_val))
+                        )
+                        else ft_val
+                    )
+                continue
+
+            # It's a tuple: could be (feature_group, budget) or (algorithm, budget)
+            # Distinguish by checking if first element is in feature_time columns
+            item_name, item_budget = item
+            if item_name in feature_time.columns:
+                # Feature group with budget: use min(actual_time, budget)
+                ft_val = feature_time.loc[instance, item_name]
+                if hasattr(ft_val, "item"):
+                    ft_val = ft_val.item()
+                actual_ft = (
+                    0.0
+                    if (
+                        ft_val is None
+                        or (isinstance(ft_val, float) and np.isnan(ft_val))
+                    )
+                    else ft_val
+                )
+                instance_feature_time += min(actual_ft, item_budget)
                 continue
 
             # Algorithm selection: (algorithm, algo_budget)
-            algorithm, algo_budget = item
+            algorithm, algo_budget = item_name, item_budget
+            if algo_budget is None:
+                algo_budget = 0.0
             remaining_budget = (
                 budget - sum(allocated_times.values()) - instance_feature_time
             )
@@ -131,12 +176,14 @@ def running_time_selector_performance(
             else:
                 allocated_times[algorithm] += remaining_budget
                 break
+
         if solved:
             total_time[instance] = sum(allocated_times.values()) + instance_feature_time
         else:
             total_time[instance] = budget * par
 
     total_time = sum(list(total_time.values()))
+
     return total_time
 
 
@@ -208,6 +255,8 @@ def running_time_closed_gap(
         feature_groups (dict | None): Feature group definitions including prerequisite information.
             When provided, validates that schedules don't use feature groups without their
             required prerequisites appearing first in the schedule.
+        max_feature_time (float | None): Deprecated parameter, kept for backward compatibility. No longer used.
+            Feature group budgets are now specified directly in the schedule.
 
     Returns:
         float: The closed gap value, representing the improvement of the selector over the single best solver
@@ -224,7 +273,7 @@ def running_time_closed_gap(
     sbs_val = single_best_solver(performance, False, budget, par)
     vbs_val = virtual_best_solver(performance, False, budget, par)
     s_val = running_time_selector_performance(
-        schedules, performance, budget, par, feature_time
+        schedules, performance, budget, feature_time, par
     )
 
     return (sbs_val - s_val) / (sbs_val - vbs_val)
