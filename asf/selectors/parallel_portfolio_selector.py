@@ -20,7 +20,7 @@ class APPS(AbstractSelector):
     """
 
     PREFIX = "parallel_portfolio"
-    RETURN_TYPE = "schedule"
+    RETURN_TYPE = "portfolio"
 
     def __init__(
         self,
@@ -60,11 +60,11 @@ class APPS(AbstractSelector):
         n_instances = len(features)
 
         # Train bootstrap ensemble for each algorithm
-        for algo_idx, algorithm in enumerate(self.algorithms):
+        for algo_idx, _ in enumerate(self.algorithms):
             algo_models = []
             algo_performance = performance.iloc[:, algo_idx]
 
-            for boot_idx in range(self.n_estimators_for_std):
+            for _ in range(self.n_estimators_for_std):
                 sample_indices = rng.choice(n_instances, size=n_instances, replace=True)
                 X_boot = features.iloc[sample_indices]
                 y_boot = algo_performance.iloc[sample_indices]

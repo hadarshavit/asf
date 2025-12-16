@@ -37,7 +37,7 @@ def evaluate_parallel_portfolio(preds, true_perf, budget):
     total = len(preds)
 
     for inst, algo_list in preds.items():
-        if inst not in true_perf.index or not algo_list:
+        if inst not in true_perf.index:
             continue
 
         # Check if any algorithm in the portfolio solves the instance
@@ -102,7 +102,7 @@ def main():
         sel = APPS(
             model_class=RandomForestRegressorWrapper,
             p_intersection=p_int,
-            n_estimators_for_std=5,  # Lower for faster training in example
+            n_estimators_for_std=5,
             random_state=42,
         )
         sel.fit(X_train, Y_train)
