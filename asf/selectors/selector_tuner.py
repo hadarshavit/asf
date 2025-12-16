@@ -22,7 +22,6 @@ try:
         Categorical,
         ConfigurationSpace,
         UniformFloatHyperparameter,
-        UniformIntegerHyperparameter,
         ForbiddenAndConjunction,
         ForbiddenEqualsClause,
     )
@@ -48,12 +47,119 @@ from asf.utils.groupkfoldshuffle import GroupKFoldShuffle
 from asf.preprocessing.feature_group_selector import FeatureGroupSelector
 
 
+def _create_pipeline(
+    config,
+    cs_transform,
+    budget,
+    maximize,
+    selector_kwargs,
+    feature_selector,
+    algorithm_pre_selector,
+    max_feature_time: float | None = None,
+):
+    """Helper function to create a SelectorPipeline from a configuration.
+
+    Parameters:
+        max_feature_time: Optional budget (seconds) to allocate per feature group.
+    """
+    # Preprocessor selection
+    preprocessors = None
+    if "preprocessors" in cs_transform:
+        preprocessors = [
+            preproc
+            for i, preproc in enumerate(cs_transform["preprocessors"])
+            if config.get(f"preprocessor_{i}")
+        ]
+        if not preprocessors:
+            preprocessors = None
+
+    # Presolver selection and budget
+    presolver = None
+    presolver_budget = None
+    if "presolver" in cs_transform:
+        if config["presolver"] != "None":
+            presolver_class = cs_transform["presolver"][config["presolver"]]
+            presolver_name = config["presolver"]
+            # Extract presolver_budget from configuration
+            budget_key = f"{presolver_name}:presolver_budget"
+            if budget_key in config:
+                presolver_budget = config[budget_key]
+
+            if presolver_class is not None:
+                presolver = presolver_class.get_from_configuration(
+                    configuration=config,
+                    cs_transform=cs_transform,
+                    budget=presolver_budget,
+                    maximize=maximize,
+                    presolver_name=presolver_name,
+                )
+
+    # Feature group selection
+    selected_feature_groups = None
+    feature_groups_info = None
+    if "feature_groups" in cs_transform:
+        feature_groups_info = cs_transform["feature_groups"]
+        selected_feature_groups = FeatureGroupSelector.get_selected_groups_from_config(
+            feature_groups_info, config, prefix="feature_group:"
+        )
+
+    # Algorithm pre-selector configuration
+    current_algorithm_pre_selector = None
+    if "algorithm_pre_selector" in cs_transform:
+        pre_selector_name = config["algorithm_pre_selector"]
+        pre_selector_class = cs_transform["algorithm_pre_selector"][pre_selector_name]
+        pre_selector_defaults = cs_transform.get("algorithm_pre_selector_defaults", {})
+
+        if pre_selector_class is not None:
+            current_algorithm_pre_selector = pre_selector_class.get_from_configuration(
+                configuration=config,
+                cs_transform=cs_transform,
+                maximize=maximize,
+                pre_selector_name=pre_selector_name,
+                **pre_selector_defaults,  # Pass default kwargs
+            )
+
+    selector_instance = cs_transform["selector"][
+        config["selector"]
+    ].get_from_configuration(
+        config,
+        cs_transform,
+        budget=(budget - presolver_budget) if presolver_budget is not None else budget,
+        maximize=maximize,
+        feature_groups=selected_feature_groups,
+        **selector_kwargs,
+    )
+
+    # Determine the effective max_feature_time: prefer value from config if present
+    effective_max_feature_time = max_feature_time
+    if "max_feature_time" in config:
+        # SMAC stores floats directly in the configuration
+        try:
+            effective_max_feature_time = float(config["max_feature_time"])
+        except Exception:
+            effective_max_feature_time = effective_max_feature_time
+
+    # Create pipeline and store max feature time (cap) on it for later evaluation
+    pipeline = SelectorPipeline(
+        selector=selector_instance,
+        preprocessor=preprocessors,
+        pre_solving=presolver,
+        feature_selector=feature_selector,
+        algorithm_pre_selector=current_algorithm_pre_selector,
+        feature_groups=selected_feature_groups,
+        max_feature_time=effective_max_feature_time,
+    )
+
+    return pipeline
+
+
 def tune_selector(
     X: pd.DataFrame,
     y: pd.DataFrame,
     selector_class: list[AbstractSelector]
     | AbstractSelector
     | list[tuple[AbstractSelector, dict]],
+    features_running_time: pd.DataFrame,
     algorithm_features=None,
     selector_kwargs: dict = {},
     preprocessing_class: list[TransformerMixin] = None,
@@ -73,6 +179,7 @@ def tune_selector(
     seed: int = 0,
     cv: int = 10,
     groups: np.ndarray = None,
+    max_feature_time: float | None = False,
 ) -> SelectorPipeline:
     """
     Tunes a selector model using SMAC for hyperparameter optimization.
@@ -103,6 +210,9 @@ def tune_selector(
         seed (int, optional): Random seed for reproducibility. Defaults to None.
         cv (int): Number of cross-validation splits. Defaults to 10.
         groups (np.ndarray, optional): Group labels for cross-validation. Defaults to None.
+        max_feature_time (float, optional): A budget (in seconds) to allocate per feature group.
+            When set, each feature group in the schedule will be given this time budget. The metric
+            will use min(actual_time, budget) for each feature group. Defaults to None.
 
     Returns:
         SelectorPipeline: A pipeline with the best-tuned selector and preprocessing steps.
@@ -159,25 +269,26 @@ def tune_selector(
 
     # Add pre-solving and budget to configuration space
     if pre_solving_class is not None:
-        if pre_solving_class is not list:
+        if type(pre_solving_class) is not list:
             pre_solving_class = [pre_solving_class]
 
+        # Create presolver selection parameter
         presolver_param = Categorical(
             name="presolver",
-            items=[str(type(p).__name__) for p in pre_solving_class],
+            items=[p.__name__ for p in pre_solving_class] + ["None"],
         )
-        cs_transform["presolver"] = {
-            str(type(p).__name__): p for p in pre_solving_class
-        }
+        cs_transform["presolver"] = {p.__name__: p for p in pre_solving_class}
         cs.add(presolver_param)
-        # Budget for presolver (fraction of total budget)
-        presolver_budget_param = UniformFloatHyperparameter(
-            name="presolver_budget",
-            lower=0.0,
-            upper=0.3,
-            default_value=0.05,
-        )
-        cs.add(presolver_budget_param)
+
+        # Add each presolver's configuration space (including presolver_budget)
+        for presolver_class in pre_solving_class:
+            cs, cs_transform = presolver_class.get_configuration_space(
+                cs=cs,
+                cs_transform=cs_transform,
+                parent_param=presolver_param,
+                parent_value=presolver_class.__name__,
+                total_budget=budget,
+            )
 
     # Add preprocessors to configuration spaces
     if preprocessing_class is not None and len(preprocessing_class) > 0:
@@ -194,40 +305,89 @@ def tune_selector(
     # Also add forbidden clauses for prerequisite groups
     fg_params = {}  # Store params to create forbidden clauses
     if feature_groups is not None and len(feature_groups) > 0:
-        # First, add all feature group parameters
-        for fg_name in feature_groups.keys():
-            fg_param = Categorical(
-                name=f"feature_group:{fg_name}",
-                items=[True, False],
-                default=True,
-            )
-            cs.add(fg_param)
-            fg_params[fg_name] = fg_param
+        # If only one feature group, don't add it as a hyperparameter (it must always be True)
+        # Only add hyperparameters if there are multiple feature groups
+        if len(feature_groups) > 1:
+            # First, add all feature group parameters
+            for fg_name in feature_groups.keys():
+                fg_param = Categorical(
+                    name=f"feature_group:{fg_name}",
+                    items=[True, False],
+                    default=True,
+                )
+                cs.add(fg_param)
+                fg_params[fg_name] = fg_param
 
-        # Then, add forbidden clauses for prerequisite requirements
-        # If a group requires another, forbid: group=True AND required=False
-        for fg_name, fg_info in feature_groups.items():
-            required_groups = fg_info.get("requires", [])
-            for required_group in required_groups:
-                if required_group in fg_params:
-                    # Forbid: fg_name=True AND required_group=False
-                    forbidden = ForbiddenAndConjunction(
-                        ForbiddenEqualsClause(fg_params[fg_name], True),
-                        ForbiddenEqualsClause(fg_params[required_group], False),
-                    )
-                    cs.add(forbidden)
+            # Then, add forbidden clauses for prerequisite requirements
+            # If a group requires another, forbid: group=True AND required=False
+            for fg_name, fg_info in feature_groups.items():
+                required_groups = fg_info.get("requires", [])
+                for required_group in required_groups:
+                    if required_group in fg_params:
+                        # Forbid: fg_name=True AND required_group=False
+                        forbidden = ForbiddenAndConjunction(
+                            ForbiddenEqualsClause(fg_params[fg_name], True),
+                            ForbiddenEqualsClause(fg_params[required_group], False),
+                        )
+                        cs.add(forbidden)
+
+            # CRITICAL: Forbid having ALL feature groups disabled
+            # At least one feature group must be enabled, otherwise the selector has no features!
+            # Create forbidden clause: forbid all groups being False simultaneously
+            all_false_clauses = [
+                ForbiddenEqualsClause(param, False) for param in fg_params.values()
+            ]
+            forbidden_all_false = ForbiddenAndConjunction(*all_false_clauses)
+            cs.add(forbidden_all_false)
 
         cs_transform["feature_groups"] = feature_groups
 
     if algorithm_pre_selector is not None:
-        n_algos_param = UniformIntegerHyperparameter(
-            name="algorithm_pre_selector:n_algorithms",
-            lower=2,
-            upper=y.shape[1]
+        # Extract class and default kwargs if tuple format (similar to selector_class)
+        if isinstance(algorithm_pre_selector, tuple):
+            pre_selector_class = algorithm_pre_selector[0]
+            pre_selector_defaults = algorithm_pre_selector[1]
+        else:
+            pre_selector_class = algorithm_pre_selector
+            pre_selector_defaults = {}
+
+        # Create algorithm pre-selector selection parameter
+        pre_selector_param = Categorical(
+            name="algorithm_pre_selector",
+            items=[str(pre_selector_class.__name__)],
+        )
+        cs_transform["algorithm_pre_selector"] = {
+            str(pre_selector_class.__name__): pre_selector_class
+        }
+        # Store default kwargs for later instantiation
+        cs_transform["algorithm_pre_selector_defaults"] = pre_selector_defaults
+        cs.add(pre_selector_param)
+
+        # Add the algorithm pre-selector's configuration space (including n_algorithms)
+        cs, cs_transform = pre_selector_class.get_configuration_space(
+            cs=cs,
+            cs_transform=cs_transform,
+            parent_param=pre_selector_param,
+            parent_value=str(pre_selector_class.__name__),
+            n_algorithms_max=y.shape[1]
             if max_algorithm_pre_selector is None
             else max_algorithm_pre_selector,
         )
-        cs.add(n_algos_param)
+
+    # Add max feature computation time hyperparameter to the config space if the
+    # user did not pass a fixed cap. This allows SMAC to tune a cap (seconds)
+    # on the total per-instance feature computation time used during HPO.
+    if max_feature_time:
+        # upper bound: use budget as a safe ceiling if available, otherwise 3600s
+        upper = float(budget) if budget is not None else 3600.0
+        mf_param = UniformFloatHyperparameter(
+            name="max_feature_time",
+            lower=0.0,
+            upper=upper,
+            default_value=min(60.0, upper),
+            log=False,
+        )
+        cs.add(mf_param)
 
     scenario = Scenario(
         configspace=cs,
@@ -249,88 +409,34 @@ def tune_selector(
         for train_idx, test_idx in kfold.split(X, y, groups):
             X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
             y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+            features_running_time_test = features_running_time.iloc[test_idx]
 
-            # Preprocessor selection
-            preprocessors = None
-            if "preprocessors" in cs_transform:
-                preprocessors = []
-                for i, preproc in enumerate(cs_transform["preprocessors"]):
-                    if config.get(f"preprocessor_{i}", False):
-                        preprocessors.append(preproc)
-                if len(preprocessors) == 0:
-                    preprocessors = None
-
-            # Presolver selection and budget
-            presolver = None
-            presolver_budget = None
-            if "presolver" in cs_transform:
-                presolver = cs_transform["presolver"][config["presolver"]]
-                presolver_budget = (
-                    config["presolver_budget"] * budget if budget is not None else None
-                )
-                if presolver is not None and presolver_budget is not None:
-                    presolver = presolver(budget=presolver_budget)
-
-            # Feature group selection
-            selected_feature_groups = None
-            X_train_filtered = X_train
-            X_test_filtered = X_test
-            if "feature_groups" in cs_transform:
-                selected_feature_groups = (
-                    FeatureGroupSelector.get_selected_groups_from_config(
-                        cs_transform["feature_groups"], config
-                    )
-                )
-                if selected_feature_groups:
-                    fg_selector = FeatureGroupSelector(
-                        cs_transform["feature_groups"], selected_feature_groups
-                    )
-                    X_train_filtered = fg_selector.fit_transform(X_train)
-                    X_test_filtered = fg_selector.transform(X_test)
-
-            # Algorithm pre-selector configuration
-            current_algorithm_pre_selector = algorithm_pre_selector
-            if (
-                algorithm_pre_selector is not None
-                and "algorithm_pre_selector:n_algorithms" in config
-            ):
-                current_algorithm_pre_selector = algorithm_pre_selector(
-                    maximize=maximize,
-                    n_algorithms=config["algorithm_pre_selector:n_algorithms"],
-                )
-
-            selector = SelectorPipeline(
-                selector=cs_transform["selector"][
-                    config["selector"]
-                ].get_from_configuration(
-                    config,
-                    cs_transform,
-                    budget=(budget - presolver_budget)
-                    if presolver_budget is not None
-                    else budget,
-                    maximize=maximize,
-                    feature_groups=selected_feature_groups,
-                    **selector_kwargs,
-                ),
-                preprocessor=preprocessors,
-                pre_solving=presolver,
-                feature_selector=feature_selector,
-                algorithm_pre_selector=current_algorithm_pre_selector,
-                feature_groups=selected_feature_groups,
-            )
-            selector.fit(
-                X_train_filtered, y_train, algorithm_features=algorithm_features
+            pipeline = _create_pipeline(
+                config,
+                cs_transform,
+                budget,
+                maximize,
+                selector_kwargs,
+                feature_selector,
+                algorithm_pre_selector,
+                max_feature_time=max_feature_time,
             )
 
-            y_pred = selector.predict(X_test_filtered)
+            pipeline.fit(X_train, y_train, algorithm_features=algorithm_features)
+            y_pred = pipeline.predict(X_test)
 
+            # max_feature_time is no longer passed to metric; budgets are in the schedule itself
             start = time.time()
-            score = smac_metric(y_pred, y_test)
+            score = smac_metric(y_pred, y_test, budget, features_running_time_test)
             _logger.debug(f"Scoring completed in {time.time() - start:.2f} seconds")
 
             scores.append(score)
 
-        return np.sum(scores)
+        score = np.mean(scores)
+
+        if maximize:
+            return -score
+        return score
 
     smac_kwargs = smac_kwargs(scenario) if smac_kwargs is not None else {}
     smac = HyperparameterOptimizationFacade(scenario, target_function, **smac_kwargs)
@@ -339,57 +445,13 @@ def tune_selector(
     del smac  # clean up SMAC to free memory and delete dask client
 
     # Final pipeline construction
-    preprocessors = None
-    if "preprocessors" in cs_transform:
-        preprocessors = []
-        for i, preproc in enumerate(cs_transform["preprocessors"]):
-            if best_config.get(f"preprocessor_{i}", "off") == "on":
-                preprocessors.append(preproc)
-        if len(preprocessors) == 0:
-            preprocessors = None
-
-    presolver = None
-    presolver_budget = None
-    if "presolver" in cs_transform:
-        presolver = cs_transform["presolver"][best_config["presolver"]]
-        presolver_budget = (
-            best_config["presolver_budget"] * budget if budget is not None else None
-        )
-        setattr(presolver, "budget", presolver_budget)
-
-    # Feature group selection from best config
-    selected_feature_groups = None
-    if "feature_groups" in cs_transform:
-        selected_feature_groups = FeatureGroupSelector.get_selected_groups_from_config(
-            cs_transform["feature_groups"], best_config
-        )
-
-    # Algorithm pre-selector configuration
-    current_algorithm_pre_selector = algorithm_pre_selector
-    if (
-        algorithm_pre_selector is not None
-        and "algorithm_pre_selector:n_algorithms" in best_config
-    ):
-        current_algorithm_pre_selector = algorithm_pre_selector(
-            n_algorithms=best_config["algorithm_pre_selector:n_algorithms"]
-        )
-
-    return SelectorPipeline(
-        selector=cs_transform["selector"][
-            best_config["selector"]
-        ].get_from_configuration(
-            best_config,
-            cs_transform,
-            budget=(budget - presolver_budget)
-            if presolver_budget is not None
-            else budget,
-            maximize=maximize,
-            feature_groups=selected_feature_groups,
-            **selector_kwargs,
-        ),
-        preprocessor=preprocessors,
-        pre_solving=presolver,
-        feature_selector=feature_selector,
-        algorithm_pre_selector=current_algorithm_pre_selector,
-        feature_groups=selected_feature_groups,
+    return _create_pipeline(
+        best_config,
+        cs_transform,
+        budget,
+        maximize,
+        selector_kwargs,
+        feature_selector,
+        algorithm_pre_selector,
+        max_feature_time=max_feature_time,
     )

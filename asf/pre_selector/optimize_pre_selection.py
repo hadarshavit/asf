@@ -144,3 +144,48 @@ class OptimizePreSelection(AbstractPreSelector):
             )
 
         return selected_performance
+
+    @staticmethod
+    def get_configuration_space(
+        cs=None,
+        cs_transform=None,
+        parent_param=None,
+        parent_value=None,
+        n_algorithms_max=None,
+        **kwargs,
+    ):
+        """Get the configuration space for OptimizePreSelection."""
+        from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
+
+        return AbstractPreSelector.get_configuration_space(
+            cs=cs,
+            cs_transform=cs_transform,
+            parent_param=parent_param,
+            parent_value=parent_value,
+            n_algorithms_max=n_algorithms_max,
+            **kwargs,
+        )
+
+    @staticmethod
+    def get_from_configuration(
+        configuration,
+        cs_transform,
+        maximize=False,
+        pre_selector_name=None,
+        **kwargs,
+    ):
+        """Create an OptimizePreSelection instance from a configuration."""
+        from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
+
+        n_algorithms = AbstractPreSelector.get_from_configuration(
+            configuration=configuration,
+            cs_transform=cs_transform,
+            maximize=maximize,
+            pre_selector_name=pre_selector_name,
+            **kwargs,
+        )
+        return OptimizePreSelection(
+            n_algorithms=n_algorithms,
+            maximize=maximize,
+            **kwargs,
+        )

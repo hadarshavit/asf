@@ -160,3 +160,48 @@ class Static3S(AbstractPresolver):
             "budget": self.budget,
             "preschedule_config": self.get_preschedule_config(),
         }
+
+    @staticmethod
+    def get_from_configuration(
+        configuration: "dict",
+        cs_transform: dict,
+        budget: float | None = None,
+        maximize: bool = False,
+        presolver_name: str | None = None,
+        **kwargs,
+    ) -> "Static3S":
+        """
+        Create a Static3S presolver instance from a configuration.
+
+        Parameters
+        ----------
+        configuration : dict
+            The configuration object or dictionary.
+        cs_transform : dict
+            The transformation dictionary for the configuration space.
+        budget : float or None, optional
+            Budget for the presolver. If None, will try to extract from configuration.
+        maximize : bool, optional
+            Whether to maximize the metric (not used by Static3S).
+        presolver_name : str or None, optional
+            Name of the presolver (used to find budget in configuration).
+        **kwargs : dict
+            Additional keyword arguments passed to the constructor.
+
+        Returns
+        -------
+        Static3S
+            The Static3S presolver instance.
+        """
+        # Extract budget from configuration if not provided
+        if budget is None and presolver_name is not None:
+            budget_key = f"{presolver_name}:presolver_budget"
+            if budget_key in configuration:
+                budget = configuration[budget_key]
+
+        # If still no budget, use a default or raise an error
+        if budget is None:
+            raise ValueError("Budget must be provided for Static3S presolver")
+
+        # Create and return the presolver instance
+        return Static3S(budget=budget, **kwargs)

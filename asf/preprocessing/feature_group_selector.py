@@ -224,7 +224,7 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
         feature_groups: dict,
         config: dict,
         prefix: str = "feature_group_",
-    ) -> list[str]:
+    ) -> dict:
         """
         Extract selected feature groups from a SMAC configuration.
 
@@ -239,11 +239,11 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
 
         Returns
         -------
-        list[str]
-            List of selected feature group names.
+        dict
+            Dictionary of selected feature groups.
         """
-        selected = []
-        for fg_name in feature_groups.keys():
+        selected = {}
+        for fg_name, fg_info in feature_groups.items():
             if config.get(f"{prefix}{fg_name}", True):
-                selected.append(fg_name)
+                selected[fg_name] = fg_info
         return selected if selected else None

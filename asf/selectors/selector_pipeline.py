@@ -31,6 +31,7 @@ class SelectorPipeline:
         feature_selector: Callable | None = None,
         algorithm_pre_selector: Callable | None = None,
         feature_groups: Any | None = None,
+        max_feature_time: float | None = None,
     ) -> None:
         """
         Initializes the SelectorPipeline.
@@ -42,11 +43,15 @@ class SelectorPipeline:
             feature_selector (Callable | None, optional): A callable for feature selection. Defaults to None.
             algorithm_pre_selector (Callable | None, optional): A callable for algorithm pre-selection. Defaults to None.
             feature_groups (Any | None, optional): Feature groups to be used by the selector. Defaults to None.
+            max_feature_time (float | None, optional): Budget (seconds) to allocate per feature group in predictions. Defaults to None.
         """
         self.selector = selector
         self.pre_solving = pre_solving
         self.feature_selector = feature_selector
         self.algorithm_pre_selector = algorithm_pre_selector
+        self.feature_groups = feature_groups
+        # Optional budget (seconds) to allocate per feature group
+        self.max_feature_time = max_feature_time
 
         # Always include SimpleImputer as the first step in the preprocessing pipeline
         if preprocessor is None:
@@ -62,6 +67,22 @@ class SelectorPipeline:
         self._orig_index = None
 
         self._logger = logging.getLogger(__name__)
+
+    def _filter_features(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Filters features based on selected feature groups.
+        """
+        if self.feature_groups and isinstance(self.feature_groups, dict):
+            selected_features = []
+            for fg_info in self.feature_groups.values():
+                if "provides" in fg_info:
+                    selected_features.extend(fg_info["provides"])
+
+            # Only keep features that are in X
+            available_features = [f for f in selected_features if f in X.columns]
+            if available_features:
+                return X[available_features]
+        return X
 
     def fit(self, X: Any, y: Any, algorithm_features: Any) -> None:
         """
@@ -84,19 +105,21 @@ class SelectorPipeline:
         )
         start = time.time()
 
-        if self.pre_solving:
-            self.pre_solving.fit(X, y)
-
-        self._logger.debug(
-            f"Pre-solving completed in {time.time() - start:.2f} seconds"
-        )
-        start = time.time()
-
+        # Algorithm pre-selection should happen BEFORE pre-solving
+        # so that the presolver only considers the pre-selected algorithms
         if self.algorithm_pre_selector:
             y = self.algorithm_pre_selector.fit_transform(y)
 
         self._logger.debug(
             f"Algorithm pre-selection completed in {time.time() - start:.2f} seconds"
+        )
+        start = time.time()
+
+        if self.pre_solving:
+            self.pre_solving.fit(X, y)
+
+        self._logger.debug(
+            f"Pre-solving completed in {time.time() - start:.2f} seconds"
         )
         start = time.time()
 
@@ -107,6 +130,8 @@ class SelectorPipeline:
             f"Feature selection completed in {time.time() - start:.2f} seconds"
         )
         start = time.time()
+
+        X = self._filter_features(X)
 
         self.selector.fit(X, y, algorithm_features=algorithm_features)
 
@@ -134,14 +159,41 @@ class SelectorPipeline:
         if self.feature_selector:
             X = self.feature_selector.transform(X)
 
+        X = self._filter_features(X)
+
         predictions = self.selector.predict(X)
 
         # Ensure predictions use the same index as X
         predictions = pd.Series(predictions, index=X.index)
+
+        feature_steps = []
+        if self.feature_groups is not None:
+            if isinstance(self.feature_groups, dict):
+                feature_steps = list(self.feature_groups.keys())
+            elif isinstance(self.feature_groups, list):
+                feature_steps = self.feature_groups
+
+        # Convert feature_steps to budgeted tuples if max_feature_time is set
+        if self.max_feature_time is not None and feature_steps:
+            feature_steps_with_budget = [
+                (fg, self.max_feature_time) for fg in feature_steps
+            ]
+        else:
+            feature_steps_with_budget = feature_steps
+
         final_preds = {}
-        if scheds is not None:
-            for instance_id, prediction in predictions.items():
-                final_preds[instance_id] = scheds + prediction
+        for instance_id, prediction in predictions.items():
+            # If pre-solving schedules are provided, prepend/concatenate them
+            # to the algorithm predictions for each instance. When no pre-solving
+            # schedule is used `scheds` will be None and we should still return
+            # the selector's predictions.
+            if scheds is not None:
+                final_preds[instance_id] = (
+                    scheds + feature_steps_with_budget + prediction
+                )
+            else:
+                final_preds[instance_id] = feature_steps_with_budget + prediction
+
         return final_preds
 
     def save(self, path: str) -> None:

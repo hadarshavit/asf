@@ -424,7 +424,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--base-path",
         type=str,
-        default="/home/shavit/asf/paper/aslib_data",
+        default="/home/ni574034/asf/bench/aslib_data",
         help="Base path to ASlib scenarios",
     )
     parser.add_argument(
@@ -439,7 +439,6 @@ if __name__ == "__main__":
             "MAXSAT19-UCMS",
             "CSP-Minizinc-Time-2016",
             "ASP-POTASSCO",
-            "OPENML-WEKA-2017",
             "BNSL-2016",
             "GRAPHS-2015",
         ],
@@ -461,7 +460,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output",
         type=str,
-        default="/home/shavit/asf/bench/results/presolver_benchmark.csv",
+        default="/home/ni574034/asf/bench/results/presolver_benchmark.csv",
         help="Output CSV file path",
     )
 
@@ -469,14 +468,19 @@ if __name__ == "__main__":
 
     executor = submitit.AutoExecutor("logs", "slurm")
     executor.update_parameters(
-        timeout_min=60 * 24 * 2,
-        slurm_partition="Kathleen",
+        timeout_min=60 * 24 * 1,
+        slurm_partition="c23ms",
         slurm_array_parallelism=1200,
         cpus_per_task=1,
         mem_gb=15.7 * 1,
         tasks_per_node=1,
         slurm_job_name="PRESOLVER_BENCH",
-        slurm_qos="medium",
+        slurm_account="lect0117",
+        slurm_setup=[
+            "module load -q GCCcore/12.2.0",
+            "module load -q Python/3.10.8",
+            "source /home/ni574034/venvs/asf_env/bin/activate",
+        ],
     )
     with executor.batch():
         for scenario in args.scenarios:
