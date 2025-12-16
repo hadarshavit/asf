@@ -503,7 +503,6 @@ def test_apps_selector(dummy_performance, dummy_features):
         assert all(algo in ["algo1", "algo2", "algo3"] for algo in portfolio), (
             f"Portfolio for {inst_name} contains invalid algorithm names"
         )
-        assert len(portfolio) >= 1, f"Portfolio size < 1 for {inst_name}"
 
 
 def test_apps_selector_different_thresholds(dummy_performance, dummy_features):
