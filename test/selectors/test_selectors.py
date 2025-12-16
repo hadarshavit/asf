@@ -32,6 +32,7 @@ from asf.selectors.meta_selector import MetaSelector
 from asf.selectors.osl_linear import OSLLinearSelector
 from asf.selectors.cosine_selector import CosineSelector
 from asf.selectors.cshc import CSHCSelector
+from asf.selectors.hybrid_decision_tree import HARRIS
 from asf.predictors.random_forest import RandomForestRegressorWrapper
 
 
@@ -529,3 +530,20 @@ def test_apps_selector_different_thresholds(dummy_performance, dummy_features):
     assert portfolios_by_p[0.01] > portfolios_by_p[0.5], (
         "Lower p_intersection should produce larger portfolios"
     )
+
+
+def test_harris_selector_basic(dummy_performance, dummy_features):
+    """Test basic HARRIS functionality: fit and predict."""
+    selector = HARRIS(
+        n_estimators=10,
+        max_depth=5,
+        min_samples_split=2,
+        lambda_param=0.5,
+        max_features="sqrt",
+        max_thresholds=5,
+        budget=450.0,
+        random_state=42,
+    )
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+    validate_predictions(predictions)
