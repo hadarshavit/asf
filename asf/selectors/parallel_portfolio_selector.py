@@ -12,11 +12,11 @@ class APPS(AbstractSelector):
     Automatic Parallel Portfolio Selector based on the approach by Kashgarani and Kotthoff.
 
     This selector predicts performance distributions for each algorithm and selects
-    a parallel portfolio based on the winning probability of each algorithm compared
-    to the best-predicted algorithm.
+    a parallel portfolio based on the overlap of each algorithm's predicted runtime
+    distribution with the best algorithm's distribution.
 
     The size of the portfolio is controlled by the p_intersection threshold, which
-    determines the minimum winning probability required for an algorithm to be included.
+    determines the minimum overlap required for an algorithm to be included.
     """
 
     PREFIX = "parallel_portfolio"
@@ -35,7 +35,7 @@ class APPS(AbstractSelector):
 
         Args:
             model_class: The predictor class to use for performance modeling.
-            p_intersection: Threshold for winning probability.
+            p_intersection: Threshold for distribution overlap.
                           Higher values -> smaller portfolios.
             n_estimators_for_std: Number of bootstrap models to estimate std deviation.
             random_state: Random seed for reproducibility.
@@ -103,7 +103,44 @@ class APPS(AbstractSelector):
 
         return means, stds
 
-    def _compute_winning_probability(
+    def _solve_intersection(
+        self, mu1: float, sigma1: float, mu2: float, sigma2: float
+    ) -> float:
+        """
+        Solve for the PDF intersection point between two Gaussians.
+        Assumes mu1 <= mu2; returns a point between the means when possible.
+        """
+
+        if abs(sigma1 - sigma2) < 1e-9:
+            return (mu1 + mu2) / 2.0
+
+        var1 = sigma1**2
+        var2 = sigma2**2
+
+        a = 0.5 / var1 - 0.5 / var2
+        b = mu2 / var2 - mu1 / var1
+        c = (mu1**2) / (2 * var1) - (mu2**2) / (2 * var2) - np.log(sigma2 / sigma1)
+
+        delta = b**2 - 4 * a * c
+        if delta < 0:
+            return (mu1 + mu2) / 2.0
+
+        sqrt_delta = np.sqrt(delta)
+        x1 = (-b - sqrt_delta) / (2 * a)
+        x2 = (-b + sqrt_delta) / (2 * a)
+
+        midpoint = (mu1 + mu2) / 2.0
+        in_range_1 = mu1 <= x1 <= mu2
+        in_range_2 = mu1 <= x2 <= mu2
+
+        if in_range_1 and not in_range_2:
+            return x1
+        if in_range_2 and not in_range_1:
+            return x2
+
+        return x1 if abs(x1 - midpoint) < abs(x2 - midpoint) else x2
+
+    def _compute_overlap(
         self,
         mu_best: float,
         sigma_best: float,
@@ -111,21 +148,16 @@ class APPS(AbstractSelector):
         sigma_candidate: float,
     ) -> float:
         """
-        Compute P(A_candidate < A_best) using the difference distribution.
-        Args:
-            mu_best: Mean performance of the best algorithm.
-            sigma_best: Std dev of the best algorithm.
-            mu_candidate: Mean performance of the candidate algorithm.
-            sigma_candidate: Std dev of the candidate algorithm.
+        Compute distribution overlap as in Kashgarani & Kotthoff.
+        Overlap = P(candidate <= c) + P(best >= c), where c is the PDF intersection.
         """
-        mu_diff = mu_best - mu_candidate
-        sigma_diff = np.sqrt(sigma_best**2 + sigma_candidate**2)
-        sigma_diff = np.maximum(sigma_diff, 1e-6)
 
-        # P(A_candidate < A_best) is P(D > 0) = 1 - CDF(0)
-        winning_prob = 1.0 - stats.norm.cdf(0, loc=mu_diff, scale=sigma_diff)
+        c = self._solve_intersection(mu_best, sigma_best, mu_candidate, sigma_candidate)
 
-        return winning_prob
+        p_cand_left = stats.norm.cdf(c, loc=mu_candidate, scale=sigma_candidate)
+        p_best_right = 1.0 - stats.norm.cdf(c, loc=mu_best, scale=sigma_best)
+
+        return p_cand_left + p_best_right
 
     def _predict(self, features: pd.DataFrame) -> Dict[str, List[str]]:
         """
@@ -154,11 +186,11 @@ class APPS(AbstractSelector):
                 mu_candidate = inst_means[algo_idx]
                 sigma_candidate = inst_stds[algo_idx]
 
-                winning_prob = self._compute_winning_probability(
+                overlap = self._compute_overlap(
                     mu_best, sigma_best, mu_candidate, sigma_candidate
                 )
 
-                if winning_prob >= self.p_intersection:
+                if overlap >= self.p_intersection:
                     portfolio.append(self.algorithms[algo_idx])
 
             predictions[inst_name] = portfolio
