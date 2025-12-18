@@ -53,6 +53,10 @@ class APPS(AbstractSelector):
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs) -> None:
         """
         Train ensemble of performance models for each algorithm.
+
+        Args:
+            features: DataFrame of instance features.
+            performance: DataFrame of algorithm performance (runtimes).
         """
         self.algorithms = list(performance.columns)
 
@@ -80,6 +84,9 @@ class APPS(AbstractSelector):
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         Predict mean and standard deviation for each algorithm on each instance.
+
+        Args:
+            features: DataFrame of instance features.
 
         Returns:
             means: Array of shape (n_instances, n_algorithms) with mean predictions

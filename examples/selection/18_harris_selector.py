@@ -109,7 +109,7 @@ def main():
     selector.fit(X_train, Y_train)
     preds = selector.predict(X_test)
     sr = evaluate_solve_rate(preds, Y_test, budget)
-    print(f"lambda={lam:.2f} -> solve-rate: {sr:.2%}")
+    print(f"lambda=0.5 -> solve-rate: {sr:.2%}")
 
     for inst in list(X_test.index)[:10]:
         algo, _ = preds.get(inst, [(None, None)])[0]

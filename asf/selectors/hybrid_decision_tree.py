@@ -19,6 +19,16 @@ class HybridDecisionTree:
         max_thresholds: int = 32,
         random_state: Optional[int] = None,
     ):
+        """
+        Initialize the Hybrid Decision Tree.
+
+        Args:
+            max_depth: Maximum depth of the tree.
+            min_samples_split: Minimum number of samples required to split an internal node.
+            lambda_param: Weighting parameter for combining regression and ranking losses (0 <= lambda_param <= 1).
+            max_thresholds: Maximum number of thresholds to consider per feature when searching for splits.
+            random_state: Seed for the random number generator.
+        """
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.lambda_param = lambda_param
@@ -87,7 +97,17 @@ class HybridDecisionTree:
     def _find_best_split(
         self, X: np.ndarray, y: np.ndarray
     ) -> Tuple[Optional[int], Optional[float]]:
-        """Find the best feature and threshold to split on."""
+        """
+        Find the best feature and threshold to split the data to minimize the hybrid loss.
+
+        Args:
+            X (np.ndarray): Feature matrix of shape (n_instances, n_features).
+            y (np.ndarray): Target values of shape (n_instances, n_algorithms).
+
+        Returns:
+            Tuple[Optional[int], Optional[float]]: The index of the best feature to split on and the threshold value.
+                Returns (None, None) if no valid split is found.
+        """
         n_instances, n_features = X.shape
 
         if n_instances < self.min_samples_split:
@@ -204,7 +224,15 @@ class HybridDecisionTree:
         return predictions
 
     def _predict_single(self, x: np.ndarray) -> np.ndarray:
-        """Predict for a single instance."""
+        """
+        Predict performances for a single instance.
+
+        Args:
+            x: Feature vector for a single instance (n_features,)
+
+        Returns:
+            Predicted performances for the single instance (n_algorithms,)
+        """
         if self.is_leaf:
             return self.regression_label
 
@@ -295,7 +323,13 @@ class HARRIS(AbstractSelector):
             return n_total_features
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs) -> None:
-        """Train the HARRIS forest."""
+        """
+        Train the HARRIS forest.
+
+        Args:
+            features: DataFrame of instance features.
+            performance: DataFrame of algorithm performance (runtimes).
+        """
         self.algorithms = list(performance.columns)
 
         X = features.values
@@ -327,14 +361,21 @@ class HARRIS(AbstractSelector):
                 random_state=rng.randint(0, 1000000),
             )
             tree.fit(X_boot_subset, y_boot)
-            if i % 2 == 0:
-                print(f"Trained {i + 1}/{self.n_estimators} trees")
 
             self.trees.append(tree)
             self.feature_indices_per_tree.append(feature_indices)
 
     def _predict(self, features: pd.DataFrame) -> dict:
-        """Predict best algorithm for each instance."""
+        """
+        Predict the best algorithm for each instance.
+
+        Args:
+            features (pd.DataFrame): Feature matrix with instances as rows and features as columns.
+
+        Returns:
+            Dict[str, List[Tuple[str, float]]]: A dictionary mapping each instance name to a list containing
+                a tuple of the best algorithm (str) and the budget (float).
+        """
         budget = getattr(self, "budget", None)
         if budget is None:
             budget = float("inf")

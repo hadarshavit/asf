@@ -32,6 +32,7 @@ from asf.selectors.meta_selector import MetaSelector
 from asf.selectors.osl_linear import OSLLinearSelector
 from asf.selectors.cosine_selector import CosineSelector
 from asf.selectors.cshc import CSHCSelector
+from asf.selectors.parallel_portfolio_selector import APPS
 from asf.selectors.hybrid_decision_tree import HARRIS
 from asf.predictors.random_forest import RandomForestRegressorWrapper
 
@@ -479,8 +480,6 @@ def test_cosine_selector_random_forest(dummy_performance, dummy_features):
 
 def test_apps_selector(dummy_performance, dummy_features):
     """Test the APPS (Automatic Parallel Portfolio Selector)."""
-    from asf.selectors.parallel_portfolio_selector import APPS
-
     selector = APPS(
         model_class=RandomForestRegressorWrapper,
         p_intersection=0.1,
@@ -508,8 +507,6 @@ def test_apps_selector(dummy_performance, dummy_features):
 
 def test_apps_selector_different_thresholds(dummy_performance, dummy_features):
     """Test that different p_intersection values produce different portfolio sizes."""
-    from asf.selectors.parallel_portfolio_selector import APPS
-
     portfolios_by_p = {}
 
     for p_val in [0.01, 0.5]:
@@ -531,14 +528,24 @@ def test_apps_selector_different_thresholds(dummy_performance, dummy_features):
     )
 
 
-def test_harris_selector_basic(dummy_performance, dummy_features):
-    """Test basic HARRIS functionality: fit and predict."""
+@pytest.mark.parametrize(
+    "lambda_param,max_features",
+    [
+        (0.0, "sqrt"),
+        (0.5, "log2"),
+        (1.0, 3),
+    ],
+)
+def test_harris_selector_basic(
+    dummy_performance, dummy_features, lambda_param, max_features
+):
+    """Test HARRIS with 3 cases: lambda in {0,0.5,1} and max_features in {sqrt,log2,3}."""
     selector = HARRIS(
         n_estimators=10,
         max_depth=5,
         min_samples_split=2,
-        lambda_param=0.5,
-        max_features="sqrt",
+        lambda_param=lambda_param,
+        max_features=max_features,
         max_thresholds=5,
         budget=450.0,
         random_state=42,
