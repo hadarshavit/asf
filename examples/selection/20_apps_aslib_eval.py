@@ -3,7 +3,6 @@ import time
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
-from scipy import stats
 
 from asf.selectors.parallel_portfolio_selector import APPS
 from asf.predictors.random_forest import RandomForestRegressorWrapper
