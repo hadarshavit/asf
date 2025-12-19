@@ -51,13 +51,13 @@ class RPCSelector(AbstractSelector):
             and "n_estimators" not in self.classifier_kwargs
         ):
             self.classifier_kwargs["n_estimators"] = int(n_estimators)
-        
+
         if (
             "random_state" in sig_params
             and "random_state" not in self.classifier_kwargs
         ):
             self.classifier_kwargs["random_state"] = int(random_state)
-        
+
         self.random_state = int(random_state)
         self.top_n = max(1, int(top_n))
 
