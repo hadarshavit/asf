@@ -22,6 +22,7 @@ from asf.selectors.cshc import CSHCSelector
 from asf.selectors.cosine_selector import CosineSelector
 from asf.selectors.parallel_portfolio_selector import APPS
 from asf.selectors.hybrid_decision_tree import HARRIS
+from asf.selectors.rpc_selector import RPCSelector
 
 __all__ = [
     "PairwiseClassifier",
@@ -47,4 +48,5 @@ __all__ = [
     "CosineSelector",
     "APPS",
     "HARRIS",
+    "RPCSelector",
 ]
