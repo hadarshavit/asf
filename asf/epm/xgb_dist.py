@@ -683,7 +683,7 @@ class XGBDistNet:
             f"{prefix}:multi_strategy", ["one_output_per_tree"]#, "multi_output_tree"]
         )
         stabilization = Categorical(
-            f"{prefix}:stabilization", ["None",]# "MAD", "L2"], default="MAD"
+            f"{prefix}:stabilization", ["None", "MAD", "L2"], default="MAD"
         )
         use_start_values = Categorical(
             f"{prefix}:use_start_values", [True, False], default=True
