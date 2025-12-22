@@ -21,15 +21,25 @@ if NGBOOST_AVAILABLE:
 
         def d_score(self, Y):
             D = np.zeros((len(Y), 2))
-            # d_theta0 (mu) = lambda * (mu - Y) / mu^2
-            D[:, 0] = self.lam * (self.mu - Y) / (self.mu ** 2)
-            # d_theta1 (lambda) = -0.5 + lambda * (Y - mu)^2 / (2 * mu^2 * Y)
+            # NLL = const - 0.5*log(lam) + 1.5*log(y) + lam*(y-mu)^2/(2*mu^2*y)
+            # Since params are log-transformed: mu = exp(params[0]), lam = exp(params[1])
+            # Need chain rule: d/d(params[i]) = d/d(param_raw) * param_raw
+            
+            # d(NLL)/d(mu) = -lam * (y - mu) / mu^3
+            # d(NLL)/d(log_mu) = d(NLL)/d(mu) * mu = -lam * (y - mu) / mu^2
+            D[:, 0] = -self.lam * (Y - self.mu) / (self.mu ** 2)
+            
+            # d(NLL)/d(lam) = -0.5/lam + (y - mu)^2 / (2 * mu^2 * y)
+            # d(NLL)/d(log_lam) = d(NLL)/d(lam) * lam = -0.5 + lam * (y - mu)^2 / (2 * mu^2 * y)
             D[:, 1] = -0.5 + self.lam * (Y - self.mu) ** 2 / (2 * self.mu ** 2 * Y)
             return D
 
         def metric(self):
             FI = np.zeros((self.mu.shape[0], 2, 2))
-            FI[:, 0, 0] = self.lam / self.mu
+            # Fisher Information for log-transformed parameters
+            # FI[log_mu, log_mu] = mu^2 * FI[mu, mu] = mu^2 * lam/mu = mu*lam
+            FI[:, 0, 0] = self.mu * self.lam
+            # FI[log_lam, log_lam] = lam^2 * FI[lam, lam] = lam^2 * 0.5/lam^2 = 0.5
             FI[:, 1, 1] = 0.5
             return FI
 
@@ -124,6 +134,9 @@ class NGBDistNet:
 
         X = np.asarray(X, dtype=np.float32)
         y = np.asarray(y, dtype=np.float32)
+        X = np.concatenate([[x for i in range(y.shape[1])] for x in X]).astype(
+            np.float32, copy=False
+        )
         y = y.flatten().astype(np.float32, copy=False)
 
         # Define base learner with max_depth
@@ -202,10 +215,71 @@ class NGBDistNet:
 
     def save(self, path: str):
         import pickle
+        save_dict = {
+            'model': self.model,
+            'distribution': self.distribution,
+            'n_estimators': self.n_estimators,
+            'learning_rate': self.learning_rate,
+            'minibatch_frac': self.minibatch_frac,
+            'col_sample': self.col_sample,
+            'max_depth': self.max_depth,
+            'min_samples_split': self.min_samples_split,
+            'min_samples_leaf': self.min_samples_leaf,
+            'early_stopping_rounds': self.early_stopping_rounds,
+            'early_stopping_tolerance': self.early_stopping_tolerance,
+            'device': self.device,
+            'kwargs': self.kwargs,
+        }
         with open(path, "wb") as f:
-            pickle.dump(self.model, f)
+            pickle.dump(save_dict, f)
 
-    def load(self, path: str):
+    @classmethod
+    def load(cls, path: str):
+        """Load the NGBDistNet model from a file.
+        
+        Parameters
+        ----------
+        path : str
+            The file path from which the model will be loaded.
+            
+        Returns
+        -------
+        NGBDistNet
+            Loaded model instance.
+        """
+        import pickle
+        with open(path, "rb") as f:
+            save_dict = pickle.load(f)
+        
+        # Create instance with saved parameters
+        instance = cls(
+            distribution=save_dict['distribution'],
+            n_estimators=save_dict['n_estimators'],
+            learning_rate=save_dict['learning_rate'],
+            minibatch_frac=save_dict['minibatch_frac'],
+            col_sample=save_dict['col_sample'],
+            max_depth=save_dict['max_depth'],
+            min_samples_split=save_dict['min_samples_split'],
+            min_samples_leaf=save_dict['min_samples_leaf'],
+            early_stopping_rounds=save_dict.get('early_stopping_rounds'),
+            early_stopping_tolerance=save_dict.get('early_stopping_tolerance', 1e-4),
+            device=save_dict.get('device', 'cpu'),
+            **save_dict.get('kwargs', {})
+        )
+        
+        # Restore the trained model
+        instance.model = save_dict['model']
+        
+        return instance
+    
+    def load_old_format(self, path: str):
+        """Load model saved in old format (pickled model only).
+        
+        Parameters
+        ----------
+        path : str
+            The file path from which the model will be loaded.
+        """
         import pickle
         with open(path, "rb") as f:
             self.model = pickle.load(f)

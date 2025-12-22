@@ -3,9 +3,10 @@ from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
+import pickle
 import torch
 import xgboost as xgb
-
+import time
 from asf.predictors.utils.losses import lognorm_loss
 from asf.predictors.utils.mlp import ExpActivation
 
@@ -97,12 +98,12 @@ class XGBDistNet:
         """
         if type == "MAD":
             input_der = torch.nan_to_num(input_der, nan=float(torch.nanmean(input_der)))
-            div = torch.nanmedian(torch.abs(input_der - torch.nanmedian(input_der)))
+            div = torch.median(torch.abs(input_der - torch.nanmedian(input_der)))
             div = torch.where(div < torch.tensor(1e-04), torch.tensor(1e-04), div)
             stab_der = input_der / div
         elif type == "L2":
             input_der = torch.nan_to_num(input_der, nan=float(torch.nanmean(input_der)))
-            div = torch.sqrt(torch.nanmean(input_der.pow(2)))
+            div = torch.sqrt(torch.mean(input_der.pow(2)))
             div = torch.where(div < torch.tensor(1e-04), torch.tensor(1e-04), div)
             div = torch.where(div > torch.tensor(10000.0), torch.tensor(10000.0), div)
             stab_der = input_der / div
@@ -443,18 +444,168 @@ class XGBDistNet:
         path : str
             The file path where the model will be saved.
         """
+        # Save XGBoost model
         self.model.save_model(path)
 
-    def load(self, path: str):
+        # Helper to convert potentially non-picklable objects to serializable descriptors
+        def _to_serializable(obj):
+            try:
+                # If object is picklable as-is, keep it
+                pickle.dumps(obj)
+                return {'__pickled__': True, 'value': obj}
+            except Exception:
+                # Fallback: store module/name for callables, or class info for instances
+                module = getattr(obj, '__module__', None)
+                name = getattr(obj, '__name__', None)
+                if module and name:
+                    return {'__pickled__': False, '__kind__': 'callable', 'module': module, 'name': name}
+                # Instance: try to record class path and repr
+                cls = obj.__class__
+                return {
+                    '__pickled__': False,
+                    '__kind__': 'instance',
+                    'class_module': cls.__module__,
+                    'class_name': cls.__name__,
+                    'repr': repr(obj),
+                }
+
+        # Save metadata (start_values and all constructor parameters)
+        metadata = {
+            'start_values': self.start_values,
+            'n_loss_params': self.n_loss_params,
+            'output_activation': _to_serializable(self.output_activation),
+            'loss_function': _to_serializable(self.loss_function),
+            'stabilization': self.stabilization,
+            'device': self.device,
+            'batch_size': self.batch_size,
+            'use_start_values': self.use_start_values,
+            'early_stopping_rounds': self.early_stopping_rounds,
+            'early_stopping_tolerance': self.early_stopping_tolerance,
+            'kwargs': {},
+        }
+
+        # Serialize kwargs safely (some values may be non-picklable)
+        for k, v in (self.kwargs or {}).items():
+            try:
+                pickle.dumps(v)
+                metadata['kwargs'][k] = {'__pickled__': True, 'value': v}
+            except Exception:
+                module = getattr(v, '__module__', None)
+                name = getattr(v, '__name__', None)
+                if module and name:
+                    metadata['kwargs'][k] = {'__pickled__': False, '__kind__': 'callable', 'module': module, 'name': name}
+                else:
+                    cls = v.__class__
+                    metadata['kwargs'][k] = {'__pickled__': False, '__kind__': 'instance', 'class_module': cls.__module__, 'class_name': cls.__name__, 'repr': repr(v)}
+
+        metadata_path = path + '.metadata.pkl'
+        with open(metadata_path, 'wb') as f:
+            pickle.dump(metadata, f)
+
+    @classmethod
+    def load(cls, path: str):
         """Load the XGBDistNet model from a file.
 
         Parameters
         ----------
         path : str
             The file path from which the model will be loaded.
+            
+        Returns
+        -------
+        XGBDistNet
+            Loaded model instance.
         """
+        import importlib
+
+        # Helper to rebuild objects saved via _to_serializable
+        def _from_serializable(entry, default=None):
+            if not isinstance(entry, dict) or '__pickled__' not in entry:
+                return entry
+            if entry.get('__pickled__'):
+                return entry.get('value')
+            # Non-pickled descriptor
+            kind = entry.get('__kind__')
+            try:
+                if kind == 'callable':
+                    mod = importlib.import_module(entry['module'])
+                    return getattr(mod, entry['name'])
+                elif kind == 'instance':
+                    mod = importlib.import_module(entry['class_module'])
+                    cls = getattr(mod, entry['class_name'])
+                    # Try to instantiate without arguments
+                    return cls()
+            except Exception:
+                # If reconstruction fails, return default
+                return default
+            return default
+
+        # Load metadata first to get constructor parameters
+        metadata_path = path + '.metadata.pkl'
+        with open(metadata_path, 'rb') as f:
+            metadata = pickle.load(f)
+
+        # Reconstruct potentially non-picklable entries
+        output_activation = _from_serializable(metadata.get('output_activation'), default=None)
+        loss_function = _from_serializable(metadata.get('loss_function'), default=None)
+
+        # Rebuild kwargs
+        kwargs = {}
+        for k, v in metadata.get('kwargs', {}).items():
+            kwargs[k] = _from_serializable(v, default=None)
+
+        # If reconstruction failed, fall back to defaults used in __init__
+        if output_activation is None:
+            output_activation = ExpActivation()
+        if loss_function is None:
+            from asf.predictors.utils.losses import lognorm_loss as _default_loss
+
+            loss_function = _default_loss
+
+        # Create instance with saved parameters
+        instance = cls(
+            loss_function=loss_function,
+            n_loss_params=metadata['n_loss_params'],
+            batch_size=metadata.get('batch_size'),
+            output_activation=output_activation,
+            stabilization=metadata['stabilization'],
+            use_start_values=metadata.get('use_start_values', True),
+            early_stopping_rounds=metadata.get('early_stopping_rounds'),
+            early_stopping_tolerance=metadata.get('early_stopping_tolerance', 0.0),
+            device=metadata['device'],
+            **(kwargs or {}),
+        )
+
+        # Load XGBoost model
+        instance.model = xgb.XGBRegressor()
+        instance.model.load_model(path)
+
+        # Restore start_values
+        instance.start_values = metadata['start_values']
+
+        return instance
+    
+    def load_old_format(self, path: str):
+        """Load model saved in old format (model only, no metadata).
+        
+        Parameters
+        ----------
+        path : str
+            The file path from which the model will be loaded.
+        """
+        # Load XGBoost model
         self.model = xgb.XGBRegressor()
         self.model.load_model(path)
+        
+        # Try to load metadata if it exists
+        metadata_path = path + '.metadata.pkl'
+        try:
+            with open(metadata_path, 'rb') as f:
+                metadata = pickle.load(f)
+            self.start_values = metadata['start_values']
+        except FileNotFoundError:
+            # No metadata file, use zeros as start values
+            self.start_values = np.zeros(self.n_loss_params, dtype=np.float32)
 
     @staticmethod
     def get_configuration_space(
@@ -532,7 +683,7 @@ class XGBDistNet:
             f"{prefix}:multi_strategy", ["one_output_per_tree"]#, "multi_output_tree"]
         )
         stabilization = Categorical(
-            f"{prefix}:stabilization", ["None", "MAD", "L2"], default="MAD"
+            f"{prefix}:stabilization", ["None",]# "MAD", "L2"], default="MAD"
         )
         use_start_values = Categorical(
             f"{prefix}:use_start_values", [True, False], default=True

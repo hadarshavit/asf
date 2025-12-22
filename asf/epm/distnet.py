@@ -48,6 +48,7 @@ class DistNet:
         self.device = device
         self.epochs = epochs
         self.batch_size = batch_size
+        self._is_trained = False  # Track if model has trained weights
         self.gradient_clip = gradient_clip
         self.lr_scheduler = lr_scheduler
         self.logger = logging.getLogger(__name__)
@@ -141,7 +142,21 @@ class DistNet:
             if end - start > 3600:
                 self.logger.info("Early stopping triggered due to time limit exceeded.")
                 break
+        
+        # Mark model as trained after fitting completes
+        self._is_trained = True
 
+    def is_trained(self) -> bool:
+        """Check if the model has trained weights loaded.
+        
+        Returns
+        -------
+        bool
+            True if model was loaded from a valid checkpoint with trained weights,
+            False if model has random/untrained weights.
+        """
+        return getattr(self, '_is_trained', False)
+    
     def predict(self, X: Union[pd.DataFrame, pd.Series, list]) -> torch.Tensor:
         if isinstance(X, pd.DataFrame) or isinstance(X, pd.Series):
             X = X.values
@@ -265,9 +280,205 @@ class DistNet:
         return partial(DistNet, **dn_kwargs)
     
     def save(self, path: str):
-        """Saves the DistNet model to the specified path."""
-        torch.save(self.model.state_dict(), path)
+        """Saves the DistNet model and configuration to the specified path."""
+        # Extract input size from the model structure
+        input_size = None
+        if self.model is not None:
+            # Try to find the first linear layer to get input size
+            for module in self.model.modules():
+                if isinstance(module, torch.nn.Linear):
+                    input_size = module.in_features
+                    break
         
-    def load(self, path: str):
-        """Loads the DistNet model from the specified path."""
-        self.model.load_state_dict(torch.load(path))
+        save_dict = {
+            'model_state_dict': self.model.state_dict() if self.model is not None else None,
+            'model_config': {
+                'input_size': input_size,
+                'output_size': self.n_loss_params,
+            },
+            'n_loss_params': self.n_loss_params,
+            # Don't try to pickle TorchScript functions directly; save name and module for reconstruction
+            'loss_function_name': getattr(self.loss_function, '__name__', None),
+            'loss_function_module': getattr(self.loss_function, '__module__', None),
+            'epochs': self.epochs,
+            'batch_size': self.batch_size,
+            'gradient_clip': self.gradient_clip,
+            'optimizer': self.optimizer,
+            'optimizer_kwargs': self.optimizer_kwargs,
+            'lr_scheduler': self.lr_scheduler,
+            'device': self.device,
+        }
+        try:
+            torch.save(save_dict, path)
+        except Exception as e:
+            # Remove incomplete file if created and raise a clear error
+            try:
+                import os
+
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception:
+                pass
+            raise RuntimeError(f"Failed to save DistNet checkpoint to {path}: {e}") from e
+    
+    @classmethod
+    def load(cls, path: str, loss_function=None, n_loss_params=None, input_size=None):
+        """Loads the DistNet model from the specified path.
+        
+        Backward compatible: handles both old format (state_dict only) and new format (full config).
+        
+        Parameters
+        ----------
+        path : str
+            Path to the saved model
+        loss_function : callable, optional
+            Required for old format models or corrupted checkpoints. Loss function to use.
+        n_loss_params : int, optional
+            Required for old format models or corrupted checkpoints. Number of loss parameters.
+        input_size : int, optional
+            Required for old format models or corrupted checkpoints. Input feature size.
+        """
+        try:
+            checkpoint = torch.load(path, map_location='cpu')
+        except RuntimeError as e:
+            # torch.load failed - file is corrupted or not a valid checkpoint
+            if loss_function is None or n_loss_params is None or input_size is None:
+                raise RuntimeError(
+                    f"Failed to load checkpoint from {path}: {e}. "
+                    "The file appears to be corrupted or incomplete. "
+                    "Please provide loss_function, n_loss_params, and input_size parameters "
+                    "to create a new model, or retrain and save the model properly."
+                ) from e
+            
+            # Create a new model from scratch since checkpoint is corrupted
+            logging.warning(
+                f"Checkpoint at {path} is corrupted or incomplete. "
+                f"Creating untrained model. This model will NOT produce meaningful predictions. "
+                f"Please retrain the model."
+            )
+            instance = cls(
+                loss_function=loss_function,
+                n_loss_params=n_loss_params,
+            )
+            
+            # Build a new model from scratch
+            instance.model = get_mlp(
+                input_size=input_size,
+                output_size=n_loss_params,
+                hidden_sizes=[16, 16],
+                compile=True,
+                dropout=0.0,
+                output_activation=ExpActivation(),
+            )
+            instance._is_trained = False  # Mark as untrained
+            
+            return instance
+        
+        # Check if this is the new format with 'model_state_dict'
+        if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+            # New format: state_dict with config
+            # Reconstruct loss function if stored as name/module, otherwise try direct callable
+            loss_fn = None
+            if 'loss_function' in checkpoint and callable(checkpoint['loss_function']):
+                loss_fn = checkpoint['loss_function']
+            else:
+                # Try reconstructing by name from the losses module
+                lf_name = checkpoint.get('loss_function_name') or checkpoint.get('loss_function')
+                lf_module = checkpoint.get('loss_function_module')
+                if lf_name:
+                    try:
+                        from asf.predictors.utils import losses as _losses
+
+                        loss_fn = getattr(_losses, lf_name)
+                    except Exception:
+                        loss_fn = None
+
+            instance = cls(
+                loss_function=loss_fn,
+                n_loss_params=checkpoint['n_loss_params'],
+                epochs=checkpoint.get('epochs', 200),
+                batch_size=checkpoint.get('batch_size', 16),
+                gradient_clip=checkpoint.get('gradient_clip', 1e-2),
+                optimizer=checkpoint.get('optimizer', torch.optim.SGD),
+                optimizer_kwargs=checkpoint.get('optimizer_kwargs', {}),
+                lr_scheduler=checkpoint.get('lr_scheduler'),
+                device=checkpoint.get('device', torch.device('cpu')),
+            )
+            
+            # Build the model architecture from config
+            model_config = checkpoint.get('model_config', {})
+            if model_config.get('input_size') is not None:
+                instance.model = get_mlp(
+                    input_size=model_config['input_size'],
+                    output_size=model_config['output_size'],
+                    hidden_sizes=[16, 16],
+                    compile=True,
+                    dropout=0.0,
+                    output_activation=ExpActivation(),
+                )
+                # Load the state_dict
+                if checkpoint['model_state_dict'] is not None:
+                    instance.model.load_state_dict(checkpoint['model_state_dict'])
+                    instance._is_trained = True
+                else:
+                    instance._is_trained = False
+        elif isinstance(checkpoint, dict) and 'model' in checkpoint:
+            # Old format: trying to save entire model (likely corrupted)
+            # This format is problematic and needs manual recovery
+            if loss_function is None or n_loss_params is None or input_size is None:
+                raise RuntimeError(
+                    f"Model at {path} was saved with old format and appears corrupted. "
+                    "Please provide loss_function, n_loss_params, and input_size parameters "
+                    "to attempt recovery, or retrain and save the model with the new version."
+                )
+            
+            instance = cls(
+                loss_function=loss_function,
+                n_loss_params=n_loss_params,
+            )
+            
+            # Try to use the saved model if it exists
+            if checkpoint.get('model') is not None:
+                instance.model = checkpoint['model']
+                instance._is_trained = True
+            else:
+                # Build a new model from scratch
+                instance.model = get_mlp(
+                    input_size=input_size,
+                    output_size=n_loss_params,
+                    hidden_sizes=[16, 16],
+                    compile=True,
+                    dropout=0.0,
+                    output_activation=ExpActivation(),
+                )
+                instance._is_trained = False
+        else:
+            # Old format: only state_dict saved
+            if loss_function is None or n_loss_params is None or input_size is None:
+                raise RuntimeError(
+                    f"Model at {path} was saved with old format. "
+                    "Please provide loss_function, n_loss_params, and input_size parameters, "
+                    "or retrain and save the model with the new version."
+                )
+            
+            # Create instance with provided parameters
+            instance = cls(
+                loss_function=loss_function,
+                n_loss_params=n_loss_params,
+            )
+            
+            # Build the model architecture
+            instance.model = get_mlp(
+                input_size=input_size,
+                output_size=n_loss_params,
+                hidden_sizes=[16, 16],
+                compile=True,
+                dropout=0.0,
+                output_activation=ExpActivation(),
+            )
+            
+            # Load the old state_dict
+            instance.model.load_state_dict(checkpoint)
+            instance._is_trained = True
+        
+        return instance
