@@ -139,12 +139,13 @@ class SelectorPipeline:
             f"Selector fitting completed in {time.time() - start:.2f} seconds"
         )
 
-    def predict(self, X: Any) -> dict:
+    def predict(self, X: Any, performance: Any = None) -> dict:
         """
         Makes predictions using the fitted pipeline.
 
         Args:
             X (Any): The input features.
+            performance (Any, optional): The performance data for oracle selectors. Defaults to None.
 
         Returns:
             Any: The predictions made by the selector.
@@ -161,7 +162,8 @@ class SelectorPipeline:
 
         X = self._filter_features(X)
 
-        predictions = self.selector.predict(X)
+        # Pass performance through to selector (needed for oracle selectors like VBS)
+        predictions = self.selector.predict(X, performance=performance)
 
         # Ensure predictions use the same index as X
         predictions = pd.Series(predictions, index=X.index)

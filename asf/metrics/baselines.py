@@ -64,6 +64,7 @@ def running_time_selector_performance(
     budget: float = 5000,
     feature_time: pd.DataFrame | None = None,
     par: float = 10,
+    return_per_instance: bool = False,
 ) -> dict[str, float | int]:
     """
     Calculates the total running time for a selector based on the given schedules and performance data.
@@ -86,11 +87,12 @@ def running_time_selector_performance(
         par (float): The penalization factor for unsolved instances.
         feature_time (pd.DataFrame | None): The feature time data for each instance.
             Should have columns corresponding to feature group names. Defaults to zero if not provided.
-        max_feature_time (float | None): Deprecated parameter, kept for backward compatibility. No longer used.
-            Feature group budgets are now specified directly in the schedule.
+        return_per_instance (bool): If True, return dict mapping instance to running time.
+            If False (default), return the sum of all running times.
 
     Returns:
-        dict[str, float | int]: A dictionary mapping each instance to its total running time.
+        dict[str, float | int] | float: If return_per_instance is True, returns a dictionary mapping
+            each instance to its total running time. Otherwise, returns the sum of all running times.
     """
     if feature_time is None:
         feature_time = pd.DataFrame(
@@ -182,9 +184,10 @@ def running_time_selector_performance(
         else:
             total_time[instance] = budget * par
 
-    total_time = sum(list(total_time.values()))
+    if return_per_instance:
+        return total_time
 
-    return total_time
+    return sum(list(total_time.values()))
 
 
 def _validate_schedule_prerequisites(

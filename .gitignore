@@ -178,3 +178,5 @@ aslib_data/**
 test*.ipynb
 
 logs/**
+bench/results*/**
+paper/**
