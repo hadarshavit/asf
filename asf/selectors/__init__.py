@@ -20,6 +20,7 @@ from asf.selectors.satzilla import SATzilla
 from asf.selectors.osl_linear import OSLLinearSelector
 from asf.selectors.cshc import CSHCSelector
 from asf.selectors.cosine_selector import CosineSelector
+from asf.selectors.baselines import SingleBestSolver, VirtualBestSolver
 
 __all__ = [
     "PairwiseClassifier",
@@ -43,4 +44,6 @@ __all__ = [
     "OSLLinearSelector",
     "CSHCSelector",
     "CosineSelector",
+    "SingleBestSolver",
+    "VirtualBestSolver",
 ]

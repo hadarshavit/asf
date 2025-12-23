@@ -124,7 +124,7 @@ def _create_pipeline(
     ].get_from_configuration(
         config,
         cs_transform,
-        budget=(budget - presolver_budget) if presolver_budget is not None else budget,
+        budget=budget,  # Don't subtract presolver budget - matches AutoFolio behavior
         maximize=maximize,
         feature_groups=selected_feature_groups,
         **selector_kwargs,

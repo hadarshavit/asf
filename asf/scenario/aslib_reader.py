@@ -1,3 +1,4 @@
+from asf.selectors.baselines import VirtualBestSolver
 import os
 import pandas as pd
 from asf.metrics.baselines import running_time_closed_gap
@@ -79,10 +80,12 @@ def read_aslib_scenario(
     # e.g. SAT12-INDU = "runtime", CSP-Minizinc-Obj-2016 = "time"
     runtime_col = description["performance_measures"][0]
 
-    # Handle failed runs: if runstatus is not "ok", set runtime to budget (timeout)
+    # Handle failed runs: if runstatus is not "ok", set runtime to budget + 1 (timeout)
     # This ensures crashes, memouts, and other failures are treated as timeouts
+    # We use budget + 1 (not exactly budget) so that apply_par correctly penalizes
+    # these instances with PAR10 (values > budget get penalized)
     if "runstatus" in performance.columns:
-        performance.loc[performance["runstatus"] != "ok", runtime_col] = budget
+        performance.loc[performance["runstatus"] != "ok", runtime_col] = budget + 1
 
     # Aggregate over repetitions (e.g., take mean)
     group_cols = ["instance_id", "algorithm"]
@@ -222,6 +225,7 @@ def evaluate_selector(
     hpo_kwargs={},
     algorithm_pre_selector=None,
     metric=running_time_closed_gap,
+    return_per_instance: bool = False,
 ):
     """
     Runs HPO for a selector on a given ASlib scenario and fold, returns test performance.
@@ -234,6 +238,7 @@ def evaluate_selector(
         hpo_kwargs: Optional dict of extra kwargs for HPO
         algorithm_pre_selector: Optional preselector object (e.g., KneeOfCurvePreSelector instance)
         metric: Metric function to evaluate the selector
+        return_per_instance: If True, also return per-instance scores dict
         training_par_factor: PAR factor to apply to training performance data. Timeouts
             (values > budget) are replaced with budget * training_par_factor. This helps
             the selector learn to avoid timeouts. Set to None to disable. Defaults to 10.0.
@@ -241,6 +246,7 @@ def evaluate_selector(
     Returns:
         test_score: The test performance (e.g., PAR10 or other metric)
         selector: The fitted selector
+        per_instance_scores: (only if return_per_instance=True) Dict mapping instance_id to running time
     """
 
     # Load scenario
@@ -301,9 +307,26 @@ def evaluate_selector(
 
     selector.fit(X_train, y_train, algorithm_features=algorithm_features)
     # Predict and evaluate
-    predictions = selector.predict(X_test)
+    # Pass y_test to predict() for oracle selectors (VBS) that need true performance
+    if selector_class is VirtualBestSolver:
+        predictions = selector.predict(X_test, performance=y_test)
+    else:
+        predictions = selector.predict(X_test)
 
     # max_feature_time is no longer passed to metric; budgets are in the schedule itself
     test_score = metric(predictions, y_test, budget, features_running_time_test)
+
+    if return_per_instance:
+        from asf.metrics.baselines import running_time_selector_performance
+
+        per_instance_scores = running_time_selector_performance(
+            predictions,
+            y_test,
+            budget,
+            features_running_time_test,
+            par=10,
+            return_per_instance=True,
+        )
+        return test_score, selector, per_instance_scores
 
     return test_score, selector

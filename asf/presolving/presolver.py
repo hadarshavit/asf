@@ -33,13 +33,13 @@ class AbstractPresolver:
 
     @staticmethod
     def get_configuration_space(
-        cs: ConfigurationSpace | None = None,
+        cs: "ConfigurationSpace | None" = None,
         cs_transform: dict | None = None,
         parent_param: None = None,
         parent_value: str | None = None,
         total_budget: float | None = None,
         **kwargs,
-    ) -> tuple[ConfigurationSpace, dict]:
+    ) -> "tuple[ConfigurationSpace, dict]":
         """
         Get the configuration space for the presolver.
 
