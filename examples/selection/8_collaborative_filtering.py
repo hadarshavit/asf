@@ -17,7 +17,7 @@ def generate_correlated_data(n_instances=100, n_algorithms=6, seed=42):
             "feature2": np.random.uniform(0, 5, n_instances),
             "feature3": np.random.uniform(0, 1, n_instances),
         },
-        index=[f"instance_{i}" for i in range(n_instances)],
+        index=pd.Index([f"instance_{i}" for i in range(n_instances)]),
     )
 
     # Diverse coefficients and offsets for each algorithm
@@ -39,7 +39,7 @@ def generate_correlated_data(n_instances=100, n_algorithms=6, seed=42):
         performance.append(perf_row)
     performance = pd.DataFrame(
         performance,
-        columns=[f"algo{j + 1}" for j in range(n_algorithms)],
+        columns=pd.Index([f"algo{j + 1}" for j in range(n_algorithms)]),
         index=features.index,
     )
 

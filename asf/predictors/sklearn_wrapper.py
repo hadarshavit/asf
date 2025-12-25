@@ -8,7 +8,6 @@ from typing import Any
 
 import joblib
 import numpy as np
-from sklearn.base import BaseEstimator
 
 from asf.predictors.abstract_predictor import AbstractPredictor
 
@@ -29,11 +28,11 @@ class SklearnWrapper(AbstractPredictor):
 
     def __init__(
         self,
-        model_class: type[BaseEstimator],
+        model_class: Any,
         init_params: dict[str, Any] | None = None,
     ):
         super().__init__()
-        self.model_class = model_class(**(init_params or {}))
+        self.model_class: Any = model_class(**(init_params or {}))
 
     def fit(
         self,

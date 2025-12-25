@@ -36,7 +36,7 @@ def dummy_performance():
             [580, 570, 560],
         ]
     )
-    return pd.DataFrame(data, columns=["algo1", "algo2", "algo3"])
+    return pd.DataFrame(data, columns=pd.Index(["algo1", "algo2", "algo3"]))
 
 
 def test_optimize_pre_selection(dummy_performance):

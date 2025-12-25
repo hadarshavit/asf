@@ -86,7 +86,7 @@ def main():
     print("Sample decisions (first 12):")
     for inst in list(X_test.index)[:12]:
         rec = preds.get(inst, [(None, None)])
-        print(f"{inst}: chosen = {rec[0][0]} (pred_score={rec[0][1]})")
+        print(f"{inst}: chosen = {rec[0][0]} (pred_score={rec[0][1]})")  # type: ignore[index]
     print("=" * 60)
 
 

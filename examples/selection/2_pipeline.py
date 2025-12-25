@@ -38,7 +38,7 @@ def get_data():
             [580, 570, 560],
         ]
     )
-    performance = pd.DataFrame(data, columns=["algo1", "algo2", "algo3"])
+    performance = pd.DataFrame(data, columns=pd.Index(["algo1", "algo2", "algo3"]))
 
     data = np.array(
         [
@@ -64,7 +64,9 @@ def get_data():
             [105, 52, 10.5],
         ]
     )
-    features = pd.DataFrame(data, columns=["feature1", "feature2", "feature3"])
+    features = pd.DataFrame(
+        data, columns=pd.Index(["feature1", "feature2", "feature3"])
+    )
 
     return features, performance
 

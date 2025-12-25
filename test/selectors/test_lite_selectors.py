@@ -64,7 +64,7 @@ def dummy_performance():
             [580, 570, 560],
         ]
     )
-    return pd.DataFrame(data, columns=["algo1", "algo2", "algo3"])
+    return pd.DataFrame(data, columns=pd.Index(["algo1", "algo2", "algo3"]))
 
 
 @pytest.fixture
@@ -93,7 +93,7 @@ def dummy_features():
             [105, 52, 10.5],
         ]
     )
-    return pd.DataFrame(data, columns=["feature1", "feature2", "feature3"])
+    return pd.DataFrame(data, columns=pd.Index(["feature1", "feature2", "feature3"]))
 
 
 @pytest.mark.parametrize(
@@ -119,7 +119,7 @@ def test_pairwise_classifier_handles_numpy_input(dummy_performance, dummy_featur
     # Ensure predict() and fit() handle numpy array inputs as expected
     from sklearn.ensemble import RandomForestClassifier
 
-    clf = PairwiseClassifier(model_class=RandomForestClassifier)
+    clf = PairwiseClassifier(model_class=RandomForestClassifier)  # type: ignore[arg-type]
     # Fit with numpy arrays
     clf.fit(dummy_features.to_numpy(), dummy_performance.to_numpy())
     # Predict with numpy array inputs
@@ -198,7 +198,7 @@ def test_performance_model_with_multi_target(
 
 
 def save_load(dummy_performance, dummy_features):
-    model = PerformanceModel(model_class=RandomForestRegressor)
+    model = PerformanceModel(model_class=RandomForestRegressor)  # type: ignore[arg-type]
     model.fit(dummy_features, dummy_performance)
     model.save("model.pkl")
     loaded_model = PerformanceModel.load("model.pkl")

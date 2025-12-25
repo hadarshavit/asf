@@ -31,14 +31,14 @@ def test_abstract_selector_numpy_to_dataframe_conversion():
     assert sel.features == ["f_0", "f_1"]
     assert sel.algorithms == ["algo_0", "algo_1"]
 
-    preds = sel.predict(pd.DataFrame([[0.0, 0.0]], columns=["f_0", "f_1"]))
-    assert list(preds.keys())[0] in (0, "i0")
+    preds = sel.predict(pd.DataFrame([[0.0, 0.0]], columns=pd.Index(["f_0", "f_1"])))
+    assert list(preds.keys())[0] in (0, "i0")  # type: ignore[attr-defined]
 
 
 def test_abstract_selector_rejects_mixed_types():
     sel = TinySelector()
     # features DataFrame, performance numpy should raise
-    X = pd.DataFrame([[1.0, 2.0]], columns=["a", "b"])
+    X = pd.DataFrame([[1.0, 2.0]], columns=pd.Index(["a", "b"]))
     Y = np.array([[1.0, 2.0]])
     try:
         sel.fit(X, Y)
@@ -60,8 +60,8 @@ class TinyModelBased(AbstractModelBasedSelector):
 
 
 def test_model_based_selector_save_and_load(tmp_path):
-    X = pd.DataFrame({"x": [1, 2]}, index=["i1", "i2"])
-    Y = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 0.1]}, index=X.index)
+    X = pd.DataFrame({"x": [1, 2]}, index=pd.Index(["i1", "i2"]))
+    Y = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 0.1]}, index=pd.Index(X.index))
     sel = TinyModelBased(budget=2.0)
     sel.fit(X, Y)
 
@@ -69,4 +69,4 @@ def test_model_based_selector_save_and_load(tmp_path):
     sel.save(p.as_posix())
     loaded = TinyModelBased.load(p.as_posix())
     preds = loaded.predict(X)
-    assert set(preds.keys()) == set(X.index)
+    assert set(preds.keys()) == set(X.index)  # type: ignore[attr-defined]

@@ -14,7 +14,7 @@ benefit-maximization and 4-approximation for cost-minimization.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 import numpy as np
 import pandas as pd
 
@@ -208,7 +208,7 @@ class SubmodularPresolver(AbstractPresolver):
             self.algorithms = list(performance.columns)
         else:
             self._performance = pd.DataFrame(performance)
-            self.algorithms = [f"a{i}" for i in range(performance.shape[1])]
+            self.algorithms = [f"a{i}" for i in range(cast(Any, performance).shape[1])]
 
         n_instances = len(self._performance)
 

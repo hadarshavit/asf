@@ -60,7 +60,7 @@ def dummy_performance():
             [580, 200, 10],
         ]
     )
-    return pd.DataFrame(data, columns=["algo1", "algo2", "algo3"])
+    return pd.DataFrame(data, columns=pd.Index(["algo1", "algo2", "algo3"]))
 
 
 @pytest.fixture
@@ -89,7 +89,7 @@ def dummy_features():
             [105, 52, 10.5],
         ]
     )
-    return pd.DataFrame(data, columns=["feature1", "feature2", "feature3"])
+    return pd.DataFrame(data, columns=pd.Index(["feature1", "feature2", "feature3"]))
 
 
 def validate_predictions(predictions):
@@ -115,7 +115,7 @@ def validate_predictions(predictions):
 
 
 def test_simple_ranking(dummy_performance, dummy_features):
-    selector = SimpleRanking(model_class=XGBRanker, budget=450.0)
+    selector = SimpleRanking(model_class=XGBRanker, budget=450.0)  # type: ignore[arg-type]
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
@@ -152,7 +152,7 @@ def test_survival_analysis_schedule(dummy_performance, dummy_features):
     predictions = selector.predict(dummy_features)
 
     assert len(predictions) == len(dummy_features)
-    for sched in predictions.values():
+    for sched in predictions.values():  # type: ignore[attr-defined]
         assert isinstance(sched, list)
         assert all(isinstance(x, tuple) and len(x) == 2 for x in sched)
         assert all(
@@ -169,7 +169,7 @@ def test_isa_selector(dummy_performance, dummy_features):
     predictions = selector.predict(dummy_features)
 
     assert len(predictions) == len(dummy_features)
-    for sched in predictions.values():
+    for sched in predictions.values():  # type: ignore[attr-defined]
         assert isinstance(sched, list)
         assert all(isinstance(x, tuple) and len(x) == 2 for x in sched)
         assert all(
@@ -216,7 +216,7 @@ def test_sunny_selector(dummy_performance, dummy_features):
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     assert len(predictions) == len(dummy_features)
-    for sched in predictions.values():
+    for sched in predictions.values():  # type: ignore[attr-defined]
         assert isinstance(sched, list)
         assert all(isinstance(x, tuple) and len(x) == 2 for x in sched)
         assert all(isinstance(x[0], str) and isinstance(x[1], float) for x in sched)
@@ -273,7 +273,7 @@ def test_meta_selector(dummy_performance, dummy_features):
         SATzilla(budget=budget),
         ISAC(budget=budget),
     ]
-    meta_sel = SimpleRanking(model_class=XGBRanker, budget=budget)
+    meta_sel = SimpleRanking(model_class=XGBRanker, budget=budget)  # type: ignore[arg-type]
 
     meta = MetaSelector(
         base_selectors=base_selectors, meta_selector=meta_sel, budget=budget, n_folds=2
@@ -291,7 +291,7 @@ def test_meta_selector_rejects_schedule_base(dummy_performance, dummy_features):
     with pytest.raises(ValueError):
         MetaSelector(
             base_selectors=[SNNAP(k=3, budget=budget), ISA(budget=budget)],
-            meta_selector=SimpleRanking(model_class=XGBRanker, budget=budget),
+            meta_selector=SimpleRanking(model_class=XGBRanker, budget=budget),  # type: ignore[arg-type]
             budget=budget,
         )
 
@@ -436,7 +436,7 @@ def test_osl_linear_selector(dummy_performance, dummy_features):
     predictions = selector.predict(dummy_features)
 
     assert len(predictions) == len(dummy_features)
-    for pred in predictions.values():
+    for pred in predictions.values():  # type: ignore[attr-defined]
         assert isinstance(pred, list) and len(pred) == 1
         algo, score = pred[0]
         assert algo in ["algo1", "algo2", "algo3"] or algo is None

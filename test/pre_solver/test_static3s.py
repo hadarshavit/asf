@@ -15,9 +15,10 @@ except ImportError:
 @pytest.fixture
 def dummy_data():
     rng = np.random.RandomState(0)
-    features = pd.DataFrame(rng.randn(20, 3), columns=["f1", "f2", "f3"])
+    features = pd.DataFrame(rng.randn(20, 3), columns=pd.Index(["f1", "f2", "f3"]))
     performance = pd.DataFrame(
-        rng.exponential(15, (20, 4)), columns=["algo1", "algo2", "algo3", "algo4"]
+        rng.exponential(15, (20, 4)),
+        columns=pd.Index(["algo1", "algo2", "algo3", "algo4"]),
     )
     return features, performance
 
@@ -57,6 +58,7 @@ def test_schedule_time_and_ordering(dummy_data):
     budget = 40.0
     s = Static3S(runcount_limit=5, budget=budget, max_candidates_per_solver=8)
     s.fit(X, Y)
+    assert s.schedule is not None
     assert len(s.schedule) > 0
     times = [t for _, t in s.schedule]
     assert times == sorted(times)

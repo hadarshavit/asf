@@ -33,7 +33,7 @@ def test_selector_pipeline_config_space_refactor():
     )
 
     # Check HPs
-    hps = cs.get_hyperparameters_dict()
+    hps = dict(cs)
 
     # Should have preprocessor:DummyPreprocessor1
     hp_name_1 = f"{SelectorPipeline.PREFIX}:preprocessor:DummyPreprocessor1"
@@ -42,8 +42,8 @@ def test_selector_pipeline_config_space_refactor():
 
     # Check choices (ClassChoice converts to Categorical with strings for ConfigSpace)
     # The internal logic maps "False" string to False boolean, but ConfigSpace sees "False"
-    assert "DummyPreprocessor1" in hp1.choices
-    assert "False" in hp1.choices
+    assert "DummyPreprocessor1" in hp1.choices  # type: ignore[attr-defined]
+    assert "False" in hp1.choices  # type: ignore[attr-defined]
 
     # Defaults
     assert hp1.default_value == "False"

@@ -21,8 +21,8 @@ def test_pairwise_generate_features_and_predict():
     feats = sel.generate_features(X)
     assert list(feats.columns) == sel.algorithms
     preds = sel.predict(X)
-    assert set(preds.keys()) == {str(i) for i in X.index}
-    for v in preds.values():
+    assert set(preds.keys()) == {str(i) for i in X.index}  # type: ignore[attr-defined]
+    for v in preds.values():  # type: ignore[attr-defined]
         assert isinstance(v, list) and len(v) == 1
 
 

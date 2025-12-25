@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
+import pickle
 from sklearn.preprocessing import OneHotEncoder
 
 from asf.predictors.ranking_mlp import RankingMLP
@@ -38,6 +39,15 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
 
     PREFIX = "joint_ranking"
     RETURN_TYPE = "single"
+
+    def save(self, path: str) -> None:
+        with open(path, "wb") as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def load(cls, path: str) -> "AbstractSelector":
+        with open(path, "rb") as f:
+            return pickle.load(f)
 
     def __init__(
         self,

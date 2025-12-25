@@ -99,7 +99,7 @@ def main():
         inst_feature_df = X_test.loc[[inst_name]]
 
         # 1. Get primary selector's choice
-        primary_pred = sel.primary_selector.predict(inst_feature_df).get(inst_name)
+        primary_pred = sel.primary_selector.predict(inst_feature_df).get(inst_name)  # type: ignore[attr-defined]
         if not primary_pred:
             continue
 
@@ -122,7 +122,7 @@ def main():
                 primary_success += 1
         elif sel.backup_selector:
             backup_used += 1
-            backup_pred_list = sel.backup_selector.predict(inst_feature_df).get(
+            backup_pred_list = sel.backup_selector.predict(inst_feature_df).get(  # type: ignore[attr-defined]
                 inst_name
             )
             if backup_pred_list:
@@ -183,7 +183,7 @@ def main():
     print()
     print("Sample decisions (first 12):")
     for inst in list(X_test.index)[:12]:
-        algo, _ = preds.get(inst, [(None, None)])[0]
+        algo, _ = preds.get(inst, [(None, None)])[0]  # type: ignore[attr-defined]
         rt = Y_test.at[inst, algo] if algo is not None else float("nan")
         print(f"{inst}: chosen={algo}, true_rt={rt:.2f}")
     print("=" * 60)

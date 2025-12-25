@@ -12,7 +12,7 @@ def small_dataframes():
             "f1": [1.0, np.nan, 3.0, 4.0],
             "f2": [0.5, 0.7, np.nan, 1.2],
         },
-        index=[f"i{k}" for k in range(4)],
+        index=pd.Index([f"i{k}" for k in range(4)]),
     )
     Y = pd.DataFrame(
         {
@@ -39,7 +39,7 @@ def test_selector_pipeline_fit_predict_and_config(tmp_path):
     assert set(preds.keys()) == set(X.index)
     for v in preds.values():
         assert isinstance(v, list) and len(v) == 1
-        algo, bud = v[0]
+        algo, bud, *_ = v[0]
         assert algo in ["a", "b"]
         assert bud == 10.0
 

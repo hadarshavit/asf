@@ -4,7 +4,7 @@ Greedy Presolver - SATzilla-style pre-solver selection.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 import numpy as np
 import pandas as pd
 
@@ -81,7 +81,7 @@ class GreedyPresolver(AbstractPresolver):
             self.algorithms = list(perf.columns)
         else:
             perf = pd.DataFrame(performance)
-            self.algorithms = [f"a{i}" for i in range(performance.shape[1])]
+            self.algorithms = [f"a{i}" for i in range(cast(Any, performance).shape[1])]
 
         n_instances = len(perf)
 

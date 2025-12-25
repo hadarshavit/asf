@@ -224,8 +224,10 @@ class PerformanceModel(
                     predictions[:, i] = self.regressors.predict(data)
 
         return pd.DataFrame(
-            predictions, index=base_features.index, columns=list(self.algorithms)
-        )  # type: ignore[arg-type]
+            predictions,
+            index=base_features.index,
+            columns=pd.Index(list(self.algorithms)),
+        )
 
     @staticmethod
     def _define_hyperparameters(

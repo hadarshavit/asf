@@ -4,7 +4,7 @@ Static 3S presolver - Resource-constrained set covering problem.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -88,7 +88,7 @@ class Static3S(AbstractPresolver):
         else:
             perf = pd.DataFrame(performance)
             instances = list(range(len(perf)))
-            self.algorithms = [f"a{i}" for i in range(performance.shape[1])]
+            self.algorithms = [f"a{i}" for i in range(cast(Any, performance).shape[1])]
 
         # Build candidate (solver, time) pairs.
         candidates = {}

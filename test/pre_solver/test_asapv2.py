@@ -7,9 +7,12 @@ from asf.presolving.asap_v2 import ASAPv2
 @pytest.fixture
 def dummy_data():
     """Create dummy data for testing"""
-    features = pd.DataFrame(np.random.randn(15, 3), columns=["f1", "f2", "f3"])
+    features = pd.DataFrame(
+        np.random.randn(15, 3), columns=pd.Index(["f1", "f2", "f3"])
+    )
     performance = pd.DataFrame(
-        np.random.exponential(15, (15, 4)), columns=["algo1", "algo2", "algo3", "algo4"]
+        np.random.exponential(15, (15, 4)),
+        columns=pd.Index(["algo1", "algo2", "algo3", "algo4"]),
     )
     return features, performance
 
@@ -110,9 +113,9 @@ class TestASAPv2EdgeCases:
 
     def test_single_algorithm(self):
         """Test with single algorithm - size_preschedule becomes 0"""
-        features = pd.DataFrame(np.random.randn(5, 2), columns=["f1", "f2"])
+        features = pd.DataFrame(np.random.randn(5, 2), columns=pd.Index(["f1", "f2"]))
         performance = pd.DataFrame(
-            np.random.exponential(10, (5, 1)), columns=["only_algo"]
+            np.random.exponential(10, (5, 1)), columns=pd.Index(["only_algo"])
         )
 
         asap = ASAPv2(budget=20.0, verbosity=0)
@@ -125,9 +128,9 @@ class TestASAPv2EdgeCases:
 
     def test_two_algorithms(self):
         """Test with two algorithms - size_preschedule becomes 1"""
-        features = pd.DataFrame(np.random.randn(5, 2), columns=["f1", "f2"])
+        features = pd.DataFrame(np.random.randn(5, 2), columns=pd.Index(["f1", "f2"]))
         performance = pd.DataFrame(
-            np.random.exponential(10, (5, 2)), columns=["algo1", "algo2"]
+            np.random.exponential(10, (5, 2)), columns=pd.Index(["algo1", "algo2"])
         )
 
         asap = ASAPv2(budget=20.0, verbosity=0)
@@ -139,9 +142,10 @@ class TestASAPv2EdgeCases:
 
     def test_many_algorithms(self):
         """Test with many algorithms"""
-        features = pd.DataFrame(np.random.randn(10, 2), columns=["f1", "f2"])
+        features = pd.DataFrame(np.random.randn(10, 2), columns=pd.Index(["f1", "f2"]))
         performance = pd.DataFrame(
-            np.random.exponential(15, (10, 8)), columns=[f"algo_{i}" for i in range(8)]
+            np.random.exponential(15, (10, 8)),
+            columns=pd.Index([f"algo_{i}" for i in range(8)]),
         )
 
         asap = ASAPv2(budget=20.0, runcount_limit=5, verbosity=0, size_preschedule=3)
@@ -279,7 +283,9 @@ class TestASAPv2AlgorithmSelection:
         asap = ASAPv2(budget=30.0, size_preschedule=3, runcount_limit=5, verbosity=0)
         asap.fit(features, performance)
 
+        assert asap.schedule is not None
         schedule_algos = [alg for alg, _ in asap.schedule]
+        assert asap.ialgos_preschedule is not None
         preschedule_algos = [asap.algorithms[idx] for idx in asap.ialgos_preschedule]
 
         for alg in schedule_algos:

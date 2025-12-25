@@ -54,11 +54,11 @@ def test_build_cli_command(tmp_path: Path):
     _write_dummy_csv(perf)
 
     cmd = build_cli_command(
-        selector=[SATzilla, PairwiseRegressor],
+        selector=[SATzilla, PairwiseRegressor],  # type: ignore[arg-type]
         feature_data=feats,
         performance_data=perf,
         destination=tmp_path / "model.pkl",
-        model="Ridge",
+        model="Ridge",  # type: ignore[arg-type]
         tuning=True,
         budget=60,
         maximize=False,
@@ -84,8 +84,8 @@ def _validate_pipeline_extensive(
     features: pd.DataFrame,
     expected_budget: float,
     expected_selector_types: list,
-    expected_preprocessor_types: list = None,
-    expected_presolver_type: type = None,
+    expected_preprocessor_types: list | None = None,
+    expected_presolver_type: type | None = None,
     presolver_budget_fraction: float = 0.0,
     tuning: bool = False,
 ):
@@ -189,7 +189,7 @@ def _validate_pipeline_extensive(
         assert inst_id in features.index
         assert isinstance(schedule, list) and len(schedule) > 0
         total_time = 0.0
-        for algo_name, time_alloc in schedule:
+        for algo_name, time_alloc, *_ in schedule:
             assert isinstance(algo_name, (str, type(None)))
             assert isinstance(time_alloc, (int, float)) and time_alloc >= 0
             total_time += time_alloc
@@ -200,11 +200,11 @@ def _run_cli_and_validate(
     tmp_path: Path,
     selector: list,
     tuning: bool = False,
-    preprocessors: list = None,
-    presolvers: list = None,
+    preprocessors: list | None = None,
+    presolvers: list | None = None,
     presolver_budget: float = 0.0,
     budget: int = 450,
-    runcount_limit: int = None,
+    runcount_limit: int | None = None,
 ):
     """Run CLI subprocess and validate resulting pipeline."""
     feats = tmp_path / "features.csv"
@@ -218,7 +218,7 @@ def _run_cli_and_validate(
         feature_data=feats,
         performance_data=perf,
         destination=out_model,
-        model="Ridge",
+        model="Ridge",  # type: ignore[arg-type]
         tuning=tuning,
         budget=budget,
         maximize=False,

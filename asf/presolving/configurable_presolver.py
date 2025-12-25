@@ -7,7 +7,7 @@ configuration space, specifying which algorithms to use and for how long.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -88,7 +88,7 @@ class ConfigurablePresolver(AbstractPresolver):
         if isinstance(performance, pd.DataFrame):
             self.algorithms = list(performance.columns)
         else:
-            self.algorithms = [f"a{i}" for i in range(performance.shape[1])]
+            self.algorithms = [f"a{i}" for i in range(cast(Any, performance).shape[1])]
 
         self.schedule = []
 

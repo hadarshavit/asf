@@ -33,7 +33,7 @@ def get_data():
             [580, 570, 560],
         ]
     )
-    performance = pd.DataFrame(data, columns=["algo1", "algo2", "algo3"])
+    performance = pd.DataFrame(data, columns=pd.Index(["algo1", "algo2", "algo3"]))
 
     data = np.array(
         [
@@ -59,7 +59,9 @@ def get_data():
             [105, 52, 10.5],
         ]
     )
-    features = pd.DataFrame(data, columns=["feature1", "feature2", "feature3"])
+    features = pd.DataFrame(
+        data, columns=pd.Index(["feature1", "feature2", "feature3"])
+    )
 
     return features, performance
 
@@ -77,7 +79,9 @@ if __name__ == "__main__":
         features,
         performance,
         selector_class=[PairwiseClassifier, PairwiseRegressor],
-        features_running_time=pd.DataFrame(0.0, index=features.index, columns=[]),
+        features_running_time=pd.DataFrame(
+            0.0, index=features.index, columns=pd.Index([])
+        ),
         budget=5000,
         runcount_limit=10,
         preprocessing_class=preprocessors,
@@ -109,7 +113,9 @@ if __name__ == "__main__":
             (PairwiseClassifier, {"model_class": [SVMClassifierWrapper]}),
             (PairwiseRegressor, {"model_class": [SVMRegressorWrapper]}),
         ],
-        features_running_time=pd.DataFrame(0.0, index=features.index, columns=[]),
+        features_running_time=pd.DataFrame(
+            0.0, index=features.index, columns=pd.Index([])
+        ),
         budget=5000,
         runcount_limit=10,
         preprocessing_class=preprocessors,

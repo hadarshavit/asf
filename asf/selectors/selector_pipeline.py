@@ -136,37 +136,45 @@ class SelectorPipeline(ConfigurableMixin):
 
     def fit(
         self,
-        X: pd.DataFrame,
-        y: pd.DataFrame,
+        features: pd.DataFrame,
+        performance: pd.DataFrame,
         algorithm_features: pd.DataFrame | None = None,
+        **kwargs: Any,
     ) -> None:
         """
         Fit the pipeline.
 
         Parameters
         ----------
-        X : pd.DataFrame
+        features : pd.DataFrame
             The input features.
-        y : pd.DataFrame
+        performance : pd.DataFrame
             The performance data.
         algorithm_features : pd.DataFrame or None, default=None
             Optional algorithm features.
+        **kwargs : Any
+            Additional keyword arguments.
         """
         start = time.time()
         self._logger.debug("Starting fit process")
 
-        X = self.preprocessor.fit_transform(X, y)
+        X = self.preprocessor.fit_transform(features, performance)
         self._logger.debug(
             f"Preprocessing completed in {time.time() - start:.2f} seconds"
         )
         start = time.time()
+
+        # Update y (performance) alias for local usage
+        y = performance
 
         if self.algorithm_pre_selector:
             if hasattr(self.algorithm_pre_selector, "fit_transform"):
                 y = self.algorithm_pre_selector.fit_transform(X, y)  # type: ignore
             else:
                 self.algorithm_pre_selector.fit(X, y)  # type: ignore
-                y = self.algorithm_pre_selector.transform(y)  # type: ignore
+                # Some pre-selectors might not have transform for y, checking usage
+                if hasattr(self.algorithm_pre_selector, "transform"):
+                    y = self.algorithm_pre_selector.transform(y)  # type: ignore
 
         self._logger.debug(
             f"Algorithm pre-selection completed in {time.time() - start:.2f} seconds"
@@ -174,7 +182,7 @@ class SelectorPipeline(ConfigurableMixin):
         start = time.time()
 
         if self.pre_solving:
-            self.pre_solving.fit(X, y)
+            self.pre_solving.fit(features, performance)
 
         self._logger.debug(
             f"Pre-solving completed in {time.time() - start:.2f} seconds"
@@ -194,7 +202,7 @@ class SelectorPipeline(ConfigurableMixin):
         start = time.time()
 
         X = self._filter_features(X)
-        self.selector.fit(X, y, algorithm_features=algorithm_features)
+        self.selector.fit(X, y, algorithm_features=algorithm_features, **kwargs)
 
         self._logger.debug(
             f"Selector fitting completed in {time.time() - start:.2f} seconds"
@@ -202,25 +210,28 @@ class SelectorPipeline(ConfigurableMixin):
 
     def predict(
         self,
-        X: pd.DataFrame,
+        features: pd.DataFrame,
         performance: pd.DataFrame | None = None,
+        **kwargs: Any,
     ) -> dict[str, list[tuple[str, float] | tuple[str, float, float]]]:
         """
         Make predictions.
 
         Parameters
         ----------
-        X : pd.DataFrame
+        features : pd.DataFrame
             The input features.
         performance : pd.DataFrame or None, default=None
             Performance data for oracle selectors.
+        **kwargs : Any
+            Additional keyword arguments.
 
         Returns
         -------
         dict
             Predictions mapping instance IDs to schedules.
         """
-        X = self.preprocessor.transform(X)
+        X = self.preprocessor.transform(features)
 
         scheds: list[Any] = []
         if self.pre_solving:
@@ -377,7 +388,7 @@ class SelectorPipeline(ConfigurableMixin):
                 and isinstance(selector_class[0], tuple)
             ):
                 selector_choices = [
-                    c[0]
+                    c[0]  # type: ignore[index]
                     for c in (
                         selector_class if isinstance(selector_class, list) else []
                     )

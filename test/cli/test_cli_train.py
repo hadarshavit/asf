@@ -32,14 +32,20 @@ def test_build_cli_command_with_partial_and_direct_model(tmp_path):
             self.maximize = maximize
 
         # Unused abstract methods in this test
-        def fit(self, X, y):
-            return self
+        # Unused abstract methods in this test
+        def fit(self, features, performance, algorithm_features=None, **kwargs):
+            pass
 
-        def predict(self, X):
+        def predict(self, features, performance=None):
             return {}
 
         def save(self, path):
             pass
+
+        @classmethod
+        def load(cls, path):
+            # Only needed to satisfy abstract method if it is abstract, but load is usually a classmethod
+            return cls(None)
 
     # two DataFrame inputs saved temporarily to ensure suffix mapping works in build args
     feat = tmp_path / "f.csv"

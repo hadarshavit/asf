@@ -18,7 +18,7 @@ def test_tune_epm_requires_smac(monkeypatch):
             return None
 
     with pytest.raises(RuntimeError):
-        tuner.tune_epm(X, y, model_class=DummyPredictor)
+        tuner.tune_epm(X, y, model_class=DummyPredictor)  # type: ignore[arg-type]
 
 
 def test_tune_epm_with_mock_smac_returns_configured_epm(monkeypatch):
@@ -34,39 +34,43 @@ def test_tune_epm_with_mock_smac_returns_configured_epm(monkeypatch):
 
     class DummyPredictor(AbstractPredictor):
         @staticmethod
-        def get_configuration_space(**kwargs):
+        def get_configuration_space(  # type: ignore[override]
+            cs=None, pre_prefix="", parent_param=None, parent_value=None
+        ):
             return {"any": "space"}
 
         @staticmethod
-        def get_from_configuration(config, **kwargs):
+        def get_from_configuration(configuration, pre_prefix="", **kwargs):  # type: ignore[override]
             class Model(AbstractPredictor):
-                def fit(self, X, y, sample_weight=None, **kwargs):
+                def fit(self, X, Y, **kwargs):
                     # simple constant regressor on normalized target
-                    self.mean_ = float(np.mean(y))
+                    self.mean_ = float(np.mean(Y))
 
                 def predict(self, X, **kwargs):
                     return np.full(len(X), self.mean_)
 
-                def save(self, path):
+                def save(self, file_path: str):
                     pass
 
-                def load(self, path):
-                    pass
+                @classmethod
+                def load(cls, file_path: str):
+                    return cls()
 
             return Model
 
         # Implement abstract methods for DummyPredictor itself too, though not used as instance here
-        def fit(self, X, y, **kwargs):
+        def fit(self, X, Y, **kwargs):
             pass
 
         def predict(self, X, **kwargs):
             return []
 
-        def save(self, path):
+        def save(self, file_path: str):
             pass
 
-        def load(self, path):
-            pass
+        @classmethod
+        def load(cls, file_path: str):
+            return cls()
 
     class FakeScenario:
         def __init__(

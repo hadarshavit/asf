@@ -135,8 +135,8 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
         n_instances = len(features)
         meta_performance = pd.DataFrame(
             index=features.index,
-            columns=list(self.selector_names),
-            dtype=float,  # type: ignore[arg-type]
+            columns=pd.Index(list(self.selector_names)),
+            dtype=float,
         )
         meta_performance[:] = np.nan
 

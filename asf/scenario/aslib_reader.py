@@ -179,9 +179,9 @@ def read_aslib_scenario(
     cv = cv.set_index("instance_id")
 
     # Sort indices for consistency
-    features = features.sort_index()
-    performance = performance.sort_index()
-    cv = cv.sort_index()
+    features = features.sort_index()  # type: ignore[attr-defined]
+    performance = performance.sort_index()  # type: ignore[attr-defined]
+    cv = cv.sort_index()  # type: ignore[attr-defined]
     features_running_time = features_running_time.sort_index()  # type: ignore[attr-defined]
 
     # Load algorithm features if available

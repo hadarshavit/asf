@@ -146,8 +146,10 @@ class PairwiseRegressor(
             features_df = base_features
 
         scores = pd.DataFrame(
-            0.0, index=features_df.index, columns=list(self.algorithms)
-        )  # type: ignore[arg-type]
+            0.0,
+            index=features_df.index,
+            columns=pd.Index(list(self.algorithms)),
+        )
         cnt = 0
         for i, algo1 in enumerate(self.algorithms):
             for _j, algo2 in enumerate(self.algorithms[i + 1 :]):

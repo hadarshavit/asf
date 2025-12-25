@@ -110,14 +110,16 @@ if TORCH_AVAILABLE:
                 larger["performance"],
             )
 else:
+    # Use Any to silence type checker complaining about union types
+    from typing import Any
 
-    class RegressionDataset(object):  # type: ignore
+    class RegressionDataset(Any):  # type: ignore
         def __init__(self, *args, **kwargs):
             raise RuntimeError(
                 "PyTorch is not installed. Install it with: pip install torch"
             )
 
-    class RankingDataset(object):  # type: ignore
+    class RankingDataset(Any):  # type: ignore
         def __init__(self, *args, **kwargs):
             raise RuntimeError(
                 "PyTorch is not installed. Install it with: pip install torch"

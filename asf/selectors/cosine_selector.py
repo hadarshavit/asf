@@ -34,144 +34,167 @@ except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
 
-class _ASLLMRecommendationModel(nn.Module):
-    """
-    Neural network model implementing the AS-LLM architecture.
+if TORCH_AVAILABLE:
 
-    Architecture:
-    - User (instance) features → MLP → user embedding
-    - Algorithm features (provided) → frozen embedding
-    - Algorithm index → learnable embedding → LSTM → encoding
-    - Fusion: α * LSTM_encoding + β * algorithm_features
-    - Fused features → MLP → algorithm embedding
-    - Cosine similarity between user and algorithm embeddings
-    - Concat(user_emb, algo_emb, cosine_sim) → MLP → binary classification
-    """
-
-    def __init__(
-        self,
-        num_algorithms: int,
-        num_user_features: int,
-        algorithm_features: torch.Tensor,
-        embed_size: int = 50,
-        num_hiddens: int = 50,
-        num_layers: int = 2,
-        output_dim: int = 10,
-        alpha: float = 0.9,
-        beta: float = 0.1,
-    ):
-        super().__init__()
-        self.num_algorithms = num_algorithms
-        self.num_user_features = num_user_features
-        self.alpha = alpha
-        self.beta = beta
-
-        # User (instance) feature MLP: input → 50 → output_dim
-        self.user_mlp = nn.Sequential(
-            nn.Linear(num_user_features, 50),
-            nn.Linear(50, output_dim),
-        )
-
-        # Frozen algorithm features embedding (from self.algorithm_features)
-        self.llm_embedding = nn.Embedding.from_pretrained(
-            algorithm_features.float(), freeze=True
-        )
-
-        # Learnable algorithm embedding
-        self.item_embedding = nn.Embedding(num_algorithms, embed_size)
-
-        # LSTM for processing algorithm embeddings
-        self.algorithm_lstm = nn.LSTM(
-            input_size=embed_size,
-            hidden_size=num_hiddens,
-            num_layers=num_layers,
-            bidirectional=False,
-        )
-
-        # Algorithm feature MLP: 2*num_hiddens (or algo_feat_dim) → 50 → output_dim
-        # After fusion, dimension is 2*num_hiddens (from LSTM concat)
-        self.algorithm_mlp = nn.Sequential(
-            nn.Linear(2 * num_hiddens, 50),
-            nn.ReLU(),
-            nn.Linear(50, output_dim),
-        )
-
-        # Cosine similarity
-        self.cosine_similarity = nn.CosineSimilarity(dim=1)
-
-        # Final MLP: concat(user_emb, algo_emb, cosine_sim) → output
-        self.concat_mlp = nn.Sequential(
-            nn.Linear(output_dim + output_dim + 1, 10),
-            nn.Linear(10, 10),
-            nn.ReLU(),
-            nn.Linear(10, 2),  # Binary classification: match or not
-        )
-
-    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+    class _ASLLMRecommendationModel(nn.Module):
+        num_algorithms: int
+        num_user_features: int
+        alpha: float
+        beta: float
         """
-        Forward pass.
+        Neural network model implementing the AS-LLM architecture.
 
-        Parameters
-        ----------
-        inputs : torch.Tensor
-            Shape: (batch, num_user_features + num_algorithms + 1)
-            First num_user_features columns: instance features
-            Next num_algorithms columns: one-hot algorithm encoding
-            Last column: algorithm index
-
-        Returns
-        -------
-        torch.Tensor
-            Shape: (batch, 2) - binary classification logits
+        Architecture:
+        - User (instance) features → MLP → user embedding
+        - Algorithm features (provided) → frozen embedding
+        - Algorithm index → learnable embedding → LSTM → encoding
+        - Fusion: α * LSTM_encoding + β * algorithm_features
+        - Fused features → MLP → algorithm embedding
+        - Cosine similarity between user and algorithm embeddings
+        - Concat(user_emb, algo_emb, cosine_sim) → MLP → binary classification
         """
-        # Extract user features
-        user_features = inputs[:, : self.num_user_features]
-        user_vector = self.user_mlp(user_features)
 
-        # Extract algorithm one-hot and index
-        algo_onehot = inputs[:, self.num_user_features : -1]
-        algo_idx = inputs[:, -1].long()
+        def __init__(
+            self,
+            num_algorithms: int,
+            num_user_features: int,
+            algorithm_features: torch.Tensor,
+            embed_size: int = 50,
+            num_hiddens: int = 50,
+            num_layers: int = 2,
+            output_dim: int = 10,
+            alpha: float = 0.9,
+            beta: float = 0.1,
+        ):
+            super().__init__()
+            self.num_algorithms = num_algorithms  # type: ignore[attr-defined]
+            self.num_user_features = num_user_features  # type: ignore[attr-defined]
+            self.alpha = alpha  # type: ignore[attr-defined]
+            self.beta = beta  # type: ignore[attr-defined]
 
-        # Algorithm embedding through LSTM
-        # algo_onehot shape: (batch, num_algorithms) - used as sequence input
-        item_embed = self.item_embedding(algo_onehot.permute(1, 0).long())
-        # item_embed shape: (num_algorithms, batch, embed_size)
+            # User (instance) feature MLP: input → 50 → output_dim
+            self.user_mlp = nn.Sequential(
+                nn.Linear(num_user_features, 50),
+                nn.Linear(50, output_dim),
+            )
 
-        lstm_out, _ = self.algorithm_lstm(item_embed)
-        # Concatenate first and last hidden states
-        encoding = torch.cat((lstm_out[0], lstm_out[-1]), dim=-1)
-        # encoding shape: (batch, 2*num_hiddens)
+            # Frozen algorithm features embedding (from self.algorithm_features)
+            self.llm_embedding = nn.Embedding.from_pretrained(
+                algorithm_features.float(), freeze=True
+            )
 
-        # Get frozen algorithm features for this algorithm
-        llm_embed = self.llm_embedding(algo_idx)
-        # llm_embed shape: (batch, algo_feat_dim)
+            # Learnable algorithm embedding
+            self.item_embedding = nn.Embedding(num_algorithms, embed_size)
 
-        # Fusion: alpha * encoding + beta * llm_embed
-        # Need to project llm_embed to match encoding dimension
-        # For simplicity, we'll pad or truncate if dimensions don't match
-        if llm_embed.shape[1] != encoding.shape[1]:
-            # Project llm_embed to encoding dimension
-            if not hasattr(self, "_llm_proj"):
-                self._llm_proj = nn.Linear(llm_embed.shape[1], encoding.shape[1]).to(
-                    encoding.device
-                )
-            llm_embed = self._llm_proj(llm_embed)
+            # LSTM for processing algorithm embeddings
+            self.algorithm_lstm = nn.LSTM(
+                input_size=embed_size,
+                hidden_size=num_hiddens,
+                num_layers=num_layers,
+                bidirectional=False,
+            )
 
-        alg_feature = self.alpha * encoding + self.beta * llm_embed
+            # Algorithm feature MLP: 2*num_hiddens (or algo_feat_dim) → 50 → output_dim
+            # After fusion, dimension is 2*num_hiddens (from LSTM concat)
+            self.algorithm_mlp = nn.Sequential(
+                nn.Linear(2 * num_hiddens, 50),
+                nn.ReLU(),
+                nn.Linear(50, output_dim),
+            )
 
-        # Algorithm MLP
-        item_vector = self.algorithm_mlp(alg_feature)
+            # Cosine similarity
+            self.cosine_similarity = nn.CosineSimilarity(dim=1)
 
-        # Cosine similarity
-        similarity = self.cosine_similarity(user_vector, item_vector)
+            # Final MLP: concat(user_emb, algo_emb, cosine_sim) → output
+            self.concat_mlp = nn.Sequential(
+                nn.Linear(output_dim + output_dim + 1, 10),
+                nn.Linear(10, 10),
+                nn.ReLU(),
+                nn.Linear(10, 2),  # Binary classification: match or not
+            )
 
-        # Concatenate and final MLP
-        concat_input = torch.cat(
-            (user_vector, item_vector, similarity.unsqueeze(1)), dim=1
-        )
-        output = self.concat_mlp(concat_input)
+        def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+            """
+            Forward pass.
 
-        return output
+            Parameters
+            ----------
+            inputs : torch.Tensor
+                Shape: (batch, num_user_features + num_algorithms + 1)
+                First num_user_features columns: instance features
+                Next num_algorithms columns: one-hot algorithm encoding
+                Last column: algorithm index
+
+            Returns
+            -------
+            torch.Tensor
+                Shape: (batch, 2) - binary classification logits
+            """
+            # Extract user features
+            user_features = inputs[:, : self.num_user_features]
+            user_vector = self.user_mlp(user_features)
+
+            # Extract algorithm one-hot and index
+            algo_onehot = inputs[:, self.num_user_features : -1]
+            algo_idx = inputs[:, -1].long()
+
+            # Algorithm embedding through LSTM
+            # algo_onehot shape: (batch, num_algorithms) - used as sequence input
+            item_embed = self.item_embedding(algo_onehot.permute(1, 0).long())
+            # item_embed shape: (num_algorithms, batch, embed_size)
+
+            lstm_out, _ = self.algorithm_lstm(item_embed)
+            # Concatenate first and last hidden states
+            encoding = torch.cat((lstm_out[0], lstm_out[-1]), dim=-1)
+            # encoding shape: (batch, 2*num_hiddens)
+
+            # Get frozen algorithm features for this algorithm
+            llm_embed = self.llm_embedding(algo_idx)
+            # llm_embed shape: (batch, algo_feat_dim)
+
+            # Fusion: alpha * encoding + beta * llm_embed
+            # Need to project llm_embed to match encoding dimension
+            # For simplicity, we'll pad or truncate if dimensions don't match
+            if llm_embed.shape[1] != encoding.shape[1]:
+                # Project llm_embed to encoding dimension
+                if not hasattr(self, "_llm_proj"):
+                    self._llm_proj = nn.Linear(
+                        llm_embed.shape[1], encoding.shape[1]
+                    ).to(encoding.device)
+                llm_embed = self._llm_proj(llm_embed)
+
+            alg_feature = self.alpha * encoding + self.beta * llm_embed
+
+            # Algorithm MLP
+            item_vector = self.algorithm_mlp(alg_feature)
+
+            # Cosine similarity
+            similarity = self.cosine_similarity(user_vector, item_vector)
+
+            # Concatenate and final MLP
+            concat_input = torch.cat(
+                (user_vector, item_vector, similarity.unsqueeze(1)), dim=1
+            )
+            output = self.concat_mlp(concat_input)
+
+            return output
+else:
+
+    class _ASLLMRecommendationModel:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __call__(self, *args, **kwargs):
+            pass
+
+        def train(self):
+            pass
+
+        def eval(self):
+            pass
+
+        def parameters(self):
+            return []
 
 
 class CosineSelector(ConfigurableMixin, AbstractSelector):
@@ -210,6 +233,24 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
 
     PREFIX = "cosine"
     RETURN_TYPE = "single"
+
+    # Type hints for attributes set in __init__
+    normalize_features: bool
+    embed_size: int
+    num_hiddens: int
+    num_layers: int
+    alpha: float
+    beta: float
+    lr: float
+    num_epochs: int
+    batch_size: int
+    random_state: int
+    _device: torch.device
+    _model: nn.Module | None
+    _scaler: StandardScaler | None
+    _imputer: SimpleImputer | None
+    _alg_feats: pd.DataFrame | None
+    algorithms: list[str]
 
     def __init__(
         self,
@@ -402,7 +443,7 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
         num_user_features = X.shape[1]
         num_algorithms = len(self.algorithms)
 
-        self._model = _ASLLMRecommendationModel(
+        self._model = _ASLLMRecommendationModel(  # type: ignore[attr-defined]
             num_algorithms=num_algorithms,
             num_user_features=num_user_features,
             algorithm_features=alg_features_tensor,
@@ -483,41 +524,11 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
                         best_score = score
                         best_algo = self.algorithms[j]
 
-                out[str(inst)] = [(best_algo, float(self.budget or 0))]
+                out[str(inst)] = [(best_algo, float(self.budget or 0))]  # type: ignore[assignment]
 
         return out
 
-    def save(self, path: str) -> None:
-        """
-        Save the selector instance to the specified file path.
-
-        Parameters
-        ----------
-        path : str
-            The file path to save the selector.
-        """
-        import joblib
-
-        joblib.dump(self, path)
-
-    @classmethod
-    def load(cls, path: str) -> "CosineSelector":
-        """
-        Load a selector instance from the specified file path.
-
-        Parameters
-        ----------
-        path : str
-            The file path to load the selector from.
-
-        Returns
-        -------
-        CosineSelector
-            The loaded selector instance.
-        """
-        import joblib
-
-        return joblib.load(path)
+    # save and load are inherited from AbstractSelector/ConfigurableMixin
 
     @staticmethod
     def _define_hyperparameters(

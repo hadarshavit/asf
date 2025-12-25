@@ -39,7 +39,7 @@ def test_brute_force_selects_lowest_sum_dataframe():
 
     selected = selector.fit_transform(performance)
 
-    assert list(selected.columns) == ["a", "c"]
+    assert list(selected.columns) == ["a", "c"]  # type: ignore[attr-defined]
 
 
 def test_brute_force_returns_numpy_for_array_input():
@@ -78,7 +78,7 @@ def test_beam_search_respects_metric_minimize():
 
     selected = selector.fit_transform(performance)
 
-    assert set(selected.columns) == {"A", "B"}
+    assert set(selected.columns) == {"A", "B"}  # type: ignore[attr-defined]
 
 
 def test_marginal_contribution_based_maximize_selects_largest_column():
@@ -98,7 +98,7 @@ def test_marginal_contribution_based_maximize_selects_largest_column():
 
     selected = selector.fit_transform(performance)
 
-    assert list(selected.columns) == ["C"]
+    assert list(selected.columns) == ["C"]  # type: ignore[attr-defined]
 
 
 def test_sbs_pre_selector_handles_numpy_input():
@@ -160,7 +160,7 @@ def test_optimize_pre_selection_uses_custom_optimizer():
 
     assert optimizer.called_with is not None
     assert optimizer.called_with["bounds"] == [(0, 1)] * 3
-    assert set(selected.columns) == {"A", "B"}
+    assert set(selected.columns) == {"A", "B"}  # type: ignore[attr-defined]
 
 
 class _DummyBasePreSelector(AbstractPreSelector):
@@ -197,7 +197,7 @@ def test_knee_of_curve_pre_selector_detects_knee():
 
     selected = selector.fit_transform(performance)
 
-    assert list(selected.columns) == ["A", "B"]
+    assert list(selected.columns) == ["A", "B"]  # type: ignore[attr-defined]
 
 
 def test_knee_of_curve_pre_selector_returns_original_when_no_knee():
@@ -300,7 +300,7 @@ def test_brute_force_maximize_returns_best_columns():
 
     selected = selector.fit_transform(performance)
 
-    assert list(selected.columns) == ["B"]
+    assert list(selected.columns) == ["B"]  # type: ignore[attr-defined]
 
 
 def test_sbs_pre_selector_dataframe_minimize_orders_correctly():
@@ -316,4 +316,4 @@ def test_sbs_pre_selector_dataframe_minimize_orders_correctly():
 
     selected = selector.fit_transform(performance)
 
-    assert list(selected.columns) == ["C", "A"]
+    assert list(selected.columns) == ["C", "A"]  # type: ignore[attr-defined]

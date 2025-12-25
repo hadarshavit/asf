@@ -244,7 +244,7 @@ def convert_class_choices_to_categorical(cs: ConfigurationSpace) -> Configuratio
     for condition in cs.conditions:
         # Create new condition with updated hyperparameter references
         child = hp_map[condition.child.name]
-        parent = hp_map[condition.parent.name]
+        parent = hp_map[condition.parent.name]  # type: ignore[attr-defined]
         new_condition = type(condition)(
             child=child, parent=parent, value=getattr(condition, "value", None)
         )
@@ -710,7 +710,7 @@ class ConfigurableMixin:
 
                 if hasattr(chosen_cls, "get_from_configuration"):
                     # Get a partial for the chosen class
-                    value = chosen_cls.get_from_configuration(
+                    value = chosen_cls.get_from_configuration(  # type: ignore[operator]
                         configuration=configuration,
                         pre_prefix=child_pre_prefix,
                     )

@@ -1,10 +1,12 @@
 import pandas as pd
 import numpy as np
+from typing import Any
 
 from asf.epm.epm import EPM
 
 
 from asf.predictors.abstract_predictor import AbstractPredictor
+from asf.preprocessing.performance_scaling import AbstractNormalization
 
 
 class DummyPredictor(AbstractPredictor):
@@ -14,23 +16,24 @@ class DummyPredictor(AbstractPredictor):
         super().__init__(**kwargs)
         self._mean = None
 
-    def fit(self, X, y, sample_weight=None):
-        # y might be a pandas Series or numpy array
-        self._mean = float(np.mean(np.asarray(y)))
+    def fit(self, X: Any, Y: Any, **kwargs: Any) -> None:
+        # Y might be a pandas Series or numpy array
+        self._mean = float(np.mean(np.asarray(Y)))
 
-    def predict(self, X):
+    def predict(self, X: Any, **kwargs: Any) -> Any:
         # return the mean for each row in X
         n = len(X)
         return np.array([self._mean] * n)
 
-    def save(self, path):
+    def save(self, file_path: str) -> None:
         pass
 
-    def load(self, path):
-        pass
+    @classmethod
+    def load(cls, file_path: str) -> "AbstractPredictor":
+        return cls()
 
 
-class IdentityNorm:
+class IdentityNorm(AbstractNormalization):
     def fit(self, X, y=None, sample_weight=None):
         return self
 
