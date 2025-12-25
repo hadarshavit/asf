@@ -208,9 +208,9 @@ def test_collaborative_filtering_selector(dummy_performance, dummy_features):
 def test_sunny_selector(dummy_performance, dummy_features):
     budget = 500
 
-    cs, cs_transform = SUNNY.get_configuration_space()
+    cs = SUNNY.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    SUNNY.get_from_configuration(cs.get_default_configuration(), cs_transform)
+    SUNNY.get_from_configuration(cs.get_default_configuration())
 
     selector = SUNNY(k=3, use_v2=True, use_tsunny=True, budget=budget)
 
@@ -226,9 +226,9 @@ def test_sunny_selector(dummy_performance, dummy_features):
 
 
 def test_isac_selector(dummy_performance, dummy_features):
-    cs, cs_transform = ISAC.get_configuration_space()
+    cs = ISAC.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    ISAC.get_from_configuration(cs.get_default_configuration(), cs_transform)
+    ISAC.get_from_configuration(cs.get_default_configuration())
 
     selector = ISAC(budget=450.0)
     selector.fit(dummy_features, dummy_performance)
@@ -237,9 +237,9 @@ def test_isac_selector(dummy_performance, dummy_features):
 
 
 def test_snnap_selector(dummy_performance, dummy_features):
-    cs, cs_transform = SNNAP.get_configuration_space()
+    cs = SNNAP.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    SNNAP.get_from_configuration(cs.get_default_configuration(), cs_transform)
+    SNNAP.get_from_configuration(cs.get_default_configuration())
 
     selector = SNNAP(k=3, budget=450.0)
     selector.fit(dummy_features, dummy_performance)
@@ -248,9 +248,9 @@ def test_snnap_selector(dummy_performance, dummy_features):
 
 
 def test_satzilla_selector(dummy_performance, dummy_features):
-    cs, cs_transform = SATzilla.get_configuration_space()
+    cs = SATzilla.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    SATzilla.get_from_configuration(cs.get_default_configuration(), cs_transform)
+    SATzilla.get_from_configuration(cs.get_default_configuration())
 
     selector = SATzilla(budget=450)
     selector.fit(
@@ -336,9 +336,17 @@ def test_cshc_selector_no_backup(dummy_performance, dummy_features):
 
 def test_selector_tuner(dummy_performance, dummy_features):
     # Keep runcount_limit and cv low for fast testing
+    # Create dummy feature running time (same shape as features)
+    features_running_time = pd.DataFrame(
+        np.random.exponential(0.1, dummy_features.shape),
+        columns=dummy_features.columns,
+        index=dummy_features.index,
+    )
+
     tuned_pipeline = tune_selector(
         X=dummy_features,
         y=dummy_performance,
+        features_running_time=features_running_time,
         selector_class=[PairwiseClassifier, PairwiseRegressor],
         runcount_limit=2,
         cv=2,
@@ -364,11 +372,9 @@ def test_selector_tuner(dummy_performance, dummy_features):
     ],
 )
 def test_pairwise_classifier(dummy_performance, dummy_features, model_class):
-    cs, cs_transform = PairwiseClassifier.get_configuration_space()
+    cs = PairwiseClassifier.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    PairwiseClassifier.get_from_configuration(
-        cs.get_default_configuration(), cs_transform
-    )
+    PairwiseClassifier.get_from_configuration(cs.get_default_configuration())
 
     classifier = PairwiseClassifier(
         model_class=model_class, use_weights=True, budget=450.0
@@ -383,11 +389,9 @@ def test_pairwise_classifier(dummy_performance, dummy_features, model_class):
     [XGBoostClassifierWrapper],
 )
 def test_multi_class_classifier(dummy_performance, dummy_features, model_class):
-    cs, cs_transform = MultiClassClassifier.get_configuration_space()
+    cs = MultiClassClassifier.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    MultiClassClassifier.get_from_configuration(
-        cs.get_default_configuration(), cs_transform
-    )
+    MultiClassClassifier.get_from_configuration(cs.get_default_configuration())
 
     classifier = MultiClassClassifier(model_class=model_class, budget=450.0)
     classifier.fit(dummy_features, dummy_performance)
@@ -400,11 +404,9 @@ def test_multi_class_classifier(dummy_performance, dummy_features, model_class):
     [XGBoostRegressorWrapper, RegressionMLP],
 )
 def test_pairwise_regressor(dummy_performance, dummy_features, model_class):
-    cs, cs_transform = PairwiseRegressor.get_configuration_space()
+    cs = PairwiseRegressor.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    PairwiseRegressor.get_from_configuration(
-        cs.get_default_configuration(), cs_transform
-    )
+    PairwiseRegressor.get_from_configuration(cs.get_default_configuration())
 
     regressor = PairwiseRegressor(model_class=model_class, budget=450.0)
     regressor.fit(dummy_features, dummy_performance)
@@ -417,11 +419,9 @@ def test_pairwise_regressor(dummy_performance, dummy_features, model_class):
     [XGBoostRegressorWrapper, RegressionMLP],
 )
 def test_performance_model(dummy_performance, dummy_features, model_class):
-    cs, cs_transform = PerformanceModel.get_configuration_space()
+    cs = PerformanceModel.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    PerformanceModel.get_from_configuration(
-        cs.get_default_configuration(), cs_transform
-    )
+    PerformanceModel.get_from_configuration(cs.get_default_configuration())
 
     model = PerformanceModel(model_class=model_class, budget=450.0)
     model.fit(dummy_features, dummy_performance)

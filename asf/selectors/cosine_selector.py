@@ -11,7 +11,23 @@ from asf.predictors.ridge import RidgeRegressorWrapper
 import inspect
 
 
-class CosineSelector(AbstractSelector):
+from asf.utils.configurable import ConfigurableMixin, ClassChoice
+
+try:
+    from ConfigSpace import (  # noqa: F401
+        ConfigurationSpace,
+        Categorical,
+        Integer,
+        Float,
+    )
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
+from functools import partial
+
+
+class CosineSelector(ConfigurableMixin, AbstractSelector):
     """
     Cosine similarity based selector using a shared latent space learned from
     the performance (interaction) matrix Y.
@@ -163,6 +179,9 @@ class CosineSelector(AbstractSelector):
                 # as not all classes may have a standard signature or may not be inspectable.
                 pass
             proj = self._projection_model(**kwargs)
+            proj = self._projection_model(**kwargs)
+        elif isinstance(self._projection_model, partial):
+            proj = self._projection_model()
         else:
             proj = self._projection_model
 
@@ -212,3 +231,59 @@ class CosineSelector(AbstractSelector):
             score = float(budget) if budget is not None else float(row[j])
             out[inst] = [(chosen, score)]
         return out
+
+    @staticmethod
+    def _define_hyperparameters(projection_model=None, **kwargs):
+        """Define hyperparameters for CosineSelector."""
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
+
+        if projection_model is None:
+            projection_model = [RidgeRegressorWrapper]
+
+        projection_model_param = ClassChoice(
+            name="projection_model",
+            choices=projection_model,
+            default=projection_model[0],
+        )
+
+        normalize_features_param = Categorical(
+            name="normalize_features",
+            items=[True, False],
+            default=True,
+        )
+
+        shared_latent_dim_param = Integer(
+            name="shared_latent_dim",
+            bounds=(1, 20),
+            default=4,
+        )
+
+        ridge_alpha_param = Float(
+            name="ridge_alpha",
+            bounds=(1e-3, 100.0),
+            log=True,
+            default=1.0,
+        )
+
+        params = [
+            projection_model_param,
+            normalize_features_param,
+            shared_latent_dim_param,
+            ridge_alpha_param,
+        ]
+
+        return params, [], []
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
+    ) -> partial:
+        """
+        Create a partial function from a clean (unprefixed) configuration.
+        """
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(CosineSelector, **config)

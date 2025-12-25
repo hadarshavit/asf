@@ -6,8 +6,23 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
 from asf.selectors.abstract_selector import AbstractSelector
 
+from asf.utils.configurable import ConfigurableMixin, ClassChoice
 
-class CSHCSelector(AbstractSelector):
+try:
+    from ConfigSpace import (  # noqa: F401
+        ConfigurationSpace,
+        Categorical,
+        Integer,
+        EqualsCondition,
+    )
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
+from functools import partial
+
+
+class CSHCSelector(ConfigurableMixin, AbstractSelector):
     """
     CSHC: Confidence-Switching Hybrid Selector.
 
@@ -193,3 +208,81 @@ class CSHCSelector(AbstractSelector):
                 final_preds[inst_name] = [(best_algo, self.budget)]
 
         return final_preds
+
+    @staticmethod
+    def _define_hyperparameters(candidate_selectors=None, **kwargs):
+        """Define hyperparameters for CSHCSelector."""
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
+
+        if candidate_selectors is None:
+            # Fallback or error?
+            # Ideally we should fail or return empty if no selectors can be chosen.
+            # But avoiding strict error for importability.
+            return [], [], []
+
+        primary_selector_param = ClassChoice(
+            name="primary_selector",
+            choices=candidate_selectors,
+            default=candidate_selectors[0],
+        )
+
+        use_backup = Categorical(
+            name="use_backup_selector",
+            items=[True, False],
+            default=False,
+        )
+
+        backup_selector_param = ClassChoice(
+            name="backup_selector",
+            choices=candidate_selectors,
+            default=candidate_selectors[0],
+        )
+
+        n_estimators_param = Integer(
+            name="n_estimators",
+            bounds=(10, 200),
+            default=100,
+        )
+
+        n_folds_param = Integer(
+            name="n_folds",
+            bounds=(2, 10),
+            default=5,
+        )
+
+        params = [
+            primary_selector_param,
+            use_backup,
+            backup_selector_param,
+            n_estimators_param,
+            n_folds_param,
+        ]
+
+        conditions = [
+            EqualsCondition(backup_selector_param, use_backup, True),
+        ]
+
+        return params, conditions, []
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
+    ) -> partial:
+        """
+        Create a partial function from a clean (unprefixed) configuration.
+        """
+        config = clean_config.copy()
+
+        # Handle use_backup_selector logic
+        if not config.get("use_backup_selector", False):
+            config["backup_selector"] = None
+
+        # Remove the flag from kwargs if it exists, as __init__ doesn't expect it
+        if "use_backup_selector" in config:
+            del config["use_backup_selector"]
+
+        config.update(kwargs)
+        return partial(CSHCSelector, **config)

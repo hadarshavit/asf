@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 try:
-    from ConfigSpace import ConfigurationSpace, Float, EqualsCondition
-    from ConfigSpace.hyperparameters import Hyperparameter
+    from ConfigSpace import (  # noqa: F401
+        ConfigurationSpace,
+        Float,
+        EqualsCondition,
+        Categorical,
+        Integer,
+    )
+    from ConfigSpace.hyperparameters import Hyperparameter  # noqa: F401
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
@@ -15,8 +21,10 @@ from asf.predictors.sklearn_wrapper import SklearnWrapper
 from functools import partial
 from typing import Any
 
+from asf.utils.configurable import ConfigurableMixin
 
-class LinearClassifierWrapper(SklearnWrapper):
+
+class LinearClassifierWrapper(ConfigurableMixin, SklearnWrapper):
     """
     A wrapper for the SGDClassifier from scikit-learn, providing additional functionality
     for configuration space generation and parameter extraction.
@@ -36,46 +44,21 @@ class LinearClassifierWrapper(SklearnWrapper):
         super().__init__(SGDClassifier, init_params or {})
 
     @staticmethod
-    def get_configuration_space(
-        cs: ConfigurationSpace | None = None,
-        pre_prefix: str = "",
-        parent_param: Hyperparameter | None = None,
-        parent_value: str | None = None,
-    ) -> ConfigurationSpace:
+    def _define_hyperparameters(**kwargs):
         """
-        Get the configuration space for the Linear Classifier.
-
-        Parameters
-        ----------
-        cs : ConfigurationSpace, optional
-            The configuration space to add the parameters to. If None, a new ConfigurationSpace will be created.
-
-        Returns
-        -------
-        ConfigurationSpace
-            The configuration space with the Linear Classifier parameters.
+        Define hyperparameters for the Linear Classifier.
         """
         if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{LinearClassifierWrapper.PREFIX}"
-        else:
-            prefix = LinearClassifierWrapper.PREFIX
-
-        if cs is None:
-            cs = ConfigurationSpace(name="Linear Classifier")
+            return [], [], []
 
         alpha = Float(
-            f"{prefix}:alpha",
+            "alpha",
             (1e-5, 1),
             log=True,
             default=1e-3,
         )
         eta0 = Float(
-            f"{prefix}:eta0",
+            "eta0",
             (1e-5, 1),
             log=True,
             default=1e-2,
@@ -86,61 +69,27 @@ class LinearClassifierWrapper(SklearnWrapper):
             eta0,
         ]
 
-        if parent_param is not None:
-            conditions = [
-                EqualsCondition(
-                    child=param,
-                    parent=parent_param,
-                    value=parent_value,
-                )
-                for param in params
-            ]
-        else:
-            conditions = []
+        return params, [], []
 
-        cs.add(params + conditions)
-
-        return cs
-
-    @staticmethod
-    def get_from_configuration(
-        configuration: dict[str, Any], pre_prefix: str = "", **kwargs
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
     ) -> partial:
         """
-        Create a partial function to initialize LinearClassifierWrapper with parameters from a configuration.
-
-        Parameters
-        ----------
-        configuration : dict
-            A dictionary containing the configuration parameters.
-        additional_params : dict, optional
-            Additional parameters to include in the initialization.
-
-        Returns
-        -------
-        partial
-            A partial function to initialize LinearClassifierWrapper.
+        Create a partial function from a clean (unprefixed) configuration.
         """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{LinearClassifierWrapper.PREFIX}"
-        else:
-            prefix = LinearClassifierWrapper.PREFIX
-
         linear_classifier_params = {
-            "alpha": configuration[f"{prefix}:alpha"],
-            "eta0": configuration[f"{prefix}:eta0"],
+            "alpha": clean_config["alpha"],
+            "eta0": clean_config["eta0"],
             **kwargs,
         }
 
         return partial(LinearClassifierWrapper, init_params=linear_classifier_params)
 
 
-class LinearRegressorWrapper(SklearnWrapper):
+class LinearRegressorWrapper(ConfigurableMixin, SklearnWrapper):
     """
     A wrapper for the SGDRegressor from scikit-learn, providing additional functionality
     for configuration space generation and parameter extraction.
@@ -160,111 +109,96 @@ class LinearRegressorWrapper(SklearnWrapper):
         super().__init__(SGDRegressor, init_params or {})
 
     @staticmethod
-    def get_configuration_space(
-        cs: ConfigurationSpace | None = None,
-        pre_prefix: str = "",
-        parent_param: Hyperparameter | None = None,
-        parent_value: str | None = None,
-    ) -> ConfigurationSpace:
+    def _define_hyperparameters(**kwargs):
         """
-        Get the configuration space for the Linear Regressor.
-
-        Parameters
-        ----------
-        cs : ConfigurationSpace, optional
-            The configuration space to add the parameters to. If None, a new ConfigurationSpace will be created.
-
-        Returns
-        -------
-        ConfigurationSpace
-            The configuration space with the Linear Regressor parameters.
+        Define hyperparameters for the Linear Regressor.
         """
         if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{LinearRegressorWrapper.PREFIX}"
-        else:
-            prefix = LinearRegressorWrapper.PREFIX
-
-        if cs is None:
-            cs = ConfigurationSpace(name="Linear Regressor")
+            return [], [], []
 
         alpha = Float(
-            f"{prefix}:alpha",
+            "alpha",
             (1e-5, 1),
             log=True,
             default=1e-3,
         )
         eta0 = Float(
-            f"{prefix}:eta0",
+            "eta0",
             (1e-5, 1),
             log=True,
             default=1e-2,
         )
 
         params = [alpha, eta0]
+        return params, [], []
 
-        if parent_param is not None:
-            conditions = [
-                EqualsCondition(
-                    child=param,
-                    parent=parent_param,
-                    value=parent_value,
-                )
-                for param in params
-            ]
-        else:
-            conditions = []
-
-        cs.add(params + conditions)
-
-        return cs
-
-    @staticmethod
-    def get_from_configuration(
-        configuration: dict[str, Any], pre_prefix: str = "", **kwargs
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
     ) -> partial:
         """
-        Create a partial function to initialize LinearRegressorWrapper with parameters from a configuration.
-
-        Parameters
-        ----------
-        configuration : dict
-            A dictionary containing the configuration parameters.
-        additional_params : dict, optional
-            Additional parameters to include in the initialization.
-
-        Returns
-        -------
-        partial
-            A partial function to initialize LinearRegressorWrapper.
+        Create a partial function from a clean (unprefixed) configuration.
         """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{LinearRegressorWrapper.PREFIX}"
-        else:
-            prefix = LinearRegressorWrapper.PREFIX
-
         linear_regressor_params = {
-            "alpha": configuration[f"{prefix}:alpha"],
-            "eta0": configuration[f"{prefix}:eta0"],
+            "alpha": clean_config["alpha"],
+            "eta0": clean_config["eta0"],
             **kwargs,
         }
 
         return partial(LinearRegressorWrapper, init_params=linear_regressor_params)
 
 
-class RidgeRegressorWrapper(SklearnWrapper):
+class RidgeRegressorWrapper(ConfigurableMixin, SklearnWrapper):
     """Wrapper around scikit-learn's Ridge regressor for ASF predictors."""
 
     PREFIX = "ridge_regressor"
 
-    def __init__(self, init_params: dict[str, Any] | None = None):
-        super().__init__(Ridge, init_params or {})
+    def __init__(self, init_params: dict[str, Any] = {}):
+        super().__init__(Ridge, init_params)
+
+    @staticmethod
+    def _define_hyperparameters(**kwargs):
+        """
+        Define hyperparameters for the Ridge Regressor.
+        """
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
+
+        alpha = Float(
+            "alpha",
+            (1e-6, 100.0),
+            log=True,
+            default=1.0,
+        )
+        fit_intercept = Categorical(
+            "fit_intercept",
+            [True, False],
+            default=True,
+        )
+        solver = Categorical(
+            "solver",
+            ["auto", "svd", "cholesky", "lsqr", "sparse_cg", "sag", "saga"],
+            default="auto",
+        )
+
+        params = [alpha, fit_intercept, solver]
+        return params, [], []
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
+    ) -> partial:
+        """
+        Create a partial function from a clean (unprefixed) configuration.
+        """
+        params = {
+            "alpha": clean_config["alpha"],
+            "fit_intercept": clean_config["fit_intercept"],
+            "solver": clean_config["solver"],
+            **kwargs,
+        }
+        return partial(RidgeRegressorWrapper, init_params=params)

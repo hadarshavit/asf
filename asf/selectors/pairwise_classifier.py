@@ -3,12 +3,8 @@ import pandas as pd
 
 try:
     from ConfigSpace import (
-        ConfigurationSpace,
         Categorical,
-        Configuration,
-        EqualsCondition,
     )
-    from ConfigSpace.hyperparameters import Hyperparameter
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
@@ -23,10 +19,12 @@ from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelect
 from asf.selectors.feature_generator import (
     AbstractFeatureGenerator,
 )
-from functools import partial
+from asf.utils.configurable import ConfigurableMixin, ClassChoice
 
 
-class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
+class PairwiseClassifier(
+    ConfigurableMixin, AbstractModelBasedSelector, AbstractFeatureGenerator
+):
     """
     PairwiseClassifier is a selector that uses pairwise comparison of algorithms
     to predict the best algorithm for a given instance.
@@ -151,121 +149,28 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
 
         return predictions_sum
 
-    if CONFIGSPACE_AVAILABLE:
+    @staticmethod
+    def _define_hyperparameters(
+        model_class: list[type[AbstractPredictor]] = None,
+        **kwargs,  # Accept additional kwargs from mixin
+    ):
+        """
+        Define hyperparameters for PairwiseClassifier.
 
-        @staticmethod
-        def get_configuration_space(
-            cs: ConfigurationSpace | None = None,
-            cs_transform: dict[str, dict] | None = None,
-            model_class: list[type[AbstractPredictor]] = [
-                RandomForestClassifierWrapper,
-                XGBoostClassifierWrapper,
-            ],
-            pre_prefix: str = "",
-            parent_param: Hyperparameter | None = None,
-            parent_value: str | None = None,
-            **kwargs,
-        ) -> tuple[ConfigurationSpace, dict[str, dict]]:
-            """
-            Get the configuration space for the predictor.
+        Parameters
+        ----------
+        model_class : list[type[AbstractPredictor]], optional
+            List of model classes to include in the configuration space.
+            Defaults to [RandomForestClassifierWrapper, XGBoostClassifierWrapper].
+        """
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
 
-            Args:
-                cs (Optional[ConfigurationSpace]): The configuration space to use. If None, a new one will be created.
-                cs_transform (Optional[Dict[str, dict]]): A dictionary for transforming configuration space parameters.
-                model_class (List[type[AbstractPredictor]]): The list of model classes to use. Defaults to [RandomForestClassifierWrapper, XGBoostClassifierWrapper].
-                hierarchical_generator (Optional[List[AbstractFeatureGenerator]]): List of hierarchical feature generators.
-                **kwargs: Additional keyword arguments to pass to the model class.
+        if model_class is None:
+            model_class = [RandomForestClassifierWrapper, XGBoostClassifierWrapper]
 
-            Returns:
-                Tuple[ConfigurationSpace, Dict[str, dict]]: The configuration space and its transformation dictionary.
-            """
-            if cs is None:
-                cs = ConfigurationSpace()
-
-            if cs_transform is None:
-                cs_transform = dict()
-
-            if pre_prefix != "":
-                prefix = f"{pre_prefix}:{PairwiseClassifier.PREFIX}"
-            else:
-                prefix = PairwiseClassifier.PREFIX
-
-            model_class_param = Categorical(
-                name=f"{prefix}:model_class",
-                items=[str(c.__name__) for c in model_class],
-            )
-
-            cs_transform[f"{prefix}:model_class"] = {
-                str(c.__name__): c for c in model_class
-            }
-
-            use_weights_param = Categorical(
-                name=f"{prefix}:use_weights",
-                items=[True, False],
-            )
-
-            params = [model_class_param, use_weights_param]
-
-            if parent_param is not None:
-                conditions = [
-                    EqualsCondition(
-                        child=param,
-                        parent=parent_param,
-                        value=parent_value,
-                    )
-                    for param in params
-                ]
-            else:
-                conditions = []
-
-            cs.add(params + conditions)
-
-            for model in model_class:
-                model.get_configuration_space(
-                    cs=cs,
-                    pre_prefix=f"{prefix}:model_class",
-                    parent_param=model_class_param,
-                    parent_value=str(model.__name__),
-                    **kwargs,
-                )
-
-            return cs, cs_transform
-
-        @staticmethod
-        def get_from_configuration(
-            configuration: Configuration,
-            cs_transform: dict[str, dict],
-            pre_prefix: str = "",
-            **kwargs,
-        ) -> partial:
-            """
-            Get the predictor from a given configuration.
-
-            Args:
-                configuration (Configuration): The configuration object.
-                cs_transform (Dict[str, dict]): The transformation dictionary for the configuration space.
-
-            Returns:
-                partial: A partial function to initialize the PairwiseClassifier with the given configuration.
-            """
-
-            if pre_prefix != "":
-                prefix = f"{pre_prefix}:{PairwiseClassifier.PREFIX}"
-            else:
-                prefix = PairwiseClassifier.PREFIX
-
-            model_class = cs_transform[f"{prefix}:model_class"][
-                configuration[f"{prefix}:model_class"]
-            ]
-            use_weights = configuration[f"{prefix}:use_weights"]
-
-            model = model_class.get_from_configuration(
-                configuration, pre_prefix=f"{prefix}:model_class"
-            )
-
-            return PairwiseClassifier(
-                model_class=model,
-                use_weights=use_weights,
-                hierarchical_generator=None,
-                **kwargs,
-            )
+        hyperparameters = [
+            ClassChoice("model_class", choices=model_class),
+            Categorical("use_weights", items=[True, False], default=True),
+        ]
+        return hyperparameters, [], []

@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 try:
-    from ConfigSpace import (
+    from ConfigSpace import (  # noqa: F401
         ConfigurationSpace,
         Constant,
         Float,
         Integer,
         EqualsCondition,
     )
-    from ConfigSpace.hyperparameters import Hyperparameter
+    from ConfigSpace.hyperparameters import Hyperparameter  # noqa: F401
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
-from typing import Any, Callable
+from typing import Any
 from functools import partial
 import numpy as np
 
@@ -26,9 +26,10 @@ except ImportError:
     XGB_AVAILABLE = False
 
 from asf.predictors.sklearn_wrapper import SklearnWrapper
+from asf.utils.configurable import ConfigurableMixin
 
 
-class XGBoostClassifierWrapper(SklearnWrapper):
+class XGBoostClassifierWrapper(ConfigurableMixin, SklearnWrapper):
     """
     Wrapper for the XGBoost classifier to integrate with the ASF framework.
     """
@@ -99,157 +100,46 @@ class XGBoostClassifierWrapper(SklearnWrapper):
         return self.model_class.predict(X, **kwargs)
 
     @staticmethod
-    def get_configuration_space(
-        cs: ConfigurationSpace | None = None,
-        pre_prefix: str = "",
-        parent_param: Hyperparameter | None = None,
-        parent_value: str | None = None,
-    ) -> ConfigurationSpace:
-        """
-        Get the configuration space for the XGBoost classifier.
-
-        Parameters
-        ----------
-        cs : ConfigurationSpace, optional
-            The configuration space to add the parameters to. If None, a new ConfigurationSpace will be created.
-
-        Returns
-        -------
-        ConfigurationSpace
-            The configuration space with the XGBoost parameters.
-        """
+    def _define_hyperparameters(**kwargs):
+        """Define hyperparameters for XGBoost classifier."""
         if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-        if cs is None:
-            cs = ConfigurationSpace(name="XGBoost")
+            return [], [], []
 
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{XGBoostClassifierWrapper.PREFIX}"
-        else:
-            prefix = XGBoostClassifierWrapper.PREFIX
-
-        booster = Constant(f"{prefix}:booster", "gbtree")
-        n_estimators = Constant(f"{prefix}:n_estimators", 2000)
-        max_depth = Integer(
-            f"{prefix}:max_depth",
-            (1, 11),
-            log=False,
-            default=8,
-        )
-        min_child_weight = Integer(
-            f"{prefix}:min_child_weight",
-            (1, 100),
-            log=True,
-            default=39,
-        )
-        colsample_bytree = Float(
-            f"{prefix}:colsample_bytree",
-            (0.0, 1.0),
-            log=False,
-            default=0.2545374925231651,
-        )
-        colsample_bylevel = Float(
-            f"{prefix}:colsample_bylevel",
-            (0.0, 1.0),
-            log=False,
-            default=0.6909224923784677,
-        )
-        lambda_param = Float(
-            f"{prefix}:lambda",
-            (0.001, 1000),
-            log=True,
-            default=31.393252465064943,
-        )
-        alpha = Float(
-            f"{prefix}:alpha",
-            (0.001, 1000),
-            log=True,
-            default=0.24167936088332426,
-        )
-        learning_rate = Float(
-            f"{prefix}:learning_rate",
-            (0.001, 0.1),
-            log=True,
-            default=0.008237525103357958,
-        )
-
-        params = [
-            booster,
-            max_depth,
-            min_child_weight,
-            colsample_bytree,
-            colsample_bylevel,
-            lambda_param,
-            alpha,
-            learning_rate,
-            n_estimators,
+        hyperparameters = [
+            Constant("booster", "gbtree"),
+            Constant("n_estimators", 2000),
+            Integer("max_depth", (1, 11), log=False, default=8),
+            Integer("min_child_weight", (1, 100), log=True, default=39),
+            Float(
+                "colsample_bytree", (0.0, 1.0), log=False, default=0.2545374925231651
+            ),
+            Float(
+                "colsample_bylevel", (0.0, 1.0), log=False, default=0.6909224923784677
+            ),
+            Float("lambda", (0.001, 1000), log=True, default=31.393252465064943),
+            Float("alpha", (0.001, 1000), log=True, default=0.24167936088332426),
+            Float(
+                "learning_rate", (0.001, 0.1), log=True, default=0.008237525103357958
+            ),
         ]
+        return hyperparameters, [], []
 
-        if parent_param is not None:
-            conditions = [
-                EqualsCondition(
-                    child=param,
-                    parent=parent_param,
-                    value=parent_value,
-                )
-                for param in params
-            ]
-        else:
-            conditions = []
-
-        cs.add(params + conditions)
-
-        return cs
-
-    @staticmethod
-    def get_from_configuration(
-        configuration: dict[str, Any],
-        pre_prefix: str = "",
-        **kwargs: Any,
-    ) -> Callable[..., "XGBoostClassifierWrapper"]:
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
+    ) -> partial:
         """
-        Create an XGBoostClassifierWrapper from a configuration.
-
-        Parameters
-        ----------
-        configuration : dict
-            The configuration dictionary.
-        additional_params : dict, optional
-            Additional parameters to include in the configuration.
-
-        Returns
-        -------
-        Callable[..., XGBoostClassifierWrapper]
-            A callable that initializes the wrapper with the given configuration.
+        Create a partial function from a clean (unprefixed) configuration.
         """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{XGBoostClassifierWrapper.PREFIX}"
-        else:
-            prefix = XGBoostClassifierWrapper.PREFIX
-
-        xgb_params = {
-            "booster": configuration[f"{prefix}:booster"],
-            "max_depth": configuration[f"{prefix}:max_depth"],
-            "min_child_weight": configuration[f"{prefix}:min_child_weight"],
-            "colsample_bytree": configuration[f"{prefix}:colsample_bytree"],
-            "colsample_bylevel": configuration[f"{prefix}:colsample_bylevel"],
-            "lambda": configuration[f"{prefix}:lambda"],
-            "alpha": configuration[f"{prefix}:alpha"],
-            "learning_rate": configuration[f"{prefix}:learning_rate"],
-            "n_estimators": configuration[f"{prefix}:n_estimators"],
-            **kwargs,
-        }
+        xgb_params = clean_config.copy()
+        xgb_params.update(kwargs)
 
         return partial(XGBoostClassifierWrapper, init_params=xgb_params)
 
 
-class XGBoostRegressorWrapper(SklearnWrapper):
+class XGBoostRegressorWrapper(ConfigurableMixin, SklearnWrapper):
     """
     Wrapper for the XGBoost regressor to integrate with the ASF framework.
     """
@@ -268,156 +158,46 @@ class XGBoostRegressorWrapper(SklearnWrapper):
         super().__init__(XGBRegressor, init_params or {})
 
     @staticmethod
-    def get_configuration_space(
-        cs: ConfigurationSpace | None = None,
-        pre_prefix: str = "",
-        parent_param: Hyperparameter | None = None,
-        parent_value: str | None = None,
-    ) -> ConfigurationSpace:
-        """
-        Get the configuration space for the XGBoost regressor.
-
-        Parameters
-        ----------
-        cs : ConfigurationSpace, optional
-            The configuration space to add the parameters to. If None, a new ConfigurationSpace will be created.
-
-        Returns
-        -------
-        ConfigurationSpace
-            The configuration space with the XGBoost parameters.
-        """
+    def _define_hyperparameters(**kwargs):
+        """Define hyperparameters for XGBoost regressor."""
         if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-        if cs is None:
-            cs = ConfigurationSpace(name="XGBoostRegressor")
+            return [], [], []
 
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{XGBoostRegressorWrapper.PREFIX}"
-        else:
-            prefix = XGBoostRegressorWrapper.PREFIX
-
-        booster = Constant(f"{prefix}:booster", "gbtree")
-        n_estimators = Constant(f"{prefix}:n_estimators", 2000)
-        max_depth = Integer(
-            f"{prefix}:max_depth",
-            (1, 11),
-            log=False,
-            default=8,
-        )
-        min_child_weight = Integer(
-            f"{prefix}:min_child_weight",
-            (1, 100),
-            log=True,
-            default=39,
-        )
-        colsample_bytree = Float(
-            f"{prefix}:colsample_bytree",
-            (0.0, 1.0),
-            log=False,
-            default=0.2545374925231651,
-        )
-        colsample_bylevel = Float(
-            f"{prefix}:colsample_bylevel",
-            (0.0, 1.0),
-            log=False,
-            default=0.6909224923784677,
-        )
-        lambda_param = Float(
-            f"{prefix}:lambda",
-            (0.001, 1000),
-            log=True,
-            default=31.393252465064943,
-        )
-        alpha = Float(
-            f"{prefix}:alpha",
-            (0.001, 1000),
-            log=True,
-            default=0.24167936088332426,
-        )
-        learning_rate = Float(
-            f"{prefix}:learning_rate",
-            (0.001, 0.1),
-            log=True,
-            default=0.008237525103357958,
-        )
-
-        params = [
-            booster,
-            max_depth,
-            min_child_weight,
-            colsample_bytree,
-            colsample_bylevel,
-            lambda_param,
-            alpha,
-            learning_rate,
-            n_estimators,
+        hyperparameters = [
+            Constant("booster", "gbtree"),
+            Constant("n_estimators", 2000),
+            Integer("max_depth", (1, 11), log=False, default=8),
+            Integer("min_child_weight", (1, 100), log=True, default=39),
+            Float(
+                "colsample_bytree", (0.0, 1.0), log=False, default=0.2545374925231651
+            ),
+            Float(
+                "colsample_bylevel", (0.0, 1.0), log=False, default=0.6909224923784677
+            ),
+            Float("lambda", (0.001, 1000), log=True, default=31.393252465064943),
+            Float("alpha", (0.001, 1000), log=True, default=0.24167936088332426),
+            Float(
+                "learning_rate", (0.001, 0.1), log=True, default=0.008237525103357958
+            ),
         ]
-        if parent_param is not None:
-            conditions = [
-                EqualsCondition(
-                    child=param,
-                    parent=parent_param,
-                    value=parent_value,
-                )
-                for param in params
-            ]
-        else:
-            conditions = []
+        return hyperparameters, [], []
 
-        cs.add(params + conditions)
-
-        return cs
-
-    @staticmethod
-    def get_from_configuration(
-        configuration: dict[str, Any],
-        pre_prefix: str = "",
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
         **kwargs,
-    ) -> Callable[..., "XGBoostRegressorWrapper"]:
+    ) -> partial:
         """
-        Create an XGBoostRegressorWrapper from a configuration.
-
-        Parameters
-        ----------
-        configuration : dict
-            The configuration dictionary.
-        additional_params : dict, optional
-            Additional parameters to include in the configuration.
-
-        Returns
-        -------
-        Callable[..., XGBoostRegressorWrapper]
-            A callable that initializes the wrapper with the given configuration.
+        Create a partial function from a clean (unprefixed) configuration.
         """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{XGBoostRegressorWrapper.PREFIX}"
-        else:
-            prefix = XGBoostRegressorWrapper.PREFIX
-
-        xgb_params = {
-            "booster": configuration[f"{prefix}:booster"],
-            "max_depth": configuration[f"{prefix}:max_depth"],
-            "min_child_weight": configuration[f"{prefix}:min_child_weight"],
-            "colsample_bytree": configuration[f"{prefix}:colsample_bytree"],
-            "colsample_bylevel": configuration[f"{prefix}:colsample_bylevel"],
-            "lambda": configuration[f"{prefix}:lambda"],
-            "alpha": configuration[f"{prefix}:alpha"],
-            "learning_rate": configuration[f"{prefix}:learning_rate"],
-            "n_estimators": configuration[f"{prefix}:n_estimators"],
-            **kwargs,
-        }
+        xgb_params = clean_config.copy()
+        xgb_params.update(kwargs)
 
         return partial(XGBoostRegressorWrapper, init_params=xgb_params)
 
 
-class XGBoostRankerWrapper(SklearnWrapper):
+class XGBoostRankerWrapper(ConfigurableMixin, SklearnWrapper):
     """
     Wrapper for the XGBoost ranker to integrate with the ASF framework.
     """
@@ -436,144 +216,39 @@ class XGBoostRankerWrapper(SklearnWrapper):
         super().__init__(XGBRanker, init_params or {})
 
     @staticmethod
-    def get_configuration_space(
-        cs: ConfigurationSpace | None = None,
-        pre_prefix: str = "",
-        parent_param: Hyperparameter | None = None,
-        parent_value: str | None = None,
-    ) -> ConfigurationSpace:
-        """
-        Get the configuration space for the XGBoost ranker.
-
-        Parameters
-        ----------
-        cs : ConfigurationSpace, optional
-            The configuration space to add the parameters to. If None, a new ConfigurationSpace will be created.
-
-        Returns
-        -------
-        ConfigurationSpace
-            The configuration space with the XGBoost parameters.
-        """
+    def _define_hyperparameters(**kwargs):
+        """Define hyperparameters for XGBoost ranker."""
         if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-        if cs is None:
-            cs = ConfigurationSpace(name="XGBoostRanker")
+            return [], [], []
 
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{XGBoostRankerWrapper.PREFIX}"
-        else:
-            prefix = XGBoostRankerWrapper.PREFIX
-
-        booster = Constant(f"{prefix}:booster", "gbtree")
-        max_depth = Integer(
-            f"{prefix}:max_depth",
-            (1, 20),
-            log=False,
-            default=13,
-        )
-        min_child_weight = Integer(
-            f"{prefix}:min_child_weight",
-            (1, 100),
-            log=True,
-            default=39,
-        )
-        colsample_bytree = Float(
-            f"{prefix}:colsample_bytree",
-            (0.0, 1.0),
-            log=False,
-            default=0.2545374925231651,
-        )
-        colsample_bylevel = Float(
-            f"{prefix}:colsample_bylevel",
-            (0.0, 1.0),
-            log=False,
-            default=0.6909224923784677,
-        )
-        lambda_param = Float(
-            f"{prefix}:lambda",
-            (0.001, 1000),
-            log=True,
-            default=31.393252465064943,
-        )
-        alpha = Float(
-            f"{prefix}:alpha",
-            (0.001, 1000),
-            log=True,
-            default=0.24167936088332426,
-        )
-        learning_rate = Float(
-            f"{prefix}:learning_rate",
-            (0.001, 0.1),
-            log=True,
-            default=0.008237525103357958,
-        )
-        params = [
-            booster,
-            max_depth,
-            min_child_weight,
-            colsample_bytree,
-            colsample_bylevel,
-            lambda_param,
-            alpha,
-            learning_rate,
+        hyperparameters = [
+            Constant("booster", "gbtree"),
+            Integer("max_depth", (1, 20), log=False, default=13),
+            Integer("min_child_weight", (1, 100), log=True, default=39),
+            Float(
+                "colsample_bytree", (0.0, 1.0), log=False, default=0.2545374925231651
+            ),
+            Float(
+                "colsample_bylevel", (0.0, 1.0), log=False, default=0.6909224923784677
+            ),
+            Float("lambda", (0.001, 1000), log=True, default=31.393252465064943),
+            Float("alpha", (0.001, 1000), log=True, default=0.24167936088332426),
+            Float(
+                "learning_rate", (0.001, 0.1), log=True, default=0.008237525103357958
+            ),
         ]
+        return hyperparameters, [], []
 
-        if parent_param is not None:
-            conditions = [
-                EqualsCondition(
-                    child=param,
-                    parent=parent_param,
-                    value=parent_value,
-                )
-                for param in params
-            ]
-        else:
-            conditions = []
-
-        cs.add(params + conditions)
-        return cs
-
-    @staticmethod
-    def get_from_configuration(
-        configuration: dict[str, Any],
-        pre_prefix: str = "",
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
         **kwargs,
-    ) -> Callable[..., "XGBoostRankerWrapper"]:
+    ) -> partial:
         """
-        Create an XGBoostRankerWrapper from a configuration.
-
-        Parameters
-        ----------
-        configuration : dict
-            The configuration dictionary.
-
-        Returns
-        -------
-        Callable[..., XGBoostRankerWrapper]
-            A callable that initializes the wrapper with the given configuration.
+        Create a partial function from a clean (unprefixed) configuration.
         """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{XGBoostRankerWrapper.PREFIX}"
-        else:
-            prefix = XGBoostRankerWrapper.PREFIX
-
-        xgb_params = {
-            "booster": configuration[f"{prefix}:booster"],
-            "max_depth": configuration[f"{prefix}:max_depth"],
-            "min_child_weight": configuration[f"{prefix}:min_child_weight"],
-            "colsample_bytree": configuration[f"{prefix}:colsample_bytree"],
-            "colsample_bylevel": configuration[f"{prefix}:colsample_bylevel"],
-            "lambda": configuration[f"{prefix}:lambda"],
-            "alpha": configuration[f"{prefix}:alpha"],
-            "learning_rate": configuration[f"{prefix}:learning_rate"],
-            **kwargs,
-        }
+        xgb_params = clean_config.copy()
+        xgb_params.update(kwargs)
 
         return partial(XGBoostRankerWrapper, init_params=xgb_params)

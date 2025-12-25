@@ -14,8 +14,24 @@ from sklearn.impute import SimpleImputer
 
 from asf.predictors.abstract_predictor import AbstractPredictor
 
+from asf.utils.configurable import ConfigurableMixin
+from functools import partial
+from typing import Any
 
-class RegressionMLP(AbstractPredictor):
+try:
+    from ConfigSpace import (  # noqa: F401
+        ConfigurationSpace,
+        Integer,
+        Float,
+        Categorical,
+    )
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
+
+
+class RegressionMLP(AbstractPredictor, ConfigurableMixin):
     def __init__(
         self,
         model: object | None = None,
@@ -26,6 +42,8 @@ class RegressionMLP(AbstractPredictor):
         seed: int = 42,
         device: str = "cpu",
         compile: bool = True,
+        learning_rate: float = 1e-3,
+        weight_decay: float = 0.0,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -43,7 +61,11 @@ class RegressionMLP(AbstractPredictor):
         self.batch_size = batch_size
         self.optimizer = optimizer or torch.optim.Adam
         self.epochs = epochs
+        self.optimizer = optimizer or torch.optim.Adam
+        self.epochs = epochs
         self.compile = compile
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
 
     def _get_dataloader(
         self, features: pd.DataFrame, performance: pd.DataFrame
@@ -73,7 +95,11 @@ class RegressionMLP(AbstractPredictor):
         )
         dataloader = self._get_dataloader(features, performance)
 
-        optimizer = self.optimizer(self.model.parameters())
+        optimizer = self.optimizer(
+            self.model.parameters(),
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay,
+        )
         self.model.train()
         for epoch in range(self.epochs):
             total_loss = 0
@@ -103,3 +129,32 @@ class RegressionMLP(AbstractPredictor):
 
     def load(self, file_path: str) -> None:
         self.model = torch.load(file_path)
+
+    PREFIX = "regression_mlp"
+
+    @staticmethod
+    def _define_hyperparameters(**kwargs):
+        """Define hyperparameters for RegressionMLP."""
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
+
+        hyperparameters = [
+            Integer("batch_size", (32, 256), log=True, default=128),
+            Integer("epochs", (200, 2000), log=True, default=500),
+            Float("learning_rate", (1e-4, 1e-1), log=True, default=1e-3),
+            Float("weight_decay", (1e-6, 1e-2), log=True, default=1e-5),
+        ]
+        return hyperparameters, [], []
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
+    ) -> partial:
+        """
+        Create a partial function from a clean (unprefixed) configuration.
+        """
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(RegressionMLP, **config)

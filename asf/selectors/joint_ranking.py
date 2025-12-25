@@ -9,7 +9,19 @@ from asf.selectors.feature_generator import (
 )
 
 
-class JointRanking(AbstractSelector, AbstractFeatureGenerator):
+from asf.utils.configurable import ConfigurableMixin, ClassChoice
+
+try:
+    from ConfigSpace import ConfigurationSpace  # noqa: F401
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
+from functools import partial
+from typing import Any, Union, Callable
+
+
+class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator):
     """
     JointRanking implements a ranking-based approach for selecting the best-performing
     algorithms for a given set of features. It combines feature generation and model-based
@@ -24,7 +36,7 @@ class JointRanking(AbstractSelector, AbstractFeatureGenerator):
 
     def __init__(
         self,
-        model: RankingMLP = None,
+        model: Union[RankingMLP, Callable, None] = None,
         **kwargs,
     ) -> None:
         """
@@ -36,7 +48,7 @@ class JointRanking(AbstractSelector, AbstractFeatureGenerator):
         """
         AbstractSelector.__init__(self, **kwargs)
         AbstractFeatureGenerator.__init__(self)
-        self.model: RankingMLP = model
+        self.model = model
 
     def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
         """
@@ -56,6 +68,10 @@ class JointRanking(AbstractSelector, AbstractFeatureGenerator):
 
         if self.model is None:
             self.model = RankingMLP(
+                input_size=len(self.features) + len(self.algorithms)
+            )
+        elif callable(self.model) and not isinstance(self.model, RankingMLP):
+            self.model = self.model(
                 input_size=len(self.features) + len(self.algorithms)
             )
 
@@ -108,3 +124,33 @@ class JointRanking(AbstractSelector, AbstractFeatureGenerator):
             predictions[:, i] = prediction.flatten()
 
         return pd.DataFrame(predictions, columns=self.algorithms)
+
+    @staticmethod
+    def _define_hyperparameters(model=None, **kwargs):
+        """Define hyperparameters for JointRanking."""
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
+
+        if model is None:
+            model = [RankingMLP]
+
+        model_param = ClassChoice(
+            name="model",
+            choices=model,
+            default=model[0],
+        )
+
+        return [model_param], [], []
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
+    ) -> partial:
+        """
+        Create a partial function from a clean (unprefixed) configuration.
+        """
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(JointRanking, **config)

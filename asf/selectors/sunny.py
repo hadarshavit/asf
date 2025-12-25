@@ -7,20 +7,22 @@ from sklearn.model_selection import KFold
 
 try:
     from ConfigSpace import (
-        ConfigurationSpace,
         Categorical,
         Integer,
-        Configuration,
         EqualsCondition,
     )
-    from ConfigSpace.hyperparameters import Hyperparameter
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
 
-class SUNNY(AbstractSelector):
+from asf.utils.configurable import ConfigurableMixin
+from functools import partial
+from typing import Any
+
+
+class SUNNY(ConfigurableMixin, AbstractSelector):
     """
     SUNNY/SUNNY-AS2 algorithm selector.
 
@@ -414,141 +416,73 @@ class SUNNY(AbstractSelector):
 
         return predictions
 
-    if CONFIGSPACE_AVAILABLE:
+    @staticmethod
+    def _define_hyperparameters(**kwargs):
+        """Define hyperparameters for SUNNY."""
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
 
-        @staticmethod
-        def get_configuration_space(
-            cs: ConfigurationSpace | None = None,
-            cs_transform: dict[str, dict] | None = None,
-            pre_prefix: str = "",
-            parent_param: Hyperparameter | None = None,
-            parent_value: str | None = None,
-            **kwargs,
-        ) -> tuple[ConfigurationSpace, dict[str, dict]]:
-            """
-            Get the configuration space for SUNNY selector.
+        use_v2_param = Categorical(
+            name="use_v2",
+            items=[True, False],
+            default=False,
+        )
 
-            Args:
-                cs: The configuration space to use. If None, a new one will be created.
-                cs_transform: A dictionary for transforming configuration space parameters.
-                pre_prefix: Prefix for parameter names.
-                parent_param: Parent parameter for conditional configuration.
-                parent_value: Value of parent parameter that activates these hyperparameters.
-                **kwargs: Additional keyword arguments.
+        k_param = Integer(
+            name="k",
+            bounds=(1, 50),
+            default=10,
+        )
 
-            Returns:
-                Tuple[ConfigurationSpace, Dict[str, dict]]: The configuration space and its transformation dictionary.
-            """
-            if cs is None:
-                cs = ConfigurationSpace()
+        n_folds_param = Integer(
+            name="n_folds",
+            bounds=(3, 10),
+            default=5,
+        )
 
-            if cs_transform is None:
-                cs_transform = dict()
+        k_candidates_param = Categorical(
+            name="k_candidates",
+            items=["small", "medium", "broad"],
+            default="medium",
+        )
 
-            if pre_prefix != "":
-                prefix = f"{pre_prefix}:{SUNNY.PREFIX}"
-            else:
-                prefix = SUNNY.PREFIX
+        params = [use_v2_param, k_param, n_folds_param, k_candidates_param]
 
-            use_v2_param = Categorical(
-                name=f"{prefix}:use_v2",
-                items=[True, False],
-                default=False,
-            )
+        conditions = [
+            EqualsCondition(n_folds_param, use_v2_param, True),
+            EqualsCondition(k_candidates_param, use_v2_param, True),
+        ]
 
-            k_param = Integer(
-                name=f"{prefix}:k",
-                bounds=(1, 50),
-                default=10,
-            )
+        return params, conditions, []
 
-            n_folds_param = Integer(
-                name=f"{prefix}:n_folds",
-                bounds=(3, 10),
-                default=5,
-            )
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
+    ) -> partial:
+        """
+        Create a partial function from a clean (unprefixed) configuration.
+        """
+        config = clean_config.copy()
 
-            k_candidates_param = Categorical(
-                name=f"{prefix}:k_candidates",
-                items=["small", "medium", "broad"],
-                default="medium",
-            )
+        # Helper to map k_candidates categorical to list
+        k_candidates_map = {
+            "small": [3, 5, 7],
+            "medium": [3, 5, 7, 10, 20],
+            "broad": [3, 5, 7, 10, 20, 50],
+        }
 
-            cs_transform[f"{prefix}:k_candidates"] = {
-                "small": [3, 5, 7],
-                "medium": [3, 5, 7, 10, 20],
-                "broad": [3, 5, 7, 10, 20, 50],
-            }
+        use_v2 = config.get("use_v2", False)
 
-            params = [use_v2_param, k_param, n_folds_param, k_candidates_param]
+        if use_v2:
+            # If use_v2 is True, take n_folds and k_candidates from config
+            k_candidates_str = config.get("k_candidates", "medium")
+            config["k_candidates"] = k_candidates_map[k_candidates_str]
+        else:
+            # If use_v2 is False, set default values expected by __init__ or logic
+            config["n_folds"] = 5
+            config["k_candidates"] = [3, 5, 7, 10, 20, 50]
 
-            conditions = [
-                EqualsCondition(
-                    child=n_folds_param,
-                    parent=use_v2_param,
-                    value=True,
-                ),
-                EqualsCondition(
-                    child=k_candidates_param,
-                    parent=use_v2_param,
-                    value=True,
-                ),
-            ]
-
-            if parent_param is not None:
-                for param in params:
-                    conditions.append(
-                        EqualsCondition(
-                            child=param,
-                            parent=parent_param,
-                            value=parent_value,
-                        )
-                    )
-
-            cs.add(params + conditions)
-
-            return cs, cs_transform
-
-        @staticmethod
-        def get_from_configuration(
-            configuration: Configuration,
-            cs_transform: dict[str, dict],
-            pre_prefix: str = "",
-            **kwargs,
-        ) -> "SUNNY":
-            """
-            Get the SUNNY selector from a given configuration.
-
-            Args:
-                configuration: The configuration object.
-                cs_transform: The transformation dictionary for the configuration space.
-                pre_prefix: Prefix for parameter names.
-                **kwargs: Additional keyword arguments for SUNNY initialization.
-
-            Returns:
-                Sunny: An instance of SUNNY configured according to the given configuration.
-            """
-            if pre_prefix != "":
-                prefix = f"{pre_prefix}:{SUNNY.PREFIX}"
-            else:
-                prefix = SUNNY.PREFIX
-
-            use_v2 = configuration[f"{prefix}:use_v2"]
-            k = configuration[f"{prefix}:k"]
-
-            if use_v2:
-                n_folds = configuration[f"{prefix}:n_folds"]
-                k_candidates = cs_transform[f"{prefix}:k_candidates"][
-                    configuration[f"{prefix}:k_candidates"]
-                ]
-            else:
-                n_folds = 5
-                k_candidates = [3, 5, 7, 10, 20, 50]
-
-            return SUNNY(
-                k=k,
-                use_v2=use_v2,
-                n_folds=n_folds,
-                k_candidates=k_candidates,
-                **kwargs,
-            )
+        config.update(kwargs)
+        return partial(SUNNY, **config)

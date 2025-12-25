@@ -1,12 +1,16 @@
 import numpy as np
 import pandas as pd
 from asf.selectors.abstract_selector import AbstractSelector
-from asf.utils.g_means import GMeans
-from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
+from asf.clustering.wrappers import (
+    GMeansWrapper,
+    KMeansWrapper,
+    AgglomerativeClusteringWrapper,
+    DBSCANWrapper,
+)
 
 
 try:
-    from ConfigSpace import (
+    from ConfigSpace import (  # noqa: F401
         ConfigurationSpace,
         Categorical,
         Integer,
@@ -14,14 +18,19 @@ try:
         Configuration,
         EqualsCondition,
     )
-    from ConfigSpace.hyperparameters import Hyperparameter
+    from ConfigSpace.hyperparameters import Hyperparameter  # noqa: F401
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
 
-class ISAC(AbstractSelector):
+from asf.utils.configurable import ConfigurableMixin, ClassChoice
+from functools import partial
+from typing import Any
+
+
+class ISAC(ConfigurableMixin, AbstractSelector):
     """
     ISAC (Instance-Specific Algorithm Configuration) selector.
 
@@ -44,7 +53,7 @@ class ISAC(AbstractSelector):
 
     def __init__(
         self,
-        clusterer: object | None = GMeans,
+        clusterer: object | None = GMeansWrapper,
         clusterer_kwargs: dict | None = None,
         **kwargs,
     ):
@@ -117,243 +126,46 @@ class ISAC(AbstractSelector):
             )
         return predictions
 
-    if CONFIGSPACE_AVAILABLE:
+    @staticmethod
+    def _define_hyperparameters(**kwargs):
+        """Define hyperparameters for ISAC."""
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
 
-        @staticmethod
-        def get_configuration_space(
-            cs: ConfigurationSpace | None = None,
-            cs_transform: dict[str, dict] | None = None,
-            pre_prefix: str = "",
-            parent_param: Hyperparameter | None = None,
-            parent_value: str | None = None,
-            **kwargs,
-        ) -> tuple[ConfigurationSpace, dict[str, dict]]:
-            """
-            Get the configuration space for ISAC.
+        clusterer_param = ClassChoice(
+            name="clusterer",
+            choices=[
+                GMeansWrapper,
+                KMeansWrapper,
+                AgglomerativeClusteringWrapper,
+                DBSCANWrapper,
+            ],
+            default=GMeansWrapper,
+        )
 
-            Args:
-                cs: The configuration space to use. If None, a new one will be created.
-                cs_transform: A dictionary for transforming configuration space parameters.
-                pre_prefix: Prefix for parameter names.
-                parent_param: Parent parameter for conditional configuration.
-                parent_value: Value of parent parameter that activates these hyperparameters.
-                **kwargs: Additional keyword arguments.
+        return [clusterer_param], [], []
 
-            Returns:
-                Tuple[ConfigurationSpace, Dict[str, dict]]: The configuration space and its transformation dictionary.
-            """
-            if cs is None:
-                cs = ConfigurationSpace()
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
+    ) -> partial:
+        """
+        Create a partial function from a clean (unprefixed) configuration.
+        """
+        # "clusterer" in kwargs is already the partial/instance of the wrapper
 
-            if cs_transform is None:
-                cs_transform = dict()
+        # We need to filter clean_config to avoid passing "clusterer" string (if present)
+        # However, _get_from_clean_configuration's contract implies clean_config contains
+        # parameter values. "clusterer" key will have value "GMeansWrapper" (string).
+        # But we want to pass the object from kwargs.
 
-            if pre_prefix != "":
-                prefix = f"{pre_prefix}:{ISAC.PREFIX}"
-            else:
-                prefix = ISAC.PREFIX
+        config = clean_config.copy()
+        if "clusterer" in config:
+            del config["clusterer"]
 
-            clusterer_param = Categorical(
-                name=f"{prefix}:clusterer",
-                items=["GMeans", "KMeans", "AgglomerativeClustering", "DBSCAN"],
-                default="GMeans",
-            )
+        config.update(kwargs)  # This puts the object back in if it was in kwargs
 
-            cs_transform[f"{prefix}:clusterer"] = {
-                "GMeans": GMeans,
-                "KMeans": KMeans,
-                "AgglomerativeClustering": AgglomerativeClustering,
-                "DBSCAN": DBSCAN,
-            }
-
-            # GMeans hyperparameters
-            gmeans_min_samples = Float(
-                name=f"{prefix}:gmeans:min_samples",
-                bounds=(0.0001, 0.1),
-                default=0.001,
-                log=True,
-            )
-            gmeans_significance = Categorical(
-                name=f"{prefix}:gmeans:significance",
-                items=[0.15, 0.1, 0.05, 0.025, 0.001],
-                default=0.05,
-            )
-            gmeans_n_init = Integer(
-                name=f"{prefix}:gmeans:n_init",
-                bounds=(1, 10),
-                default=5,
-            )
-
-            # KMeans hyperparameters
-            kmeans_n_clusters = Integer(
-                name=f"{prefix}:kmeans:n_clusters",
-                bounds=(2, 20),
-                default=5,
-            )
-
-            # AgglomerativeClustering hyperparameters
-            agg_n_clusters = Integer(
-                name=f"{prefix}:agg:n_clusters",
-                bounds=(2, 20),
-                default=5,
-            )
-            agg_linkage = Categorical(
-                name=f"{prefix}:agg:linkage",
-                items=["ward", "complete", "average", "single"],
-                default="ward",
-            )
-
-            # DBSCAN hyperparameters
-            dbscan_eps = Float(
-                name=f"{prefix}:dbscan:eps",
-                bounds=(0.1, 2.0),
-                default=0.5,
-            )
-            dbscan_min_samples = Integer(
-                name=f"{prefix}:dbscan:min_samples",
-                bounds=(2, 10),
-                default=5,
-            )
-
-            params = [
-                clusterer_param,
-                gmeans_min_samples,
-                gmeans_significance,
-                gmeans_n_init,
-                kmeans_n_clusters,
-                agg_n_clusters,
-                agg_linkage,
-                dbscan_eps,
-                dbscan_min_samples,
-            ]
-
-            conditions = []
-            conditions.extend(
-                [
-                    EqualsCondition(
-                        child=gmeans_min_samples,
-                        parent=clusterer_param,
-                        value="GMeans",
-                    ),
-                    EqualsCondition(
-                        child=gmeans_significance,
-                        parent=clusterer_param,
-                        value="GMeans",
-                    ),
-                    EqualsCondition(
-                        child=gmeans_n_init,
-                        parent=clusterer_param,
-                        value="GMeans",
-                    ),
-                ]
-            )
-
-            conditions.append(
-                EqualsCondition(
-                    child=kmeans_n_clusters,
-                    parent=clusterer_param,
-                    value="KMeans",
-                )
-            )
-
-            conditions.extend(
-                [
-                    EqualsCondition(
-                        child=agg_n_clusters,
-                        parent=clusterer_param,
-                        value="AgglomerativeClustering",
-                    ),
-                    EqualsCondition(
-                        child=agg_linkage,
-                        parent=clusterer_param,
-                        value="AgglomerativeClustering",
-                    ),
-                ]
-            )
-
-            conditions.extend(
-                [
-                    EqualsCondition(
-                        child=dbscan_eps,
-                        parent=clusterer_param,
-                        value="DBSCAN",
-                    ),
-                    EqualsCondition(
-                        child=dbscan_min_samples,
-                        parent=clusterer_param,
-                        value="DBSCAN",
-                    ),
-                ]
-            )
-
-            if parent_param is not None:
-                for param in params:
-                    conditions.append(
-                        EqualsCondition(
-                            child=param,
-                            parent=parent_param,
-                            value=parent_value,
-                        )
-                    )
-
-            cs.add(params + conditions)
-
-            return cs, cs_transform
-
-        @staticmethod
-        def get_from_configuration(
-            configuration: Configuration,
-            cs_transform: dict[str, dict],
-            pre_prefix: str = "",
-            **kwargs,
-        ) -> "ISAC":
-            """
-            Get the ISAC selector from a given configuration.
-
-            Args:
-                configuration: The configuration object.
-                cs_transform: The transformation dictionary for the configuration space.
-                pre_prefix: Prefix for parameter names.
-                **kwargs: Additional keyword arguments for ISAC initialization.
-
-            Returns:
-                ISAC: An instance of ISAC configured according to the given configuration.
-            """
-            if pre_prefix != "":
-                prefix = f"{pre_prefix}:{ISAC.PREFIX}"
-            else:
-                prefix = ISAC.PREFIX
-
-            clusterer_class = cs_transform[f"{prefix}:clusterer"][
-                configuration[f"{prefix}:clusterer"]
-            ]
-
-            clusterer_kwargs = {}
-            if configuration[f"{prefix}:clusterer"] == "GMeans":
-                clusterer_kwargs["min_samples"] = configuration[
-                    f"{prefix}:gmeans:min_samples"
-                ]
-                clusterer_kwargs["significance"] = configuration[
-                    f"{prefix}:gmeans:significance"
-                ]
-                clusterer_kwargs["n_init"] = configuration[f"{prefix}:gmeans:n_init"]
-            elif configuration[f"{prefix}:clusterer"] == "KMeans":
-                clusterer_kwargs["n_clusters"] = configuration[
-                    f"{prefix}:kmeans:n_clusters"
-                ]
-            elif configuration[f"{prefix}:clusterer"] == "AgglomerativeClustering":
-                clusterer_kwargs["n_clusters"] = configuration[
-                    f"{prefix}:agg:n_clusters"
-                ]
-                clusterer_kwargs["linkage"] = configuration[f"{prefix}:agg:linkage"]
-            elif configuration[f"{prefix}:clusterer"] == "DBSCAN":
-                clusterer_kwargs["eps"] = configuration[f"{prefix}:dbscan:eps"]
-                clusterer_kwargs["min_samples"] = configuration[
-                    f"{prefix}:dbscan:min_samples"
-                ]
-
-            return ISAC(
-                clusterer=clusterer_class,
-                clusterer_kwargs=clusterer_kwargs,
-                **kwargs,
-            )
+        # Ensure clusterer is passed correctly to __init__
+        return partial(ISAC, **config)

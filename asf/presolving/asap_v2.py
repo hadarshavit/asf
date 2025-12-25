@@ -443,3 +443,41 @@ class ASAPv2(AbstractPresolver):
                 if time > 0
             }
         return {}
+
+    @classmethod
+    def get_from_configuration(
+        cls, configuration: dict, pre_prefix: str = "", **kwargs
+    ) -> "ASAPv2":
+        """
+        Create an ASAPv2 presolver from a configuration.
+
+        Parameters
+        ----------
+        configuration : dict
+            The configuration dictionary.
+        pre_prefix : str
+            Prefix for the configuration keys.
+        **kwargs
+            Additional arguments.
+
+        Returns
+        -------
+        ASAPv2
+            The initialized presolver.
+        """
+        if pre_prefix:
+            prefix = f"{pre_prefix}:"
+        else:
+            prefix = ""
+
+        # AbstractPresolver adds presolver_budget to the config
+        # We use it to set max_runtime_preschedule
+        presolver_budget = configuration.get(
+            f"{prefix}presolver_budget", configuration.get("presolver_budget")
+        )
+
+        init_params = kwargs.copy()
+        if presolver_budget is not None:
+            init_params["max_runtime_preschedule"] = presolver_budget
+
+        return cls(**init_params)

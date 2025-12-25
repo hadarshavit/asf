@@ -5,9 +5,24 @@ from sklearn.model_selection import KFold
 
 from asf.selectors.abstract_selector import AbstractSelector
 from asf.presolving.aspeed import Aspeed, CLINGO_AVAIL
+from asf.utils.configurable import ConfigurableMixin
+
+try:
+    from ConfigSpace import (  # noqa: F401
+        ConfigurationSpace,
+        Categorical,
+        Integer,
+        EqualsCondition,
+    )
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
+from functools import partial
+from typing import Any
 
 
-class ISA(AbstractSelector):
+class ISA(ConfigurableMixin, AbstractSelector):
     """
     ISA (Instance-Specific Aspeed) selector.
     """
@@ -189,3 +204,93 @@ class ISA(AbstractSelector):
             predictions[instance_name] = schedule
 
         return predictions
+
+    @staticmethod
+    def _define_hyperparameters(**kwargs):
+        """Define hyperparameters for ISA."""
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
+
+        k_param = Integer(
+            name="k",
+            bounds=(1, 50),
+            default=10,
+        )
+
+        use_k_tuning_param = Categorical(
+            name="use_k_tuning",
+            items=[True, False],
+            default=True,
+        )
+
+        n_folds_param = Integer(
+            name="n_folds",
+            bounds=(2, 10),
+            default=5,
+        )
+
+        k_candidates_param = Categorical(
+            name="k_candidates",
+            items=["small", "medium", "broad"],
+            default="medium",
+        )
+
+        aspeed_cutoff_param = Integer(
+            name="aspeed_cutoff",
+            bounds=(1, 300),
+            default=30,
+        )
+
+        cores_param = Integer(
+            name="cores",
+            bounds=(1, 8),
+            default=1,
+        )
+
+        params = [
+            k_param,
+            use_k_tuning_param,
+            n_folds_param,
+            k_candidates_param,
+            aspeed_cutoff_param,
+            cores_param,
+        ]
+
+        conditions = [
+            EqualsCondition(n_folds_param, use_k_tuning_param, True),
+            EqualsCondition(k_candidates_param, use_k_tuning_param, True),
+        ]
+
+        return params, conditions, []
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
+    ) -> partial:
+        """
+        Create a partial function from a clean (unprefixed) configuration.
+        """
+        config = clean_config.copy()
+
+        # Helper to map k_candidates categorical to list
+        k_candidates_map = {
+            "small": [3, 5, 10],
+            "medium": [3, 5, 10, 15, 20],
+            "broad": [3, 5, 10, 15, 20, 30, 50],
+        }
+
+        use_k = config.get("use_k_tuning", True)
+
+        if use_k:
+            k_candidates_str = config.get("k_candidates", "medium")
+            config["k_candidates"] = k_candidates_map[k_candidates_str]
+        else:
+            # Default fallback if not tuning k
+            config["k_candidates"] = [3, 5, 10, 15, 20]  # Default from __init__
+            if "n_folds" not in config:
+                config["n_folds"] = 5
+
+        config.update(kwargs)
+        return partial(ISA, **config)

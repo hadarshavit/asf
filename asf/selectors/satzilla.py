@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Dict, List, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -12,23 +12,22 @@ from asf.selectors.abstract_epm_based_selector import AbstractEPMBasedSelector
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 
 # Optional ConfigSpace import (consistent with other modules)
+from asf.utils.configurable import ConfigurableMixin, ClassChoice
+
 try:
     from ConfigSpace import (
-        ConfigurationSpace,
         Categorical,
         Integer,
         Float,
-        EqualsCondition,
-        Configuration,
     )
-    from ConfigSpace.hyperparameters import Hyperparameter
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
+from functools import partial
 
 
-class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
+class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSelector):
     """
     SATzilla-like selector using Schmee & Hahn (1979) iterative imputation
     for censored runtimes (log-scale) and per-algorithm ridge models on
@@ -161,131 +160,65 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
         return results
 
     @staticmethod
-    def get_configuration_space(
-        cs: Optional[ConfigurationSpace] = None,
-        cs_transform: Optional[Dict[str, Dict[str, type]]] = None,
-        model_class: List[type] = None,
-        pre_prefix: str = "",
-        parent_param: Optional[Hyperparameter] = None,
-        parent_value: Optional[str] = None,
-        **kwargs,
-    ) -> Tuple[ConfigurationSpace, Dict[str, Dict[str, type]]]:
-        """
-        Build ConfigSpace for SATzilla, including:
-        - model_class choice (wrappers) with nested model hyperparams
-        - SATzilla-specific EM/log parameters
-        """
+    def _define_hyperparameters(model_class=None, **kwargs):
+        """Define hyperparameters for SATzilla."""
         if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-        if cs is None:
-            cs = ConfigurationSpace()
-        if cs_transform is None:
-            cs_transform = {}
+            return [], [], []
+
         if model_class is None:
             model_class = [RidgeRegressorWrapper]
 
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{SATzilla.PREFIX}"
-        else:
-            prefix = SATzilla.PREFIX
-
-        model_class_param = Categorical(
-            name=f"{prefix}:model_class",
-            items=[str(c.__name__) for c in model_class],
+        model_class_param = ClassChoice(
+            name="model_class",
+            choices=model_class,
+            default=model_class[0],
         )
-        cs_transform[f"{prefix}:model_class"] = {
-            str(c.__name__): c for c in model_class
-        }
 
-        use_log10 = Categorical(
-            f"{prefix}:use_log10",
-            [True, False],
+        use_log10_param = Categorical(
+            name="use_log10",
+            items=[True, False],
             default=True,
         )
-        em_max_iter = Integer(
-            f"{prefix}:em_max_iter",
-            (5, 50),
+
+        em_max_iter_param = Integer(
+            name="em_max_iter",
+            bounds=(5, 50),
             default=20,
         )
-        em_tol = Float(
-            f"{prefix}:em_tol",
-            (1e-6, 1e-2),
+
+        em_tol_param = Float(
+            name="em_tol",
+            bounds=(1e-6, 1e-2),
             log=True,
             default=1e-3,
         )
-        em_min_sigma = Float(
-            f"{prefix}:em_min_sigma",
-            (1e-8, 1e-1),
+
+        em_min_sigma_param = Float(
+            name="em_min_sigma",
+            bounds=(1e-8, 1e-1),
             log=True,
             default=1e-6,
         )
 
-        params = [model_class_param, use_log10, em_max_iter, em_tol, em_min_sigma]
-
-        # Activate these params only when the parent selector is SATzilla
-        if parent_param is not None:
-            conditions = [
-                EqualsCondition(
-                    child=param,
-                    parent=parent_param,
-                    value=parent_value,
-                )
-                for param in params
-            ]
-        else:
-            conditions = []
-
-        cs.add(params + conditions)
-
-        for mc in model_class:
-            mc.get_configuration_space(
-                cs=cs,
-                pre_prefix=f"{prefix}:model_class",
-                parent_param=model_class_param,
-                parent_value=str(mc.__name__),
-                **kwargs,
-            )
-
-        return cs, cs_transform
-
-    @staticmethod
-    def get_from_configuration(
-        configuration: Configuration,
-        cs_transform: Dict[str, Dict[str, type]],
-        pre_prefix: str = "",
-        **kwargs,
-    ):
-        """
-        Instantiate SATzilla from a ConfigSpace configuration.
-        """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{SATzilla.PREFIX}"
-        else:
-            prefix = SATzilla.PREFIX
-
-        model_cls = cs_transform[f"{prefix}:model_class"][
-            configuration[f"{prefix}:model_class"]
+        params = [
+            model_class_param,
+            use_log10_param,
+            em_max_iter_param,
+            em_tol_param,
+            em_min_sigma_param,
         ]
-        model_ctor = model_cls.get_from_configuration(
-            configuration, pre_prefix=f"{prefix}:model_class"
-        )
 
-        use_log10 = configuration[f"{prefix}:use_log10"]
-        em_max_iter = configuration[f"{prefix}:em_max_iter"]
-        em_tol = configuration[f"{prefix}:em_tol"]
-        em_min_sigma = configuration[f"{prefix}:em_min_sigma"]
+        return params, [], []
 
-        return SATzilla(
-            model_class=model_ctor,
-            use_log10=use_log10,
-            em_max_iter=em_max_iter,
-            em_tol=em_tol,
-            em_min_sigma=em_min_sigma,
-            **kwargs,
-        )
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
+    ) -> partial:
+        """
+        Create a partial function from a clean (unprefixed) configuration.
+        """
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(SATzilla, **config)

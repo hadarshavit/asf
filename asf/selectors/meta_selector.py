@@ -4,9 +4,22 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
 from asf.selectors.abstract_selector import AbstractSelector
+from asf.utils.configurable import ConfigurableMixin, ClassChoice
+
+try:
+    from ConfigSpace import (  # noqa: F401
+        ConfigurationSpace,
+        Integer,
+    )
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
+from functools import partial
+from typing import Any
 
 
-class MetaSelector(AbstractSelector):
+class MetaSelector(ConfigurableMixin, AbstractSelector):
     """
     A meta-selector that trains multiple base selectors and uses another selector
     to choose among them for each instance.
@@ -163,3 +176,65 @@ class MetaSelector(AbstractSelector):
 
             final_predictions[instance_name] = formatted
         return final_predictions
+
+    @staticmethod
+    def _define_hyperparameters(candidate_selectors=None, **kwargs):
+        """Define hyperparameters for MetaSelector."""
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
+
+        if candidate_selectors is None:
+            return [], [], []
+
+        meta_selector_param = ClassChoice(
+            name="meta_selector",
+            choices=candidate_selectors,
+            default=candidate_selectors[0],
+        )
+
+        par_factor_param = Integer(
+            name="par_factor",
+            bounds=(1, 100),
+            default=10,
+        )
+
+        n_folds_param = Integer(
+            name="n_folds",
+            bounds=(2, 10),
+            default=5,
+        )
+
+        params = [
+            meta_selector_param,
+            par_factor_param,
+            n_folds_param,
+        ]
+
+        return params, [], []
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        candidate_selectors: List[type] | None = None,
+        **kwargs,
+    ) -> partial:
+        """
+        Create a partial function from a clean (unprefixed) configuration.
+        """
+        config = clean_config.copy()
+
+        # Instantiate base selectors with default configuration
+        if candidate_selectors:
+            base_selectors = []
+            for sel_cls in candidate_selectors:
+                try:
+                    base_selectors.append(sel_cls())
+                except Exception:
+                    # Fallback if init requires args (should not happen for ConfigurableMixin classes)
+                    # We can't do much here if we don't know the args.
+                    pass
+            config["base_selectors"] = base_selectors
+
+        config.update(kwargs)
+        return partial(MetaSelector, **config)

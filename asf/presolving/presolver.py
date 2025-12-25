@@ -28,7 +28,7 @@ class AbstractPresolver:
         pass
 
     @abstractmethod
-    def predict(self) -> dict[str, list[tuple[str, float]]]:
+    def predict(self) -> list[tuple[str, float]]:
         pass
 
     @staticmethod
@@ -86,11 +86,13 @@ class AbstractPresolver:
         if parent_param is not None and parent_value is not None:
             # Budget for presolver (fraction of total budget)
             if total_budget is not None:
+                # Ensure upper > lower (upper must be strictly greater than 1)
+                upper_budget = max(1.1, 0.1 * total_budget)
                 presolver_budget_param = UniformFloatHyperparameter(
                     name=f"{parent_value}:presolver_budget",
                     lower=1,
-                    upper=0.1 * total_budget,
-                    default_value=min(10, 0.1 * total_budget),
+                    upper=upper_budget,
+                    default_value=min(10, upper_budget),
                     log=True,
                 )
                 cs.add(presolver_budget_param)

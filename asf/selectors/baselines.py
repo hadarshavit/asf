@@ -9,9 +9,12 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 from asf.selectors.abstract_selector import AbstractSelector
+from asf.utils.configurable import ConfigurableMixin
+from functools import partial
+from typing import Any
 
 
-class SingleBestSolver(AbstractSelector):
+class SingleBestSolver(ConfigurableMixin, AbstractSelector):
     """
     Single Best Solver (SBS) selector.
 
@@ -19,6 +22,10 @@ class SingleBestSolver(AbstractSelector):
     training instances. This represents the baseline performance achievable
     without any instance-specific selection.
     """
+
+    PREFIX = "sbs"
+
+    PREFIX = "sbs"
 
     def __init__(
         self,
@@ -73,8 +80,22 @@ class SingleBestSolver(AbstractSelector):
             for instance in features.index
         }
 
+    @staticmethod
+    def _define_hyperparameters(**kwargs):
+        return [], [], []
 
-class VirtualBestSolver(AbstractSelector):
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
+    ) -> partial:
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(SingleBestSolver, **config)
+
+
+class VirtualBestSolver(ConfigurableMixin, AbstractSelector):
     """
     Virtual Best Solver (VBS) / Oracle selector.
 
@@ -86,6 +107,12 @@ class VirtualBestSolver(AbstractSelector):
     so it should only be used as an upper bound reference, not as a
     practical selector.
     """
+
+    PREFIX = "vbs"
+
+    PREFIX = "vbs"
+
+    PREFIX = "vbs"
 
     def __init__(
         self,
@@ -157,3 +184,17 @@ class VirtualBestSolver(AbstractSelector):
             result[instance] = [(best_algorithm, self.budget)]
 
         return result
+
+    @staticmethod
+    def _define_hyperparameters(**kwargs):
+        return [], [], []
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
+    ) -> partial:
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(VirtualBestSolver, **config)

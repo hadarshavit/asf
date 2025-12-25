@@ -4,9 +4,12 @@ import pandas as pd
 import numpy as np
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 from asf.predictors.linear_model import RidgeRegressorWrapper
+from asf.utils.configurable import ConfigurableMixin, ClassChoice
+from functools import partial
+from typing import Any
 
 try:
-    from ConfigSpace import (
+    from ConfigSpace import (  # noqa: F401
         ConfigurationSpace,
         Categorical,
         Integer,
@@ -14,14 +17,14 @@ try:
         Configuration,
         EqualsCondition,
     )
-    from ConfigSpace.hyperparameters import Hyperparameter
+    from ConfigSpace.hyperparameters import Hyperparameter  # noqa: F401
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
 
-class CollaborativeFilteringSelector(AbstractModelBasedSelector):
+class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelector):
     """
     Collaborative filtering selector using SGD matrix factorization (ALORS-style).
     """
@@ -207,78 +210,41 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
         return predictions
 
     @staticmethod
-    def get_configuration_space(
-        cs: ConfigurationSpace | None = None,
-        cs_transform: dict[str, dict] | None = None,
-        model_class: list[type] | None = None,
-        pre_prefix: str = "",
-        parent_param: Hyperparameter | None = None,
-        parent_value: str | None = None,
-        **kwargs,
-    ) -> tuple[ConfigurationSpace, dict[str, dict]]:
-        """
-        Get the configuration space for CollaborativeFilteringSelector.
-
-        Args:
-            cs: The configuration space to use. If None, a new one will be created.
-            cs_transform: A dictionary for transforming configuration space parameters.
-            model_class: List of regressor wrapper classes to choose from.
-            pre_prefix: Prefix for parameter names.
-            parent_param: Parent parameter for conditional configuration.
-            parent_value: Value of parent parameter that activates these hyperparameters.
-            **kwargs: Additional keyword arguments.
-
-        Returns:
-            Tuple[ConfigurationSpace, Dict[str, dict]]: The configuration space and its transformation dictionary.
-        """
+    def _define_hyperparameters(model_class=None, **kwargs):
+        """Define hyperparameters for CollaborativeFilteringSelector."""
         if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-        if cs is None:
-            cs = ConfigurationSpace()
-
-        if cs_transform is None:
-            cs_transform = dict()
+            return [], [], []
 
         if model_class is None:
             model_class = [RidgeRegressorWrapper]
 
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{CollaborativeFilteringSelector.PREFIX}"
-        else:
-            prefix = CollaborativeFilteringSelector.PREFIX
-
-        model_class_param = Categorical(
-            name=f"{prefix}:model_class",
-            items=[str(c.__name__) for c in model_class],
+        model_class_param = ClassChoice(
+            name="model_class",
+            choices=model_class,
+            default=model_class[0],
         )
 
-        cs_transform[f"{prefix}:model_class"] = {
-            str(c.__name__): c for c in model_class
-        }
-
         n_components_param = Integer(
-            name=f"{prefix}:n_components",
+            name="n_components",
             bounds=(5, 50),
             default=10,
         )
 
         n_iter_param = Integer(
-            name=f"{prefix}:n_iter",
+            name="n_iter",
             bounds=(50, 500),
             default=100,
         )
 
         lr_param = Float(
-            name=f"{prefix}:lr",
+            name="lr",
             bounds=(1e-5, 1e-1),
             log=True,
             default=0.001,
         )
 
         reg_param = Float(
-            name=f"{prefix}:reg",
+            name="reg",
             bounds=(1e-4, 1.0),
             log=True,
             default=0.1,
@@ -292,76 +258,17 @@ class CollaborativeFilteringSelector(AbstractModelBasedSelector):
             reg_param,
         ]
 
-        if parent_param is not None:
-            conditions = [
-                EqualsCondition(
-                    child=param,
-                    parent=parent_param,
-                    value=parent_value,
-                )
-                for param in params
-            ]
-        else:
-            conditions = []
+        return params, [], []
 
-        cs.add(params + conditions)
-
-        for mc in model_class:
-            mc.get_configuration_space(
-                cs=cs,
-                pre_prefix=f"{prefix}:model_class",
-                parent_param=model_class_param,
-                parent_value=str(mc.__name__),
-                **kwargs,
-            )
-
-        return cs, cs_transform
-
-    @staticmethod
-    def get_from_configuration(
-        configuration: Configuration,
-        cs_transform: dict[str, dict],
-        pre_prefix: str = "",
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
         **kwargs,
-    ) -> "CollaborativeFilteringSelector":
+    ) -> partial:
         """
-        Get the CollaborativeFilteringSelector from a given configuration.
-
-        Args:
-            configuration: The configuration object.
-            cs_transform: The transformation dictionary for the configuration space.
-            pre_prefix: Prefix for parameter names.
-            **kwargs: Additional keyword arguments for CollaborativeFilteringSelector initialization.
-
-        Returns:
-            CollaborativeFilteringSelector: An instance configured according to the given configuration.
+        Create a partial function from a clean (unprefixed) configuration.
         """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{CollaborativeFilteringSelector.PREFIX}"
-        else:
-            prefix = CollaborativeFilteringSelector.PREFIX
-
-        model_cls = cs_transform[f"{prefix}:model_class"][
-            configuration[f"{prefix}:model_class"]
-        ]
-        model_ctor = model_cls.get_from_configuration(
-            configuration, pre_prefix=f"{prefix}:model_class"
-        )
-
-        n_components = configuration[f"{prefix}:n_components"]
-        n_iter = configuration[f"{prefix}:n_iter"]
-        lr = configuration[f"{prefix}:lr"]
-        reg = configuration[f"{prefix}:reg"]
-
-        return CollaborativeFilteringSelector(
-            model_class=model_ctor,
-            n_components=n_components,
-            n_iter=n_iter,
-            lr=lr,
-            reg=reg,
-            **kwargs,
-        )
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(CollaborativeFilteringSelector, **config)

@@ -3,7 +3,24 @@ import numpy as np
 from asf.predictors import AbstractPredictor
 
 
-class EPMRandomForest(ExtraTreesRegressor, AbstractPredictor):
+from asf.utils.configurable import ConfigurableMixin
+from functools import partial
+from typing import Any
+
+try:
+    from ConfigSpace import (  # noqa: F401
+        ConfigurationSpace,
+        Integer,
+        Float,
+        Categorical,
+    )
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
+
+
+class EPMRandomForest(ExtraTreesRegressor, AbstractPredictor, ConfigurableMixin):
     """
     Implementation of random forest as done in the paper
     "Algorithm runtime prediction: Methods & evaluation" by Hutter, Xu, Hoos, and Leyton-Brown (2014).
@@ -43,6 +60,37 @@ class EPMRandomForest(ExtraTreesRegressor, AbstractPredictor):
         """
         super().__init__(**kwargs)
         self.log = log
+
+    PREFIX = "epm_extra_trees"
+
+    @staticmethod
+    def _define_hyperparameters(**kwargs):
+        """Define hyperparameters for EPMRandomForest (ExtraTrees)."""
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
+
+        hyperparameters = [
+            Integer("n_estimators", (16, 128), log=True, default=100),
+            Integer("min_samples_split", (2, 20), log=False, default=2),
+            Integer("min_samples_leaf", (1, 20), log=False, default=1),
+            Float("max_features", (0.1, 1.0), log=False, default=1.0),
+            Categorical("bootstrap", items=[True, False], default=False),
+            Categorical("log", items=[True, False], default=False),
+        ]
+        return hyperparameters, [], []
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
+    ) -> partial:
+        """
+        Create a partial function from a clean (unprefixed) configuration.
+        """
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(EPMRandomForest, **config)
 
     def fit(
         self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray | None = None

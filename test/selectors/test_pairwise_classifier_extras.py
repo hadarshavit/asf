@@ -1,6 +1,8 @@
 import pandas as pd
 import pytest
 
+pytest.importorskip("xgboost")
+
 from asf.selectors.pairwise_classifier import PairwiseClassifier
 from asf.predictors.xgboost import XGBoostClassifierWrapper
 

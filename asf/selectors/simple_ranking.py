@@ -4,9 +4,20 @@ from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
 
 from asf.predictors.abstract_predictor import AbstractPredictor
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
+from asf.predictors.xgboost import XGBoostRankerWrapper
+from asf.utils.configurable import ConfigurableMixin, ClassChoice
+
+try:
+    import ConfigSpace  # noqa: F401
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
+from functools import partial
+from typing import Any
 
 
-class SimpleRanking(AbstractModelBasedSelector):
+class SimpleRanking(ConfigurableMixin, AbstractModelBasedSelector):
     """
     Algorithm Selection via Ranking (Oentaryo et al.) + algo features (optional).
     Attributes:
@@ -134,3 +145,33 @@ class SimpleRanking(AbstractModelBasedSelector):
             ]
 
         return scheds
+
+    @staticmethod
+    def _define_hyperparameters(model_class=None, **kwargs):
+        """Define hyperparameters for SimpleRanking."""
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
+
+        if model_class is None:
+            model_class = [XGBoostRankerWrapper]
+
+        model_class_param = ClassChoice(
+            name="model_class",
+            choices=model_class,
+            default=model_class[0],
+        )
+
+        return [model_class_param], [], []
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
+    ) -> partial:
+        """
+        Create a partial function from a clean (unprefixed) configuration.
+        """
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(SimpleRanking, **config)

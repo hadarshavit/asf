@@ -4,24 +4,28 @@ from scipy.optimize import differential_evolution
 
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 from asf.predictors.survival import RandomSurvivalForestWrapper, SKSURV_AVAILABLE
+from functools import partial
+from typing import Any
+
 
 if SKSURV_AVAILABLE:
     from sksurv.util import Surv
 
     try:
         from ConfigSpace import (
-            ConfigurationSpace,
             Categorical,
-            Configuration,
             EqualsCondition,
+            Integer,
+            Float,
         )
-        from ConfigSpace.hyperparameters import Hyperparameter
 
         CONFIGSPACE_AVAILABLE = True
     except ImportError:
         CONFIGSPACE_AVAILABLE = False
 
-    class SurvivalAnalysis(AbstractModelBasedSelector):
+    from asf.utils.configurable import ConfigurableMixin, ClassChoice
+
+    class SurvivalAnalysis(ConfigurableMixin, AbstractModelBasedSelector):
         """
         Selects the best algorithm for a given problem instance using survival analysis.
         Tries to maximize the probability of finishing within a given time budget.
@@ -315,118 +319,86 @@ if SKSURV_AVAILABLE:
 
             return schedule
 
-        if CONFIGSPACE_AVAILABLE:
+        @staticmethod
+        def _define_hyperparameters(model_class=None, **kwargs):
+            """Define hyperparameters for SurvivalAnalysis."""
+            if not CONFIGSPACE_AVAILABLE:
+                return [], [], []
 
-            @staticmethod
-            def get_configuration_space(
-                cs: ConfigurationSpace | None = None,
-                cs_transform: dict[str, dict] | None = None,
-                model_class: list[type] | None = None,
-                pre_prefix: str = "",
-                parent_param: Hyperparameter | None = None,
-                parent_value: str | None = None,
-                **kwargs,
-            ) -> tuple[ConfigurationSpace, dict[str, dict]]:
-                """
-                Get the configuration space for SurvivalAnalysis.
+            if model_class is None:
+                model_class = [RandomSurvivalForestWrapper]
 
-                Args:
-                    cs: The configuration space to use. If None, a new one will be created.
-                    cs_transform: A dictionary for transforming configuration space parameters.
-                    model_class: List of survival model wrapper classes to choose from.
-                    pre_prefix: Prefix for parameter names.
-                    parent_param: Parent parameter for conditional configuration.
-                    parent_value: Value of parent parameter that activates these hyperparameters.
-                    **kwargs: Additional keyword arguments.
+            model_class_param = ClassChoice(
+                name="model_class",
+                choices=model_class,
+                default=model_class[0],
+            )
 
-                Returns:
-                    Tuple[ConfigurationSpace, Dict[str, dict]]: The configuration space and its transformation dictionary.
-                """
-                if cs is None:
-                    cs = ConfigurationSpace()
+            use_schedule_param = Categorical(
+                name="use_schedule",
+                items=[True, False],
+                default=False,
+            )
 
-                if cs_transform is None:
-                    cs_transform = dict()
+            popsize_param = Integer(
+                name="popsize",
+                bounds=(10, 100),
+                default=20,
+            )
 
-                if model_class is None:
-                    model_class = [RandomSurvivalForestWrapper]
+            maxiter_param = Integer(
+                name="maxiter",
+                bounds=(50, 500),
+                default=150,
+            )
 
-                if pre_prefix != "":
-                    prefix = f"{pre_prefix}:{SurvivalAnalysis.PREFIX}"
-                else:
-                    prefix = SurvivalAnalysis.PREFIX
+            tol_param = Float(
+                name="tol",
+                bounds=(1e-4, 1e-1),
+                log=True,
+                default=0.01,
+            )
 
-                model_class_param = Categorical(
-                    name=f"{prefix}:model_class",
-                    items=[str(c.__name__) for c in model_class],
-                )
+            dominance_resolution_param = Integer(
+                name="dominance_resolution",
+                bounds=(50, 500),
+                default=100,
+            )
 
-                cs_transform[f"{prefix}:model_class"] = {
-                    str(c.__name__): c for c in model_class
-                }
+            params = [
+                model_class_param,
+                use_schedule_param,
+                popsize_param,
+                maxiter_param,
+                tol_param,
+                dominance_resolution_param,
+            ]
 
-                params = [model_class_param]
+            conditions = [
+                EqualsCondition(popsize_param, use_schedule_param, True),
+                EqualsCondition(maxiter_param, use_schedule_param, True),
+                EqualsCondition(tol_param, use_schedule_param, True),
+                EqualsCondition(dominance_resolution_param, use_schedule_param, True),
+            ]
 
-                if parent_param is not None:
-                    conditions = [
-                        EqualsCondition(
-                            child=param,
-                            parent=parent_param,
-                            value=parent_value,
-                        )
-                        for param in params
-                    ]
-                else:
-                    conditions = []
+            return params, conditions, []
 
-                cs.add(params + conditions)
+        @classmethod
+        def _get_from_clean_configuration(
+            cls,
+            clean_config: dict[str, Any],
+            **kwargs,
+        ) -> partial:
+            """
+            Create a partial function from a clean (unprefixed) configuration.
+            """
+            config = clean_config.copy()
+            # If use_schedule is False, ConfigSpace might not return dependent params if they are inactive?
+            # But ConfigurableMixin/ConfigSpace usually handles this.
+            # We just pass the config.
 
-                for mc in model_class:
-                    mc.get_configuration_space(
-                        cs=cs,
-                        pre_prefix=f"{prefix}:model_class",
-                        parent_param=model_class_param,
-                        parent_value=str(mc.__name__),
-                        **kwargs,
-                    )
-
-                return cs, cs_transform
-
-            @staticmethod
-            def get_from_configuration(
-                configuration: Configuration,
-                cs_transform: dict[str, dict],
-                pre_prefix: str = "",
-                **kwargs,
-            ) -> "SurvivalAnalysis":
-                """
-                Get the SurvivalAnalysis from a given configuration.
-
-                Args:
-                    configuration: The configuration object.
-                    cs_transform: The transformation dictionary for the configuration space.
-                    pre_prefix: Prefix for parameter names.
-                    **kwargs: Additional keyword arguments for SurvivalAnalysis initialization.
-
-                Returns:
-                    SurvivalAnalysis: An instance configured according to the given configuration.
-                """
-                if pre_prefix != "":
-                    prefix = f"{pre_prefix}:{SurvivalAnalysis.PREFIX}"
-                else:
-                    prefix = SurvivalAnalysis.PREFIX
-
-                model_cls = cs_transform[f"{prefix}:model_class"][
-                    configuration[f"{prefix}:model_class"]
-                ]
-                model_ctor = model_cls.get_from_configuration(
-                    configuration, pre_prefix=f"{prefix}:model_class"
-                )
-
-                return SurvivalAnalysis(
-                    model_class=model_ctor,
-                    **kwargs,
-                )
+            config.update(kwargs)
+            return partial(SurvivalAnalysis, **config)
 
 else:
 

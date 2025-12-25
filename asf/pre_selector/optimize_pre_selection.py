@@ -2,6 +2,7 @@ from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
 import pandas as pd
 import numpy as np
 from typing import Callable
+from functools import partial
 
 try:
     import scipy.optimize
@@ -50,14 +51,18 @@ class OptimizePreSelection(AbstractPreSelector):
         self.metric = metric
         self.n_algorithms = n_algorithms
         self.maximize = maximize
-        if fmin_function is None:
+        if fmin_function is None or isinstance(fmin_function, str):
             if SCIPY_AVAILABLE:
-                fmin_function = scipy.optimize.minimize
+                if fmin_function is None or fmin_function == "differential_evolution":
+                    self.fmin_function = scipy.optimize.differential_evolution
+                else:
+                    # If string is provided, use scipy.optimize.minimize with that method
+                    method = fmin_function
+                    self.fmin_function = partial(scipy.optimize.minimize, method=method)
             else:
                 raise ImportError(
                     "Scipy is not available. Please install scipy to use this feature."
                 )
-            self.fmin_function = scipy.optimize.differential_evolution
         else:
             self.fmin_function = fmin_function
 
@@ -116,10 +121,17 @@ class OptimizePreSelection(AbstractPreSelector):
         initial_guess[: self.n_algorithms] = 1
         bounds = [(0, 1) for _ in range(performance_frame.shape[1])]
 
-        result = self.fmin_function(
-            objective_function,
-            bounds=bounds,
-        )
+        if self.fmin_function == scipy.optimize.differential_evolution:
+            result = self.fmin_function(
+                objective_function,
+                bounds=bounds,
+            )
+        else:
+            result = self.fmin_function(
+                objective_function,
+                x0=initial_guess,
+                bounds=bounds,
+            )
 
         selected_algorithms = performance_frame.columns[
             result.x.argsort()[-self.n_algorithms :]

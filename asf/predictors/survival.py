@@ -3,6 +3,20 @@ from __future__ import annotations
 from typing import Any
 
 from asf.predictors.abstract_predictor import AbstractPredictor
+from asf.utils.configurable import ConfigurableMixin
+from functools import partial
+
+try:
+    from ConfigSpace import (  # noqa: F401
+        ConfigurationSpace,
+        Integer,
+        Float,
+        Categorical,
+    )
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
 
 try:
     from sksurv.ensemble import RandomSurvivalForest
@@ -15,7 +29,7 @@ except ImportError:  # pragma: no cover - optional dependency
 
 if SKSURV_AVAILABLE:
 
-    class RandomSurvivalForestWrapper(AbstractPredictor):
+    class RandomSurvivalForestWrapper(ConfigurableMixin, AbstractPredictor):
         """Lightweight wrapper around ``sksurv``'s ``RandomSurvivalForest`` model."""
 
         PREFIX = "random_survival_forest"
@@ -27,6 +41,34 @@ if SKSURV_AVAILABLE:
                 )
             params = init_params or {}
             self.model = RandomSurvivalForest(**params)  # type: ignore[misc]
+
+        @staticmethod
+        def _define_hyperparameters(**kwargs):
+            """Define hyperparameters for RandomSurvivalForestWrapper."""
+            if not CONFIGSPACE_AVAILABLE:
+                return [], [], []
+
+            hyperparameters = [
+                Integer("n_estimators", (10, 1000), log=True, default=100),
+                Integer("min_samples_split", (2, 20), default=6),
+                Integer("min_samples_leaf", (1, 20), default=3),
+                Float("max_features", (0.1, 1.0), default=1.0),
+                Categorical("bootstrap", items=[True, False], default=True),
+            ]
+            return hyperparameters, [], []
+
+        @classmethod
+        def _get_from_clean_configuration(
+            cls,
+            clean_config: dict[str, Any],
+            **kwargs,
+        ) -> partial:
+            """
+            Create a partial function from a clean (unprefixed) configuration.
+            """
+            config = clean_config.copy()
+            config.update(kwargs)
+            return partial(RandomSurvivalForestWrapper, init_params=config)
 
         def fit(self, X: Any, y: Any, **kwargs: Any) -> None:
             self.model.fit(X, y, **kwargs)

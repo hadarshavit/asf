@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 from asf.predictors.sklearn_wrapper import SklearnWrapper
+from asf.utils.configurable import ConfigurableMixin
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 try:
-    from ConfigSpace import (
+    from ConfigSpace import (  # noqa: F401
         ConfigurationSpace,
         Integer,
         Float,
         Categorical,
         EqualsCondition,
     )
-    from ConfigSpace.hyperparameters import Hyperparameter
+    from ConfigSpace.hyperparameters import Hyperparameter  # noqa: F401
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
@@ -20,7 +21,7 @@ from functools import partial
 from typing import Any
 
 
-class RandomForestClassifierWrapper(SklearnWrapper):
+class RandomForestClassifierWrapper(ConfigurableMixin, SklearnWrapper):
     """
     A wrapper for the RandomForestClassifier from scikit-learn, providing
     additional functionality for configuration space management.
@@ -40,133 +41,39 @@ class RandomForestClassifierWrapper(SklearnWrapper):
         super().__init__(RandomForestClassifier, init_params)
 
     @staticmethod
-    def get_configuration_space(
-        cs: ConfigurationSpace | None = None,
-        pre_prefix: str = "",
-        parent_param: Hyperparameter | None = None,
-        parent_value: str | None = None,
-    ) -> ConfigurationSpace:
-        """
-        Get the configuration space for the Random Forest Classifier.
-
-        Parameters
-        ----------
-        cs : ConfigurationSpace, optional
-            The configuration space to add the parameters to. If None, a new ConfigurationSpace will be created.
-
-        Returns
-        -------
-        ConfigurationSpace
-            The configuration space with the Random Forest Classifier parameters.
-        """
+    def _define_hyperparameters(**kwargs):
+        """Define hyperparameters for RandomForestClassifier."""
         if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
+            return [], [], []
 
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{RandomForestClassifierWrapper.PREFIX}:"
-        else:
-            prefix = RandomForestClassifierWrapper.PREFIX
-
-        if cs is None:
-            cs = ConfigurationSpace(name="RandomForest")
-
-        n_estimators = Integer(
-            f"{prefix}n_estimators",
-            (16, 128),
-            log=True,
-            default=116,
-        )
-        min_samples_split = Integer(
-            f"{prefix}min_samples_split",
-            (2, 20),
-            log=False,
-            default=2,
-        )
-        min_samples_leaf = Integer(
-            f"{prefix}min_samples_leaf",
-            (1, 20),
-            log=False,
-            default=2,
-        )
-        max_features = Float(
-            f"{prefix}max_features",
-            (0.1, 1.0),
-            log=False,
-            default=0.17055852159745608,
-        )
-        bootstrap = Categorical(
-            f"{prefix}bootstrap",
-            items=[True, False],
-            default=False,
-        )
-
-        params = [
-            n_estimators,
-            min_samples_split,
-            min_samples_leaf,
-            max_features,
-            bootstrap,
+        hyperparameters = [
+            Integer("n_estimators", (16, 128), log=True, default=116),
+            Integer("min_samples_split", (2, 20), log=False, default=2),
+            Integer("min_samples_leaf", (1, 20), log=False, default=2),
+            Float("max_features", (0.1, 1.0), log=False, default=0.17055852159745608),
+            Categorical("bootstrap", items=[True, False], default=False),
         ]
-        if parent_param is not None:
-            conditions = [
-                EqualsCondition(
-                    child=param,
-                    parent=parent_param,
-                    value=parent_value,
-                )
-                for param in params
-            ]
-        else:
-            conditions = []
+        conditions = []
+        forbiddens = []
 
-        cs.add(params + conditions)
+        return hyperparameters, conditions, forbiddens
 
-        return cs
-
-    @staticmethod
-    def get_from_configuration(
-        configuration: dict[str, Any], pre_prefix: str = "", **kwargs
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
     ) -> partial:
         """
-        Create a RandomForestClassifierWrapper instance from a configuration.
-
-        Parameters
-        ----------
-        configuration : dict
-            A dictionary containing the configuration parameters.
-        additional_params : dict, optional
-            Additional parameters to override or extend the configuration.
-
-        Returns
-        -------
-        partial
-            A partial function to create a RandomForestClassifierWrapper instance.
+        Create a partial function from a clean (unprefixed) configuration.
         """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{RandomForestClassifierWrapper.PREFIX}:"
-        else:
-            prefix = RandomForestClassifierWrapper.PREFIX
-
-        rf_params = {
-            "n_estimators": configuration[f"{prefix}n_estimators"],
-            "min_samples_split": configuration[f"{prefix}min_samples_split"],
-            "min_samples_leaf": configuration[f"{prefix}min_samples_leaf"],
-            "max_features": configuration[f"{prefix}max_features"],
-            "bootstrap": configuration[f"{prefix}bootstrap"],
-            **kwargs,
-        }
+        rf_params = clean_config.copy()
+        rf_params.update(kwargs)
 
         return partial(RandomForestClassifierWrapper, init_params=rf_params)
 
 
-class RandomForestRegressorWrapper(SklearnWrapper):
+class RandomForestRegressorWrapper(ConfigurableMixin, SklearnWrapper):
     """
     A wrapper for the RandomForestRegressor from scikit-learn, providing
     additional functionality for configuration space management.
@@ -186,126 +93,33 @@ class RandomForestRegressorWrapper(SklearnWrapper):
         super().__init__(RandomForestRegressor, init_params)
 
     @staticmethod
-    def get_configuration_space(
-        cs: ConfigurationSpace | None = None,
-        pre_prefix: str = "",
-        parent_param: Hyperparameter | None = None,
-        parent_value: str | None = None,
-    ) -> ConfigurationSpace:
-        """
-        Get the configuration space for the Random Forest Regressor.
-
-        Parameters
-        ----------
-        cs : ConfigurationSpace, optional
-            The configuration space to add the parameters to. If None, a new ConfigurationSpace will be created.
-
-        Returns
-        -------
-        ConfigurationSpace
-            The configuration space with the Random Forest Regressor parameters.
-        """
+    def _define_hyperparameters(**kwargs):
+        """Define hyperparameters for RandomForestRegressor."""
         if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
+            return [], [], []
 
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{RandomForestRegressorWrapper.PREFIX}:"
-        else:
-            prefix = RandomForestRegressorWrapper.PREFIX
-
-        if cs is None:
-            cs = ConfigurationSpace(name="RandomForestRegressor")
-
-        n_estimators = Integer(
-            f"{prefix}n_estimators",
-            (16, 128),
-            log=True,
-            default=116,
-        )
-        min_samples_split = Integer(
-            f"{prefix}min_samples_split",
-            (2, 20),
-            log=False,
-            default=2,
-        )
-        min_samples_leaf = Integer(
-            f"{prefix}min_samples_leaf",
-            (1, 20),
-            log=False,
-            default=2,
-        )
-        max_features = Float(
-            f"{prefix}max_features",
-            (0.1, 1.0),
-            log=False,
-            default=0.17055852159745608,
-        )
-        bootstrap = Categorical(
-            f"{prefix}bootstrap",
-            items=[True, False],
-            default=False,
-        )
-        params = [
-            n_estimators,
-            min_samples_split,
-            min_samples_leaf,
-            max_features,
-            bootstrap,
+        hyperparameters = [
+            Integer("n_estimators", (16, 128), log=True, default=116),
+            Integer("min_samples_split", (2, 20), log=False, default=2),
+            Integer("min_samples_leaf", (1, 20), log=False, default=2),
+            Float("max_features", (0.1, 1.0), log=False, default=0.17055852159745608),
+            Categorical("bootstrap", items=[True, False], default=False),
         ]
-        if parent_param is not None:
-            conditions = [
-                EqualsCondition(
-                    child=param,
-                    parent=parent_param,
-                    value=parent_value,
-                )
-                for param in params
-            ]
-        else:
-            conditions = []
+        conditions = []
+        forbiddens = []
 
-        cs.add(params + conditions)
+        return hyperparameters, conditions, forbiddens
 
-        return cs
-
-    @staticmethod
-    def get_from_configuration(
-        configuration: dict[str, Any], pre_prefix: str = "", **kwargs
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
     ) -> partial:
         """
-        Create a RandomForestRegressorWrapper instance from a configuration.
-
-        Parameters
-        ----------
-        configuration : dict
-            A dictionary containing the configuration parameters.
-        additional_params : dict, optional
-            Additional parameters to override or extend the configuration.
-
-        Returns
-        -------
-        partial
-            A partial function to create a RandomForestRegressorWrapper instance.
+        Create a partial function from a clean (unprefixed) configuration.
         """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{RandomForestRegressorWrapper.PREFIX}:"
-        else:
-            prefix = RandomForestRegressorWrapper.PREFIX
-
-        rf_params = {
-            "n_estimators": configuration[f"{prefix}n_estimators"],
-            "min_samples_split": configuration[f"{prefix}min_samples_split"],
-            "min_samples_leaf": configuration[f"{prefix}min_samples_leaf"],
-            "max_features": configuration[f"{prefix}max_features"],
-            "bootstrap": configuration[f"{prefix}bootstrap"],
-            **kwargs,
-        }
+        rf_params = clean_config.copy()
+        rf_params.update(kwargs)
 
         return partial(RandomForestRegressorWrapper, init_params=rf_params)

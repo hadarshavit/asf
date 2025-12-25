@@ -5,12 +5,21 @@ from asf.selectors import PerformanceModel
 from asf.selectors.selector_tuner import tune_selector
 
 
+try:
+    import smac  # noqa: F401
+
+    SMAC_AVAILABLE = True
+except ImportError:
+    SMAC_AVAILABLE = False
+
+
 @pytest.fixture()
 def scenario_data():
     scenario_path = "/home/ni574034/asf/paper/aslib_data/MAXSAT19-UCMS"
     return read_aslib_scenario(scenario_path)
 
 
+@pytest.mark.skipif(not SMAC_AVAILABLE, reason="SMAC is not installed")
 def test_max_feature_time_is_tunable_and_applied(scenario_data):
     (
         features,
@@ -44,6 +53,7 @@ def test_max_feature_time_is_tunable_and_applied(scenario_data):
     assert sel.max_feature_time <= float(budget)
 
 
+@pytest.mark.skipif(not SMAC_AVAILABLE, reason="SMAC is not installed")
 def test_fixed_max_feature_time_is_respected(scenario_data):
     (
         features,
@@ -79,24 +89,27 @@ def test__create_pipeline_prefers_config_value():
 
     class DummySelector:
         @staticmethod
-        def get_from_configuration(config, cs_transform, **kwargs):
+        def get_from_configuration(configuration, **kwargs):
             class Inst:
                 pass
 
-            return Inst()
+            from functools import partial
 
-    config = {"selector": "Dummy", "max_feature_time": 123.0}
-    cs_transform = {"selector": {"Dummy": DummySelector}}
+            return partial(Inst)
+
+    config = {"pipeline:selector": "DummySelector", "pipeline:max_feature_time": 123.0}
 
     pipeline = _create_pipeline(
-        config=config,
-        cs_transform=cs_transform,
-        budget=1000,
-        maximize=False,
-        selector_kwargs={},
-        feature_selector=None,
-        algorithm_pre_selector=None,
-        max_feature_time=None,
+        config,
+        1000,
+        False,
+        {},
+        [DummySelector],  # selector_class must be a list
+        None,
+        None,
+        None,
+        None,
+        None,
     )
 
     assert hasattr(pipeline, "max_feature_time")

@@ -11,7 +11,23 @@ except Exception as e:
     raise ImportError("scipy is required for OSL optimizer") from e
 
 
-class OSLLinearSelector(AbstractSelector):
+from asf.utils.configurable import ConfigurableMixin
+
+try:
+    from ConfigSpace import (
+        Categorical,
+        Integer,
+        Float,
+    )
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
+from functools import partial
+from typing import Any
+
+
+class OSLLinearSelector(ConfigurableMixin, AbstractSelector):
     """
     Selector using Optimistic Superset Loss (OSL) to predict runtimes.
     """
@@ -175,3 +191,56 @@ class OSLLinearSelector(AbstractSelector):
                     best_algo = algo
             out[idx] = [(best_algo, self.budget)]
         return out
+
+    @staticmethod
+    def _define_hyperparameters(**kwargs):
+        """Define hyperparameters for OSLLinearSelector."""
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
+
+        reg_param = Float(
+            name="reg",
+            bounds=(0.0, 10.0),  # Allow 0.0
+            default=0.0,
+        )
+
+        optimizer_method_param = Categorical(
+            name="optimizer_method",
+            items=["L-BFGS-B", "CG", "BFGS", "TNC", "SLSQP"],
+            default="L-BFGS-B",
+        )
+
+        maxiter_param = Integer(
+            name="maxiter",
+            bounds=(100, 5000),
+            default=1000,
+        )
+
+        tol_param = Float(
+            name="tol",
+            bounds=(1e-6, 1e-2),
+            log=True,
+            default=1e-5,
+        )
+
+        params = [
+            reg_param,
+            optimizer_method_param,
+            maxiter_param,
+            tol_param,
+        ]
+
+        return params, [], []
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
+    ) -> partial:
+        """
+        Create a partial function from a clean (unprefixed) configuration.
+        """
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(OSLLinearSelector, **config)

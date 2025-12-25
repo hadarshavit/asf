@@ -148,7 +148,9 @@ class Static3S(AbstractPresolver):
             self.schedule = chosen
             return
 
-    def predict(self) -> dict[str, list[tuple[str, float]]]:
+    def predict(self) -> list[tuple[str, float]]:
+        if self.schedule is None:
+            raise ValueError("Static3S has not been fitted yet.")
         return self.schedule
 
     def get_preschedule_config(self) -> dict[str, float]:
