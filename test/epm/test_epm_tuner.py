@@ -18,35 +18,59 @@ def test_tune_epm_requires_smac(monkeypatch):
             return None
 
     with pytest.raises(RuntimeError):
-        tuner.tune_epm(X, y, model_class=DummyPredictor)
+        tuner.tune_epm(X, y, model_class=DummyPredictor)  # type: ignore[arg-type]
 
 
 def test_tune_epm_with_mock_smac_returns_configured_epm(monkeypatch):
     # Arrange: mock SMAC availability and inject fake Scenario/Facade so no external dependency is needed
     import asf.epm.epm_tuner as tuner
     from asf.epm.epm import EPM
+    from asf.predictors.abstract_predictor import AbstractPredictor
 
     rng = np.random.RandomState(42)
     X = rng.rand(12, 3)
     # ensure strictly positive targets for LogNormalization default
     y = np.exp(rng.randn(12))
 
-    class DummyPredictor:
+    class DummyPredictor(AbstractPredictor):
         @staticmethod
-        def get_configuration_space():
+        def get_configuration_space(  # type: ignore[override]
+            cs=None, pre_prefix="", parent_param=None, parent_value=None
+        ):
             return {"any": "space"}
 
         @staticmethod
-        def get_from_configuration(config, **kwargs):
-            class Model:
-                def fit(self, X, y, sample_weight=None):
+        def get_from_configuration(configuration, pre_prefix="", **kwargs):  # type: ignore[override]
+            class Model(AbstractPredictor):
+                def fit(self, X, Y, **kwargs):
                     # simple constant regressor on normalized target
-                    self.mean_ = float(np.mean(y))
+                    self.mean_ = float(np.mean(Y))
 
-                def predict(self, X):
+                def predict(self, X, **kwargs):
                     return np.full(len(X), self.mean_)
 
+                def save(self, file_path: str):
+                    pass
+
+                @classmethod
+                def load(cls, file_path: str):
+                    return cls()
+
             return Model
+
+        # Implement abstract methods for DummyPredictor itself too, though not used as instance here
+        def fit(self, X, Y, **kwargs):
+            pass
+
+        def predict(self, X, **kwargs):
+            return []
+
+        def save(self, file_path: str):
+            pass
+
+        @classmethod
+        def load(cls, file_path: str):
+            return cls()
 
     class FakeScenario:
         def __init__(

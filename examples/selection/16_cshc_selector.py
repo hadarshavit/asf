@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import Any
 
 from asf.selectors.cshc import CSHCSelector
 from asf.selectors.osl_linear import OSLLinearSelector
@@ -12,8 +13,8 @@ def make_data(n_instances=300, n_algorithms=5, n_inst_feats=10, seed=42, budget=
 
     features = pd.DataFrame(
         rng.normal(size=(n_instances, n_inst_feats)),
-        columns=[f"f{i}" for i in range(n_inst_feats)],
-        index=[f"inst_{i}" for i in range(n_instances)],
+        columns=[f"f{i}" for i in range(n_inst_feats)],  # type: ignore[arg-type]
+        index=[f"inst_{i}" for i in range(n_instances)],  # type: ignore[arg-type]
     )
 
     alg_names = [f"algo{i + 1}" for i in range(n_algorithms)]
@@ -36,7 +37,7 @@ def make_data(n_instances=300, n_algorithms=5, n_inst_feats=10, seed=42, budget=
     return features, perf
 
 
-def evaluate_solve_rate(preds: dict, perf: pd.DataFrame, budget: float) -> float:
+def evaluate_solve_rate(preds: Any, perf: pd.DataFrame, budget: float) -> float:
     """Helper function to evaluate the solve rate of predictions."""
     solved = 0
     total = 0
@@ -98,7 +99,7 @@ def main():
         inst_feature_df = X_test.loc[[inst_name]]
 
         # 1. Get primary selector's choice
-        primary_pred = sel.primary_selector.predict(inst_feature_df).get(inst_name)
+        primary_pred = sel.primary_selector.predict(inst_feature_df).get(inst_name)  # type: ignore[attr-defined]
         if not primary_pred:
             continue
 
@@ -121,7 +122,7 @@ def main():
                 primary_success += 1
         elif sel.backup_selector:
             backup_used += 1
-            backup_pred_list = sel.backup_selector.predict(inst_feature_df).get(
+            backup_pred_list = sel.backup_selector.predict(inst_feature_df).get(  # type: ignore[attr-defined]
                 inst_name
             )
             if backup_pred_list:
@@ -182,7 +183,7 @@ def main():
     print()
     print("Sample decisions (first 12):")
     for inst in list(X_test.index)[:12]:
-        algo, _ = preds.get(inst, [(None, None)])[0]
+        algo, _ = preds.get(inst, [(None, None)])[0]  # type: ignore[attr-defined]
         rt = Y_test.at[inst, algo] if algo is not None else float("nan")
         print(f"{inst}: chosen={algo}, true_rt={rt:.2f}")
     print("=" * 60)

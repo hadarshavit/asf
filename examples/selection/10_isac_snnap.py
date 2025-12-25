@@ -25,8 +25,8 @@ def generate_data(n_instances=120, n_algorithms=5, seed=0):
 
     features = pd.DataFrame(
         centers[cluster_ids] + rng.normal(scale=0.8, size=(n_instances, 2)),
-        columns=["f1", "f2"],
-        index=[f"inst_{i}" for i in range(n_instances)],
+        columns=["f1", "f2"],  # type: ignore[arg-type]
+        index=[f"inst_{i}" for i in range(n_instances)],  # type: ignore[arg-type]
     )
 
     # Create cluster-specific base performance for each algorithm

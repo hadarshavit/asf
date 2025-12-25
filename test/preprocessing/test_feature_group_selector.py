@@ -54,7 +54,7 @@ def sample_features_df():
             "cluster_coeff": [0.7, 0.8],
             "adv_feature": [0.9, 1.0],
         },
-        index=["inst1", "inst2"],
+        index=pd.Index(["inst1", "inst2"]),
     )
 
 
@@ -84,7 +84,7 @@ class TestFeatureGroupSelectorPrerequisites:
         selector = FeatureGroupSelector(
             feature_groups_with_prereqs, selected_groups=["Pre", "Basic", "KLB", "CG"]
         )
-        assert "Pre" in selector.selected_groups
+        assert "Pre" in selector.selected_groups  # type: ignore[operator]
 
     def test_invalid_selection_missing_prereq(self, feature_groups_with_prereqs):
         """Selecting a group without its prerequisite should raise error."""
@@ -111,7 +111,7 @@ class TestFeatureGroupSelectorPrerequisites:
         selector = FeatureGroupSelector(
             feature_groups_with_prereqs, selected_groups=["Pre", "Basic", "Advanced"]
         )
-        assert "Advanced" in selector.selected_groups
+        assert "Advanced" in selector.selected_groups  # type: ignore[operator]
 
     def test_validation_disabled(self, feature_groups_with_prereqs):
         """When validation is disabled, invalid selections should be allowed."""
@@ -141,7 +141,7 @@ class TestFeatureGroupSelectorPrerequisites:
         selector = FeatureGroupSelector(
             feature_groups_no_prereqs, selected_groups=["basic", "advanced"]
         )
-        assert set(selector.selected_groups) == {"basic", "advanced"}
+        assert set(selector.selected_groups) == {"basic", "advanced"}  # type: ignore[arg-type]
 
 
 # ============================================================================
@@ -277,7 +277,7 @@ class TestStaticValidation:
             feature_groups_with_prereqs, config
         )
 
-        assert set(selected) == {"Pre", "Basic", "CG"}
+        assert set(selected) == {"Pre", "Basic", "CG"}  # type: ignore[arg-type]
 
     def test_get_selected_groups_from_config_all_false(
         self, feature_groups_with_prereqs
@@ -311,8 +311,8 @@ class TestStaticValidation:
         )
 
         # Pre is False, others default to True
-        assert "Pre" not in selected
-        assert "Basic" in selected
+        assert "Pre" not in selected  # type: ignore[operator]
+        assert "Basic" in selected  # type: ignore[operator]
 
 
 # ============================================================================
@@ -372,4 +372,4 @@ class TestEdgeCases:
 
         # But selecting both should work
         selector = FeatureGroupSelector(feature_groups, selected_groups=["A", "B"])
-        assert set(selector.selected_groups) == {"A", "B"}
+        assert set(selector.selected_groups) == {"A", "B"}  # type: ignore[arg-type]

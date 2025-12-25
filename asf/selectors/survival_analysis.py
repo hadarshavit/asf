@@ -1,31 +1,56 @@
-import pandas as pd
+from __future__ import annotations
+
+from functools import partial
+from typing import Any
+
 import numpy as np
+import pandas as pd
 from scipy.optimize import differential_evolution
 
+from asf.predictors.survival import SKSURV_AVAILABLE, RandomSurvivalForestWrapper
+from asf.selectors.abstract_selector import AbstractSelector
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
-from asf.predictors.survival import RandomSurvivalForestWrapper, SKSURV_AVAILABLE
 
 if SKSURV_AVAILABLE:
     from sksurv.util import Surv
 
+    from asf.utils.configurable import ClassChoice, ConfigurableMixin
+
     try:
-        from ConfigSpace import (
-            ConfigurationSpace,
+        from ConfigSpace import (  # noqa: F401
             Categorical,
-            Configuration,
+            ConfigurationSpace,
             EqualsCondition,
+            Float,
+            Integer,
         )
-        from ConfigSpace.hyperparameters import Hyperparameter
 
         CONFIGSPACE_AVAILABLE = True
     except ImportError:
         CONFIGSPACE_AVAILABLE = False
 
-    class SurvivalAnalysis(AbstractModelBasedSelector):
+    class SurvivalAnalysis(ConfigurableMixin, AbstractModelBasedSelector):
         """
-        Selects the best algorithm for a given problem instance using survival analysis.
-        Tries to maximize the probability of finishing within a given time budget.
-        Can optionally build a schedule of multiple algorithms using RunAndSchedule2Survive logic.
+        Selector using survival analysis for algorithm selection.
+
+        Attributes
+        ----------
+        use_schedule : bool
+            Whether to build a schedule of multiple algorithms.
+        max_schedule_length : int or None
+            Maximum number of algorithms in a schedule.
+        popsize : int
+            Population size for differential evolution.
+        maxiter : int
+            Maximum iterations for differential evolution.
+        tol : float
+            Tolerance for differential evolution.
+        dominance_resolution : int
+            Resolution for dominance analysis.
+        survival_features : list[str]
+            Feature column names used by the survival model.
+        model : RandomSurvivalForestWrapper or None
+            Trained survival model.
         """
 
         PREFIX = "survival"
@@ -33,41 +58,44 @@ if SKSURV_AVAILABLE:
 
         def __init__(
             self,
-            model_class: type[
-                RandomSurvivalForestWrapper
-            ] = RandomSurvivalForestWrapper,
+            model_class: Any = RandomSurvivalForestWrapper,
             use_schedule: bool = False,
             max_schedule_length: int | None = None,
             popsize: int = 20,
             maxiter: int = 150,
             tol: float = 0.01,
             dominance_resolution: int = 100,
-            **kwargs,
-        ):
+            **kwargs: Any,
+        ) -> None:
             """
-            Initializes the SurvivalAnalysis.
+            Initialize the SurvivalAnalysis selector.
 
-            Args:
-                model_class: Wrapper class for survival model (default: RandomSurvivalForestWrapper).
-                use_schedule (bool): If True, build a schedule using an optimization-based approach.
-                                   If False, select the single best algorithm.
-                max_schedule_length (Optional[int]): The maximum number of algorithms in a schedule.
-                popsize (int): Population size for differential_evolution.
-                maxiter (int): Max iterations for differential_evolution.
-                tol (float): Tolerance for convergence for differential_evolution.
-                dominance_resolution (int): Number of points for the time grid in dominance analysis.
-                **kwargs: Additional arguments for the parent classes.
-
-            Raises:
-                ValueError: If budget is not a positive number.
+            Parameters
+            ----------
+            model_class : type[RandomSurvivalForestWrapper], default=RandomSurvivalForestWrapper
+                Wrapper class for the survival model.
+            use_schedule : bool, default=False
+                Whether to build a schedule.
+            max_schedule_length : int or None, default=None
+                Maximum number of algorithms in a schedule.
+            popsize : int, default=20
+                Population size for differential_evolution.
+            maxiter : int, default=150
+                Max iterations for differential_evolution.
+            tol : float, default=0.01
+                Tolerance for convergence.
+            dominance_resolution : int, default=100
+                Resolution for dominance analysis grid.
+            **kwargs : Any
+                Additional keyword arguments.
             """
             super().__init__(model_class=model_class, **kwargs)
-            self.use_schedule = use_schedule
+            self.use_schedule = bool(use_schedule)
             self.max_schedule_length = max_schedule_length
-            self.popsize = popsize
-            self.maxiter = maxiter
-            self.tol = tol
-            self.dominance_resolution = dominance_resolution
+            self.popsize = int(popsize)
+            self.maxiter = int(maxiter)
+            self.tol = float(tol)
+            self.dominance_resolution = int(dominance_resolution)
 
             if use_schedule:
                 self.RETURN_TYPE = "schedule"
@@ -77,30 +105,38 @@ if SKSURV_AVAILABLE:
                     "budget must be a positive number for survival analysis selector."
                 )
 
-        def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
-            """
-            Fits the Random Survival Forest model to the given data.
+            self.survival_features: list[str] = []
+            self.model: RandomSurvivalForestWrapper | None = None
 
-            Args:
-                features (pd.DataFrame): DataFrame containing problem instance features.
-                performance (pd.DataFrame): DataFrame where columns are algorithms and rows are instances.
-                                            Values are runtimes, with NaN indicating a timeout.
+        def _fit(
+            self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
+        ) -> None:
             """
+            Fit the survival analysis model.
 
-            # 1. Reshape and preprocess the data
+            Parameters
+            ----------
+            features : pd.DataFrame
+                Training features.
+            performance : pd.DataFrame
+                Training performance data.
+            """
             fit_data = []
             for instance in features.index:
                 instance_features = features.loc[instance]
                 for algo in self.algorithms:
                     runtime = performance.loc[instance, algo]
-                    # Treat as timeout if runtime is missing or exceeds budget
-                    finished = not pd.isna(runtime) and runtime < self.budget
+                    finished = not pd.isna(runtime) and runtime < float(
+                        self.budget or 0
+                    )
                     status = int(finished)
-                    runtime = runtime if finished else self.budget
+                    runtime_val = (
+                        float(runtime) if finished else float(self.budget or 0)
+                    )
                     row = {
                         **instance_features.to_dict(),
                         "algorithm": algo,
-                        "runtime": runtime,
+                        "runtime": runtime_val,
                         "status": status,
                     }
                     fit_data.append(row)
@@ -112,7 +148,6 @@ if SKSURV_AVAILABLE:
                 prefix="algo",
             )
 
-            # Store the feature column names for prediction
             self.survival_features = fit_features.columns.tolist()
 
             y_structured = Surv.from_arrays(
@@ -124,25 +159,29 @@ if SKSURV_AVAILABLE:
             self.model.fit(fit_features, y_structured)
 
         def _predict(
-            self, features: pd.DataFrame
+            self,
+            features: pd.DataFrame | None,
+            performance: pd.DataFrame | None = None,
         ) -> dict[str, list[tuple[str, float]]]:
             """
-            Predicts the best algorithm for a new problem instance.
+            Predict algorithm schedules for each instance.
 
-            Args:
-                features (pd.DataFrame): DataFrame containing the feature data.
+            Parameters
+            ----------
+            features : pd.DataFrame
+                The query instance features.
 
-            Returns:
-                Dict[str, List[Tuple[str, float]]]: A dictionary mapping instance names to the predicted
-                best algorithm and the associated budget.
-
-            Raises:
-                ValueError: If the model has not been fitted yet.
+            Returns
+            -------
+            dict
+                Mapping from instance name to algorithm schedules.
             """
+            if features is None:
+                raise ValueError("SurvivalAnalysis require features for prediction.")
             if self.model is None:
-                raise ValueError("Model has not been fitted yet. Call fit() first.")
+                raise ValueError("Model has not been fitted yet.")
 
-            predictions = {}
+            predictions: dict[str, list[tuple[str, float]]] = {}
             for instance, instance_features in features.iterrows():
                 surv_funcs = {}
                 for algo in self.algorithms:
@@ -158,40 +197,41 @@ if SKSURV_AVAILABLE:
                     surv_funcs[algo] = self.model.predict_survival_function(pred_row)[0]
 
                 if not self.use_schedule:
-                    # Original logic: find the single best algorithm
                     best_algo = None
                     best_prob = -1.0
                     for algo, surv_func in surv_funcs.items():
-                        completion_prob = 1.0 - surv_func(self.budget)
+                        completion_prob = 1.0 - float(surv_func(self.budget))
                         if completion_prob > best_prob:
                             best_prob = completion_prob
                             best_algo = algo
-                    predictions[instance] = [(best_algo, self.budget)]
+                    predictions[str(instance)] = [
+                        (str(best_algo), float(self.budget or 0))
+                    ]
                 else:
-                    # Build schedule using differential evolution
                     schedule = self._find_optimal_schedule(surv_funcs)
-                    predictions[instance] = (
-                        schedule if schedule else [(None, self.budget)]
-                    )
+                    predictions[str(instance)] = schedule if schedule else []
 
             return predictions
 
         def _eval_schedule(
-            self, x: np.ndarray, all_algos: list, surv_funcs: dict
+            self, x: np.ndarray, all_algos: list[str], surv_funcs: dict[str, Any]
         ) -> float:
             """
-            Evaluates the sequential success probability of a schedule encoded by the optimizer's vector `x`.
-            This is the fitness function for the optimizer.
+            Evaluate the fitness of a schedule for differential evolution.
 
-            The vector `x` encodes inclusion flags and normalized end times for all algorithms.
+            Parameters
+            ----------
+            x : np.ndarray
+                The vector from the optimizer.
+            all_algos : list[str]
+                List of available algorithms.
+            surv_funcs : dict
+                Mapping from algorithm names to survival functions.
 
-            Args:
-                x: The vector from the optimizer.
-                all_algos: The complete list of algorithm names.
-                surv_funcs: A dictionary mapping algorithm names to their survival functions.
-
-            Returns:
-                The negative success probability (since optimizers minimize).
+            Returns
+            -------
+            float
+                Negative success probability.
             """
             n_algorithms = len(all_algos)
 
@@ -220,58 +260,66 @@ if SKSURV_AVAILABLE:
 
             for i, (algo, norm_end_time) in enumerate(included_schedule_info):
                 if i == len(included_schedule_info) - 1:
-                    time_slice = self.budget - last_actual_end_time
+                    time_slice = float(self.budget or 0) - last_actual_end_time
                 else:
-                    actual_end_time = norm_end_time * self.budget
+                    actual_end_time = float(norm_end_time) * float(self.budget or 0)
                     time_slice = actual_end_time - last_actual_end_time
 
                 if time_slice <= 1e-6:
                     continue
 
-                surv_func = surv_funcs[algo]
-                prob_solve_at_this_step = 1.0 - surv_func(time_slice)
+                sur_func = surv_funcs[algo]
+                prob_solve_at_this_step = 1.0 - float(sur_func(time_slice))
 
                 total_success_prob += prob_of_reaching_step * prob_solve_at_this_step
-                prob_of_reaching_step *= surv_func(time_slice)
+                prob_of_reaching_step *= float(sur_func(time_slice))
 
                 last_actual_end_time += time_slice
 
             return -total_success_prob
 
-        def _find_optimal_schedule(self, surv_funcs: dict) -> list:
+        def _find_optimal_schedule(
+            self, surv_funcs: dict[str, Any]
+        ) -> list[tuple[str, float]]:
             """
-            Performs dominance analysis and then uses differential evolution
-            to find the optimal schedule on the non-dominated set of algorithms.
+            Find the optimal schedule using dominance analysis and evolution.
+
+            Parameters
+            ----------
+            surv_funcs : dict
+                Mapping from algorithm names to survival functions.
+
+            Returns
+            -------
+            list[tuple[str, float]]
+                The optimized algorithm schedule.
             """
-            # Dominance Analysis
-            time_grid = np.linspace(0, self.budget, self.dominance_resolution)
+            time_grid = np.linspace(
+                0, float(self.budget or 0), self.dominance_resolution
+            )
             prob_matrix = np.array(
                 [surv_funcs[algo](time_grid) for algo in self.algorithms]
             )
 
-            # Case 1: Check for a single, globally dominant algorithm
             for i, algo in enumerate(self.algorithms):
                 is_dominant = np.all(prob_matrix[i, :] <= prob_matrix)
                 if is_dominant:
-                    return [(algo, self.budget)]
+                    return [(str(algo), float(self.budget or 0))]
 
-            # Case 2: Filter out algorithms that are dominated by others
             lower_envelope = np.min(prob_matrix, axis=0)
             non_dominated_algos = []
             for i, algo in enumerate(self.algorithms):
-                # An algorithm is non-dominated if its curve touches the lower envelope at any point
                 if np.any(np.isclose(prob_matrix[i, :], lower_envelope)):
-                    non_dominated_algos.append(algo)
+                    non_dominated_algos.append(str(algo))
 
             if len(non_dominated_algos) <= 1:
                 if non_dominated_algos:
-                    return [(non_dominated_algos[0], self.budget)]
+                    return [(str(non_dominated_algos[0]), float(self.budget or 0))]
                 else:
                     return []
 
-            # Optimization
-            n_algorithms_to_optimize = len(non_dominated_algos)
-            bounds = [(0, 1)] * (2 * n_algorithms_to_optimize)
+            n_to_optimize = len(non_dominated_algos)
+            bounds = [(0, 1)] * (2 * n_to_optimize)
 
             result = differential_evolution(
                 func=self._eval_schedule,
@@ -283,155 +331,145 @@ if SKSURV_AVAILABLE:
                 seed=42,
             )
 
-            # Post-process the best vector found by the optimizer
             best_x = result.x
-            inclusion_flags = best_x[:n_algorithms_to_optimize]
-            normalized_end_times = best_x[n_algorithms_to_optimize:]
+            inclusion_flags = best_x[:n_to_optimize]
+            normalized_end_times = best_x[n_to_optimize:]
 
-            included_schedule_info = []
+            included_info = []
             for i, algo in enumerate(non_dominated_algos):
                 if inclusion_flags[i] >= 0.5:
-                    included_schedule_info.append((algo, normalized_end_times[i]))
+                    included_info.append((algo, normalized_end_times[i]))
 
-            if not included_schedule_info:
+            if not included_info:
                 return []
 
-            included_schedule_info.sort(key=lambda item: item[1])
+            included_info.sort(key=lambda item: item[1])
 
-            # Convert to the final schedule format with actual time slices
-            schedule = []
+            schedule: list[tuple[str, float]] = []
             last_actual_end_time = 0.0
-            for i, (algo, norm_end_time) in enumerate(included_schedule_info):
-                # The last algorithm in the schedule runs for the remaining budget
-                if i == len(included_schedule_info) - 1:
-                    time_slice = self.budget - last_actual_end_time
+            for i, (algo, norm_end_time) in enumerate(included_info):
+                if i == len(included_info) - 1:
+                    time_slice = float(self.budget or 0) - last_actual_end_time
                 else:
-                    actual_end_time = norm_end_time * self.budget
+                    actual_end_time = float(norm_end_time) * float(self.budget or 0)
                     time_slice = actual_end_time - last_actual_end_time
 
                 if time_slice > 1e-6:
-                    schedule.append((algo, time_slice))
+                    schedule.append((str(algo), float(time_slice)))
                 last_actual_end_time += time_slice
 
             return schedule
 
-        if CONFIGSPACE_AVAILABLE:
+        @staticmethod
+        def _define_hyperparameters(
+            model_class: list[type[RandomSurvivalForestWrapper]] | None = None,
+            **kwargs: Any,
+        ) -> tuple[list[Any], list[Any], list[Any]]:
+            """
+            Define hyperparameters for SurvivalAnalysis.
 
-            @staticmethod
-            def get_configuration_space(
-                cs: ConfigurationSpace | None = None,
-                cs_transform: dict[str, dict] | None = None,
-                model_class: list[type] | None = None,
-                pre_prefix: str = "",
-                parent_param: Hyperparameter | None = None,
-                parent_value: str | None = None,
-                **kwargs,
-            ) -> tuple[ConfigurationSpace, dict[str, dict]]:
-                """
-                Get the configuration space for SurvivalAnalysis.
+            Parameters
+            ----------
+            model_class : list[type] or None, default=None
+                List of model classes to choose from.
+            **kwargs : Any
+                Additional keyword arguments.
 
-                Args:
-                    cs: The configuration space to use. If None, a new one will be created.
-                    cs_transform: A dictionary for transforming configuration space parameters.
-                    model_class: List of survival model wrapper classes to choose from.
-                    pre_prefix: Prefix for parameter names.
-                    parent_param: Parent parameter for conditional configuration.
-                    parent_value: Value of parent parameter that activates these hyperparameters.
-                    **kwargs: Additional keyword arguments.
+            Returns
+            -------
+            tuple
+                Tuple of (hyperparameters, conditions, forbiddens).
+            """
+            if not CONFIGSPACE_AVAILABLE:
+                return [], [], []
 
-                Returns:
-                    Tuple[ConfigurationSpace, Dict[str, dict]]: The configuration space and its transformation dictionary.
-                """
-                if cs is None:
-                    cs = ConfigurationSpace()
+            if model_class is None:
+                choices: list[Any] = [RandomSurvivalForestWrapper]
+            else:
+                choices = model_class
 
-                if cs_transform is None:
-                    cs_transform = dict()
+            model_class_param = ClassChoice(
+                name="model_class",
+                choices=choices,  # type: ignore[arg-type]
+                default=choices[0],
+            )
 
-                if model_class is None:
-                    model_class = [RandomSurvivalForestWrapper]
+            use_schedule_param = Categorical(
+                name="use_schedule",
+                items=[True, False],
+                default=False,
+            )
 
-                if pre_prefix != "":
-                    prefix = f"{pre_prefix}:{SurvivalAnalysis.PREFIX}"
-                else:
-                    prefix = SurvivalAnalysis.PREFIX
+            popsize_param = Integer(
+                name="popsize",
+                bounds=(10, 100),
+                default=20,
+            )
 
-                model_class_param = Categorical(
-                    name=f"{prefix}:model_class",
-                    items=[str(c.__name__) for c in model_class],
-                )
+            maxiter_param = Integer(
+                name="maxiter",
+                bounds=(50, 500),
+                default=150,
+            )
 
-                cs_transform[f"{prefix}:model_class"] = {
-                    str(c.__name__): c for c in model_class
-                }
+            tol_param = Float(
+                name="tol",
+                bounds=(1e-4, 1e-1),
+                log=True,
+                default=0.01,
+            )
 
-                params = [model_class_param]
+            dominance_resolution_param = Integer(
+                name="dominance_resolution",
+                bounds=(50, 500),
+                default=100,
+            )
 
-                if parent_param is not None:
-                    conditions = [
-                        EqualsCondition(
-                            child=param,
-                            parent=parent_param,
-                            value=parent_value,
-                        )
-                        for param in params
-                    ]
-                else:
-                    conditions = []
+            params = [
+                model_class_param,
+                use_schedule_param,
+                popsize_param,
+                maxiter_param,
+                tol_param,
+                dominance_resolution_param,
+            ]
 
-                cs.add(params + conditions)
+            conditions = [
+                EqualsCondition(popsize_param, use_schedule_param, True),
+                EqualsCondition(maxiter_param, use_schedule_param, True),
+                EqualsCondition(tol_param, use_schedule_param, True),
+                EqualsCondition(dominance_resolution_param, use_schedule_param, True),
+            ]
 
-                for mc in model_class:
-                    mc.get_configuration_space(
-                        cs=cs,
-                        pre_prefix=f"{prefix}:model_class",
-                        parent_param=model_class_param,
-                        parent_value=str(mc.__name__),
-                        **kwargs,
-                    )
+            return params, conditions, []
 
-                return cs, cs_transform
+        @classmethod
+        def _get_from_clean_configuration(
+            cls,
+            clean_config: dict[str, Any],
+            **kwargs: Any,
+        ) -> partial[SurvivalAnalysis]:
+            """
+            Create a partial function from a clean configuration.
 
-            @staticmethod
-            def get_from_configuration(
-                configuration: Configuration,
-                cs_transform: dict[str, dict],
-                pre_prefix: str = "",
-                **kwargs,
-            ) -> "SurvivalAnalysis":
-                """
-                Get the SurvivalAnalysis from a given configuration.
+            Parameters
+            ----------
+            clean_config : dict
+                The clean configuration.
+            **kwargs : Any
+                Additional keyword arguments.
 
-                Args:
-                    configuration: The configuration object.
-                    cs_transform: The transformation dictionary for the configuration space.
-                    pre_prefix: Prefix for parameter names.
-                    **kwargs: Additional keyword arguments for SurvivalAnalysis initialization.
-
-                Returns:
-                    SurvivalAnalysis: An instance configured according to the given configuration.
-                """
-                if pre_prefix != "":
-                    prefix = f"{pre_prefix}:{SurvivalAnalysis.PREFIX}"
-                else:
-                    prefix = SurvivalAnalysis.PREFIX
-
-                model_cls = cs_transform[f"{prefix}:model_class"][
-                    configuration[f"{prefix}:model_class"]
-                ]
-                model_ctor = model_cls.get_from_configuration(
-                    configuration, pre_prefix=f"{prefix}:model_class"
-                )
-
-                return SurvivalAnalysis(
-                    model_class=model_ctor,
-                    **kwargs,
-                )
+            Returns
+            -------
+            partial
+                Partial function for SurvivalAnalysis.
+            """
+            config = clean_config.copy()
+            config.update(kwargs)
+            return partial(SurvivalAnalysis, **config)
 
 else:
 
-    class SurvivalAnalysis:
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "sksurv is not installed. Please install sksurv to use SurvivalAnalysis."
-            )
+    class SurvivalAnalysis(AbstractSelector):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            raise ImportError("sksurv is not installed.")

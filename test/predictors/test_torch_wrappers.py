@@ -28,17 +28,19 @@ def test_regression_mlp_fit_predict():
 
     features = pd.DataFrame(
         [[0.0, np.nan], [1.0, 1.0]],
-        index=["i1", "i2"],
-        columns=["f1", "f2"],
+        index=pd.Index(["i1", "i2"]),
+        columns=pd.Index(["f1", "f2"]),
     )
-    performance = pd.DataFrame([0.1, 0.9], index=features.index, columns=["perf"])
+    performance = pd.DataFrame(
+        [0.1, 0.9], index=features.index, columns=pd.Index(["perf"])
+    )
 
     model = RegressionMLP(
         loss=torch.nn.MSELoss(),
         optimizer=torch.optim.SGD,
         epochs=1,
         batch_size=2,
-        compile=False,
+        compile_model=False,
     )
 
     model.fit(features, performance)
@@ -53,18 +55,18 @@ def test_ranking_mlp_fit_predict():
 
     features = pd.DataFrame(
         [[0.0, 1.0], [1.0, 0.0]],
-        index=["i1", "i2"],
-        columns=["f1", "f2"],
+        index=pd.Index(["i1", "i2"]),
+        columns=pd.Index(["f1", "f2"]),
     )
     performance = pd.DataFrame(
         [[0.1, 0.3], [0.2, 0.1]],
         index=features.index,
-        columns=["algo_a", "algo_b"],
+        columns=pd.Index(["algo_a", "algo_b"]),
     )
     algorithm_features = pd.DataFrame(
         [[0.0], [1.0]],
-        index=["algo_a", "algo_b"],
-        columns=["bias"],
+        index=pd.Index(["algo_a", "algo_b"]),
+        columns=pd.Index(["bias"]),
     )
 
     model = RankingMLP(
@@ -72,10 +74,10 @@ def test_ranking_mlp_fit_predict():
         optimizer=torch.optim.SGD,
         epochs=1,
         batch_size=2,
-        compile=False,
+        compile_model=False,
     )
 
-    model.fit(features, performance, algorithm_features)
-    preds = model.predict(features, algorithm_features)
+    model.fit(features, performance, algorithm_features=algorithm_features)
+    preds = model.predict(features, algorithm_features=algorithm_features)
 
     assert preds.shape[0] == features.shape[0]

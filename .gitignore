@@ -176,3 +176,8 @@ cython_debug/
 
 aslib_data/** 
 test*.ipynb
+
+logs/**
+bench/results*/**
+paper/**
+.ruff_cache/**

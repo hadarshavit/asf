@@ -1,6 +1,15 @@
-import pandas as pd
-import numpy as np
+"""
+Answer Set Programming (ASP) based presolver.
+"""
+
+from __future__ import annotations
+
 import math
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
 from asf.presolving.presolver import AbstractPresolver
 
 try:
@@ -15,19 +24,26 @@ except ImportError:
 
 class Aspeed(AbstractPresolver):
     """
-    A presolver class that uses Answer Set Programming (ASP) to compute a schedule for solving instances.
+    A presolver class that uses Answer Set Programming (ASP) to compute a schedule.
 
-    Attributes:
-        cores (int): Number of CPU cores to use.
-        cutoff (int): Time limit for solving.
-        data_threshold (int): Minimum number of instances to use.
-        data_fraction (float): Fraction of instances to use.
-        schedule (list): Computed schedule of algorithms and their runcount_limits.
+    Parameters
+    ----------
+    budget : float, default=30.0
+        The total time budget for the presolver.
+    aspeed_cutoff : int, default=60
+        Time limit for the ASP solver in seconds.
+    maximize : bool, default=False
+        Whether to maximize or minimize the performance metric.
+    cores : int, default=1
+        Number of CPU cores to use for the ASP solver.
+    data_threshold : int, default=300
+        Minimum number of instances to use for subsampling.
+    data_fraction : float, default=0.3
+        Fraction of instances to use for subsampling if above data_threshold.
     """
 
     def __init__(
         self,
-        runcount_limit: float = 100.0,
         budget: float = 30.0,
         aspeed_cutoff: int = 60,
         maximize: bool = False,
@@ -35,35 +51,42 @@ class Aspeed(AbstractPresolver):
         data_threshold: int = 300,
         data_fraction: float = 0.3,
     ) -> None:
-        """
-        Initializes the Aspeed presolver.
-
-        Args:
-            metadata (dict): Metadata for the presolver.
-            cores (int): Number of CPU cores to use.
-            cutoff (int): Time limit for solving.
-        """
         if not CLINGO_AVAIL:
             raise ImportError(
                 "clingo is not installed. Please install it to use the Aspeed presolver."
             )
-        super().__init__(
-            budget=budget, runcount_limit=runcount_limit, maximize=maximize
-        )
+        super().__init__(budget=budget, maximize=maximize)
         self.cores = cores
-        self.data_threshold = data_threshold  # minimal number of instances to use
-        self.data_fraction = data_fraction  # fraction of instances to use
-        self.aspeed_cutoff = aspeed_cutoff  # time limit for solving
+        self.data_threshold = data_threshold
+        self.data_fraction = data_fraction
+        self.aspeed_cutoff = aspeed_cutoff
         self.schedule: list[tuple[str, float]] = []
+        self.algorithms: list[str] = []
 
-    def fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
+    def fit(
+        self,
+        features: pd.DataFrame | np.ndarray | None,
+        performance: pd.DataFrame | np.ndarray | None,
+        **kwargs: Any,
+    ) -> None:
         """
-        Fits the presolver to the given features and performance data.
+        Fit the presolver to the data.
 
-        Args:
-            features (pd.DataFrame): A DataFrame containing feature data.
-            performance (pd.DataFrame): A DataFrame containing performance data.
+        Parameters
+        ----------
+        features : pd.DataFrame or np.ndarray
+            The instance features.
+        performance : pd.DataFrame or np.ndarray
+            The algorithm performances.
         """
+        if performance is None:
+            raise ValueError("Aspeed requires performance data for fitting.")
+        if isinstance(performance, pd.DataFrame):
+            perf_frame = performance
+            self.algorithms = list(performance.columns)
+        else:
+            perf_frame = pd.DataFrame(performance)
+            self.algorithms = [f"a{i}" for i in range(performance.shape[1])]
 
         # ASP program with dynamic number of cores
         asp_program = """
@@ -120,91 +143,86 @@ solved(I)   :- solved(I,_).
 #show slice/3.
     """
 
-        # remember algorithm names (expects DataFrame columns)
-        try:
-            self.algorithms = list(performance.columns)
-        except Exception:
-            # if performance is provided as numpy array, create default names
-            self.algorithms = [f"a{i}" for i in range(performance.shape[1])]
-
-        # Create a Clingo Control object with the specified number of threads
-        # Use -t (threads) argument which is broadly supported
+        # Create a Clingo Control object
         ctl = clingo.Control(arguments=[f"-t{self.cores}"])
-
-        # # Register external Python functions
-        # ctl.register_external("insert", insert)
-        # ctl.register_external("order", order)
-
-        # Load the ASP program
         ctl.add(asp_program)
 
-        # if the instance set is too large, we subsample it
-        if performance.shape[0] > self.data_threshold:
+        # Subsample if needed
+        if perf_frame.shape[0] > self.data_threshold:
             random_indx = np.random.choice(
-                range(performance.shape[0]),
+                range(perf_frame.shape[0]),
                 size=min(
-                    performance.shape[0],
+                    perf_frame.shape[0],
                     max(
-                        int(performance.shape[0] * self.data_fraction),
+                        int(perf_frame.shape[0] * self.data_fraction),
                         self.data_threshold,
                     ),
                 ),
                 replace=True,
             )
-            # keep it as a pandas DataFrame view using iloc
-            performance = performance.iloc[random_indx, :]
+            perf_frame = perf_frame.iloc[random_indx, :]
 
         times = [
-            "time(i%d, %d, %d)." % (i, j, max(1, math.ceil(performance.iloc[i, j])))
-            for i in range(performance.shape[0])
-            for j in range(performance.shape[1])
+            "time(i%d, %d, %d)." % (i, j, max(1, math.ceil(perf_frame.iloc[i, j])))
+            for i in range(perf_frame.shape[0])
+            for j in range(perf_frame.shape[1])
         ]
 
         kappa = "kappa(%d)." % (self.budget)
-
-        # join facts with newlines (more readable for clingo) and add kappa
         data_in = "\n".join(times) + "\n" + kappa
         ctl.add(data_in)
 
-        # Ground the logic program (ground the default 'base' part)
         try:
             ctl.ground([("base", [])])
         except Exception:
-            # fallback to grounding everything
             ctl.ground()
 
-        def clingo_callback(model: clingo.Model):
+        def clingo_callback(model: clingo.Model) -> None:
             """Callback function to process the Clingo model."""
             schedule_dict = {}
-            for slice in model.symbols(shown=True):
+            for symbol in model.symbols(shown=True):
                 try:
-                    algo = self.algorithms[slice.arguments[1].number]
+                    algo = self.algorithms[symbol.arguments[1].number]
                 except Exception:
-                    algo = str(slice.arguments[1])
-                runcount_limit = slice.arguments[2].number
+                    algo = str(symbol.arguments[1])
+                runcount_limit = symbol.arguments[2].number
                 schedule_dict[algo] = runcount_limit
 
-            # sort by allocated time
             self.schedule = sorted(schedule_dict.items(), key=lambda x: x[1])
 
-        # Use async solve and a timeout similar to AutoFolio
         try:
             with ctl.solve(on_model=clingo_callback, async_=True) as handle:
                 if handle.wait(self.aspeed_cutoff):
                     handle.get()
                 else:
-                    # timeout: cancel and keep whatever was found (if any)
                     handle.cancel()
         except Exception as e:
-            # If solving failed, leave schedule empty and report
             print(f"Clingo solving failed: {e}")
             self.schedule = []
 
-    def predict(self) -> dict[str, list[tuple[str, float]]]:
+    def predict(
+        self,
+        features: pd.DataFrame | np.ndarray | None = None,
+        performance: pd.DataFrame | np.ndarray | None = None,
+        **kwargs: Any,
+    ) -> list[tuple[str, float]] | dict[str, list[tuple[str, float]]]:
         """
-        Predicts the schedule based on the fitted model.
+        Return the predicted schedule.
 
-        Returns:
-            dict[str, list[tuple[str, float]]]: A dictionary containing the schedule.
+        Parameters
+        ----------
+        features : pd.DataFrame or None, default=None
+            The features for the instances.
+        performance : pd.DataFrame or None, default=None
+            The algorithm performances.
+
+        Returns
+        -------
+        list or dict
+            The presolving schedule.
         """
+        if features is not None:
+            if isinstance(features, np.ndarray):
+                features = pd.DataFrame(features)
+            return {str(inst): self.schedule for inst in features.index}
         return self.schedule

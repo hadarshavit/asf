@@ -90,7 +90,7 @@ An example output is:
 ```
 
 The budget is set by default to None. To change the budget, you can pass it as an argument for the selector initialisation.
-Similarly, ASF minimises the performance by default. To change it, pass `maxmimize=True` to the selector.
+Similarly, ASF minimises the performance by default. To change it, pass `maximize=True` to the selector.
 
 
 

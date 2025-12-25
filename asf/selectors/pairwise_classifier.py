@@ -1,18 +1,10 @@
+from __future__ import annotations
+
+from functools import partial
+from typing import Any
+
 import numpy as np
 import pandas as pd
-
-try:
-    from ConfigSpace import (
-        ConfigurationSpace,
-        Categorical,
-        Configuration,
-        EqualsCondition,
-    )
-    from ConfigSpace.hyperparameters import Hyperparameter
-
-    CONFIGSPACE_AVAILABLE = True
-except ImportError:
-    CONFIGSPACE_AVAILABLE = False
 
 from asf.predictors import (
     AbstractPredictor,
@@ -20,21 +12,32 @@ from asf.predictors import (
     XGBoostClassifierWrapper,
 )
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
-from asf.selectors.feature_generator import (
-    AbstractFeatureGenerator,
-)
-from functools import partial
+from asf.selectors.feature_generator import AbstractFeatureGenerator
+from asf.utils.configurable import ClassChoice, ConfigurableMixin
+
+try:
+    from ConfigSpace import (  # noqa: F401
+        Categorical,
+        ConfigurationSpace,
+    )
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
 
 
-class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
+class PairwiseClassifier(
+    ConfigurableMixin, AbstractModelBasedSelector, AbstractFeatureGenerator
+):
     """
-    PairwiseClassifier is a selector that uses pairwise comparison of algorithms
-    to predict the best algorithm for a given instance.
+    Selector using pairwise comparison of algorithms.
 
-    Attributes:
-        PREFIX (str): Prefix used for configuration space parameters.
-        classifiers (List[AbstractPredictor]): List of trained classifiers for pairwise comparisons.
-        use_weights (bool): Whether to use weights based on performance differences.
+    Attributes
+    ----------
+    classifiers : list[AbstractPredictor]
+        Trained classifiers for pairwise comparisons.
+    use_weights : bool
+        Whether to use weights based on performance differences.
     """
 
     PREFIX = "pairwise_classifier"
@@ -44,220 +47,179 @@ class PairwiseClassifier(AbstractModelBasedSelector, AbstractFeatureGenerator):
         self,
         model_class: type[AbstractPredictor] = RandomForestClassifierWrapper,
         use_weights: bool = True,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         """
-        Initializes the PairwiseClassifier with a given model class and hierarchical feature generator.
+        Initialize the PairwiseClassifier.
 
-        Args:
-            model_class (type[AbstractPredictor]): The classifier model to be used for pairwise comparisons.
-            use_weights (bool): Whether to use weights based on performance differences. Defaults to True.
-            **kwargs: Additional keyword arguments for the parent class.
+        Parameters
+        ----------
+        model_class : type[AbstractPredictor], default=RandomForestClassifierWrapper
+            The classifier model class used for pairwise comparisons.
+        use_weights : bool, default=True
+            Whether to use weights based on performance differences.
+        **kwargs : Any
+            Additional keyword arguments.
         """
         AbstractModelBasedSelector.__init__(self, model_class, **kwargs)
         AbstractFeatureGenerator.__init__(self)
         self.classifiers: list[AbstractPredictor] = []
-        self.use_weights: bool = use_weights
+        self.use_weights = bool(use_weights)
 
-    def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
+    def _fit(
+        self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
+    ) -> None:
         """
-        Fits the pairwise classifiers using the provided features and performance data.
+        Fit the pairwise classifiers.
 
-        Args:
-            features (pd.DataFrame): The feature data for the instances.
-            performance (pd.DataFrame): The performance data for the algorithms.
+        Parameters
+        ----------
+        features : pd.DataFrame
+            The input features.
+        performance : pd.DataFrame
+            The algorithm performance data.
         """
-        assert self.algorithm_features is None, (
-            "PairwiseClassifier does not use algorithm features."
-        )
+        if self.algorithm_features is not None:
+            raise ValueError("PairwiseClassifier does not use algorithm features.")
+
+        self.classifiers = []
         for i, algorithm in enumerate(self.algorithms):
             for other_algorithm in self.algorithms[i + 1 :]:
-                algo1_times = performance[algorithm]
-                algo2_times = performance[other_algorithm]
+                val1 = performance[algorithm].to_numpy(dtype=float)
+                val2 = performance[other_algorithm].to_numpy(dtype=float)
 
                 if self.maximize:
-                    diffs = algo1_times > algo2_times
+                    diffs = (val1 > val2).astype(int)
                 else:
-                    diffs = algo1_times < algo2_times
-
-                # Ensure diffs are integers (0/1), not boolean
-                diffs = diffs.astype(int)
+                    diffs = (val1 < val2).astype(int)
 
                 cur_model = self.model_class()
+                if cur_model is None:
+                    raise RuntimeError("Classifier could not be initialized.")
+
                 cur_model.fit(
                     features,
                     diffs,
-                    sample_weight=None
-                    if not self.use_weights
-                    else np.abs(algo1_times - algo2_times),
+                    sample_weight=None if not self.use_weights else np.abs(val1 - val2),
                 )
                 self.classifiers.append(cur_model)
 
     def _predict(
-        self, features: pd.DataFrame
-    ) -> dict[str, list[tuple[str, int | float]]]:
+        self,
+        features: pd.DataFrame | None,
+        performance: pd.DataFrame | None = None,
+    ) -> dict[str, list[tuple[str, float]]]:
         """
-        Predicts the best algorithm for each instance using the trained pairwise classifiers.
+        Predict the best algorithm for each instance.
 
-        Args:
-            features (pd.DataFrame): The feature data for the instances.
+        Parameters
+        ----------
+        features : pd.DataFrame
+            The query instance features.
 
-        Returns:
-            dict[str, list[tuple[str, int | float]]]: A dictionary mapping instance names to the predicted best algorithm and budget.
-            Example: {instance_name: [(algorithm_name, budget)]}
+        Returns
+        -------
+        dict
+            Mapping from instance name to algorithm schedules.
         """
-        predictions_sum = self.generate_features(features)
-        result = {
-            instance_name: [
-                (
-                    predictions_sum.loc[instance_name].idxmax(),
-                    self.budget,
-                )
-            ]
-            for i, instance_name in enumerate(features.index)
-        }
+        if features is None:
+            raise ValueError("PairwiseClassifier require features for prediction.")
+        votes = self.generate_features(features)
+        result: dict[str, list[tuple[str, float]]] = {}
+        for instance in features.index:
+            best_algo = votes.loc[instance].idxmax()
+            result[str(instance)] = [(str(best_algo), float(self.budget or 0))]
         return result
 
-    def generate_features(self, features: pd.DataFrame) -> pd.DataFrame:
+    def generate_features(self, base_features: pd.DataFrame) -> pd.DataFrame:
         """
-        Generates features for the pairwise classifiers.
+                Generate vote counts for each algorithm.
 
-        Args:
-            features (pd.DataFrame): The feature data for the instances.
+                Parameters
+                ----------
+                base_features : pd.DataFrame
+                    The input features.
 
-        Returns:
-            pd.DataFrame: A DataFrame of predictions for each instance and algorithm pair.
+                Returns
+        -------
+                pd.DataFrame
+                    DataFrame of vote counts for each algorithm.
         """
+        # Ensure input is a DataFrame
+        if not isinstance(base_features, pd.DataFrame):
+            cols = (
+                self.features
+                if self.features
+                else [f"f_{i}" for i in range(base_features.shape[1])]
+            )
+            features_df = pd.DataFrame(base_features, columns=list(cols))  # type: ignore[arg-type]
+        else:
+            features_df = base_features
+
+        votes = pd.DataFrame(0, index=features_df.index, columns=list(self.algorithms))  # type: ignore[arg-type]
         cnt = 0
-        predictions_sum = pd.DataFrame(0, index=features.index, columns=self.algorithms)
-        for i, algorithm in enumerate(self.algorithms):
-            for j, other_algorithm in enumerate(self.algorithms[i + 1 :]):
-                prediction = self.classifiers[cnt].predict(features)
-                # prediction is an array of 0s and 1s
-                # 1 means algorithm is better, 0 means other_algorithm is better
-                predictions_sum.loc[features.index[prediction == 1], algorithm] += 1
-                predictions_sum.loc[
-                    features.index[prediction == 0], other_algorithm
-                ] += 1
+        for i, algo1 in enumerate(self.algorithms):
+            for _j, algo2 in enumerate(self.algorithms[i + 1 :]):
+                pred = self.classifiers[cnt].predict(features_df)
+                # 1 means algo1 is better, 0 means algo2 is better
+                votes.loc[features_df.index[pred == 1], algo1] += 1
+                votes.loc[features_df.index[pred == 0], algo2] += 1
                 cnt += 1
+        return votes
 
-        return predictions_sum
+    @staticmethod
+    def _define_hyperparameters(
+        model_class: list[type[AbstractPredictor]] | None = None,
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """
+        Define hyperparameters for PairwiseClassifier.
 
-    if CONFIGSPACE_AVAILABLE:
+        Parameters
+        ----------
+        model_class : list[type[AbstractPredictor]] or None, default=None
+            List of model classes.
+        **kwargs : Any
+            Additional keyword arguments.
 
-        @staticmethod
-        def get_configuration_space(
-            cs: ConfigurationSpace | None = None,
-            cs_transform: dict[str, dict] | None = None,
-            model_class: list[type[AbstractPredictor]] = [
-                RandomForestClassifierWrapper,
-                XGBoostClassifierWrapper,
-            ],
-            pre_prefix: str = "",
-            parent_param: Hyperparameter | None = None,
-            parent_value: str | None = None,
-            **kwargs,
-        ) -> tuple[ConfigurationSpace, dict[str, dict]]:
-            """
-            Get the configuration space for the predictor.
+        Returns
+        -------
+        tuple
+            Tuple of (hyperparameters, conditions, forbiddens).
+        """
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
 
-            Args:
-                cs (Optional[ConfigurationSpace]): The configuration space to use. If None, a new one will be created.
-                cs_transform (Optional[Dict[str, dict]]): A dictionary for transforming configuration space parameters.
-                model_class (List[type[AbstractPredictor]]): The list of model classes to use. Defaults to [RandomForestClassifierWrapper, XGBoostClassifierWrapper].
-                hierarchical_generator (Optional[List[AbstractFeatureGenerator]]): List of hierarchical feature generators.
-                **kwargs: Additional keyword arguments to pass to the model class.
+        if model_class is None:
+            model_class = [RandomForestClassifierWrapper, XGBoostClassifierWrapper]
 
-            Returns:
-                Tuple[ConfigurationSpace, Dict[str, dict]]: The configuration space and its transformation dictionary.
-            """
-            if cs is None:
-                cs = ConfigurationSpace()
+        hyperparameters = [
+            ClassChoice("model_class", choices=model_class),
+            Categorical("use_weights", items=[True, False], default=True),
+        ]
+        return hyperparameters, [], []
 
-            if cs_transform is None:
-                cs_transform = dict()
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs: Any,
+    ) -> partial[PairwiseClassifier]:
+        """
+                Create a partial function from a clean configuration.
 
-            if pre_prefix != "":
-                prefix = f"{pre_prefix}:{PairwiseClassifier.PREFIX}"
-            else:
-                prefix = PairwiseClassifier.PREFIX
+                Parameters
+        -------
+                clean_config : dict
+                    The clean configuration.
+                **kwargs : Any
+                    Additional keyword arguments.
 
-            model_class_param = Categorical(
-                name=f"{prefix}:model_class",
-                items=[str(c.__name__) for c in model_class],
-            )
-
-            cs_transform[f"{prefix}:model_class"] = {
-                str(c.__name__): c for c in model_class
-            }
-
-            use_weights_param = Categorical(
-                name=f"{prefix}:use_weights",
-                items=[True, False],
-            )
-
-            params = [model_class_param, use_weights_param]
-
-            if parent_param is not None:
-                conditions = [
-                    EqualsCondition(
-                        child=param,
-                        parent=parent_param,
-                        value=parent_value,
-                    )
-                    for param in params
-                ]
-            else:
-                conditions = []
-
-            cs.add(params + conditions)
-
-            for model in model_class:
-                model.get_configuration_space(
-                    cs=cs,
-                    pre_prefix=f"{prefix}:model_class",
-                    parent_param=model_class_param,
-                    parent_value=str(model.__name__),
-                    **kwargs,
-                )
-
-            return cs, cs_transform
-
-        @staticmethod
-        def get_from_configuration(
-            configuration: Configuration,
-            cs_transform: dict[str, dict],
-            pre_prefix: str = "",
-            **kwargs,
-        ) -> partial:
-            """
-            Get the predictor from a given configuration.
-
-            Args:
-                configuration (Configuration): The configuration object.
-                cs_transform (Dict[str, dict]): The transformation dictionary for the configuration space.
-
-            Returns:
-                partial: A partial function to initialize the PairwiseClassifier with the given configuration.
-            """
-
-            if pre_prefix != "":
-                prefix = f"{pre_prefix}:{PairwiseClassifier.PREFIX}"
-            else:
-                prefix = PairwiseClassifier.PREFIX
-
-            model_class = cs_transform[f"{prefix}:model_class"][
-                configuration[f"{prefix}:model_class"]
-            ]
-            use_weights = configuration[f"{prefix}:use_weights"]
-
-            model = model_class.get_from_configuration(
-                configuration, pre_prefix=f"{prefix}:model_class"
-            )
-
-            return PairwiseClassifier(
-                model_class=model,
-                use_weights=use_weights,
-                hierarchical_generator=None,
-                **kwargs,
-            )
+                Returns
+                -------
+                partial
+                    Partial function for PairwiseClassifier.
+        """
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(PairwiseClassifier, **config)

@@ -43,9 +43,18 @@ jobs:
         # Optional: legacy root requirements support if present
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         pip install .[all]
+    - name: Clone ASLib data
+      run: |
+        git clone --depth 1 https://github.com/coseal/aslib_data.git aslib_data
     - name: Test with pytest
+      env:
+        ASLIB_PATH: ${{ github.workspace }}/aslib_data
       run: |
         pytest --cov-report=xml --cov asf --junitxml=junit.xml -o junit_family=legacy test/
+    - name: Cleanup SMAC output
+      if: always()
+      run: |
+        rm -rf ./smac_output/
     - name: Inspect coverage artifact
       run: |
         ls -l

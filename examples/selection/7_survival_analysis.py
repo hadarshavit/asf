@@ -24,7 +24,7 @@ def generate_complex_data(n_instances=100, n_algorithms=6, budget=150.0, seed=42
             "feature3": np.random.uniform(0, 1, n_instances),
             "type": types,
         },
-        index=[f"instance_{i}" for i in range(n_instances)],
+        index=pd.Index([f"instance_{i}" for i in range(n_instances)]),
     )
 
     # Performance: Each algorithm is best for a specific type

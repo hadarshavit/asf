@@ -12,7 +12,9 @@ def generate_and_save(n_instances=200, n_algorithms=6, seed=42, budget=60.0):
     # features correlated structure
     X = rng.normal(loc=[5.0, 3.0, 7.0], scale=[2.5, 1.5, 3.0], size=(n_instances, 3))
     features = pd.DataFrame(
-        X, columns=["f1", "f2", "f3"], index=[f"inst_{i}" for i in range(n_instances)]
+        X,
+        columns=pd.Index(["f1", "f2", "f3"]),
+        index=pd.Index([f"inst_{i}" for i in range(n_instances)]),
     )
 
     # per-algo base + feature sensitivity
@@ -55,7 +57,7 @@ def generate_and_save(n_instances=200, n_algorithms=6, seed=42, budget=60.0):
     perf = pd.DataFrame(
         vals,
         index=features.index,
-        columns=[f"algo{j + 1}" for j in range(n_algorithms)],
+        columns=pd.Index([f"algo{j + 1}" for j in range(n_algorithms)]),
     )
 
     features.to_csv(OUT_DIR / "features.csv")

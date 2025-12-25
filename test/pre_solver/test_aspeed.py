@@ -12,7 +12,7 @@ def get_small_data():
             [12, 12, 12],
             [100, 200, 1],
         ],
-        columns=["algoA", "algoB", "algoC"],
+        columns=pd.Index(["algoA", "algoB", "algoC"]),
     )
     features = pd.DataFrame([[0], [1], [2], [3], [4]])
     return features, perf

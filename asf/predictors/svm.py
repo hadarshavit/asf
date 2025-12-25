@@ -23,9 +23,10 @@ from typing import Any
 from sklearn.svm import SVC, SVR
 
 from asf.predictors.sklearn_wrapper import SklearnWrapper
+from asf.utils.configurable import ConfigurableMixin
 
 
-class SVMClassifierWrapper(SklearnWrapper):
+class SVMClassifierWrapper(ConfigurableMixin, SklearnWrapper):
     """
     A wrapper for the Scikit-learn SVC (Support Vector Classifier) model.
     Provides methods to define a configuration space and create an instance
@@ -50,12 +51,14 @@ class SVMClassifierWrapper(SklearnWrapper):
         """
         super().__init__(SVC, init_params)
 
-    @staticmethod
+    @classmethod
     def get_configuration_space(
+        cls,
         cs: ConfigurationSpace | None = None,
         pre_prefix: str = "",
         parent_param: Hyperparameter | None = None,
         parent_value: str | None = None,
+        **kwargs,
     ) -> ConfigurationSpace:
         """
         Define the configuration space for the SVM classifier.
@@ -73,10 +76,7 @@ class SVMClassifierWrapper(SklearnWrapper):
         if cs is None:
             cs = ConfigurationSpace(name="SVM")
 
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{SVMClassifierWrapper.PREFIX}"
-        else:
-            prefix = SVMClassifierWrapper.PREFIX
+        prefix = cls.PREFIX
         max_iter = Constant(
             f"{prefix}:max_iter",
             20000,
@@ -108,7 +108,7 @@ class SVMClassifierWrapper(SklearnWrapper):
             f"{prefix}:C",
             (1.0, 20),
             log=True,
-            default=3.2333262862494365,
+            default=1.0,
         )
         shrinking = Categorical(
             f"{prefix}:shrinking",
@@ -157,54 +157,28 @@ class SVMClassifierWrapper(SklearnWrapper):
 
         return cs
 
-    @staticmethod
-    def get_from_configuration(
-        configuration: dict[str, Any], pre_prefix: str = "", **kwargs
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
     ) -> partial:
         """
-        Create an SVMClassifierWrapper instance from a configuration.
-
-        Parameters
-        ----------
-        configuration : dict
-            Dictionary containing the configuration parameters.
-        additional_params : dict, optional
-            Additional parameters to include in the model initialization.
-
-        Returns
-        -------
-        partial
-            A partial function to create an SVMClassifierWrapper instance.
+        Create a partial function from a clean (unprefixed) configuration.
         """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
+        # We need to manually handle 'kernel' logic because ConfigSpace doesn't
+        # automatically filter inactive conditionals from the dictionary
+        # if the input dictionary has them (which depends on how SMAC behaves).
+        # Assuming clean_config has valid active parameters.
 
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{SVMClassifierWrapper.PREFIX}"
-        else:
-            prefix = SVMClassifierWrapper.PREFIX
-
-        svm_params = {
-            "kernel": configuration[f"{prefix}:kernel"],
-            "coef0": configuration[f"{prefix}:coef0"],
-            "tol": configuration[f"{prefix}:tol"],
-            "C": configuration[f"{prefix}:C"],
-            "shrinking": configuration[f"{prefix}:shrinking"],
-            "max_iter": configuration[f"{prefix}:max_iter"],
-            **kwargs,
-        }
-
-        if svm_params["kernel"] == "poly":
-            svm_params["degree"] = configuration[f"{prefix}:degree"]
-        if svm_params["kernel"] in ["rbf", "poly", "sigmoid"]:
-            svm_params["gamma"] = configuration[f"{prefix}:gamma"]
+        # SklearnWrapper expects init_params dict, not kwargs
+        svm_params = clean_config.copy()
+        svm_params.update(kwargs)
 
         return partial(SVMClassifierWrapper, init_params=svm_params)
 
 
-class SVMRegressorWrapper(SklearnWrapper):
+class SVMRegressorWrapper(ConfigurableMixin, SklearnWrapper):
     """
     A wrapper for the Scikit-learn SVR (Support Vector Regressor) model.
     Provides methods to define a configuration space and create an instance
@@ -229,12 +203,14 @@ class SVMRegressorWrapper(SklearnWrapper):
         """
         super().__init__(SVR, init_params)
 
-    @staticmethod
+    @classmethod
     def get_configuration_space(
+        cls,
         cs: ConfigurationSpace | None = None,
         pre_prefix: str = "",
         parent_param: Hyperparameter | None = None,
         parent_value: str | None = None,
+        **kwargs,
     ) -> ConfigurationSpace:
         """
         Define the configuration space for the SVM regressor.
@@ -256,10 +232,7 @@ class SVMRegressorWrapper(SklearnWrapper):
                 "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
             )
 
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{SVMRegressorWrapper.PREFIX}"
-        else:
-            prefix = SVMRegressorWrapper.PREFIX
+        prefix = cls.PREFIX
 
         if cs is None:
             cs = ConfigurationSpace(name="SVM Regressor")
@@ -344,49 +317,16 @@ class SVMRegressorWrapper(SklearnWrapper):
 
         return cs
 
-    @staticmethod
-    def get_from_configuration(
-        configuration: dict[str, Any], pre_prefix: str = "", **kwargs
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs,
     ) -> partial:
         """
-        Create an SVMRegressorWrapper instance from a configuration.
-
-        Parameters
-        ----------
-        configuration : dict
-            Dictionary containing the configuration parameters.
-        additional_params : dict, optional
-            Additional parameters to include in the model initialization.
-
-        Returns
-        -------
-        partial
-            A partial function to create an SVMRegressorWrapper instance.
+        Create a partial function from a clean (unprefixed) configuration.
         """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
+        svm_params = clean_config.copy()
+        svm_params.update(kwargs)
 
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{SVMRegressorWrapper.PREFIX}"
-        else:
-            prefix = SVMRegressorWrapper.PREFIX
-
-        svr_params = {
-            "kernel": configuration[f"{prefix}:kernel"],
-            "coef0": configuration[f"{prefix}:coef0"],
-            "tol": configuration[f"{prefix}:tol"],
-            "C": configuration[f"{prefix}:C"],
-            "shrinking": configuration[f"{prefix}:shrinking"],
-            "epsilon": configuration[f"{prefix}:epsilon"],
-            "max_iter": configuration[f"{prefix}:max_iter"],
-            **kwargs,
-        }
-
-        if svr_params["kernel"] == "poly":
-            svr_params["degree"] = configuration[f"{prefix}:degree"]
-        if svr_params["kernel"] in ["rbf", "poly", "sigmoid"]:
-            svr_params["gamma"] = configuration[f"{prefix}:gamma"]
-
-        return partial(SVMRegressorWrapper, init_params=svr_params)
+        return partial(SVMRegressorWrapper, init_params=svm_params)
