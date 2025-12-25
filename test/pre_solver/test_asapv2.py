@@ -19,11 +19,19 @@ def dummy_data():
 
 def validate_predictions(predictions, budget):
     """Basic validation of prediction structure"""
-    assert isinstance(predictions, list), "Predictions should be a list (schedule)"
-
-    for alg_name, time_alloc in predictions:
-        assert isinstance(alg_name, str), "Algorithm name should be a string"
-        assert time_alloc >= 0, "Time allocation should be positive"
+    # predict() returns dict when features are passed, list otherwise
+    if isinstance(predictions, dict):
+        for inst_key, schedule in predictions.items():
+            assert isinstance(inst_key, str), "Instance key should be a string"
+            assert isinstance(schedule, list), "Each schedule should be a list"
+            for alg_name, time_alloc in schedule:
+                assert isinstance(alg_name, str), "Algorithm name should be a string"
+                assert time_alloc >= 0, "Time allocation should be positive"
+    else:
+        assert isinstance(predictions, list), "Predictions should be a list (schedule)"
+        for alg_name, time_alloc in predictions:
+            assert isinstance(alg_name, str), "Algorithm name should be a string"
+            assert time_alloc >= 0, "Time allocation should be positive"
 
 
 class TestASAPv2Basic:
@@ -81,8 +89,21 @@ class TestASAPv2Basic:
         asap = ASAPv2(budget=30.0, verbosity=0)
         asap.fit(features, performance)
 
-        predictions = asap.predict(features)
-        assert predictions == asap.schedule, "Predictions should equal schedule"
+        # predict() with features returns dict mapping instances to schedules
+        predictions_dict = asap.predict(features)
+        assert isinstance(predictions_dict, dict), (
+            "predictions with features should be dict"
+        )
+        for inst_key, schedule in predictions_dict.items():
+            assert schedule == asap.schedule, (
+                "Each schedule should equal fitted schedule"
+            )
+
+        # predict() without features returns the schedule directly
+        predictions_list = asap.predict()
+        assert predictions_list == asap.schedule, (
+            "Predictions without features should equal schedule"
+        )
 
 
 @pytest.mark.parametrize("budget", [10.0, 30.0, 60.0, 120.0])

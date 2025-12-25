@@ -251,9 +251,9 @@ class EPMRandomForest(ForestRegressor, AbstractPredictor, ConfigurableMixin):
         vars_arr = preds_arr.var(axis=1)
 
         if self.return_var:
-            return means.reshape(-1, 1), vars_arr.reshape(-1, 1)
+            return means, vars_arr
         else:
-            return means.reshape(-1, 1)
+            return means
 
     def save(self, file_path: str) -> None:
         """

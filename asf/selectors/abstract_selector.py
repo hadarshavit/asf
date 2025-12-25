@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Any
 
 import numpy as np
@@ -233,7 +233,6 @@ class AbstractSelector(ABC):
         pass
 
     @classmethod
-    @abstractmethod
     def load(cls, path: str) -> "AbstractSelector":
         """
         Load a selector instance.
@@ -248,7 +247,7 @@ class AbstractSelector(ABC):
         AbstractSelector
             The loaded selector instance.
         """
-        pass
+        raise NotImplementedError(f"{cls.__name__} does not support loading from file.")
 
     @staticmethod
     def get_configuration_space(

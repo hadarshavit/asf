@@ -167,9 +167,9 @@ class PerformanceModel(
         results: dict[str, list[tuple[str, float]]] = {}
         for i, instance_name in enumerate(features.index):
             idx = (
-                int(np.argmax(predictions[i]))
+                int(np.argmax(predictions.iloc[i]))
                 if self.maximize
-                else int(np.argmin(predictions[i]))
+                else int(np.argmin(predictions.iloc[i]))
             )
             results[str(instance_name)] = [
                 (str(self.algorithms[idx]), float(self.budget or 0))
