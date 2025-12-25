@@ -46,23 +46,16 @@ def _create_pipeline(
     budget,
     maximize,
     selector_kwargs,
-    selector_class,
-    preprocessing_class,
-    pre_solving_class,
     feature_groups,
-    algorithm_pre_selector,
     max_feature_time: float | None = None,
 ):
     """Helper function to create a SelectorPipeline from a configuration."""
 
     # Use SelectorPipeline.get_from_configuration directly
+    # Classes are now resolved from config space metadata, no need to pass them
     pipeline_partial = SelectorPipeline.get_from_configuration(
         configuration=config,
-        selector_class=selector_class,
-        preprocessing_class=preprocessing_class,
-        pre_solving_class=pre_solving_class,
         feature_groups=feature_groups,
-        algorithm_pre_selector=algorithm_pre_selector,
         max_feature_time=max_feature_time,
         budget=budget,
         maximize=maximize,
@@ -196,11 +189,7 @@ def tune_selector(
                 budget,
                 maximize,
                 selector_kwargs,
-                selector_class,
-                preprocessing_class,
-                pre_solving_class,
                 feature_groups,
-                algorithm_pre_selector,
                 max_feature_time=max_feature_time,
             )
 
@@ -232,10 +221,6 @@ def tune_selector(
         budget,
         maximize,
         selector_kwargs,
-        selector_class,
-        preprocessing_class,
-        pre_solving_class,
         feature_groups,
-        algorithm_pre_selector,
         max_feature_time=max_feature_time,
     )

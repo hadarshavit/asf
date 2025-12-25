@@ -409,21 +409,101 @@ class SelectorPipeline(ConfigurableMixin):
         return hyperparameters, conditions, forbiddens
 
     @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict,
+        configuration: Configuration | dict = None,
+        pre_prefix: str = "",
+        feature_groups: dict | None = None,
+        budget: float | None = None,
+        max_feature_time: float | None = None,
+        **kwargs,
+    ) -> partial:
+        """
+        Create a SelectorPipeline from a clean (unprefixed) configuration.
+
+        This method handles the instantiation of complex nested components
+        (selectors, preprocessors, presolvers, etc.) from the clean config.
+        """
+        init_kwargs = {}
+
+        # Compute prefix for nested lookups (needed for feature groups)
+        if pre_prefix:
+            prefix = f"{pre_prefix}:{cls.PREFIX}:"
+        else:
+            prefix = f"{cls.PREFIX}:"
+
+        # 1. Selector - already resolved by parent class
+        if "selector" in clean_config:
+            selector_val = clean_config["selector"]
+            if callable(selector_val):
+                # It's a partial, instantiate it
+                init_kwargs["selector"] = selector_val()
+            else:
+                init_kwargs["selector"] = selector_val
+
+        # 2. Presolver - handled via use_presolver and presolver keys
+        use_presolver = clean_config.get("use_presolver", False)
+        if use_presolver and "presolver" in clean_config:
+            presolver_val = clean_config["presolver"]
+            if callable(presolver_val):
+                init_kwargs["pre_solving"] = presolver_val()
+            else:
+                init_kwargs["pre_solving"] = presolver_val
+
+        # 3. Preprocessors - collect all preprocessor:* keys
+        selected_preprocessors = []
+        for key, val in clean_config.items():
+            if key.startswith("preprocessor:"):
+                if val is False or val == "False":
+                    continue
+                if callable(val):
+                    selected_preprocessors.append(val())
+                elif val is not None:
+                    selected_preprocessors.append(val)
+        if selected_preprocessors:
+            init_kwargs["preprocessor"] = selected_preprocessors
+
+        # 4. Feature Groups - need the original feature_groups dict and configuration
+        if feature_groups and configuration is not None:
+            from asf.preprocessing.feature_group_selector import FeatureGroupSelector
+
+            selected_fg = FeatureGroupSelector.get_selected_groups_from_config(
+                feature_groups, configuration, prefix=f"{prefix}feature_group:"
+            )
+            init_kwargs["feature_groups"] = selected_fg
+
+        # 5. Algorithm Pre-selector
+        if "algorithm_pre_selector" in clean_config:
+            pre_sel_val = clean_config["algorithm_pre_selector"]
+            if callable(pre_sel_val):
+                init_kwargs["algorithm_pre_selector"] = pre_sel_val()
+            else:
+                init_kwargs["algorithm_pre_selector"] = pre_sel_val
+
+        # 6. Max feature time
+        if "max_feature_time" in clean_config:
+            init_kwargs["max_feature_time"] = clean_config["max_feature_time"]
+        elif max_feature_time is not None and max_feature_time is not False:
+            init_kwargs["max_feature_time"] = max_feature_time
+
+        return partial(cls, **init_kwargs)
+
+    @classmethod
     def get_from_configuration(
         cls,
         configuration: Configuration | dict,
         pre_prefix: str = "",
-        selector_class: list[type] = None,
-        preprocessing_class: list[type] | None = None,
-        pre_solving_class: list[type] | None = None,
         feature_groups: dict | None = None,
-        algorithm_pre_selector: type | tuple[type, dict] | None = None,
-        max_feature_time: float | None = None,
         budget: float | None = None,
+        max_feature_time: float | None = None,
         **kwargs,
     ) -> partial:
         """
         Create a SelectorPipeline from a configuration.
+
+        This method extracts values from the configuration, resolves classes
+        from the config space, and delegates to _get_from_clean_configuration.
         """
         if not CONFIGSPACE_AVAILABLE:
             raise RuntimeError("ConfigSpace is not installed.")
@@ -434,156 +514,107 @@ class SelectorPipeline(ConfigurableMixin):
         else:
             prefix = f"{cls.PREFIX}:"
 
-        init_kwargs = {}
+        clean_config = {}
+
+        # Get config space if available for class resolution
+        config_space = getattr(configuration, "config_space", None)
 
         # 1. Selector
-        # Try to resolve selector class from config space if selector_class is not provided
-        chosen_cls = None
         selector_name = configuration.get(f"{prefix}selector")
-
-        if selector_class:
-            # Re-normalize selector_class to list of classes
-            if (
-                isinstance(selector_class, list)
-                and len(selector_class) > 0
-                and isinstance(selector_class[0], tuple)
-            ):
-                selector_choices = [c[0] for c in selector_class]
-            elif not isinstance(selector_class, list):
-                selector_choices = [selector_class]
-            else:
-                selector_choices = selector_class
-
-            selector_map = {c.__name__: c for c in selector_choices}
-            if selector_name and selector_name in selector_map:
-                chosen_cls = selector_map[selector_name]
-        elif selector_name and hasattr(configuration, "config_space"):
-            hp = configuration.config_space.get(f"{prefix}selector")
+        if selector_name and config_space:
+            hp = config_space.get(f"{prefix}selector")
             if hp:
                 chosen_cls = cls._resolve_class_from_hp(hp, selector_name)
-
-        if chosen_cls:
-            child_pre_prefix = f"{prefix}selector"
-            if hasattr(chosen_cls, "get_from_configuration"):
-                child_kwargs = kwargs.copy()
-                if budget is not None:
-                    child_kwargs["budget"] = budget
-
-                val_partial = chosen_cls.get_from_configuration(
-                    configuration=configuration,
-                    pre_prefix=child_pre_prefix,
-                    **child_kwargs,
-                )
-                init_kwargs["selector"] = val_partial()
-            else:
-                selector_init_kwargs = {}
-                if budget is not None:
-                    selector_init_kwargs["budget"] = budget
-                init_kwargs["selector"] = chosen_cls(**selector_init_kwargs)
+                if chosen_cls:
+                    child_pre_prefix = f"{prefix}selector"
+                    if hasattr(chosen_cls, "get_from_configuration"):
+                        child_kwargs = kwargs.copy()
+                        if budget is not None:
+                            child_kwargs["budget"] = budget
+                        clean_config["selector"] = chosen_cls.get_from_configuration(
+                            configuration=configuration,
+                            pre_prefix=child_pre_prefix,
+                            **child_kwargs,
+                        )
+                    else:
+                        selector_init_kwargs = {}
+                        if budget is not None:
+                            selector_init_kwargs["budget"] = budget
+                        clean_config["selector"] = chosen_cls(**selector_init_kwargs)
 
         # 2. Presolver
         use_presolver = configuration.get(f"{prefix}use_presolver")
+        clean_config["use_presolver"] = use_presolver
+
         presolver_name = configuration.get(f"{prefix}presolver")
-        chosen_cls = None
+        if use_presolver and presolver_name and config_space:
+            hp = config_space.get(f"{prefix}presolver")
+            if hp:
+                chosen_cls = cls._resolve_class_from_hp(hp, presolver_name)
+                if chosen_cls:
+                    child_pre_prefix = f"{prefix}presolver"
+                    if hasattr(chosen_cls, "get_from_configuration"):
+                        clean_config["presolver"] = chosen_cls.get_from_configuration(
+                            configuration=configuration,
+                            pre_prefix=child_pre_prefix,
+                            **kwargs,
+                        )
+                    else:
+                        clean_config["presolver"] = chosen_cls()
 
-        if use_presolver and presolver_name:
-            if pre_solving_class:
-                if not isinstance(pre_solving_class, list):
-                    pre_solving_class = [pre_solving_class]
-                presolver_map = {c.__name__: c for c in pre_solving_class}
-                if presolver_name in presolver_map:
-                    chosen_cls = presolver_map[presolver_name]
-            elif hasattr(configuration, "config_space"):
-                hp = configuration.config_space.get(f"{prefix}presolver")
-                if hp:
-                    chosen_cls = cls._resolve_class_from_hp(hp, presolver_name)
-
-        if chosen_cls:
-            child_pre_prefix = f"{prefix}presolver"
-            if hasattr(chosen_cls, "get_from_configuration"):
-                val_partial = chosen_cls.get_from_configuration(
-                    configuration=configuration,
-                    pre_prefix=child_pre_prefix,
-                    **kwargs,
-                )
-                init_kwargs["pre_solving"] = val_partial()
-            else:
-                init_kwargs["pre_solving"] = chosen_cls()
-
-        # 3. Preprocessors
-        selected_preprocessors = []
-        if preprocessing_class:
-            for preproc_cls in preprocessing_class:
-                key = f"{prefix}preprocessor:{preproc_cls.__name__}"
-                val = configuration.get(key)
-                if val == preproc_cls.__name__:
-                    selected_preprocessors.append(preproc_cls())
-        elif hasattr(configuration, "config_space"):
-            # Discover preprocessors from space
-            for hp in configuration.config_space.get_hyperparameters():
+        # 3. Preprocessors - discover from config space
+        if config_space:
+            for hp in config_space.get_hyperparameters():
                 if hp.name.startswith(f"{prefix}preprocessor:"):
                     val = configuration.get(hp.name)
-                    resolved = cls._resolve_class_from_hp(hp, val)
-                    if resolved and resolved is not False:
-                        if hasattr(resolved, "get_from_configuration"):
-                            selected_preprocessors.append(
-                                resolved.get_from_configuration(
-                                    configuration, pre_prefix=hp.name, **kwargs
-                                )()
+                    if val and val != "False":
+                        resolved = cls._resolve_class_from_hp(hp, val)
+                        if resolved and resolved is not False:
+                            # Store with just the preprocessor:ClassName part
+                            key_suffix = hp.name[len(prefix) :]
+                            if hasattr(resolved, "get_from_configuration"):
+                                clean_config[key_suffix] = (
+                                    resolved.get_from_configuration(
+                                        configuration, pre_prefix=hp.name, **kwargs
+                                    )
+                                )
+                            else:
+                                clean_config[key_suffix] = resolved()
+                    else:
+                        key_suffix = hp.name[len(prefix) :]
+                        clean_config[key_suffix] = False
+
+        # 4. Algorithm Pre-selector
+        pre_sel_name = configuration.get(f"{prefix}algorithm_pre_selector")
+        if pre_sel_name and config_space:
+            hp = config_space.get(f"{prefix}algorithm_pre_selector")
+            if hp:
+                chosen_cls = cls._resolve_class_from_hp(hp, pre_sel_name)
+                if chosen_cls:
+                    child_pre_prefix = f"{prefix}algorithm_pre_selector"
+                    if hasattr(chosen_cls, "get_from_configuration"):
+                        clean_config["algorithm_pre_selector"] = (
+                            chosen_cls.get_from_configuration(
+                                configuration=configuration,
+                                pre_prefix=child_pre_prefix,
+                                **kwargs,
                             )
-                        else:
-                            selected_preprocessors.append(resolved())
+                        )
+                    else:
+                        clean_config["algorithm_pre_selector"] = chosen_cls()
 
-        if selected_preprocessors:
-            init_kwargs["preprocessor"] = selected_preprocessors
+        # 5. Max feature time
+        mft_val = configuration.get(f"{prefix}max_feature_time")
+        if mft_val is not None:
+            clean_config["max_feature_time"] = mft_val
 
-        # 4. Feature Groups
-        if feature_groups:
-            # Reconstruct selected groups dict
-            from asf.preprocessing.feature_group_selector import FeatureGroupSelector
-
-            selected_fg = FeatureGroupSelector.get_selected_groups_from_config(
-                feature_groups, configuration, prefix=f"{prefix}feature_group:"
-            )
-            init_kwargs["feature_groups"] = selected_fg
-        elif hasattr(configuration, "config_space"):
-            # Discover feature groups from space if not provided explicitly?
-            # FeatureGroupSelector.get_selected_groups_from_config needs the full feature_groups dict
-            # because it contains the 'provides' and 'requires' info.
-            # If it's missing, we only have names from the config.
-            # For now, we keep this as is, as feature_groups is usually passed.
-            pass
-
-        # 5. Algorithm Pre-selector
-        chosen_cls = None
-        if algorithm_pre_selector:
-            if isinstance(algorithm_pre_selector, tuple):
-                chosen_cls = algorithm_pre_selector[0]
-            else:
-                chosen_cls = algorithm_pre_selector
-        elif hasattr(configuration, "config_space"):
-            hp = configuration.config_space.get(f"{prefix}algorithm_pre_selector")
-            val = configuration.get(f"{prefix}algorithm_pre_selector")
-            if hp and val:
-                chosen_cls = cls._resolve_class_from_hp(hp, val)
-
-        if chosen_cls:
-            child_pre_prefix = f"{prefix}algorithm_pre_selector"
-            if hasattr(chosen_cls, "get_from_configuration"):
-                val_partial = chosen_cls.get_from_configuration(
-                    configuration=configuration, pre_prefix=child_pre_prefix, **kwargs
-                )
-                init_kwargs["algorithm_pre_selector"] = val_partial()
-            else:
-                init_kwargs["algorithm_pre_selector"] = chosen_cls()
-
-        if max_feature_time is None:
-            mft_val = configuration.get(f"{prefix}max_feature_time")
-            if mft_val is not None:
-                init_kwargs["max_feature_time"] = mft_val
-        elif max_feature_time is not False and isinstance(
-            max_feature_time, (int, float)
-        ):
-            init_kwargs["max_feature_time"] = max_feature_time
-
-        return partial(cls, **init_kwargs)
+        # Delegate to _get_from_clean_configuration
+        return cls._get_from_clean_configuration(
+            clean_config=clean_config,
+            configuration=configuration,
+            pre_prefix=pre_prefix,
+            feature_groups=feature_groups,
+            budget=budget,
+            max_feature_time=max_feature_time,
+            **kwargs,
+        )

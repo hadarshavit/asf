@@ -57,12 +57,8 @@ def test_selector_pipeline_config_space_refactor():
     }
     config = Configuration(cs, values=config_dict)
 
-    # Create pipeline
-    pipeline_partial = SelectorPipeline.get_from_configuration(
-        config,
-        selector_class=[DummySelector],
-        preprocessing_class=[DummyPreprocessor1, DummyPreprocessor2],
-    )
+    # Create pipeline (no need to pass class lists - auto-discovery from config space)
+    pipeline_partial = SelectorPipeline.get_from_configuration(config)
     pipeline = pipeline_partial()
 
     # Verify preprocessors
@@ -95,9 +91,7 @@ def test_selector_pipeline_none_preprocessing():
     }
     config = Configuration(cs, values=config_dict)
 
-    pipeline = SelectorPipeline.get_from_configuration(
-        config, selector_class=[DummySelector], preprocessing_class=[DummyPreprocessor1]
-    )()
+    pipeline = SelectorPipeline.get_from_configuration(config)()
 
     # Should only have SimpleImputer
     steps = pipeline.preprocessor.steps
