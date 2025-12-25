@@ -23,5 +23,7 @@ jobs:
       run: ruff check --output-format=github --target-version=py311
     - name: Check code formatting with Ruff
       run: ruff format --diff --target-version=py311
+    - name: Install dependencies for type checking
+      run: pip install .[all]
     - name: Check type annotations with ty
       run: ty check --output-format=github
