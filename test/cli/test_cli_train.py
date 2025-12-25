@@ -1,6 +1,8 @@
 from functools import partial
+import argparse
 
 import pandas as pd
+import pytest
 
 from asf.cli import cli_train
 from asf import selectors
@@ -74,3 +76,42 @@ def test_build_cli_command_with_partial_and_direct_model(tmp_path):
     cmd2 = cli_train.build_cli_command(selector2, feat, perf, dst)
     # Ensure model name appears
     assert "SomeModel" in cmd2
+
+
+class TestFractionType:
+    """Tests for the _fraction_type validation function."""
+
+    def test_valid_fraction_middle(self):
+        """Test valid fraction value in the middle of range."""
+        result = cli_train._fraction_type("0.5")
+        assert result == 0.5
+
+    def test_valid_fraction_zero(self):
+        """Test valid fraction at lower boundary."""
+        result = cli_train._fraction_type("0.0")
+        assert result == 0.0
+
+    def test_valid_fraction_one(self):
+        """Test valid fraction at upper boundary."""
+        result = cli_train._fraction_type("1.0")
+        assert result == 1.0
+
+    def test_invalid_fraction_negative(self):
+        """Test that negative values raise error."""
+        with pytest.raises(argparse.ArgumentTypeError):
+            cli_train._fraction_type("-0.1")
+
+    def test_invalid_fraction_above_one(self):
+        """Test that values above 1 raise error."""
+        with pytest.raises(argparse.ArgumentTypeError):
+            cli_train._fraction_type("1.5")
+
+    def test_invalid_fraction_not_a_number(self):
+        """Test that non-numeric values raise error."""
+        with pytest.raises(argparse.ArgumentTypeError):
+            cli_train._fraction_type("abc")
+
+    def test_invalid_fraction_empty_string(self):
+        """Test that empty string raises error."""
+        with pytest.raises(argparse.ArgumentTypeError):
+            cli_train._fraction_type("")

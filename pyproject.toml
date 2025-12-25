@@ -39,8 +39,9 @@ aspeed = [ 'clingo' ]
 survival = [ 'scikit-survival' ] 
 3s = [ 'pulp' ]
 analysis = [ 'plotly', 'scipy' ]
+epmbench = [ 'fastparquet' ]
 dev = [ 'pytest', 'pytest-cov', 'ruff' ]
-all = [ 'pyyaml', 'liac-arff', 'torch', 'xgboost', 'smac', 'clingo', 'scikit-survival', 'pulp', 'plotly', 'scipy' ]
+all = [ 'pyyaml', 'liac-arff', 'torch', 'xgboost', 'smac', 'clingo', 'scikit-survival', 'pulp', 'plotly', 'scipy', 'fastparquet' ]
 
 [build-system]
 requires = ["setuptools", "wheel"]
@@ -54,3 +55,5 @@ include = ["asf*"]
 documentation = "https://hadarshavit.github.io/asf/latest/"
 repository = "https://github.com/hadarshavit/asf"
 
+[tool.ty.rules]
+unresolved-import = "ignore"

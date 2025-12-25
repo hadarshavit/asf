@@ -389,7 +389,11 @@ def running_time_closed_gap(
     if isinstance(s_val, dict):
         s_val = float(sum(s_val.values()))
 
-    return (sbs_val - s_val) / (sbs_val - vbs_val)
+    denominator = sbs_val - vbs_val
+    if abs(denominator) < 1e-9:
+        return 0.0
+
+    return (sbs_val - s_val) / denominator
 
 
 def precision_regret(

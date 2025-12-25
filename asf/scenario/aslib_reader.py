@@ -5,7 +5,7 @@ Utilities for reading and evaluating algorithm selection scenarios in ASlib form
 from __future__ import annotations
 
 import os
-from typing import Any, Callable
+from typing import Any, Callable, Literal, overload
 
 import pandas as pd
 
@@ -177,6 +177,8 @@ def read_aslib_scenario(
         cv_data: dict[str, Any] = load(f)
     cv = pd.DataFrame(cv_data["data"], columns=[a[0] for a in cv_data["attributes"]])  # type: ignore[arg-type]
     cv = cv.set_index("instance_id")
+    if "repetition" in cv.columns:
+        cv = cv.drop(columns=["repetition"])
 
     # Sort indices for consistency
     features = features.sort_index()  # type: ignore[attr-defined]
@@ -228,6 +230,32 @@ def read_aslib_scenario(
         budget,
         algorithm_features,
     )
+
+
+@overload
+def evaluate_selector(
+    selector_class: type,
+    scenario_path: str,
+    fold: int,
+    hpo_func: Callable[..., Any] | None = None,
+    hpo_kwargs: dict[str, Any] | None = None,
+    algorithm_pre_selector: Any | None = None,
+    metric: Callable[..., float] = running_time_closed_gap,
+    return_per_instance: Literal[False] = False,
+) -> tuple[float, Any]: ...
+
+
+@overload
+def evaluate_selector(
+    selector_class: type,
+    scenario_path: str,
+    fold: int,
+    hpo_func: Callable[..., Any] | None = None,
+    hpo_kwargs: dict[str, Any] | None = None,
+    algorithm_pre_selector: Any | None = None,
+    metric: Callable[..., float] = running_time_closed_gap,
+    return_per_instance: Literal[True] = True,
+) -> tuple[float, Any, dict[str, float]]: ...
 
 
 def evaluate_selector(
