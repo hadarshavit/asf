@@ -32,7 +32,6 @@ from asf.selectors.meta_selector import MetaSelector
 from asf.selectors.osl_linear import OSLLinearSelector
 from asf.selectors.cosine_selector import CosineSelector
 from asf.selectors.cshc import CSHCSelector
-from asf.predictors.random_forest import RandomForestRegressorWrapper
 
 
 @pytest.fixture
@@ -445,7 +444,7 @@ def test_osl_linear_selector(dummy_performance, dummy_features):
         assert score >= 0
 
 
-def test_cosine_selector_default_ridge(dummy_performance, dummy_features):
+def test_cosine_selector_default(dummy_performance, dummy_features):
     # simple algorithm feature matrix matching performance columns
     alg_df = pd.DataFrame(
         [
@@ -453,32 +452,41 @@ def test_cosine_selector_default_ridge(dummy_performance, dummy_features):
             [0.0, 1.0],
             [0.5, 0.5],
         ],
-        index=["algo1", "algo2", "algo3"],
-        columns=["af1", "af2"],
+        index=["algo1", "algo2", "algo3"],  # type: ignore[arg-type]
+        columns=["af1", "af2"],  # type: ignore[arg-type]
     )
 
-    sel = CosineSelector(shared_latent_dim=2, normalize_features=True, budget=450.0)
+    sel = CosineSelector(
+        normalize_features=True,
+        num_epochs=5,  # Low for fast testing
+        embed_size=10,
+        num_hiddens=10,
+        budget=450.0,
+    )
     sel.fit(dummy_features, dummy_performance, alg_df)
     preds = sel.predict(dummy_features)
     validate_predictions(preds)
 
 
-def test_cosine_selector_random_forest(dummy_performance, dummy_features):
+def test_cosine_selector_custom_params(dummy_performance, dummy_features):
     alg_df = pd.DataFrame(
         [
             [1.0, 0.0],
             [0.0, 1.0],
             [0.5, 0.5],
         ],
-        index=["algo1", "algo2", "algo3"],
-        columns=["af1", "af2"],
+        index=["algo1", "algo2", "algo3"],  # type: ignore[arg-type]
+        columns=["af1", "af2"],  # type: ignore[arg-type]
     )
 
     sel = CosineSelector(
-        shared_latent_dim=2,
         normalize_features=True,
-        projection_model=RandomForestRegressorWrapper,
-        projection_model_kwargs={"n_estimators": 10, "random_state": 42},
+        embed_size=20,
+        num_hiddens=20,
+        num_layers=1,
+        alpha=0.8,
+        beta=0.2,
+        num_epochs=5,  # Low for fast testing
         budget=450.0,
     )
     sel.fit(dummy_features, dummy_performance, alg_df)

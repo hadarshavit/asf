@@ -2,7 +2,6 @@ import os
 import numpy as np
 import pandas as pd
 from typing import Any, cast
-from asf.predictors.random_forest import RandomForestRegressorWrapper
 
 from asf.selectors.cosine_selector import CosineSelector
 from asf.scenario.aslib_reader import read_aslib_scenario
@@ -51,11 +50,17 @@ def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
     X_train, X_test = features.iloc[:n_train], features.iloc[n_train:]
     Y_train, Y_test = performance.iloc[:n_train], performance.iloc[n_train:]
 
+    # AS-LLM based CosineSelector
     sel = CosineSelector(
         normalize_features=True,
-        shared_latent_dim=4,
-        projection_model=RandomForestRegressorWrapper,
-        projection_model_kwargs={"n_estimators": 100, "random_state": 42},
+        embed_size=50,
+        num_hiddens=50,
+        num_layers=2,
+        alpha=0.9,
+        beta=0.1,
+        num_epochs=50,  # Reduced for demo
+        batch_size=128,
+        lr=0.001,
     )
     sel.fit(X_train, Y_train, algorithm_features=alg_df)
 
@@ -70,7 +75,7 @@ def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
     oracle_sr = float(oracle_hits.mean())
 
     print("=" * 60)
-    print("CosineSelector (real ASLib data)")
+    print("CosineSelector - AS-LLM Architecture (real ASLib data)")
     print("=" * 60)
     print(f"Scenario: {aslib_scenario_dir}")
     print(
