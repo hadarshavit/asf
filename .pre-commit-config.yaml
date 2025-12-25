@@ -4,25 +4,22 @@ repos:
     - id: ruff_format
       name: ruff format
       entry: ruff format --target-version=py311 --force-exclude
-      language: python
+      language: system
       types_or: [python, pyi]
       require_serial: true
-      additional_dependencies: []
 - repo: local
   hooks:
     - id: ruff_check
       name: ruff check
       entry: ruff check --target-version=py311 --force-exclude
-      language: python
+      language: system
       types_or: [python, pyi]
       require_serial: true
-      additional_dependencies: []
 - repo: local
   hooks:
     - id: ty
       name: ty
-      entry: ty check --python /rwthfs/rz/cluster/home/ni574034/venvs/asf_env/bin/python --force-exclude
-      language: python
+      entry: ty check --force-exclude
+      language: system
       types_or: [python, pyi]
       require_serial: true
-      additional_dependencies: []

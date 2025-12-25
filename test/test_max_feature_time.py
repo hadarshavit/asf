@@ -1,3 +1,6 @@
+import os
+import shutil
+
 import pytest
 
 from asf.scenario.aslib_reader import read_aslib_scenario
@@ -13,9 +16,22 @@ except ImportError:
     SMAC_AVAILABLE = False
 
 
+@pytest.fixture(autouse=True)
+def cleanup_smac_output():
+    """Clean up smac_output directory after each test."""
+    yield
+    smac_output_dir = os.path.join(os.getcwd(), "smac_output")
+    if os.path.exists(smac_output_dir):
+        shutil.rmtree(smac_output_dir)
+
+
 @pytest.fixture()
 def scenario_data():
-    scenario_path = "/home/ni574034/asf/paper/aslib_data/MAXSAT19-UCMS"
+    aslib_path = os.environ.get("ASLIB_PATH")
+    if aslib_path is None:
+        pytest.skip("ASLIB_PATH environment variable not set")
+    assert aslib_path is not None  # for type checker: pytest.skip always raises
+    scenario_path = os.path.join(aslib_path, "MAXSAT19-UCMS")
     return read_aslib_scenario(scenario_path)
 
 

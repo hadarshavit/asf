@@ -94,7 +94,7 @@ class GMeans:
                 # A better implementation would be recursive.
                 # Let's simplify and just use the number of clusters found.
                 # For now, let's just implement the basic logic.
-                pass  # TODO: Improve implementation if needed
+                pass  # Simplified: basic G-means used for clustering in ISAC
 
             i += 1
 
