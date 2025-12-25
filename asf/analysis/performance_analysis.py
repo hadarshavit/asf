@@ -6,16 +6,24 @@ including baseline computation, correlation analysis, CDF plots, box plots, and 
 All plotting functions use Plotly and provide an option to return data without plotting.
 """
 
+from __future__ import annotations
+
+from typing import Any, Callable
+
+import io
+import sys
+
 import numpy as np
 import pandas as pd
-from scipy.stats import spearmanr, friedmanchisquare
-from scipy.cluster.hierarchy import linkage
-from scipy.special import comb
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-
 import plotly.express as px
 import plotly.graph_objects as go
+from scipy.cluster.hierarchy import dendrogram as scipy_dendrogram
+from scipy.cluster.hierarchy import linkage
+from scipy.spatial.distance import squareform
+from scipy.special import comb
+from scipy.stats import friedmanchisquare, pearsonr, spearmanr
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 
 def compute_baselines(
@@ -23,31 +31,40 @@ def compute_baselines(
     maximize: bool = False,
     budget: float | None = None,
     runstatus: pd.DataFrame | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """
-    Compute baseline performance metrics: VBS (Virtual Best Solver) and BSA (Best Single Algorithm).
+    Compute baseline performance metrics: VBS and BSA.
 
-    Args:
-        performance: DataFrame with performance values, rows are instances, columns are algorithms.
-        maximize: Whether to maximize (True) or minimize (False) performance.
-        budget: Algorithm cutoff time/budget for runtime scenarios.
-        runstatus: Optional DataFrame with run status for each algorithm/instance.
+    VBS (Virtual Best Solver) and BSA (Best Single Algorithm).
 
-    Returns:
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values, rows are instances, columns are algorithms.
+    maximize : bool, default=False
+        Whether to maximize (True) or minimize (False) performance.
+    budget : float or None, default=None
+        Algorithm cutoff time/budget for runtime scenarios.
+    runstatus : pd.DataFrame or None, default=None
+        Optional DataFrame with run status for each algorithm/instance.
+
+    Returns
+    -------
+    dict
         Dictionary with baseline metrics including VBS score, BSA score, and best algorithm name.
     """
     if maximize:
-        vbs_score = performance.max(axis=1).mean()
+        vbs_score = float(performance.max(axis=1).mean())
         algo_perfs = performance.mean(axis=0)
-        best_algo = algo_perfs.idxmax()
-        bsa_score = algo_perfs[best_algo]
+        best_algo = str(algo_perfs.idxmax())
+        bsa_score = float(algo_perfs[best_algo])
     else:
-        vbs_score = performance.min(axis=1).mean()
+        vbs_score = float(performance.min(axis=1).mean())
         algo_perfs = performance.mean(axis=0)
-        best_algo = algo_perfs.idxmin()
-        bsa_score = algo_perfs[best_algo]
+        best_algo = str(algo_perfs.idxmin())
+        bsa_score = float(algo_perfs[best_algo])
 
-    result = {
+    result: dict[str, Any] = {
         "vbs_score": vbs_score,
         "bsa_score": bsa_score,
         "best_algorithm": best_algo,
@@ -80,14 +97,22 @@ def compute_greedy_portfolio(
     maximize: bool = False,
 ) -> list[tuple[str, float]]:
     """
-    Build a greedy portfolio by iteratively adding algorithms that most improve VBS.
+    Build a greedy portfolio by iteratively adding algorithms.
 
-    Args:
-        performance: DataFrame with performance values.
-        max_algos: Maximum number of algorithms to select. If None, selects all.
-        maximize: Whether to maximize (True) or minimize (False) performance.
+    Algorithms are added based on which most improves VBS.
 
-    Returns:
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    max_algos : int or None, default=None
+        Maximum number of algorithms to select. If None, selects all.
+    maximize : bool, default=False
+        Whether to maximize (True) or minimize (False) performance.
+
+    Returns
+    -------
+    list of tuple of (str, float)
         List of tuples (algorithm_name, vbs_score_after_adding).
     """
     if max_algos is None:
@@ -98,21 +123,24 @@ def compute_greedy_portfolio(
         perf_data = perf_data * -1
 
     # Start with best single algorithm
-    bsa = perf_data.mean(axis=0).idxmin()
-    bsa_score = perf_data.mean(axis=0).min()
+    bsa = str(perf_data.mean(axis=0).idxmin())
+    bsa_score = float(perf_data.mean(axis=0).min())
 
     selected = [(bsa, -bsa_score if maximize else bsa_score)]
     remaining = set(performance.columns) - {bsa}
 
-    def get_vbs(data):
-        return data.min(axis=1).mean()
+    def get_vbs(data: pd.DataFrame) -> float:
+        return float(data.min(axis=1).mean())
 
     for _ in range(1, max_algos):
         if not remaining:
             break
 
         current_algos = [a[0] for a in selected]
-        best_addition = (None, get_vbs(perf_data[current_algos]))
+        best_addition: tuple[str | None, float] = (
+            None,
+            get_vbs(perf_data[current_algos]),
+        )
 
         for algo in remaining:
             test_algos = current_algos + [algo]
@@ -124,7 +152,7 @@ def compute_greedy_portfolio(
             break
 
         score = -best_addition[1] if maximize else best_addition[1]
-        selected.append((best_addition[0], score))
+        selected.append((str(best_addition[0]), score))
         remaining.remove(best_addition[0])
 
     return selected
@@ -135,16 +163,21 @@ def compute_algorithm_correlation(
     method: str = "spearman",
 ) -> tuple[pd.DataFrame, list[str]]:
     """
-    Compute correlation matrix between algorithms using hierarchical clustering for ordering.
+    Compute correlation matrix between algorithms.
 
-    Args:
-        performance: DataFrame with performance values.
-        method: Correlation method ('spearman' or 'pearson').
+    Uses hierarchical clustering for ordering the matrix.
 
-    Returns:
-        Tuple of:
-            - Correlation matrix as DataFrame with algorithms ordered by hierarchical clustering.
-            - List of algorithm names in clustered order.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    method : str, default="spearman"
+        Correlation method ('spearman' or 'pearson').
+
+    Returns
+    -------
+    tuple of (pd.DataFrame, list of str)
+        Correlation matrix as DataFrame and algorithm names in clustered order.
     """
     algos = list(performance.columns)
     n_algos = len(algos)
@@ -169,28 +202,30 @@ def compute_algorithm_correlation(
                 rho = np.corrcoef(y_i, y_j)[0, 1]
 
             if np.isnan(rho):
-                rho = 0
+                rho = 0.0
             data[i, j] = rho
             data[j, i] = rho
 
     # Hierarchical clustering for ordering
     link = linkage(data * -1, "ward")
 
-    sorted_algos = [[a] for a in algos]
+    sorted_algos_list: list[list[str]] = [[a] for a in algos]
     for link_item in link:
-        new_cluster = sorted_algos[int(link_item[0])][:]
-        new_cluster.extend(sorted_algos[int(link_item[1])][:])
-        sorted_algos.append(new_cluster)
+        new_cluster = sorted_algos_list[int(link_item[0])][:]
+        new_cluster.extend(sorted_algos_list[int(link_item[1])][:])
+        sorted_algos_list.append(new_cluster)
 
-    sorted_algos = sorted_algos[-1]
+    sorted_algos = sorted_algos_list[-1]
 
     # Resort data according to clustering
     indx_list = [sorted_algos.index(a) for a in algos]
-    indx_list = np.argsort(indx_list)
-    data = data[indx_list, :]
-    data = data[:, indx_list]
+    indx_list_arr = np.argsort(indx_list)
+    data = data[indx_list_arr, :]
+    data = data[:, indx_list_arr]
 
-    correlation_df = pd.DataFrame(data, index=sorted_algos, columns=sorted_algos)
+    correlation_df = pd.DataFrame(
+        data, index=pd.Index(sorted_algos), columns=pd.Index(sorted_algos)
+    )
 
     return correlation_df, sorted_algos
 
@@ -201,15 +236,21 @@ def plot_algorithm_correlation(
     return_data: bool = False,
 ) -> go.Figure | tuple[go.Figure, pd.DataFrame, list[str]]:
     """
-    Plot correlation heatmap between algorithms with hierarchical clustering.
+    Plot correlation heatmap between algorithms.
 
-    Args:
-        performance: DataFrame with performance values.
-        method: Correlation method ('spearman' or 'pearson').
-        return_data: If True, also return the correlation data.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    method : str, default="spearman"
+        Correlation method ('spearman' or 'pearson').
+    return_data : bool, default=False
+        If True, also return the correlation data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, correlation_df, sorted_algos) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, correlation_df, sorted_algos).
     """
     correlation_df, sorted_algos = compute_algorithm_correlation(performance, method)
 
@@ -245,19 +286,24 @@ def compute_performance_cdf(
     """
     Compute CDF data for algorithm performance.
 
-    Args:
-        performance: DataFrame with performance values.
-        budget: Optional cutoff value for runtime scenarios.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    budget : float or None, default=None
+        Optional cutoff value for runtime scenarios.
 
-    Returns:
+    Returns
+    -------
+    dict
         Dictionary mapping algorithm names to (x, y) CDF data.
     """
     if budget is not None:
         max_val = budget
     else:
-        max_val = performance.max().max()
+        max_val = float(performance.max().max())
 
-    min_val = max(0.0005, performance.min().min())
+    min_val = max(0.0005, float(performance.min().min()))
 
     cdfs = {}
     for algo in performance.columns:
@@ -266,17 +312,17 @@ def compute_performance_cdf(
             continue
 
         # Clip values to max_val
-        values = values.clip(upper=max_val)
+        values_clipped = values.clip(upper=max_val)
 
         # Create CDF
-        x = np.sort(values)
+        x = np.sort(values_clipped.values)
         y = np.arange(1, len(x) + 1) / len(x)
 
         # Add start point
         x = np.concatenate([[min_val], x])
         y = np.concatenate([[0], y])
 
-        cdfs[algo] = (x, y)
+        cdfs[str(algo)] = (x, y)
 
     return cdfs
 
@@ -286,18 +332,25 @@ def plot_performance_cdf(
     budget: float | None = None,
     log_scale: bool = True,
     return_data: bool = False,
-) -> go.Figure | tuple[go.Figure, dict]:
+) -> go.Figure | tuple[go.Figure, dict[str, tuple[np.ndarray, np.ndarray]]]:
     """
     Plot CDF of algorithm performance.
 
-    Args:
-        performance: DataFrame with performance values.
-        budget: Optional cutoff value for runtime scenarios.
-        log_scale: Whether to use log scale for x-axis.
-        return_data: If True, also return the CDF data.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    budget : float or None, default=None
+        Optional cutoff value for runtime scenarios.
+    log_scale : bool, default=True
+        Whether to use log scale for x-axis.
+    return_data : bool, default=False
+        If True, also return the CDF data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, cdf_data) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, cdf_data).
     """
     cdf_data = compute_performance_cdf(performance, budget)
 
@@ -334,29 +387,38 @@ def compute_box_plot_data(
     performance: pd.DataFrame,
     budget: float | None = None,
     log_scale: bool = False,
-) -> dict[str, dict]:
+) -> dict[str, dict[str, Any]]:
     """
     Compute box plot statistics for each algorithm.
 
-    Args:
-        performance: DataFrame with performance values.
-        budget: Optional cutoff value to clip performance.
-        log_scale: Whether to log-transform the data.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    budget : float or None, default=None
+        Optional cutoff value to clip performance.
+    log_scale : bool, default=False
+        Whether to log-transform the data.
 
-    Returns:
+    Returns
+    -------
+    dict
         Dictionary mapping algorithm names to their statistics.
     """
-    data = performance.copy()
+    data_df = performance.copy()
     if budget is not None:
-        data = data.clip(upper=budget)
+        data_df = data_df.clip(upper=budget)
 
     if log_scale:
-        data = np.log10(data.replace(0, np.nan))
+        # Replace 0 with NaN before log transform to avoid -inf
+        data_df = np.log10(data_df.replace(0, np.nan))
 
-    stats = {}
-    for algo in data.columns:
-        values = data[algo].dropna().values
-        stats[algo] = {
+    stats: dict[str, dict[str, Any]] = {}
+    for algo in data_df.columns:
+        values = data_df[algo].dropna().values
+        if len(values) == 0:
+            continue
+        stats[str(algo)] = {
             "values": values,
             "mean": np.mean(values),
             "median": np.median(values),
@@ -375,32 +437,39 @@ def plot_performance_box(
     budget: float | None = None,
     log_scale: bool = False,
     return_data: bool = False,
-) -> go.Figure | tuple[go.Figure, dict]:
+) -> go.Figure | tuple[go.Figure, dict[str, dict[str, Any]]]:
     """
     Plot box plots for algorithm performance.
 
-    Args:
-        performance: DataFrame with performance values.
-        budget: Optional cutoff value to clip performance.
-        log_scale: Whether to use log scale for y-axis.
-        return_data: If True, also return the box plot data.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    budget : float or None, default=None
+        Optional cutoff value to clip performance.
+    log_scale : bool, default=False
+        Whether to use log scale for y-axis.
+    return_data : bool, default=False
+        If True, also return the box plot data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, stats) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, stats).
     """
-    data = performance.copy()
+    data_df = performance.copy()
     if budget is not None:
-        data = data.clip(upper=budget)
+        data_df = data_df.clip(upper=budget)
 
     stats = compute_box_plot_data(performance, budget, log_scale=False)
 
     fig = go.Figure()
 
-    for algo in data.columns:
+    for algo in data_df.columns:
         fig.add_trace(
             go.Box(
-                y=data[algo],
-                name=algo,
+                y=data_df[algo],
+                name=str(algo),
                 boxpoints=False,
             )
         )
@@ -426,11 +495,16 @@ def compute_runstatus_distribution(
     """
     Compute the distribution of run statuses for each algorithm.
 
-    Args:
-        runstatus: DataFrame with runstatus for each algorithm/instance.
-        stati: List of status values to include. Defaults to common statuses.
+    Parameters
+    ----------
+    runstatus : pd.DataFrame
+        DataFrame with runstatus for each algorithm/instance.
+    stati : list of str or None, default=None
+        List of status values to include. Defaults to common statuses.
 
-    Returns:
+    Returns
+    -------
+    pd.DataFrame
         DataFrame with frequency of each status per algorithm.
     """
     if stati is None:
@@ -453,13 +527,19 @@ def plot_runstatus_bar(
     """
     Plot stacked bar chart of algorithm run status distribution.
 
-    Args:
-        runstatus: DataFrame with runstatus for each algorithm/instance.
-        stati: List of status values to include.
-        return_data: If True, also return the distribution data.
+    Parameters
+    ----------
+    runstatus : pd.DataFrame
+        DataFrame with runstatus for each algorithm/instance.
+    stati : list of str or None, default=None
+        List of status values to include.
+    return_data : bool, default=False
+        If True, also return the distribution data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, distribution_df) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, distribution_df).
     """
     if stati is None:
         stati = ["ok", "timeout", "memout", "not_applicable", "crash", "other"]
@@ -500,25 +580,31 @@ def compute_scatter_data(
     performance: pd.DataFrame,
     algo1: str,
     algo2: str,
-) -> dict:
+) -> dict[str, Any]:
     """
     Compute scatter plot data for two algorithms.
 
-    Args:
-        performance: DataFrame with performance values.
-        algo1: First algorithm name.
-        algo2: Second algorithm name.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    algo1 : str
+        First algorithm name.
+    algo2 : str
+        Second algorithm name.
 
-    Returns:
+    Returns
+    -------
+    dict
         Dictionary with x, y values and statistics.
     """
     x = performance[algo1].values
     y = performance[algo2].values
 
     # Compute wins/ties/losses
-    wins_algo1 = np.sum(x < y)
-    wins_algo2 = np.sum(y < x)
-    ties = np.sum(x == y)
+    wins_algo1 = int(np.sum(x < y))
+    wins_algo2 = int(np.sum(y < x))
+    ties = int(np.sum(x == y))
 
     return {
         "x": x,
@@ -539,20 +625,29 @@ def plot_scatter(
     budget: float | None = None,
     log_scale: bool = True,
     return_data: bool = False,
-) -> go.Figure | tuple[go.Figure, dict]:
+) -> go.Figure | tuple[go.Figure, dict[str, Any]]:
     """
     Plot scatter plot comparing two algorithms.
 
-    Args:
-        performance: DataFrame with performance values.
-        algo1: First algorithm name.
-        algo2: Second algorithm name.
-        budget: Optional max value for axes.
-        log_scale: Whether to use log scale.
-        return_data: If True, also return the scatter data.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    algo1 : str
+        First algorithm name.
+    algo2 : str
+        Second algorithm name.
+    budget : float or None, default=None
+        Optional max value for axes.
+    log_scale : bool, default=True
+        Whether to use log scale.
+    return_data : bool, default=False
+        If True, also return the scatter data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, scatter_data) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, scatter_data).
     """
     scatter_data = compute_scatter_data(performance, algo1, algo2)
 
@@ -560,7 +655,7 @@ def plot_scatter(
     y = scatter_data["y"]
 
     if budget is None:
-        budget = max(x.max(), y.max())
+        budget = float(max(x.max(), y.max()))
 
     fig = go.Figure()
 
@@ -616,19 +711,26 @@ def plot_all_scatter(
     return_data: bool = False,
 ) -> (
     list[tuple[str, str, go.Figure]]
-    | tuple[list[tuple[str, str, go.Figure]], list[dict]]
+    | tuple[list[tuple[str, str, go.Figure]], list[dict[str, Any]]]
 ):
     """
     Generate scatter plots for all pairs of algorithms.
 
-    Args:
-        performance: DataFrame with performance values.
-        budget: Optional max value for axes.
-        log_scale: Whether to use log scale.
-        return_data: If True, also return the scatter data.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    budget : float or None, default=None
+        Optional max value for axes.
+    log_scale : bool, default=True
+        Whether to use log scale.
+    return_data : bool, default=False
+        If True, also return the scatter data.
 
-    Returns:
-        List of (algo1, algo2, figure) tuples, or tuple with list of data dicts if return_data.
+    Returns
+    -------
+    list or tuple
+        List of (algo1, algo2, figure), or tuple with list of data dicts.
     """
     algos = list(performance.columns)
     plots = []
@@ -656,14 +758,22 @@ def compute_contribution_values(
     budget: float | None = None,
 ) -> dict[str, dict[str, float]]:
     """
-    Compute contribution values: average performance, marginal contribution, and Shapley values.
+    Compute contribution values.
 
-    Args:
-        performance: DataFrame with performance values.
-        maximize: Whether to maximize (True) or minimize (False) performance.
-        budget: Optional cutoff time for runtime scenarios.
+    Computes average performance, marginal contribution, and Shapley values.
 
-    Returns:
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    maximize : bool, default=False
+        Whether to maximize (True) or minimize (False) performance.
+    budget : float or None, default=None
+        Optional cutoff time for runtime scenarios.
+
+    Returns
+    -------
+    dict
         Dictionary with 'averages', 'marginals', and 'shapleys' sub-dictionaries.
     """
     algorithms = list(performance.columns)
@@ -673,34 +783,34 @@ def compute_contribution_values(
     if maximize:
         perf_data = perf_data * -1
 
-    max_perf = perf_data.max().max()
+    max_perf = float(perf_data.max().max())
 
     # Metric function: higher is better
-    def metric(algo, inst):
+    def metric(algo: str, inst: Any) -> float:
         if budget is not None:
             perf = budget - min(budget, perf_data.loc[inst, algo])
-            return perf
+            return float(perf)
         else:
-            return max_perf - perf_data.loc[inst, algo]
+            return float(max_perf - perf_data.loc[inst, algo])
 
     # Compute Shapley values
     shapleys = _compute_vbs_shapley(instances, algorithms, metric)
 
     # Compute marginal contributions
-    def get_vbs(data):
-        return data.min(axis=1).mean()
+    def get_vbs(data: pd.DataFrame) -> float:
+        return float(data.min(axis=1).mean())
 
     all_vbs = get_vbs(perf_data)
     marginals = {}
     for algo in algorithms:
         remaining = [a for a in algorithms if a != algo]
         rem_vbs = get_vbs(perf_data[remaining])
-        marginals[algo] = rem_vbs - all_vbs
+        marginals[str(algo)] = float(rem_vbs - all_vbs)
 
     # Compute average performance
     averages = {}
     for algo in algorithms:
-        averages[algo] = performance[algo].mean()
+        averages[str(algo)] = float(performance[algo].mean())
 
     return {
         "averages": averages,
@@ -710,27 +820,33 @@ def compute_contribution_values(
 
 
 def _compute_vbs_shapley(
-    instances: list,
-    algorithms: list,
-    metric,
+    instances: list[Any],
+    algorithms: list[str],
+    metric: Callable[[str, Any], float],
 ) -> dict[str, float]:
     """
     Compute Shapley values for algorithms in the VBS game.
 
     Based on the algorithm by Alexandre Frechette et al.
 
-    Args:
-        instances: List of instance names.
-        algorithms: List of algorithm names.
-        metric: Function (algo, instance) -> float, higher is better.
+    Parameters
+    ----------
+    instances : list
+        List of instance names.
+    algorithms : list of str
+        List of algorithm names.
+    metric : Callable
+        Function (algo, instance) -> float, higher is better.
 
-    Returns:
+    Returns
+    -------
+    dict
         Dictionary mapping algorithm names to their Shapley values.
     """
     n = len(algorithms)
     m = len(instances)
 
-    shapleys = {}
+    shapleys: dict[str, float] = {}
 
     for instance in instances:
         # Sort algorithms from worst to best for this instance
@@ -750,14 +866,14 @@ def _compute_vbs_shapley(
             if neg > 0:
                 neg_shap = -value / float(neg * comb(pos + neg, pos, exact=True))
             else:
-                neg_shap = None
+                neg_shap = 0.0
 
             # Update Shapley values
             for j in range(i, len(instance_algorithms)):
                 jalgorithm = instance_algorithms[j]
 
                 if jalgorithm not in shapleys:
-                    shapleys[jalgorithm] = 0
+                    shapleys[jalgorithm] = 0.0
 
                 if j == i:
                     shapleys[jalgorithm] += pos_shap
@@ -773,26 +889,35 @@ def plot_contribution_pie(
     maximize: bool = False,
     budget: float | None = None,
     return_data: bool = False,
-) -> go.Figure | tuple[go.Figure, dict]:
+) -> go.Figure | tuple[go.Figure, dict[str, dict[str, float]]]:
     """
     Plot pie chart of algorithm contributions.
 
-    Args:
-        performance: DataFrame with performance values.
-        contribution_type: Type of contribution ('averages', 'marginals', or 'shapleys').
-        maximize: Whether to maximize performance.
-        budget: Optional cutoff time.
-        return_data: If True, also return the contribution data.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    contribution_type : str, default="shapleys"
+        Type of contribution ('averages', 'marginals', or 'shapleys').
+    maximize : bool, default=False
+        Whether to maximize performance.
+    budget : float or None, default=None
+        Optional cutoff time.
+    return_data : bool, default=False
+        If True, also return the contribution data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, contributions) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, contributions).
     """
     contributions = compute_contribution_values(performance, maximize, budget)
     data = contributions[contribution_type]
 
     # Normalize for pie chart
+    labels = list(data.keys())
     values = list(data.values())
-    min_val = min(values)
+    min_val = min(values) if values else 0.0
     if min_val < 0:
         # Shift to positive for pie chart
         values = [v - min_val + 0.001 for v in values]
@@ -800,7 +925,7 @@ def plot_contribution_pie(
     fig = go.Figure(
         data=[
             go.Pie(
-                labels=list(data.keys()),
+                labels=labels,
                 values=values,
                 textinfo="label+percent",
                 hovertemplate="%{label}: %{value:.4f}<extra></extra>",
@@ -831,18 +956,28 @@ def compute_instance_hardness(
     maximize: bool = False,
     eps: float = 0.05,
     runstatus: pd.DataFrame | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """
-    Compute instance hardness based on number of algorithms within eps% of VBS.
+    Compute instance hardness based on VBS overlap.
 
-    Args:
-        performance: DataFrame with performance values.
-        features: DataFrame with feature values for PCA projection.
-        maximize: Whether to maximize performance.
-        eps: Threshold percentage from VBS performance.
-        runstatus: Optional DataFrame with run status.
+    Hardness is defined by the number of algorithms within eps% of VBS performance.
 
-    Returns:
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    features : pd.DataFrame
+        DataFrame with feature values for PCA projection.
+    maximize : bool, default=False
+        Whether to maximize performance.
+    eps : float, default=0.05
+        Threshold percentage from VBS performance.
+    runstatus : pd.DataFrame or None, default=None
+        Optional DataFrame with run status.
+
+    Returns
+    -------
+    dict
         Dictionary with hardness data and 2D PCA coordinates.
     """
     # Fill missing features
@@ -899,20 +1034,29 @@ def plot_instance_hardness(
     eps: float = 0.05,
     runstatus: pd.DataFrame | None = None,
     return_data: bool = False,
-) -> go.Figure | tuple[go.Figure, dict]:
+) -> go.Figure | tuple[go.Figure, dict[str, Any]]:
     """
     Plot instances in 2D PCA space colored by hardness.
 
-    Args:
-        performance: DataFrame with performance values.
-        features: DataFrame with feature values.
-        maximize: Whether to maximize performance.
-        eps: Threshold percentage from VBS.
-        runstatus: Optional DataFrame with run status.
-        return_data: If True, also return the hardness data.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    features : pd.DataFrame
+        DataFrame with feature values.
+    maximize : bool, default=False
+        Whether to maximize performance.
+    eps : float, default=0.05
+        Threshold percentage from VBS.
+    runstatus : pd.DataFrame or None, default=None
+        Optional DataFrame with run status.
+    return_data : bool, default=False
+        If True, also return the hardness data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, hardness_data) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, hardness_data).
     """
     hardness_data = compute_instance_hardness(
         performance, features, maximize, eps, runstatus
@@ -964,19 +1108,28 @@ def compute_algorithm_footprint(
     maximize: bool = False,
     eps: float = 0.05,
     runstatus: pd.DataFrame | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """
     Compute the footprint of an algorithm in feature space.
 
-    Args:
-        performance: DataFrame with performance values.
-        features: DataFrame with feature values.
-        algorithm: Name of the algorithm.
-        maximize: Whether to maximize performance.
-        eps: Threshold percentage from VBS.
-        runstatus: Optional DataFrame with run status.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    features : pd.DataFrame
+        DataFrame with feature values.
+    algorithm : str
+        Name of the algorithm.
+    maximize : bool, default=False
+        Whether to maximize performance.
+    eps : float, default=0.05
+        Threshold percentage from VBS.
+    runstatus : pd.DataFrame or None, default=None
+        Optional DataFrame with run status.
 
-    Returns:
+    Returns
+    -------
+    dict
         Dictionary with footprint data and 2D coordinates.
     """
     # Fill missing features
@@ -988,7 +1141,9 @@ def compute_algorithm_footprint(
 
     pca = PCA(n_components=2)
     features_2d = pca.fit_transform(features_scaled)
-    features_df = pd.DataFrame(features_2d, index=features.index, columns=[0, 1])
+    features_df = pd.DataFrame(
+        features_2d, index=features.index, columns=pd.Index([0, 1])
+    )
 
     # Compute VBS performance
     if maximize:
@@ -1026,21 +1181,31 @@ def plot_algorithm_footprint(
     eps: float = 0.05,
     runstatus: pd.DataFrame | None = None,
     return_data: bool = False,
-) -> go.Figure | tuple[go.Figure, dict]:
+) -> go.Figure | tuple[go.Figure, dict[str, Any]]:
     """
     Plot algorithm footprint in 2D PCA feature space.
 
-    Args:
-        performance: DataFrame with performance values.
-        features: DataFrame with feature values.
-        algorithm: Name of the algorithm.
-        maximize: Whether to maximize performance.
-        eps: Threshold percentage from VBS.
-        runstatus: Optional DataFrame with run status.
-        return_data: If True, also return the footprint data.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    features : pd.DataFrame
+        DataFrame with feature values.
+    algorithm : str
+        Name of the algorithm.
+    maximize : bool, default=False
+        Whether to maximize performance.
+    eps : float, default=0.05
+        Threshold percentage from VBS.
+    runstatus : pd.DataFrame or None, default=None
+        Optional DataFrame with run status.
+    return_data : bool, default=False
+        If True, also return the footprint data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, footprint_data) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, footprint_data).
     """
     footprint_data = compute_algorithm_footprint(
         performance, features, algorithm, maximize, eps, runstatus
@@ -1102,22 +1267,29 @@ def summarize_performance(
     maximize: bool = False,
     budget: float | None = None,
     runstatus: pd.DataFrame | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """
     Generate a comprehensive summary of performance data.
 
-    Args:
-        performance: DataFrame with performance values.
-        maximize: Whether to maximize performance.
-        budget: Optional cutoff value.
-        runstatus: Optional DataFrame with run status.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    maximize : bool, default=False
+        Whether to maximize performance.
+    budget : float or None, default=None
+        Optional cutoff value.
+    runstatus : pd.DataFrame or None, default=None
+        Optional DataFrame with run status.
 
-    Returns:
+    Returns
+    -------
+    dict
         Dictionary with summary statistics and information.
     """
     baselines = compute_baselines(performance, maximize, budget, runstatus)
 
-    summary = {
+    summary: dict[str, Any] = {
         "n_instances": len(performance),
         "n_algorithms": len(performance.columns),
         "algorithm_names": performance.columns.tolist(),
@@ -1126,12 +1298,12 @@ def summarize_performance(
     }
 
     for algo in performance.columns:
-        summary["algorithm_statistics"][algo] = {
-            "mean": performance[algo].mean(),
-            "std": performance[algo].std(),
-            "min": performance[algo].min(),
-            "max": performance[algo].max(),
-            "median": performance[algo].median(),
+        summary["algorithm_statistics"][str(algo)] = {
+            "mean": float(performance[algo].mean()),
+            "std": float(performance[algo].std()),
+            "min": float(performance[algo].min()),
+            "max": float(performance[algo].max()),
+            "median": float(performance[algo].median()),
         }
 
     return summary
@@ -1146,29 +1318,27 @@ def compute_critical_distance(
     performance: pd.DataFrame,
     alpha: float = 0.05,
     maximize: bool = False,
-) -> dict:
+) -> dict[str, Any]:
     """
-    Compute critical distance for comparing algorithm rankings using the Nemenyi test.
+    Compute critical distance for comparing algorithm rankings.
 
-    The critical distance (CD) is used to determine if the difference in average ranks
-    between two algorithms is statistically significant. Based on the Friedman test
-    followed by Nemenyi post-hoc test.
+    Uses the Nemenyi test. The critical distance (CD) is used to determine
+    if the difference in average ranks between two algorithms is statistically
+    significant. Based on the Friedman test followed by Nemenyi post-hoc test.
 
-    Args:
-        performance: DataFrame with performance values, rows are instances, columns are algorithms.
-        alpha: Significance level (0.05 or 0.1 supported).
-        maximize: Whether higher performance is better (True) or lower is better (False).
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values, rows are instances, columns are algorithms.
+    alpha : float, default=0.05
+        Significance level (0.05 or 0.1 supported).
+    maximize : bool, default=False
+        Whether higher performance is better (True) or lower is better (False).
 
-    Returns:
-        Dictionary containing:
-            - average_ranks: Average rank of each algorithm
-            - critical_distance: The CD value
-            - n_algorithms: Number of algorithms
-            - n_instances: Number of instances
-            - alpha: Significance level used
-            - friedman_statistic: Friedman test statistic
-            - friedman_pvalue: Friedman test p-value
-            - significant_differences: List of algorithm pairs with significant differences
+    Returns
+    -------
+    dict
+        Dictionary containing CD results and statistics.
     """
     n_instances = len(performance)
     n_algorithms = len(performance.columns)
@@ -1256,7 +1426,7 @@ def compute_critical_distance(
         q_alpha = q_table[min(q_table.keys(), key=lambda x: abs(x - n_algorithms))]
 
     # Critical distance
-    cd = q_alpha * np.sqrt(n_algorithms * (n_algorithms + 1) / (6 * n_instances))
+    cd = float(q_alpha * np.sqrt(n_algorithms * (n_algorithms + 1) / (6 * n_instances)))
 
     # Find significant differences
     significant_pairs = []
@@ -1264,7 +1434,7 @@ def compute_critical_distance(
         for algo2 in algorithms[i + 1 :]:
             rank_diff = abs(average_ranks[algo1] - average_ranks[algo2])
             if rank_diff > cd:
-                significant_pairs.append((algo1, algo2, rank_diff))
+                significant_pairs.append((str(algo1), str(algo2), float(rank_diff)))
 
     return {
         "average_ranks": average_ranks.to_dict(),
@@ -1273,8 +1443,8 @@ def compute_critical_distance(
         "n_instances": n_instances,
         "alpha": alpha,
         "q_alpha": q_alpha,
-        "friedman_statistic": friedman_stat,
-        "friedman_pvalue": friedman_p,
+        "friedman_statistic": float(friedman_stat),
+        "friedman_pvalue": float(friedman_p),
         "significant_differences": significant_pairs,
     }
 
@@ -1284,22 +1454,29 @@ def plot_critical_distance(
     alpha: float = 0.05,
     maximize: bool = False,
     return_data: bool = False,
-) -> go.Figure | tuple[go.Figure, dict]:
+) -> go.Figure | tuple[go.Figure, dict[str, Any]]:
     """
-    Plot a Critical Distance (CD) diagram for algorithm comparison.
+    Plot a Critical Distance (CD) diagram.
 
     The CD diagram shows algorithms ordered by their average rank, with a horizontal
     bar indicating the critical distance. Algorithms connected by a bar are not
     significantly different.
 
-    Args:
-        performance: DataFrame with performance values.
-        alpha: Significance level for the Nemenyi test.
-        maximize: Whether higher performance is better.
-        return_data: If True, also return the CD data.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    alpha : float, default=0.05
+        Significance level for the Nemenyi test.
+    maximize : bool, default=False
+        Whether higher performance is better.
+    return_data : bool, default=False
+        If True, also return the CD data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, cd_data) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, cd_data).
     """
     cd_data = compute_critical_distance(performance, alpha, maximize)
 
@@ -1468,6 +1645,20 @@ def _find_cd_cliques(
     Find cliques of algorithms that are not significantly different.
 
     Uses a greedy approach to find maximal cliques.
+
+    Parameters
+    ----------
+    sorted_algos : list of str
+        List of algorithm names sorted by average rank.
+    avg_ranks : dict
+        Average rank of each algorithm.
+    cd : float
+        Critical distance.
+
+    Returns
+    -------
+    list of list of str
+        List of cliques (groups of non-significantly different algorithms).
     """
     cliques = []
     used = set()
@@ -1527,20 +1718,21 @@ def _find_cd_cliques(
 def compute_algorithm_similarity(
     performance: pd.DataFrame,
     maximize: bool = False,
-) -> dict:
+) -> dict[str, Any]:
     """
     Compute algorithm similarity based on win/loss/tie analysis.
 
-    Args:
-        performance: DataFrame with performance values.
-        maximize: Whether higher performance is better.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    maximize : bool, default=False
+        Whether higher performance is better.
 
-    Returns:
-        Dictionary containing:
-            - win_matrix: DataFrame of wins (row beats column)
-            - tie_matrix: DataFrame of ties
-            - similarity_matrix: DataFrame of similarity scores (1 - normalized wins against each other)
-            - dominance_scores: How often each algorithm beats others on average
+    Returns
+    -------
+    dict
+        Dictionary containing win/tie/similarity matrices and dominance scores.
     """
     algorithms = list(performance.columns)
     n_algos = len(algorithms)
@@ -1565,11 +1757,14 @@ def compute_algorithm_similarity(
                 wins[i, j] = np.sum(perf1 < perf2)
                 ties[i, j] = np.sum(perf1 == perf2)
 
-    win_matrix = pd.DataFrame(wins, index=algorithms, columns=algorithms)
-    tie_matrix = pd.DataFrame(ties, index=algorithms, columns=algorithms)
+    win_matrix = pd.DataFrame(
+        wins, index=pd.Index(algorithms), columns=pd.Index(algorithms)
+    )
+    tie_matrix = pd.DataFrame(
+        ties, index=pd.Index(algorithms), columns=pd.Index(algorithms)
+    )
 
-    # Similarity: based on how often algorithms agree (both beat or both lose to same algorithms)
-    # Or simpler: 1 - |wins_ij - wins_ji| / n_instances
+    # Similarity: based on how often algorithms agree
     similarity = np.zeros((n_algos, n_algos))
     for i in range(n_algos):
         for j in range(n_algos):
@@ -1580,14 +1775,18 @@ def compute_algorithm_similarity(
                 diff = abs(wins[i, j] - wins[j, i])
                 similarity[i, j] = 1 - diff / n_instances
 
-    similarity_matrix = pd.DataFrame(similarity, index=algorithms, columns=algorithms)
+    similarity_matrix = pd.DataFrame(
+        similarity, index=pd.Index(algorithms), columns=pd.Index(algorithms)
+    )
 
     # Dominance score: average win rate against all other algorithms
     dominance = {}
     for i, algo in enumerate(algorithms):
         total_wins = wins[i, :].sum()
         total_comparisons = n_instances * (n_algos - 1)
-        dominance[algo] = total_wins / total_comparisons if total_comparisons > 0 else 0
+        dominance[str(algo)] = (
+            float(total_wins / total_comparisons) if total_comparisons > 0 else 0.0
+        )
 
     return {
         "win_matrix": win_matrix,
@@ -1602,17 +1801,23 @@ def plot_algorithm_similarity_heatmap(
     performance: pd.DataFrame,
     maximize: bool = False,
     return_data: bool = False,
-) -> go.Figure | tuple[go.Figure, dict]:
+) -> go.Figure | tuple[go.Figure, dict[str, Any]]:
     """
     Plot heatmap of algorithm similarity.
 
-    Args:
-        performance: DataFrame with performance values.
-        maximize: Whether higher performance is better.
-        return_data: If True, also return the similarity data.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    maximize : bool, default=False
+        Whether higher performance is better.
+    return_data : bool, default=False
+        If True, also return the similarity data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, similarity_data) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, similarity_data).
     """
     similarity_data = compute_algorithm_similarity(performance, maximize)
     similarity_matrix = similarity_data["similarity_matrix"]
@@ -1647,18 +1852,27 @@ def plot_algorithm_win_matrix(
     maximize: bool = False,
     normalize: bool = True,
     return_data: bool = False,
-) -> go.Figure | tuple[go.Figure, dict]:
+) -> go.Figure | tuple[go.Figure, dict[str, Any]]:
     """
-    Plot heatmap of win matrix (how often row algorithm beats column algorithm).
+    Plot heatmap of win matrix.
 
-    Args:
-        performance: DataFrame with performance values.
-        maximize: Whether higher performance is better.
-        normalize: If True, show as percentage instead of counts.
-        return_data: If True, also return the similarity data.
+    Shows how often row algorithm beats column algorithm.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, similarity_data) if return_data is True.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    maximize : bool, default=False
+        Whether higher performance is better.
+    normalize : bool, default=True
+        If True, show as percentage instead of counts.
+    return_data : bool, default=False
+        If True, also return the similarity data.
+
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, similarity_data).
     """
     similarity_data = compute_algorithm_similarity(performance, maximize)
     win_matrix = similarity_data["win_matrix"]
@@ -1702,18 +1916,25 @@ def plot_algorithm_dendrogram(
     maximize: bool = False,
     method: str = "ward",
     return_data: bool = False,
-) -> go.Figure | tuple[go.Figure, dict]:
+) -> go.Figure | tuple[go.Figure, dict[str, Any]]:
     """
-    Plot dendrogram showing hierarchical clustering of algorithms based on similarity.
+    Plot dendrogram showing hierarchical clustering of algorithms.
 
-    Args:
-        performance: DataFrame with performance values.
-        maximize: Whether higher performance is better.
-        method: Linkage method ('ward', 'single', 'complete', 'average').
-        return_data: If True, also return the clustering data.
+    Parameters
+    ----------
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    maximize : bool, default=False
+        Whether higher performance is better.
+    method : str, default="ward"
+        Linkage method ('ward', 'single', 'complete', 'average').
+    return_data : bool, default=False
+        If True, also return the clustering data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, clustering_data) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, clustering_data).
     """
     similarity_data = compute_algorithm_similarity(performance, maximize)
     similarity_matrix = similarity_data["similarity_matrix"]
@@ -1722,28 +1943,19 @@ def plot_algorithm_dendrogram(
     distance_matrix = 1 - similarity_matrix.values
 
     # Hierarchical clustering
-    # Need to convert to condensed form for linkage
-    from scipy.spatial.distance import squareform
-
     condensed_dist = squareform(distance_matrix)
     link = linkage(condensed_dist, method=method)
 
     algorithms = list(similarity_matrix.columns)
 
     # Create dendrogram data
-    from scipy.cluster.hierarchy import dendrogram as scipy_dendrogram
-    import io
-    import sys
-
     # Capture dendrogram data
     old_stdout = sys.stdout
     sys.stdout = io.StringIO()
-
     dendro_data = scipy_dendrogram(link, labels=algorithms, no_plot=True)
-
     sys.stdout = old_stdout
 
-    # Build plotly figure from dendrogram data
+    # Build plotly figure
     fig = go.Figure()
 
     # Draw the dendrogram lines
@@ -1807,31 +2019,37 @@ def compute_feature_performance_correlation(
     For each feature-algorithm pair, computes the correlation coefficient.
     This helps identify which features are predictive of algorithm performance.
 
-    Args:
-        features: DataFrame with feature values, rows are instances, columns are features.
-        performance: DataFrame with performance values, rows are instances, columns are algorithms.
-        method: Correlation method ('spearman' or 'pearson').
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values, rows are instances, columns are features.
+    performance : pd.DataFrame
+        DataFrame with performance values, rows are instances, columns are algorithms.
+    method : str, default="spearman"
+        Correlation method ('spearman' or 'pearson').
 
-    Returns:
-        DataFrame with correlation coefficients (rows=features, columns=algorithms).
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with correlation coefficients.
     """
     # Ensure same instances
     common_instances = features.index.intersection(performance.index)
-    features = features.loc[common_instances]
-    performance = performance.loc[common_instances]
+    features_sub = features.loc[common_instances]
+    performance_sub = performance.loc[common_instances]
 
     # Fill missing features
-    features_filled = features.fillna(features.mean())
+    features_filled = features_sub.fillna(features_sub.mean())
 
     feature_names = list(features_filled.columns)
-    algorithm_names = list(performance.columns)
+    algorithm_names = list(performance_sub.columns)
 
     correlations = np.zeros((len(feature_names), len(algorithm_names)))
 
     for i, feat in enumerate(feature_names):
         feat_values = features_filled[feat].values
         for j, algo in enumerate(algorithm_names):
-            algo_values = performance[algo].values
+            algo_values = performance_sub[algo].values
 
             if method == "spearman":
                 rho, _ = spearmanr(feat_values, algo_values)
@@ -1839,10 +2057,12 @@ def compute_feature_performance_correlation(
                 rho = np.corrcoef(feat_values, algo_values)[0, 1]
 
             if np.isnan(rho):
-                rho = 0
+                rho = 0.0
             correlations[i, j] = rho
 
-    return pd.DataFrame(correlations, index=feature_names, columns=algorithm_names)
+    return pd.DataFrame(
+        correlations, index=pd.Index(feature_names), columns=pd.Index(algorithm_names)
+    )
 
 
 def compute_feature_performance_difference_correlation(
@@ -1853,32 +2073,38 @@ def compute_feature_performance_difference_correlation(
     method: str = "spearman",
 ) -> pd.DataFrame:
     """
-    Compute correlation between features and performance difference between two algorithms.
+    Compute correlation with performance difference between two algorithms.
 
     This identifies which features predict when one algorithm outperforms another.
 
-    Args:
-        features: DataFrame with feature values.
-        performance: DataFrame with performance values.
-        algo1: First algorithm name.
-        algo2: Second algorithm name.
-        method: Correlation method ('spearman' or 'pearson').
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values.
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    algo1 : str
+        First algorithm name.
+    algo2 : str
+        Second algorithm name.
+    method : str, default="spearman"
+        Correlation method ('spearman' or 'pearson').
 
-    Returns:
-        DataFrame with correlation coefficients and p-values for each feature.
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with correlation coefficients and p-values.
     """
-    from scipy.stats import pearsonr
-
     # Ensure same instances
     common_instances = features.index.intersection(performance.index)
-    features = features.loc[common_instances]
-    performance = performance.loc[common_instances]
+    features_sub = features.loc[common_instances]
+    performance_sub = performance.loc[common_instances]
 
     # Fill missing features
-    features_filled = features.fillna(features.mean())
+    features_filled = features_sub.fillna(features_sub.mean())
 
     # Compute performance difference
-    perf_diff = performance[algo1] - performance[algo2]
+    perf_diff = performance_sub[algo1] - performance_sub[algo2]
 
     results = []
     for feat in features_filled.columns:
@@ -1890,14 +2116,14 @@ def compute_feature_performance_difference_correlation(
             rho, pval = pearsonr(feat_values, perf_diff.values)
 
         if np.isnan(rho):
-            rho, pval = 0, 1
+            rho, pval = 0.0, 1.0
 
         results.append(
             {
                 "feature": feat,
-                "correlation": rho,
-                "p_value": pval,
-                "abs_correlation": abs(rho),
+                "correlation": float(rho),
+                "p_value": float(pval),
+                "abs_correlation": float(abs(rho)),
             }
         )
 
@@ -1917,15 +2143,23 @@ def plot_feature_performance_correlation(
     """
     Plot heatmap of feature-performance correlations.
 
-    Args:
-        features: DataFrame with feature values.
-        performance: DataFrame with performance values.
-        method: Correlation method ('spearman' or 'pearson').
-        top_n: If specified, only show top N features by max absolute correlation.
-        return_data: If True, also return the correlation data.
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values.
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    method : str, default="spearman"
+        Correlation method ('spearman' or 'pearson').
+    top_n : int or None, default=None
+        If specified, only show top N features by max absolute correlation.
+    return_data : bool, default=False
+        If True, also return the correlation data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, correlation_df) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, correlation_df).
     """
     correlation_df = compute_feature_performance_correlation(
         features, performance, method
@@ -1969,36 +2203,43 @@ def compute_feature_algorithm_selection_correlation(
     method: str = "spearman",
 ) -> pd.DataFrame:
     """
-    Compute correlation between features and whether each algorithm is the best choice.
+    Compute correlation between features and algorithm selection.
 
     For each feature-algorithm pair, computes correlation with a binary indicator
     of whether that algorithm is the best for each instance.
 
-    Args:
-        features: DataFrame with feature values.
-        performance: DataFrame with performance values.
-        maximize: Whether higher performance is better.
-        method: Correlation method ('spearman' or 'pearson').
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values.
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    maximize : bool, default=False
+        Whether higher performance is better.
+    method : str, default="spearman"
+        Correlation method ('spearman' or 'pearson').
 
-    Returns:
-        DataFrame with correlation coefficients (rows=features, columns=algorithms).
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with correlation coefficients.
     """
     # Ensure same instances
     common_instances = features.index.intersection(performance.index)
-    features = features.loc[common_instances]
-    performance = performance.loc[common_instances]
+    features_sub = features.loc[common_instances]
+    performance_sub = performance.loc[common_instances]
 
     # Fill missing features
-    features_filled = features.fillna(features.mean())
+    features_filled = features_sub.fillna(features_sub.mean())
 
     # Compute best algorithm for each instance
     if maximize:
-        best_algo = performance.idxmax(axis=1)
+        best_algo = performance_sub.idxmax(axis=1)
     else:
-        best_algo = performance.idxmin(axis=1)
+        best_algo = performance_sub.idxmin(axis=1)
 
     feature_names = list(features_filled.columns)
-    algorithm_names = list(performance.columns)
+    algorithm_names = list(performance_sub.columns)
 
     correlations = np.zeros((len(feature_names), len(algorithm_names)))
 
@@ -2014,10 +2255,12 @@ def compute_feature_algorithm_selection_correlation(
                 rho = np.corrcoef(feat_values, is_best)[0, 1]
 
             if np.isnan(rho):
-                rho = 0
+                rho = 0.0
             correlations[i, j] = rho
 
-    return pd.DataFrame(correlations, index=feature_names, columns=algorithm_names)
+    return pd.DataFrame(
+        correlations, index=pd.Index(feature_names), columns=pd.Index(algorithm_names)
+    )
 
 
 def plot_feature_selection_predictors(
@@ -2033,16 +2276,25 @@ def plot_feature_selection_predictors(
 
     Shows which features best predict when each algorithm is optimal.
 
-    Args:
-        features: DataFrame with feature values.
-        performance: DataFrame with performance values.
-        maximize: Whether higher performance is better.
-        method: Correlation method.
-        top_n: Number of top features to show.
-        return_data: If True, also return the correlation data.
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values.
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    maximize : bool, default=False
+        Whether higher performance is better.
+    method : str, default="spearman"
+        Correlation method.
+    top_n : int, default=15
+        Number of top features to show.
+    return_data : bool, default=False
+        If True, also return the correlation data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, correlation_df) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, correlation_df).
     """
     correlation_df = compute_feature_algorithm_selection_correlation(
         features, performance, maximize, method

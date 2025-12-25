@@ -28,7 +28,7 @@ def test_random_forest_configuration_space(wrapper_cls):
         f"{prefix}:bootstrap",
     }
 
-    cs_names = {hp.name for hp in cs.get_hyperparameters()}
+    cs_names = {hp.name for hp in list(cs.values())}
     assert expected_names.issubset(cs_names)
 
 

@@ -1,30 +1,56 @@
-import pandas as pd
-import numpy as np
-from sklearn.neighbors import NearestNeighbors
-from sklearn.model_selection import KFold
+from __future__ import annotations
 
+from functools import partial
+from typing import Any, cast
+
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import KFold
+from sklearn.neighbors import NearestNeighbors
+
+from asf.presolving.aspeed import CLINGO_AVAIL, Aspeed
 from asf.selectors.abstract_selector import AbstractSelector
-from asf.presolving.aspeed import Aspeed, CLINGO_AVAIL
 from asf.utils.configurable import ConfigurableMixin
 
 try:
     from ConfigSpace import (  # noqa: F401
-        ConfigurationSpace,
         Categorical,
-        Integer,
+        ConfigurationSpace,
         EqualsCondition,
+        Integer,
     )
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
-from functools import partial
-from typing import Any
 
 
 class ISA(ConfigurableMixin, AbstractSelector):
     """
     ISA (Instance-Specific Aspeed) selector.
+
+    Attributes
+    ----------
+    k : int
+        Number of neighbors for k-NN.
+    use_k_tuning : bool
+        Whether to tune k using cross-validation.
+    n_folds : int
+        Number of folds for cross-validation when tuning k.
+    k_candidates : list[int]
+        Candidate k values to consider when tuning.
+    aspeed_cutoff : int
+        Time limit for the internal aspeed solver.
+    cores : int
+        Number of cores for the internal aspeed solver.
+    random_state : int
+        Random seed for reproducibility.
+    reduced_features : pd.DataFrame or None
+        Training features after set reduction.
+    reduced_performance : pd.DataFrame or None
+        Training performance after set reduction.
+    knn : NearestNeighbors or None
+        k-NN model.
     """
 
     PREFIX = "isa"
@@ -39,47 +65,61 @@ class ISA(ConfigurableMixin, AbstractSelector):
         aspeed_cutoff: int = 30,
         cores: int = 1,
         random_state: int = 42,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         """
         Initialize the ISA selector.
 
-        Args:
-            k (int): Number of neighbors for k-NN.
-            use_k_tuning (bool): Whether to tune k using cross-validation.
-            n_folds (int): Number of folds for cross-validation when tuning k.
-            k_candidates (list[int]): Candidate k values to consider when tuning.
-            aspeed_cutoff (int): Time limit for the internal aspeed solver.
-            cores (int): Number of cores for the internal aspeed solver.
-            random_state (int): Random seed for reproducibility.
-            **kwargs: Additional arguments for the parent class.
+        Parameters
+        ----------
+        k : int, default=10
+            Number of neighbors for k-NN.
+        use_k_tuning : bool, default=True
+            Whether to tune k using cross-validation.
+        n_folds : int, default=5
+            Number of folds for cross-validation when tuning k.
+        k_candidates : list[int] or None, default=None
+            Candidate k values to consider when tuning.
+        aspeed_cutoff : int, default=30
+            Time limit for the internal aspeed solver.
+        cores : int, default=1
+            Number of cores for the internal aspeed solver.
+        random_state : int, default=42
+            Random seed for reproducibility.
+        **kwargs : Any
+            Additional keyword arguments for the parent class.
         """
         if not CLINGO_AVAIL:
             raise ImportError("clingo is not installed. Please install it to use ISA.")
         super().__init__(**kwargs)
-        self.k = k
-        self.use_k_tuning = use_k_tuning
-        self.n_folds = n_folds
+        self.k = int(k)
+        self.use_k_tuning = bool(use_k_tuning)
+        self.n_folds = int(n_folds)
         self.k_candidates = [3, 5, 10, 15, 20] if k_candidates is None else k_candidates
-        self.aspeed_cutoff = aspeed_cutoff
-        self.cores = cores
-        self.random_state = random_state
+        self.aspeed_cutoff = int(aspeed_cutoff)
+        self.cores = int(cores)
+        self.random_state = int(random_state)
 
         self.reduced_features: pd.DataFrame | None = None
         self.reduced_performance: pd.DataFrame | None = None
         self.knn: NearestNeighbors | None = None
 
-    def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
+    def _fit(
+        self,
+        features: pd.DataFrame,
+        performance: pd.DataFrame,
+        **kwargs: Any,
+    ) -> None:
         """
         Fit the ISA selector.
 
-        This involves reducing the instance set and tuning k.
-
-        Args:
-            features (pd.DataFrame): Training features (instances x features).
-            performance (pd.DataFrame): Training performance (instances x algorithms).
+        Parameters
+        ----------
+        features : pd.DataFrame
+            Training features (instances x features).
+        performance : pd.DataFrame
+            Training performance (instances x algorithms).
         """
-        # Instance Set Reduction
         is_solved = performance < self.budget
         solved_by_all = is_solved.all(axis=1)
         solved_by_none = ~is_solved.any(axis=1)
@@ -101,11 +141,15 @@ class ISA(ConfigurableMixin, AbstractSelector):
 
     def _tune_k(self) -> int:
         """
-        Find the best k using cross-validation on the reduced instance set.
-        """
-        if len(self.reduced_features) < self.n_folds:
-            return self.k
+        Tune the neighborhood size k via cross-validation.
 
+        Returns
+        -------
+        int
+            The best k value found.
+        """
+        if self.reduced_features is None:
+            return self.k
         best_k = self.k
         best_score = float("inf")
         kf = KFold(n_splits=self.n_folds, shuffle=True, random_state=self.random_state)
@@ -114,6 +158,8 @@ class ISA(ConfigurableMixin, AbstractSelector):
         for candidate_k in self.k_candidates:
             fold_scores = []
             for train_idx, val_idx in kf.split(instance_indices):
+                assert self.reduced_features is not None
+                assert self.reduced_performance is not None
                 train_features = self.reduced_features.iloc[train_idx]
                 train_perf = self.reduced_performance.iloc[train_idx]
                 val_features = self.reduced_features.iloc[val_idx]
@@ -136,20 +182,20 @@ class ISA(ConfigurableMixin, AbstractSelector):
                     instance_actual_perf = val_perf.loc[instance_row.name]
                     solved = False
                     for algo, _ in schedule:
-                        runtime = instance_actual_perf.get(algo)
-                        if runtime is not None and runtime < self.budget:
+                        runtime = float(instance_actual_perf.get(algo, self.budget))
+                        if self.budget is not None and runtime < self.budget:
                             total_runtime += runtime
                             solved = True
                             break
                     if not solved:
-                        total_runtime += self.budget
+                        total_runtime += float(self.budget or 0)
 
                 avg_runtime = total_runtime / len(val_features)
                 fold_scores.append(avg_runtime)
 
             mean_score = np.mean(fold_scores) if fold_scores else float("inf")
             if mean_score < best_score:
-                best_score = mean_score
+                best_score = float(mean_score)
                 best_k = candidate_k
 
         return best_k
@@ -159,55 +205,95 @@ class ISA(ConfigurableMixin, AbstractSelector):
     ) -> list[tuple[str, float]]:
         """
         Run aspeed on performance data to get a schedule.
+
+        Parameters
+        ----------
+        performance_subset : pd.DataFrame
+            Performance matrix for the neighborhood.
+
+        Returns
+        -------
+        list[tuple[str, float]]
+            List of (algorithm, time) tuples.
         """
         aspeed_presolver = Aspeed(
-            budget=self.budget,
+            budget=float(self.budget or 0),
             aspeed_cutoff=self.aspeed_cutoff,
             cores=self.cores,
         )
 
         aspeed_presolver.fit(features=None, performance=performance_subset)
-        schedule = aspeed_presolver.predict()
+        schedule = cast(list[tuple[str, float]], aspeed_presolver.predict())
         schedule.sort(key=lambda x: x[1])
 
         total_time = sum(time for _, time in schedule)
-        remaining_time = self.budget - total_time
+        remaining_time = float(self.budget or 0) - total_time
 
         if remaining_time > 0:
-            max_idx = max(range(len(schedule)), key=lambda i: schedule[i][1])
-            algo, time = schedule[max_idx]
-            schedule[max_idx] = (algo, time + remaining_time)
+            if schedule:
+                max_idx = max(range(len(schedule)), key=lambda i: schedule[i][1])
+                algo, time = schedule[max_idx]
+                schedule[max_idx] = (str(algo), float(time + remaining_time))
+            else:
+                # Fallback if aspeed returns empty schedule (unlikely)
+                pass
 
-        return schedule
+        return [(str(a), float(t)) for a, t in schedule]
 
-    def _predict(self, features: pd.DataFrame) -> dict[str, list[tuple[str, float]]]:
+    def _predict(
+        self,
+        features: pd.DataFrame | None,
+        performance: pd.DataFrame | None = None,
+    ) -> dict[str, list[tuple[str, float]]]:
         """
-        For each test instance, find neighbors and compute a schedule using aspeed.
+        Predict algorithm schedules for each instance.
 
-        Args:
-            features (pd.DataFrame): Feature matrix for the test instances.
+        Parameters
+        ----------
+        features : pd.DataFrame or None
+            The input features.
+        performance : pd.DataFrame or None, default=None
+            Partial performance data.
 
-        Returns:
-            Dict[str, List[Tuple[str, float]]]: A schedule for each instance.
+        Returns
+        -------
+        dict
+            Mapping from instance name to algorithm schedules.
         """
+        if features is None:
+            raise ValueError("ISA requires features for prediction.")
         if self.knn is None:
-            # This happens if the training data was all trivial
-            return {instance: [] for instance in features.index}
+            return {str(instance): [] for instance in features.index}
 
-        predictions = {}
-        for instance_name, instance_row in features.iterrows():
-            x = instance_row.values.reshape(1, -1)
+        predictions: dict[str, list[tuple[str, float]]] = {}
+        for instance_name in features.index:
+            x = features.loc[[instance_name]].values
             _, neighbor_idxs = self.knn.kneighbors(x)
+            assert self.reduced_performance is not None
             neighbor_perf = self.reduced_performance.iloc[neighbor_idxs.flatten()]
 
             schedule = self._get_aspeed_schedule(neighbor_perf)
-            predictions[instance_name] = schedule
+            predictions[str(instance_name)] = schedule
 
         return predictions
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
-        """Define hyperparameters for ISA."""
+    def _define_hyperparameters(
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """
+        Define hyperparameters for ISA.
+
+        Parameters
+        ----------
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        tuple
+            Tuple of (hyperparameters, conditions, forbiddens).
+        """
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
 
@@ -267,14 +353,25 @@ class ISA(ConfigurableMixin, AbstractSelector):
     def _get_from_clean_configuration(
         cls,
         clean_config: dict[str, Any],
-        **kwargs,
-    ) -> partial:
+        **kwargs: Any,
+    ) -> partial[ISA]:
         """
-        Create a partial function from a clean (unprefixed) configuration.
+        Create a partial function from a clean configuration.
+
+        Parameters
+        ----------
+        clean_config : dict
+            The clean configuration.
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        partial
+            Partial function for ISA.
         """
         config = clean_config.copy()
 
-        # Helper to map k_candidates categorical to list
         k_candidates_map = {
             "small": [3, 5, 10],
             "medium": [3, 5, 10, 15, 20],
@@ -287,8 +384,7 @@ class ISA(ConfigurableMixin, AbstractSelector):
             k_candidates_str = config.get("k_candidates", "medium")
             config["k_candidates"] = k_candidates_map[k_candidates_str]
         else:
-            # Default fallback if not tuning k
-            config["k_candidates"] = [3, 5, 10, 15, 20]  # Default from __init__
+            config["k_candidates"] = [3, 5, 10, 15, 20]
             if "n_folds" not in config:
                 config["n_folds"] = 5
 

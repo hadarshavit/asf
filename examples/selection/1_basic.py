@@ -1,5 +1,7 @@
 from asf.selectors import PairwiseClassifier
-from sklearn.ensemble import RandomForestClassifier
+from asf.predictors.random_forest import (
+    RandomForestClassifierWrapper as RandomForestClassifier,
+)
 import pandas as pd
 import numpy as np
 

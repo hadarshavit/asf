@@ -3,6 +3,8 @@
 Provides functions for analyzing features and performance in algorithm selection scenarios.
 """
 
+from __future__ import annotations
+
 from asf.analysis.features_analysis import (
     get_feature_statistics,
     compute_feature_correlation,

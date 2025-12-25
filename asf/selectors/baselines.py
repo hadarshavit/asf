@@ -1,17 +1,13 @@
-"""
-Baseline selectors: Single Best Solver (SBS) and Virtual Best Solver (VBS).
-
-These provide upper and lower bounds for algorithm selection performance.
-"""
-
 from __future__ import annotations
 
-import pandas as pd
-import numpy as np
-from asf.selectors.abstract_selector import AbstractSelector
-from asf.utils.configurable import ConfigurableMixin
 from functools import partial
 from typing import Any
+
+import numpy as np
+import pandas as pd
+
+from asf.selectors.abstract_selector import AbstractSelector
+from asf.utils.configurable import ConfigurableMixin
 
 
 class SingleBestSolver(ConfigurableMixin, AbstractSelector):
@@ -21,9 +17,12 @@ class SingleBestSolver(ConfigurableMixin, AbstractSelector):
     Always selects the algorithm with the best average performance across all
     training instances. This represents the baseline performance achievable
     without any instance-specific selection.
-    """
 
-    PREFIX = "sbs"
+    Attributes
+    ----------
+    best_algorithm : str or None
+        The name of the algorithm with the best aggregate performance.
+    """
 
     PREFIX = "sbs"
 
@@ -32,8 +31,22 @@ class SingleBestSolver(ConfigurableMixin, AbstractSelector):
         budget: int | None = None,
         maximize: bool = False,
         feature_groups: list[str] | None = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
+        """
+        Initialize the SingleBestSolver.
+
+        Parameters
+        ----------
+        budget : int or None, default=None
+            The budget for the selector.
+        maximize : bool, default=False
+            Indicates whether to maximize the performance metric.
+        feature_groups : list[str] or None, default=None
+            Groups of features to be considered.
+        **kwargs : Any
+            Additional keyword arguments.
+        """
         super().__init__(
             budget=budget,
             maximize=maximize,
@@ -46,10 +59,19 @@ class SingleBestSolver(ConfigurableMixin, AbstractSelector):
         self,
         features: pd.DataFrame,
         performance: pd.DataFrame,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """
         Find the single best algorithm based on aggregate performance.
+
+        Parameters
+        ----------
+        features : pd.DataFrame
+            The input features.
+        performance : pd.DataFrame
+            The performance data.
+        **kwargs : Any
+            Additional keyword arguments.
         """
         # Apply PAR10 penalty for comparison
         if self.budget is not None:
@@ -70,26 +92,66 @@ class SingleBestSolver(ConfigurableMixin, AbstractSelector):
         self.best_algorithm = performance.columns[best_idx]
 
     def _predict(
-        self, features: pd.DataFrame, performance: pd.DataFrame | None = None
+        self,
+        features: pd.DataFrame | None,
+        performance: pd.DataFrame | None = None,
     ) -> dict[str, list[tuple[str, float]]]:
         """
-        Predict the single best algorithm for all instances.
+                Predict the single best algorithm for all instances.
+
+                Parameters
+                ----------
+                features : pd.DataFrame or None
+                    The input features.
+                performance : pd.DataFrame or None, default=None
+                    The performance data.
+
+                Returns
+        -------
+                dict
+                    Dictionary mapping instance IDs to the single best algorithm.
         """
+        indices = features.index if features is not None else [0]
         return {
-            instance: [(self.best_algorithm, self.budget)]
-            for instance in features.index
+            str(instance): [(str(self.best_algorithm), float(self.budget or 0))]
+            for instance in indices
         }
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """
+        Define hyperparameters for SingleBestSolver.
+
+        Returns
+        -------
+        tuple
+            Empty hyperparameters, conditions, and forbiddens.
+        """
         return [], [], []
 
     @classmethod
     def _get_from_clean_configuration(
         cls,
         clean_config: dict[str, Any],
-        **kwargs,
-    ) -> partial:
+        **kwargs: Any,
+    ) -> partial[SingleBestSolver]:
+        """
+                Create a SingleBestSolver from a clean configuration.
+
+                Parameters
+                ----------
+                clean_config : dict
+                    The clean configuration.
+                **kwargs : Any
+                    Additional keyword arguments.
+
+                Returns
+        -------
+                partial
+                    Partial function for SingleBestSolver.
+        """
         config = clean_config.copy()
         config.update(kwargs)
         return partial(SingleBestSolver, **config)
@@ -103,14 +165,8 @@ class VirtualBestSolver(ConfigurableMixin, AbstractSelector):
     This represents the upper bound of performance achievable by any
     algorithm selector (requires oracle knowledge of true performance).
 
-    Note: This selector "cheats" by using the test performance data,
-    so it should only be used as an upper bound reference, not as a
-    practical selector.
+    Note: This selector "cheats" by using the test performance data.
     """
-
-    PREFIX = "vbs"
-
-    PREFIX = "vbs"
 
     PREFIX = "vbs"
 
@@ -119,8 +175,22 @@ class VirtualBestSolver(ConfigurableMixin, AbstractSelector):
         budget: int | None = None,
         maximize: bool = False,
         feature_groups: list[str] | None = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
+        """
+        Initialize the VirtualBestSolver.
+
+        Parameters
+        ----------
+        budget : int or None, default=None
+            The budget for the selector.
+        maximize : bool, default=False
+            Indicates whether to maximize the performance metric.
+        feature_groups : list[str] or None, default=None
+            Groups of features to be considered.
+        **kwargs : Any
+            Additional keyword arguments.
+        """
         super().__init__(
             budget=budget,
             maximize=maximize,
@@ -133,21 +203,44 @@ class VirtualBestSolver(ConfigurableMixin, AbstractSelector):
         self,
         features: pd.DataFrame,
         performance: pd.DataFrame,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """
         Store the performance data for oracle predictions.
+
+        Parameters
+        ----------
+        features : pd.DataFrame
+            The input features.
+        performance : pd.DataFrame
+            The performance data.
+        **kwargs : Any
+            Additional keyword arguments.
         """
         self._performance = performance
 
     def _predict(
-        self, features: pd.DataFrame, performance: pd.DataFrame | None = None
+        self,
+        features: pd.DataFrame | None,
+        performance: pd.DataFrame | None = None,
     ) -> dict[str, list[tuple[str, float]]]:
         """
         Predict the best algorithm for each instance (oracle).
 
         If performance data is provided at prediction time, use it.
-        Otherwise, fall back to training performance (for instances in training set).
+        Otherwise, fall back to training performance.
+
+        Parameters
+        ----------
+        features : pd.DataFrame or None
+            The input features.
+        performance : pd.DataFrame or None, default=None
+            The performance data.
+
+        Returns
+        -------
+        dict
+            Dictionary mapping instance IDs to the best algorithm.
         """
         # Use provided performance or fall back to stored
         perf = performance if performance is not None else self._performance
@@ -158,11 +251,15 @@ class VirtualBestSolver(ConfigurableMixin, AbstractSelector):
                 "Either provide it at fit time or pass it to predict."
             )
 
-        result = {}
-        for instance in features.index:
+        indices = features.index if features is not None else perf.index
+
+        result: dict[str, list[tuple[str, float]]] = {}
+        for instance in indices:
             if instance not in perf.index:
                 # Fall back to first algorithm if instance not found
-                result[instance] = [(self.algorithms[0], self.budget)]
+                result[str(instance)] = [
+                    (str(self.algorithms[0]), float(self.budget or 0))
+                ]
                 continue
 
             instance_perf = perf.loc[instance]
@@ -176,25 +273,50 @@ class VirtualBestSolver(ConfigurableMixin, AbstractSelector):
                 instance_perf_penalized = instance_perf.values
 
             if self.maximize:
-                best_idx = np.argmax(instance_perf_penalized)
+                best_idx = int(np.argmax(instance_perf_penalized))
             else:
-                best_idx = np.argmin(instance_perf_penalized)
+                best_idx = int(np.argmin(instance_perf_penalized))
 
-            best_algorithm = perf.columns[best_idx]
-            result[instance] = [(best_algorithm, self.budget)]
+            best_algorithm = str(perf.columns[best_idx])
+            result[str(instance)] = [(best_algorithm, float(self.budget or 0))]
 
         return result
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """
+        Define hyperparameters for VirtualBestSolver.
+
+        Returns
+        -------
+        tuple
+            Empty hyperparameters, conditions, and forbiddens.
+        """
         return [], [], []
 
     @classmethod
     def _get_from_clean_configuration(
         cls,
         clean_config: dict[str, Any],
-        **kwargs,
-    ) -> partial:
+        **kwargs: Any,
+    ) -> partial[VirtualBestSolver]:
+        """
+        Create a VirtualBestSolver from a clean configuration.
+
+        Parameters
+        ----------
+        clean_config : dict
+            The clean configuration.
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        partial
+            Partial function for VirtualBestSolver.
+        """
         config = clean_config.copy()
         config.update(kwargs)
         return partial(VirtualBestSolver, **config)

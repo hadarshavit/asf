@@ -1,17 +1,21 @@
-from functools import partial
-from typing import Any, Callable
-import time
+from __future__ import annotations
+
 import logging
+import time
+from functools import partial
+from pathlib import Path
+from typing import Any
+
 import pandas as pd
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 
 from asf.presolving.presolver import AbstractPresolver
 from asf.selectors.abstract_selector import AbstractSelector
-from asf.utils.configurable import ConfigurableMixin, ClassChoice
+from asf.utils.configurable import ClassChoice, ConfigurableMixin
 
 try:
-    from ConfigSpace import (
+    from ConfigSpace import (  # noqa: F401
         Categorical,
         Configuration,
         EqualsCondition,
@@ -27,16 +31,24 @@ except ImportError:
 
 class SelectorPipeline(ConfigurableMixin):
     """
-    A pipeline for applying a sequence of preprocessing, feature selection, and algorithm selection
-    steps before fitting a final selector model.
+    Sequence of preprocessing, feature selection, and algorithm selection steps.
 
-    Attributes:
-        selector (AbstractSelector): The main selector model to be used.
-    preprocessor (Callable | None): A callable for preprocessing the input data.
-    pre_solving (Callable | None): A callable for pre-solving steps.
-    feature_selector (Callable | None): A callable for feature selection.
-    algorithm_pre_selector (Callable | None): A callable for algorithm pre-selection.
-    feature_groups (Any | None): Feature groups to be used by the selector.
+    Attributes
+    ----------
+    selector : AbstractSelector
+        The main selector model to be used.
+    pre_solving : AbstractPresolver or None
+        A presolver for selecting initial algorithms.
+    feature_selector : Any or None
+        A component for feature selection.
+    algorithm_pre_selector : Any or None
+        A component for algorithm pre-selection.
+    feature_groups : Any or None
+        Feature groups to be used by the selector.
+    max_feature_time : float or None
+        Budget (seconds) to allocate per feature group in predictions.
+    preprocessor : Pipeline
+        The preprocessing pipeline (including SimpleImputer).
     """
 
     PREFIX = "pipeline"
@@ -44,89 +56,117 @@ class SelectorPipeline(ConfigurableMixin):
     def __init__(
         self,
         selector: AbstractSelector,
-        preprocessor: Any | None = None,
+        preprocessor: Any | list[Any] | None = None,
         pre_solving: AbstractPresolver | None = None,
-        feature_selector: Callable | None = None,
-        algorithm_pre_selector: Callable | None = None,
-        feature_groups: Any | None = None,
+        feature_selector: Any | None = None,
+        algorithm_pre_selector: Any | None = None,
+        feature_groups: dict[str, Any] | list[str] | None = None,
         max_feature_time: float | None = None,
     ) -> None:
         """
-        Initializes the SelectorPipeline.
+        Initialize the SelectorPipeline.
 
-        Args:
-            selector (AbstractSelector): The main selector model to be used.
-            preprocessor (Callable | None, optional): A callable for preprocessing the input data. Defaults to None.
-            pre_solving (Callable | None, optional): A callable for pre-solving steps. Defaults to None.
-            feature_selector (Callable | None, optional): A callable for feature selection. Defaults to None.
-            algorithm_pre_selector (Callable | None, optional): A callable for algorithm pre-selection. Defaults to None.
-            feature_groups (Any | None, optional): Feature groups to be used by the selector. Defaults to None.
-            max_feature_time (float | None, optional): Budget (seconds) to allocate per feature group in predictions. Defaults to None.
+        Parameters
+        ----------
+        selector : AbstractSelector
+            The main selector model to be used.
+        preprocessor : Any or list or None, default=None
+            Preprocessing steps. SimpleImputer(strategy="mean") is always added first.
+        pre_solving : AbstractPresolver or None, default=None
+            Presolver for initial algorithm selection.
+        feature_selector : Any or None, default=None
+            Component for feature selection.
+        algorithm_pre_selector : Any or None, default=None
+            Component for algorithm pre-selection.
+        feature_groups : dict or list or None, default=None
+            Feature groups configuration.
+        max_feature_time : float or None, default=None
+            Budget (seconds) per feature group.
         """
         self.selector = selector
         self.pre_solving = pre_solving
         self.feature_selector = feature_selector
         self.algorithm_pre_selector = algorithm_pre_selector
         self.feature_groups = feature_groups
-        # Optional budget (seconds) to allocate per feature group
-        self.max_feature_time = max_feature_time
+        self.max_feature_time = (
+            float(max_feature_time) if max_feature_time is not None else None
+        )
 
-        # Always include SimpleImputer as the first step in the preprocessing pipeline
         if preprocessor is None:
-            preprocessor = []
+            preproc_list = []
         elif not isinstance(preprocessor, list):
-            preprocessor = [preprocessor]
-        preprocessor = [SimpleImputer(strategy="mean")] + preprocessor
-        steps = [(type(p).__name__, p) for p in preprocessor]
+            preproc_list = [preprocessor]
+        else:
+            preproc_list = preprocessor
+
+        # Always include SimpleImputer as the first step
+        steps = [("SimpleImputer", SimpleImputer(strategy="mean"))]
+        for p in preproc_list:
+            steps.append((type(p).__name__, p))
+
         self.preprocessor = Pipeline(steps)
         self.preprocessor.set_output(transform="pandas")
-
-        self._orig_columns = None
-        self._orig_index = None
 
         self._logger = logging.getLogger(__name__)
 
     def _filter_features(self, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Filters features based on selected feature groups.
+        Filter features based on selected feature groups.
+
+        Parameters
+        ----------
+        X : pd.DataFrame
+            The input features.
+
+        Returns
+        -------
+        pd.DataFrame
+            Filtered features.
         """
         if self.feature_groups and isinstance(self.feature_groups, dict):
             selected_features = []
             for fg_info in self.feature_groups.values():
-                if "provides" in fg_info:
+                if isinstance(fg_info, dict) and "provides" in fg_info:
                     selected_features.extend(fg_info["provides"])
 
-            # Only keep features that are in X
             available_features = [f for f in selected_features if f in X.columns]
             if available_features:
                 return X[available_features]
         return X
 
-    def fit(self, X: Any, y: Any, algorithm_features: Any = None) -> None:
+    def fit(
+        self,
+        X: pd.DataFrame,
+        y: pd.DataFrame,
+        algorithm_features: pd.DataFrame | None = None,
+    ) -> None:
         """
-        Fits the pipeline to the input data.
+        Fit the pipeline.
 
-        Args:
-            X (Any): The input features.
-            y (Any): The target labels.
+        Parameters
+        ----------
+        X : pd.DataFrame
+            The input features.
+        y : pd.DataFrame
+            The performance data.
+        algorithm_features : pd.DataFrame or None, default=None
+            Optional algorithm features.
         """
-        if isinstance(X, pd.DataFrame):
-            self._orig_columns = X.columns
-            self._orig_index = X.index
-
         start = time.time()
         self._logger.debug("Starting fit process")
-        if self.preprocessor:
-            X = self.preprocessor.fit_transform(X)
+
+        X = self.preprocessor.fit_transform(X, y)
         self._logger.debug(
             f"Preprocessing completed in {time.time() - start:.2f} seconds"
         )
         start = time.time()
 
-        # Algorithm pre-selection should happen BEFORE pre-solving
-        # so that the presolver only considers the pre-selected algorithms
         if self.algorithm_pre_selector:
-            y = self.algorithm_pre_selector.fit_transform(y)
+            if hasattr(self.algorithm_pre_selector, "fit_transform"):
+                y = self.algorithm_pre_selector.fit_transform(X, y)  # type: ignore
+            else:
+                self.algorithm_pre_selector.fit(X, y)  # type: ignore
+                y = self.algorithm_pre_selector.transform(y)  # type: ignore
 
         self._logger.debug(
             f"Algorithm pre-selection completed in {time.time() - start:.2f} seconds"
@@ -142,7 +182,11 @@ class SelectorPipeline(ConfigurableMixin):
         start = time.time()
 
         if self.feature_selector:
-            X, y = self.feature_selector.fit_transform(X, y)
+            if hasattr(self.feature_selector, "fit_transform"):
+                X, y = self.feature_selector.fit_transform(X, y)  # type: ignore
+            else:
+                self.feature_selector.fit(X, y)  # type: ignore
+                X = self.feature_selector.transform(X)  # type: ignore
 
         self._logger.debug(
             f"Feature selection completed in {time.time() - start:.2f} seconds"
@@ -150,136 +194,129 @@ class SelectorPipeline(ConfigurableMixin):
         start = time.time()
 
         X = self._filter_features(X)
-
         self.selector.fit(X, y, algorithm_features=algorithm_features)
 
         self._logger.debug(
             f"Selector fitting completed in {time.time() - start:.2f} seconds"
         )
 
-    def predict(self, X: Any, performance: Any = None) -> dict:
+    def predict(
+        self,
+        X: pd.DataFrame,
+        performance: pd.DataFrame | None = None,
+    ) -> dict[str, list[tuple[str, float] | tuple[str, float, float]]]:
         """
-        Makes predictions using the fitted pipeline.
+        Make predictions.
 
-        Args:
-            X (Any): The input features.
-            performance (Any, optional): The performance data for oracle selectors. Defaults to None.
+        Parameters
+        ----------
+        X : pd.DataFrame
+            The input features.
+        performance : pd.DataFrame or None, default=None
+            Performance data for oracle selectors.
 
-        Returns:
-            Any: The predictions made by the selector.
+        Returns
+        -------
+        dict
+            Predictions mapping instance IDs to schedules.
         """
-        if self.preprocessor:
-            X = self.preprocessor.transform(X)
+        X = self.preprocessor.transform(X)
 
-        scheds = None
+        scheds: list[Any] = []
         if self.pre_solving:
-            scheds = self.pre_solving.predict()
+            # Presolver prediction returns a single schedule applied to all test instances
+            scheds = list(self.pre_solving.predict())
 
         if self.feature_selector:
-            X = self.feature_selector.transform(X)
+            X = self.feature_selector.transform(X)  # type: ignore
 
         X = self._filter_features(X)
 
-        # Pass performance through to selector (needed for oracle selectors like VBS)
+        # Pass performance to selector (needed for oracle selectors like VBS)
         predictions = self.selector.predict(X, performance=performance)
 
-        # Ensure predictions use the same index as X
-        predictions = pd.Series(predictions, index=X.index)
-
-        feature_steps = []
+        feature_steps: list[Any] = []
         if self.feature_groups is not None:
             if isinstance(self.feature_groups, dict):
                 feature_steps = list(self.feature_groups.keys())
             elif isinstance(self.feature_groups, list):
                 feature_steps = self.feature_groups
 
-        # Convert feature_steps to budgeted tuples if max_feature_time is set
         if self.max_feature_time is not None and feature_steps:
-            feature_steps_with_budget = [
-                (fg, self.max_feature_time) for fg in feature_steps
+            feature_steps = [
+                (str(fg), float(self.max_feature_time)) for fg in feature_steps
             ]
-        else:
-            feature_steps_with_budget = feature_steps
 
-        final_preds = {}
-        for instance_id, prediction in predictions.items():
-            # If pre-solving schedules are provided, prepend/concatenate them
-            # to the algorithm predictions for each instance. When no pre-solving
-            # schedule is used `scheds` will be None and we should still return
-            # the selector's predictions.
-            if scheds is not None:
-                final_preds[instance_id] = (
-                    scheds + feature_steps_with_budget + prediction
-                )
-            else:
-                final_preds[instance_id] = feature_steps_with_budget + prediction
+        final_preds: dict[str, list[tuple[str, float] | tuple[str, float, float]]] = {}
+        for instance_id in X.index:
+            prediction = predictions.get(str(instance_id), [])  # type: ignore
+            final_preds[str(instance_id)] = scheds + feature_steps + list(prediction)
 
         return final_preds
 
-    def save(self, path: str) -> None:
+    def save(self, path: str | Path) -> None:
         """
-        Saves the pipeline to a file.
+        Save the pipeline to a file.
 
-        Args:
-            path (str): The file path where the pipeline will be saved.
+        Parameters
+        ----------
+        path : str or Path
+            File path to save the pipeline.
         """
         import joblib
 
         joblib.dump(self, path)
 
     @staticmethod
-    def load(path: str) -> "SelectorPipeline":
+    def load(path: str | Path) -> SelectorPipeline:
         """
-        Loads a pipeline from a file.
+        Load a pipeline from a file.
 
-        Args:
-            path (str): The file path from which the pipeline will be loaded.
+        Parameters
+        ----------
+        path : str or Path
+            File path to load from.
 
-        Returns:
-            SelectorPipeline: The loaded pipeline.
+        Returns
+        -------
+        SelectorPipeline
+            The loaded pipeline.
         """
         import joblib
 
         return joblib.load(path)
 
-    def get_config(self) -> dict:
+    def get_config(self) -> dict[str, Any]:
         """
-        Returns a dictionary with the configuration of the pipeline.
+        Return configuration details.
 
-        Returns:
-            dict: Configuration details of the pipeline.
+        Returns
+        -------
+        dict
+            Configuration metadata.
         """
 
-        def get_model_class_name(selector):
-            if hasattr(selector, "model_class"):
-                mc = selector.model_class
-                # Handle functools.partial
+        def get_model_name(obj: Any) -> str | None:
+            if obj is None:
+                return None
+            if hasattr(obj, "model_class"):
+                mc = obj.model_class
                 if hasattr(mc, "func"):
-                    return mc.func.__name__
-                elif hasattr(mc, "__name__"):
-                    return mc.__name__
-                else:
-                    return str(type(mc))
-            return None
+                    return str(mc.func.__name__)
+                return str(getattr(mc, "__name__", type(mc).__name__))
+            return type(obj).__name__
 
-        config = {
+        return {
             "selector": type(self.selector).__name__,
-            "selector_model": get_model_class_name(self.selector),
+            "selector_model": get_model_name(self.selector),
             "pre_solving": type(self.pre_solving).__name__
             if self.pre_solving
             else None,
-            "selector_budget": self.selector.budget if self.selector else None,
-            "presolving_budget": getattr(self.pre_solving, "budget", None)
-            if self.pre_solving
-            else None,
-            "preprocessor": type(self.preprocessor).__name__
-            if self.preprocessor
-            else None,
+            "selector_budget": getattr(self.selector, "budget", None),
+            "presolving_budget": getattr(self.pre_solving, "budget", None),
             "preprocessor_steps": [
                 type(step[1]).__name__ for step in self.preprocessor.steps
-            ]
-            if hasattr(self.preprocessor, "steps")
-            else None,
+            ],
             "feature_selector": type(self.feature_selector).__name__
             if self.feature_selector
             else None,
@@ -287,21 +324,44 @@ class SelectorPipeline(ConfigurableMixin):
             if self.algorithm_pre_selector
             else None,
         }
-        return config
 
     @staticmethod
     def _define_hyperparameters(
-        selector_class: list[type] = None,
+        selector_class: list[type] | None = None,
         preprocessing_class: list[type] | None = None,
         pre_solving_class: list[type] | None = None,
-        feature_groups: dict | None = None,
-        algorithm_pre_selector: type | tuple[type, dict] | None = None,
+        feature_groups: dict[str, Any] | None = None,
+        algorithm_pre_selector: type | tuple[type, dict[str, Any]] | None = None,
         max_feature_time: float | None | bool = False,
         budget: float | None = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
         """
-        Define hyperparameters for the SelectorPipeline.
+        Define hyperparameters for SelectorPipeline.
+
+        Parameters
+        ----------
+        selector_class : list[type] or None, default=None
+            List of selector classes.
+        preprocessing_class : list[type] or None, default=None
+            List of preprocessor classes.
+        pre_solving_class : list[type] or None, default=None
+            List of presolver classes.
+        feature_groups : dict or None, default=None
+            Feature groups definition.
+        algorithm_pre_selector : type or tuple or None, default=None
+            Algorithm pre-selector class.
+        max_feature_time : float or None or bool, default=False
+            Maximum feature computation time.
+        budget : float or None, default=None
+            Total budget.
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        tuple
+            Tuple of (hyperparameters, conditions, forbiddens).
         """
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
@@ -310,311 +370,286 @@ class SelectorPipeline(ConfigurableMixin):
         conditions = []
         forbiddens = []
 
-        # 1. Selector Selection
         if selector_class:
-            # Handle list of tuples (class, kwargs)
             if (
                 isinstance(selector_class, list)
-                and len(selector_class) > 0
+                and selector_class
                 and isinstance(selector_class[0], tuple)
             ):
-                selector_choices = [c[0] for c in selector_class]
-            elif not isinstance(selector_class, list):
-                selector_choices = [selector_class]
+                selector_choices = [
+                    c[0]
+                    for c in (
+                        selector_class if isinstance(selector_class, list) else []
+                    )
+                ]  # type: ignore
             else:
-                selector_choices = selector_class
-
-            # Use ClassChoice for automatic recursion
+                selector_choices = (
+                    selector_class
+                    if isinstance(selector_class, list)
+                    else [selector_class]
+                )
             hyperparameters.append(ClassChoice("selector", choices=selector_choices))
 
-        # 2. Presolver Selection
         if pre_solving_class:
-            if not isinstance(pre_solving_class, list):
-                pre_solving_class = [pre_solving_class]
-
-            # Allow "None" as a choice by using a separate boolean switch
+            ps_choices = (
+                pre_solving_class
+                if isinstance(pre_solving_class, list)
+                else [pre_solving_class]
+            )
             use_presolver = Categorical(
                 "use_presolver", items=[True, False], default=False
             )
             hyperparameters.append(use_presolver)
-
-            presolver_choice = ClassChoice("presolver", choices=pre_solving_class)
+            presolver_choice = ClassChoice("presolver", choices=ps_choices)
             hyperparameters.append(presolver_choice)
+            conditions.append(EqualsCondition(presolver_choice, use_presolver, True))  # type: ignore
 
-            # Condition: presolver active only if use_presolver is True
-            conditions.append(EqualsCondition(presolver_choice, use_presolver, True))
-
-        # 3. Preprocessors
         if preprocessing_class:
             for preproc_cls in preprocessing_class:
-                hp = ClassChoice(
-                    f"preprocessor:{preproc_cls.__name__}",
-                    choices=[preproc_cls, False],
-                    default=False,
+                hyperparameters.append(
+                    ClassChoice(
+                        f"preprocessor:{preproc_cls.__name__}",
+                        choices=[preproc_cls, False],
+                        default=False,
+                    )
                 )
-                hyperparameters.append(hp)
 
-        # 4. Feature Groups
         fg_params = {}
         if feature_groups and len(feature_groups) > 1:
-            for fg_name in feature_groups.keys():
+            for fg_name in feature_groups:
                 fg_param = Categorical(
                     f"feature_group:{fg_name}", [True, False], default=True
                 )
                 hyperparameters.append(fg_param)
                 fg_params[fg_name] = fg_param
 
-            # Forbiddens for prerequisites
             for fg_name, fg_info in feature_groups.items():
-                required_groups = fg_info.get("requires", [])
-                for required_group in required_groups:
-                    if required_group in fg_params:
-                        # Forbid: current=True AND required=False
-                        forbidden = ForbiddenAndConjunction(
-                            ForbiddenEqualsClause(fg_params[fg_name], True),
-                            ForbiddenEqualsClause(fg_params[required_group], False),
+                for req in fg_info.get("requires", []):
+                    if req in fg_params:
+                        forbiddens.append(
+                            ForbiddenAndConjunction(
+                                ForbiddenEqualsClause(fg_params[fg_name], True),
+                                ForbiddenEqualsClause(fg_params[req], False),
+                            )
                         )
-                        forbiddens.append(forbidden)
-
-            # Forbid all False
-            all_false = ForbiddenAndConjunction(
-                *[ForbiddenEqualsClause(param, False) for param in fg_params.values()]
+            forbiddens.append(
+                ForbiddenAndConjunction(
+                    *[ForbiddenEqualsClause(p, False) for p in fg_params.values()]
+                )
             )
-            forbiddens.append(all_false)
 
-        # 5. Algorithm Pre-selector
         if algorithm_pre_selector:
-            if isinstance(algorithm_pre_selector, tuple):
-                pre_sel_cls = algorithm_pre_selector[0]
-            else:
-                pre_sel_cls = algorithm_pre_selector
-
-            # Just one option usually, but wrapped in ClassChoice allows recursion
+            aps_cls = (
+                algorithm_pre_selector[0]
+                if isinstance(algorithm_pre_selector, tuple)
+                else algorithm_pre_selector
+            )
             hyperparameters.append(
-                ClassChoice("algorithm_pre_selector", choices=[pre_sel_cls])
+                ClassChoice("algorithm_pre_selector", choices=[aps_cls])
             )
 
         if max_feature_time is None:
-            assert budget is not None
-            upper = float(budget)
-            mf_param = UniformFloatHyperparameter(
-                "max_feature_time",
-                lower=0.0,
-                upper=upper,
-                default_value=min(60.0, upper),
-                log=False,
+            upper = float(budget or 3600.0)
+            hyperparameters.append(
+                UniformFloatHyperparameter(
+                    "max_feature_time",
+                    lower=0.0,
+                    upper=upper,
+                    default_value=min(60.0, upper),
+                )
             )
-            hyperparameters.append(mf_param)
 
         return hyperparameters, conditions, forbiddens
 
     @classmethod
     def _get_from_clean_configuration(
         cls,
-        clean_config: dict,
-        configuration: Configuration | dict = None,
+        clean_config: dict[str, Any],
+        configuration: Configuration | dict[str, Any] | None = None,
         pre_prefix: str = "",
-        feature_groups: dict | None = None,
-        budget: float | None = None,
+        feature_groups: dict[str, Any] | None = None,
         max_feature_time: float | None = None,
-        **kwargs,
-    ) -> partial:
+        **kwargs: Any,
+    ) -> partial[SelectorPipeline]:
         """
-        Create a SelectorPipeline from a clean (unprefixed) configuration.
+        Create a SelectorPipeline from a clean configuration.
 
-        This method handles the instantiation of complex nested components
-        (selectors, preprocessors, presolvers, etc.) from the clean config.
+        Parameters
+        ----------
+        clean_config : dict
+            Clean configuration mapping.
+        configuration : Configuration or dict or None, default=None
+            Original configuration.
+        pre_prefix : str, default=""
+            Prefix for nested lookups.
+        feature_groups : dict or None, default=None
+            Feature groups definition.
+        max_feature_time : float or None, default=None
+            Maximum feature computation time.
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        partial
+            Partial function for SelectorPipeline.
         """
-        init_kwargs = {}
+        init_kwargs: dict[str, Any] = {}
+        prefix = f"{pre_prefix}:{cls.PREFIX}:" if pre_prefix else f"{cls.PREFIX}:"
 
-        # Compute prefix for nested lookups (needed for feature groups)
-        if pre_prefix:
-            prefix = f"{pre_prefix}:{cls.PREFIX}:"
-        else:
-            prefix = f"{cls.PREFIX}:"
-
-        # 1. Selector - already resolved by parent class
         if "selector" in clean_config:
-            selector_val = clean_config["selector"]
-            if callable(selector_val):
-                # It's a partial, instantiate it
-                init_kwargs["selector"] = selector_val()
-            else:
-                init_kwargs["selector"] = selector_val
+            val = clean_config["selector"]
+            init_kwargs["selector"] = val() if callable(val) else val
 
-        # 2. Presolver - handled via use_presolver and presolver keys
-        use_presolver = clean_config.get("use_presolver", False)
-        if use_presolver and "presolver" in clean_config:
-            presolver_val = clean_config["presolver"]
-            if callable(presolver_val):
-                init_kwargs["pre_solving"] = presolver_val()
-            else:
-                init_kwargs["pre_solving"] = presolver_val
+        if clean_config.get("use_presolver") and "presolver" in clean_config:
+            val = clean_config["presolver"]
+            init_kwargs["pre_solving"] = val() if callable(val) else val
 
-        # 3. Preprocessors - collect all preprocessor:* keys
-        selected_preprocessors = []
-        for key, val in clean_config.items():
-            if key.startswith("preprocessor:"):
-                if val is False or val == "False":
-                    continue
-                if callable(val):
-                    selected_preprocessors.append(val())
-                elif val is not None:
-                    selected_preprocessors.append(val)
-        if selected_preprocessors:
-            init_kwargs["preprocessor"] = selected_preprocessors
+        preprocs = []
+        for k, v in clean_config.items():
+            if k.startswith("preprocessor:") and v and v != "False":
+                preprocs.append(v() if callable(v) else v)
+        if preprocs:
+            init_kwargs["preprocessor"] = preprocs
 
-        # 4. Feature Groups - need the original feature_groups dict and configuration
         if feature_groups and configuration is not None:
             from asf.preprocessing.feature_group_selector import FeatureGroupSelector
 
-            selected_fg = FeatureGroupSelector.get_selected_groups_from_config(
-                feature_groups, configuration, prefix=f"{prefix}feature_group:"
+            init_kwargs["feature_groups"] = (
+                FeatureGroupSelector.get_selected_groups_from_config(
+                    feature_groups, configuration, prefix=f"{prefix}feature_group:"
+                )
             )
-            init_kwargs["feature_groups"] = selected_fg
 
-        # 5. Algorithm Pre-selector
         if "algorithm_pre_selector" in clean_config:
-            pre_sel_val = clean_config["algorithm_pre_selector"]
-            if callable(pre_sel_val):
-                init_kwargs["algorithm_pre_selector"] = pre_sel_val()
-            else:
-                init_kwargs["algorithm_pre_selector"] = pre_sel_val
+            val = clean_config["algorithm_pre_selector"]
+            init_kwargs["algorithm_pre_selector"] = val() if callable(val) else val
 
-        # 6. Max feature time
-        if "max_feature_time" in clean_config:
-            init_kwargs["max_feature_time"] = clean_config["max_feature_time"]
-        elif max_feature_time is not None and max_feature_time is not False:
-            init_kwargs["max_feature_time"] = max_feature_time
+        init_kwargs["max_feature_time"] = clean_config.get(
+            "max_feature_time", max_feature_time
+        )
 
         return partial(cls, **init_kwargs)
 
     @classmethod
     def get_from_configuration(
         cls,
-        configuration: Configuration | dict,
+        configuration: Configuration | dict[str, Any],
         pre_prefix: str = "",
-        feature_groups: dict | None = None,
+        feature_groups: dict[str, Any] | None = None,
         budget: float | None = None,
         max_feature_time: float | None = None,
-        **kwargs,
-    ) -> partial:
+        **kwargs: Any,
+    ) -> partial[SelectorPipeline]:
         """
         Create a SelectorPipeline from a configuration.
 
-        This method extracts values from the configuration, resolves classes
-        from the config space, and delegates to _get_from_clean_configuration.
+        Parameters
+        ----------
+        configuration : Configuration or dict
+            Configuration object.
+        pre_prefix : str, default=""
+            Prefix for nested lookups.
+        feature_groups : dict or None, default=None
+            Feature groups definition.
+        budget : float or None, default=None
+            Total budget.
+        max_feature_time : float or None, default=None
+            Maximum feature computation time.
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        partial
+            Partial function for SelectorPipeline.
         """
         if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError("ConfigSpace is not installed.")
+            raise RuntimeError("ConfigSpace is not available.")
 
-        # Compute prefix
-        if pre_prefix:
-            prefix = f"{pre_prefix}:{cls.PREFIX}:"
-        else:
-            prefix = f"{cls.PREFIX}:"
+        prefix = f"{pre_prefix}:{cls.PREFIX}:" if pre_prefix else f"{cls.PREFIX}:"
+        clean_config: dict[str, Any] = {}
+        cs = getattr(configuration, "config_space", None)
 
-        clean_config = {}
-
-        # Get config space if available for class resolution
-        config_space = getattr(configuration, "config_space", None)
+        def resolve(hp_name: str, val: Any) -> Any:
+            if cs and val:
+                hp = cs.get(hp_name)
+                if hp:
+                    return cls._resolve_class_from_hp(hp, str(val))
+            return None
 
         # 1. Selector
-        selector_name = configuration.get(f"{prefix}selector")
-        if selector_name and config_space:
-            hp = config_space.get(f"{prefix}selector")
-            if hp:
-                chosen_cls = cls._resolve_class_from_hp(hp, selector_name)
-                if chosen_cls:
-                    child_pre_prefix = f"{prefix}selector"
-                    if hasattr(chosen_cls, "get_from_configuration"):
-                        child_kwargs = kwargs.copy()
-                        if budget is not None:
-                            child_kwargs["budget"] = budget
-                        clean_config["selector"] = chosen_cls.get_from_configuration(
-                            configuration=configuration,
-                            pre_prefix=child_pre_prefix,
-                            **child_kwargs,
-                        )
-                    else:
-                        selector_init_kwargs = {}
-                        if budget is not None:
-                            selector_init_kwargs["budget"] = budget
-                        clean_config["selector"] = chosen_cls(**selector_init_kwargs)
+        s_val = configuration.get(f"{prefix}selector")
+        s_cls = resolve(f"{prefix}selector", s_val)
+        if s_cls is None and callable(s_val):
+            s_cls = s_val
+
+        if s_cls:
+            if hasattr(s_cls, "get_from_configuration"):
+                clean_config["selector"] = s_cls.get_from_configuration(
+                    configuration,
+                    pre_prefix=f"{prefix}selector",
+                    budget=budget,
+                    **kwargs,
+                )
+            else:
+                clean_config["selector"] = s_cls(budget=budget) if budget else s_cls()
 
         # 2. Presolver
-        use_presolver = configuration.get(f"{prefix}use_presolver")
-        clean_config["use_presolver"] = use_presolver
+        use_ps = configuration.get(f"{prefix}use_presolver")
+        clean_config["use_presolver"] = use_ps
+        ps_val = configuration.get(f"{prefix}presolver")
+        ps_cls = resolve(f"{prefix}presolver", ps_val)
+        if use_ps and ps_cls:
+            if hasattr(ps_cls, "get_from_configuration"):
+                clean_config["presolver"] = ps_cls.get_from_configuration(
+                    configuration, pre_prefix=f"{prefix}presolver", **kwargs
+                )
+            else:
+                clean_config["presolver"] = ps_cls()
 
-        presolver_name = configuration.get(f"{prefix}presolver")
-        if use_presolver and presolver_name and config_space:
-            hp = config_space.get(f"{prefix}presolver")
-            if hp:
-                chosen_cls = cls._resolve_class_from_hp(hp, presolver_name)
-                if chosen_cls:
-                    child_pre_prefix = f"{prefix}presolver"
-                    if hasattr(chosen_cls, "get_from_configuration"):
-                        clean_config["presolver"] = chosen_cls.get_from_configuration(
-                            configuration=configuration,
-                            pre_prefix=child_pre_prefix,
-                            **kwargs,
-                        )
-                    else:
-                        clean_config["presolver"] = chosen_cls()
-
-        # 3. Preprocessors - discover from config space
-        if config_space:
-            for hp in config_space.get_hyperparameters():
+        # 3. Preprocessors
+        if cs:
+            for hp in list(cs.values()):
                 if hp.name.startswith(f"{prefix}preprocessor:"):
                     val = configuration.get(hp.name)
                     if val and val != "False":
-                        resolved = cls._resolve_class_from_hp(hp, val)
-                        if resolved and resolved is not False:
-                            # Store with just the preprocessor:ClassName part
-                            key_suffix = hp.name[len(prefix) :]
-                            if hasattr(resolved, "get_from_configuration"):
-                                clean_config[key_suffix] = (
-                                    resolved.get_from_configuration(
-                                        configuration, pre_prefix=hp.name, **kwargs
-                                    )
+                        res = cls._resolve_class_from_hp(hp, str(val))
+                        if res:
+                            key = hp.name[len(prefix) :]
+                            clean_config[key] = (
+                                res.get_from_configuration(  # type: ignore
+                                    configuration, pre_prefix=hp.name, **kwargs
                                 )
-                            else:
-                                clean_config[key_suffix] = resolved()
+                                if hasattr(res, "get_from_configuration")
+                                else (res() if callable(res) else res)
+                            )
                     else:
-                        key_suffix = hp.name[len(prefix) :]
-                        clean_config[key_suffix] = False
+                        clean_config[hp.name[len(prefix) :]] = False
 
         # 4. Algorithm Pre-selector
-        pre_sel_name = configuration.get(f"{prefix}algorithm_pre_selector")
-        if pre_sel_name and config_space:
-            hp = config_space.get(f"{prefix}algorithm_pre_selector")
-            if hp:
-                chosen_cls = cls._resolve_class_from_hp(hp, pre_sel_name)
-                if chosen_cls:
-                    child_pre_prefix = f"{prefix}algorithm_pre_selector"
-                    if hasattr(chosen_cls, "get_from_configuration"):
-                        clean_config["algorithm_pre_selector"] = (
-                            chosen_cls.get_from_configuration(
-                                configuration=configuration,
-                                pre_prefix=child_pre_prefix,
-                                **kwargs,
-                            )
-                        )
-                    else:
-                        clean_config["algorithm_pre_selector"] = chosen_cls()
+        aps_val = configuration.get(f"{prefix}algorithm_pre_selector")
+        aps_cls = resolve(f"{prefix}algorithm_pre_selector", aps_val)
+        if aps_cls:
+            if hasattr(aps_cls, "get_from_configuration"):
+                clean_config["algorithm_pre_selector"] = aps_cls.get_from_configuration(
+                    configuration,
+                    pre_prefix=f"{prefix}algorithm_pre_selector",
+                    **kwargs,
+                )
+            else:
+                clean_config["algorithm_pre_selector"] = aps_cls()
 
         # 5. Max feature time
-        mft_val = configuration.get(f"{prefix}max_feature_time")
-        if mft_val is not None:
-            clean_config["max_feature_time"] = mft_val
+        mft = configuration.get(f"{prefix}max_feature_time")
+        if mft is not None:
+            clean_config["max_feature_time"] = mft
 
-        # Delegate to _get_from_clean_configuration
         return cls._get_from_clean_configuration(
             clean_config=clean_config,
             configuration=configuration,
             pre_prefix=pre_prefix,
             feature_groups=feature_groups,
-            budget=budget,
             max_feature_time=max_feature_time,
             **kwargs,
         )

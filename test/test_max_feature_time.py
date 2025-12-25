@@ -97,18 +97,13 @@ def test__create_pipeline_prefers_config_value():
 
             return partial(Inst)
 
-    config = {"pipeline:selector": "DummySelector", "pipeline:max_feature_time": 123.0}
+    config = {"pipeline:selector": DummySelector, "pipeline:max_feature_time": 123.0}
 
     pipeline = _create_pipeline(
         config,
         1000,
         False,
         {},
-        [DummySelector],  # selector_class must be a list
-        None,
-        None,
-        None,
-        None,
         None,
     )
 

@@ -9,11 +9,13 @@ def test_running_time_selector_performance_with_budgeted_feature_groups():
     """Test that the metric handles budgeted feature groups correctly."""
     # Create simple test data
     performance = pd.DataFrame(
-        {"algo1": [10.0, 20.0], "algo2": [15.0, 25.0]}, index=["inst1", "inst2"]
+        {"algo1": [10.0, 20.0], "algo2": [15.0, 25.0]},
+        index=["inst1", "inst2"],  # type: ignore[arg-type]
     )
 
     feature_time = pd.DataFrame(
-        {"fg1": [100.0, 200.0], "fg2": [50.0, 100.0]}, index=["inst1", "inst2"]
+        {"fg1": [100.0, 200.0], "fg2": [50.0, 100.0]},
+        index=["inst1", "inst2"],  # type: ignore[arg-type]
     )
 
     budget = 3600.0
@@ -41,9 +43,9 @@ def test_running_time_selector_performance_with_budgeted_feature_groups():
     )
 
     # Score with budgets should be lower (less feature time)
-    assert score_budgeted < score_unbounded
+    assert float(score_budgeted) < float(score_unbounded)  # type: ignore[arg-type]
     # Expected: algo times (10 + 20 = 30) + budgeted feature times (110 + 120 = 230) = 260
-    assert abs(score_budgeted - 260.0) < 1.0
+    assert abs(float(score_budgeted) - 260.0) < 1.0  # type: ignore[arg-type]
 
 
 def test_running_time_closed_gap_with_budgeted_feature_groups():
@@ -51,12 +53,12 @@ def test_running_time_closed_gap_with_budgeted_feature_groups():
     # Create test data where selector is better than SBS
     performance = pd.DataFrame(
         {"algo1": [100.0, 200.0, 50.0], "algo2": [150.0, 50.0, 250.0]},
-        index=["inst1", "inst2", "inst3"],
+        index=["inst1", "inst2", "inst3"],  # type: ignore[arg-type]
     )
 
     feature_time = pd.DataFrame(
         {"fg1": [100.0, 200.0, 150.0], "fg2": [50.0, 100.0, 75.0]},
-        index=["inst1", "inst2", "inst3"],
+        index=["inst1", "inst2", "inst3"],  # type: ignore[arg-type]
     )
 
     budget = 3600.0
@@ -86,7 +88,7 @@ def test_running_time_closed_gap_with_budgeted_feature_groups():
     )
 
     # Gap with budgets should be better (higher closed gap) since feature time penalty is lower
-    assert gap_budgeted > gap_unbounded
+    assert float(gap_budgeted) > float(gap_unbounded)  # type: ignore[arg-type]
 
 
 def test_pipeline_outputs_budgeted_feature_groups():

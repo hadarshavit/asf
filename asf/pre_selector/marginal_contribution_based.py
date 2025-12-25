@@ -1,59 +1,56 @@
-from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
-import pandas as pd
+"""
+Marginal contribution-based algorithm for algorithm pre-selection.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Callable, Literal
+
 import numpy as np
-from typing import Callable, Literal
+import pandas as pd
+
+from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
+
+try:
+    from ConfigSpace import Configuration, ConfigurationSpace
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
 
 
 class MarginalContributionBasedPreSelector(AbstractPreSelector):
     """
-    Pre-selector that selects algorithms based on their marginal contribution to the
-    performance metric. Supports two modes:
+    Pre-selector that selects algorithms based on their marginal contribution.
 
+    Supports two modes:
     - "backward" (default): Computes marginal contribution by measuring the impact of
-      removing each algorithm from the full set. Selects algorithms with highest contribution.
-
+      removing each algorithm from the full set.
     - "forward" (greedy forward selection): Iteratively builds the subset by adding
       the algorithm that provides the best marginal improvement at each step.
-      This is slower but often finds better subsets as it considers algorithm complementarity.
 
-    Attributes:
-        metric (Callable): A callable function to compute the performance metric.
-        n_algorithms (int): The number of algorithms to select.
-        maximize (bool): A flag indicating whether to maximize or minimize the metric.
-        mode (str): Selection mode - "backward" or "forward".
-        **kwargs: Additional arguments passed to the parent class.
-
-    Methods:
-    fit_transform(performance: pd.DataFrame | np.ndarray) -> pd.DataFrame | np.ndarray:
-            Selects a subset of algorithms based on their marginal contribution to the performance metric.
-
-                performance (pd.DataFrame | np.ndarray): A DataFrame or NumPy array containing the performance
-                    metrics of the algorithms.
-
-            Returns:
-                pd.DataFrame | np.ndarray: A DataFrame or NumPy array containing the performance metrics of the
-                    selected algorithms.
+    Parameters
+    ----------
+    metric : Callable
+        A function that takes a DataFrame of performance values and returns a single value.
+    n_algorithms : int
+        The number of algorithms to select.
+    maximize : bool, default=False
+        Whether to maximize or minimize the performance metric.
+    mode : Literal["backward", "forward"], default="backward"
+        Selection mode.
+    **kwargs : Any
+        Additional arguments passed to the parent class.
     """
 
     def __init__(
         self,
-        metric: Callable,
+        metric: Callable[[pd.DataFrame], float],
         n_algorithms: int,
         maximize: bool = False,
         mode: Literal["backward", "forward"] = "backward",
-        **kwargs,
-    ):
-        """
-        Initializes the MarginalContributionBasedPreSelector with the given configuration.
-
-        Args:
-            metric (Callable): A callable function to compute the performance metric.
-            n_algorithms (int): The number of algorithms to select.
-            maximize (bool, optional): Whether to maximize the metric. Defaults to False.
-            mode (str, optional): Selection mode - "backward" computes marginal contribution
-                from the full set, "forward" uses greedy forward selection. Defaults to "backward".
-            **kwargs: Additional arguments passed to the parent class.
-        """
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         self.metric = metric
         self.n_algorithms = n_algorithms
@@ -61,24 +58,17 @@ class MarginalContributionBasedPreSelector(AbstractPreSelector):
         self.mode = mode
 
     def _is_better(self, new_score: float, old_score: float) -> bool:
-        """Check if new_score is better than old_score based on maximize flag."""
+        """Check if new_score is better than old_score."""
         if self.maximize:
             return new_score > old_score
         return new_score < old_score
 
-    def _forward_selection(self, performance_frame: pd.DataFrame) -> list:
-        """
-        Greedy forward selection: iteratively add the algorithm that provides
-        the best marginal improvement.
-
-        Args:
-            performance_frame: DataFrame with algorithm performance data.
-
-        Returns:
-            List of selected algorithm names.
-        """
+    def _forward_selection(self, performance_frame: pd.DataFrame) -> list[str]:
+        """Greedy forward selection."""
+        if self.n_algorithms is None:
+            raise ValueError("n_algorithms must be set")
         all_algorithms = set(performance_frame.columns)
-        selected_algorithms = []
+        selected_algorithms: list[str] = []
 
         for _ in range(self.n_algorithms):
             best_candidate = None
@@ -87,7 +77,6 @@ class MarginalContributionBasedPreSelector(AbstractPreSelector):
             candidates = all_algorithms - set(selected_algorithms)
 
             for candidate in candidates:
-                # Evaluate adding this candidate to the current selection
                 test_subset = selected_algorithms + [candidate]
                 score = self.metric(performance_frame[test_subset])
 
@@ -100,18 +89,11 @@ class MarginalContributionBasedPreSelector(AbstractPreSelector):
 
         return selected_algorithms
 
-    def _backward_selection(self, performance_frame: pd.DataFrame) -> list:
-        """
-        Original backward marginal contribution method: compute contribution
-        by measuring impact of removing each algorithm from the full set.
-
-        Args:
-            performance_frame: DataFrame with algorithm performance data.
-
-        Returns:
-            List of selected algorithm names.
-        """
-        mcs = []
+    def _backward_selection(self, performance_frame: pd.DataFrame) -> list[str]:
+        """Backward marginal contribution selection."""
+        if self.n_algorithms is None:
+            raise ValueError("n_algorithms must be set")
+        mcs: list[tuple[str, float]] = []
         total_performance = self.metric(performance_frame)
         for algorithm in performance_frame.columns:
             performance_without_algorithm = performance_frame.drop(columns=[algorithm])
@@ -131,42 +113,34 @@ class MarginalContributionBasedPreSelector(AbstractPreSelector):
         return selected_algorithms
 
     def fit_transform(
-        self, performance: pd.DataFrame | np.ndarray
+        self,
+        performance: pd.DataFrame | np.ndarray,
     ) -> pd.DataFrame | np.ndarray:
         """
-            Selects a subset of algorithms based on their marginal contributions to the
-            overall performance and returns the performance data for the selected algorithms.
+        Fit the pre-selector and transform the performance data.
 
-            Parameters:
-            ----------
-        performance : pd.DataFrame | np.ndarray
-                A DataFrame or NumPy array containing the performance metrics of algorithms.
-                Each column represents an algorithm, and each row represents a performance metric.
+        Parameters
+        ----------
+        performance : pd.DataFrame or np.ndarray
+            The performance data.
 
-            Returns:
-            -------
-        pd.DataFrame | np.ndarray
-                A DataFrame or NumPy array containing the performance metrics of the selected
-                algorithms. The format matches the input type (DataFrame or NumPy array).
-
-            Notes:
-            -----
-            - The selection is based on the marginal contribution of each algorithm to the
-              overall performance, calculated using the provided `self.metric` function.
-            - The `self.maximize` attribute determines whether the metric is maximized or minimized.
-            - The number of algorithms to select is determined by `self.n_algorithms`.
-            - When mode="forward", uses greedy forward selection which considers algorithm
-              complementarity but is slower (O(k*n) metric evaluations vs O(n) for backward).
+        Returns
+        -------
+        pd.DataFrame or np.ndarray
+            The performance data with only the selected algorithms.
         """
         if isinstance(performance, np.ndarray):
             performance_frame = pd.DataFrame(
                 performance,
-                columns=[f"Algorithm_{i}" for i in range(performance.shape[1])],
+                columns=[f"Algorithm_{i}" for i in range(performance.shape[1])],  # type: ignore[arg-type]
             )
-            numpy = True
+            is_numpy = True
         else:
             performance_frame = performance
-            numpy = False
+            is_numpy = False
+
+        if self.n_algorithms is None:
+            raise ValueError("n_algorithms must be set")
 
         if self.mode == "forward":
             selected_algorithms = self._forward_selection(performance_frame)
@@ -175,21 +149,23 @@ class MarginalContributionBasedPreSelector(AbstractPreSelector):
 
         selected_performance = performance_frame[selected_algorithms]
 
-        if numpy:
+        if is_numpy:
             selected_performance = selected_performance.values
 
         return selected_performance
 
     @staticmethod
     def get_configuration_space(
-        cs=None,
-        cs_transform=None,
-        parent_param=None,
-        parent_value=None,
-        n_algorithms_max=None,
-        **kwargs,
-    ):
-        """Get the configuration space for MarginalContributionBasedPreSelector."""
+        cs: ConfigurationSpace | None = None,
+        cs_transform: dict[str, Any] | None = None,
+        parent_param: Any | None = None,
+        parent_value: Any | None = None,
+        n_algorithms_max: int | None = None,
+        **kwargs: Any,
+    ) -> tuple[ConfigurationSpace, dict[str, Any]]:
+        """
+        Get the configuration space.
+        """
         return AbstractPreSelector.get_configuration_space(
             cs=cs,
             cs_transform=cs_transform,
@@ -201,13 +177,15 @@ class MarginalContributionBasedPreSelector(AbstractPreSelector):
 
     @staticmethod
     def get_from_configuration(
-        configuration,
-        cs_transform,
-        maximize=False,
-        pre_selector_name=None,
-        **kwargs,
-    ):
-        """Create a MarginalContributionBasedPreSelector instance from a configuration."""
+        configuration: Configuration | dict[str, Any],
+        cs_transform: dict[str, Any],
+        maximize: bool = False,
+        pre_selector_name: str | None = None,
+        **kwargs: Any,
+    ) -> MarginalContributionBasedPreSelector:
+        """
+        Create a MarginalContributionBasedPreSelector instance from a configuration.
+        """
         n_algorithms = AbstractPreSelector.get_from_configuration(
             configuration=configuration,
             cs_transform=cs_transform,

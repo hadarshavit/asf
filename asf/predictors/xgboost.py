@@ -55,7 +55,7 @@ class XGBoostClassifierWrapper(ConfigurableMixin, SklearnWrapper):
         self,
         X: np.ndarray,
         Y: np.ndarray,
-        sample_weight: np.ndarray = None,
+        sample_weight: np.ndarray | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -77,7 +77,7 @@ class XGBoostClassifierWrapper(ConfigurableMixin, SklearnWrapper):
         else:
             self.bool_labels = False
 
-        self.model_class.fit(X, Y, sample_weight=sample_weight, **kwargs)
+        self.model_class.fit(X, Y, sample_weight=sample_weight, **kwargs)  # type: ignore[attr-defined]
 
     def predict(self, X: np.ndarray, **kwargs: Any) -> np.ndarray:
         """
@@ -96,8 +96,8 @@ class XGBoostClassifierWrapper(ConfigurableMixin, SklearnWrapper):
             Predicted values of shape (n_samples,).
         """
         if self.bool_labels:
-            return self.model_class.predict(X, **kwargs).astype(bool)
-        return self.model_class.predict(X, **kwargs)
+            return self.model_class.predict(X, **kwargs).astype(bool)  # type: ignore[attr-defined]
+        return self.model_class.predict(X, **kwargs)  # type: ignore[attr-defined]
 
     @staticmethod
     def _define_hyperparameters(**kwargs):

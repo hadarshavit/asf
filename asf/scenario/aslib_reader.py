@@ -1,16 +1,23 @@
-from asf.selectors.baselines import VirtualBestSolver
+"""
+Utilities for reading and evaluating algorithm selection scenarios in ASlib format.
+"""
+
+from __future__ import annotations
+
 import os
+from typing import Any, Callable
+
 import pandas as pd
+
 from asf.metrics.baselines import running_time_closed_gap
 from asf.metrics.par10 import apply_par
+from asf.selectors.baselines import VirtualBestSolver
 from asf.selectors.selector_pipeline import SelectorPipeline
-
 
 try:
     import yaml
-    from yaml import SafeLoader as Loader
-
     from arff import load
+    from yaml import SafeLoader as Loader
 
     ASLIB_AVAILABLE = True
 except ImportError:
@@ -21,36 +28,59 @@ def read_aslib_scenario(
     path: str,
     add_running_time_features: bool = True,
     training_par_factor: float | None = 10.0,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, list[str], bool, float]:
-    """Read an ASlib scenario from a file.
+) -> tuple[
+    pd.DataFrame,
+    pd.DataFrame,
+    pd.DataFrame,
+    pd.DataFrame,
+    dict[str, Any],
+    bool,
+    float,
+    pd.DataFrame | None,
+]:
+    """
+    Read an ASlib scenario from a directory.
 
-    Args:
-        path (str): The path to the ASlib scenario directory.
-        add_running_time_features (bool, optional): Whether to include running time features. Defaults to True.
+    Parameters
+    ----------
+    path : str
+        The path to the ASlib scenario directory.
+    add_running_time_features : bool, default=True
+        Whether to include running time features (feature costs).
+    training_par_factor : float or None, default=10.0
+        PAR factor to apply to training performance data. Timeouts (values > budget)
+        are replaced with budget * training_par_factor. Set to None to disable.
 
-    Returns:
-        # TODO: Update the return type annotation to match the actual return type.
-        tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, list[str], bool, float]:
-            - features (pd.DataFrame): A DataFrame containing the feature values for each instance.
-            - performance (pd.DataFrame): A DataFrame containing the performance data for each algorithm and instance.
-            - cv (pd.DataFrame): A DataFrame containing cross-validation data.
-            - feature_groups (list[str]): A list of feature groups defined in the scenario.
-            - maximize (bool): A flag indicating whether the objective is to maximize performance.
-            - budget (float): The algorithm cutoff time or budget for the scenario.
+    Returns
+    -------
+    tuple
+        A tuple containing (features, performance, features_running_time, cv,
+        feature_groups, maximize, budget, algorithm_features) where:
+        - features: pd.DataFrame of feature values per instance.
+        - performance: pd.DataFrame of algorithm performance per instance.
+        - features_running_time: pd.DataFrame of feature costs per instance.
+        - cv: pd.DataFrame of cross-validation fold assignments.
+        - feature_groups: dict of feature group definitions.
+        - maximize: bool, True if higher performance values are better.
+        - budget: float, the algorithm cutoff time.
+        - algorithm_features: pd.DataFrame of algorithm features, or None.
 
-    Raises:
-        ImportError: If the required ASlib library is not available.
+    Raises
+    ------
+    ImportError
+        If the required libraries (pyyaml, liac-arff) are not available.
     """
     if not ASLIB_AVAILABLE:
         raise ImportError(
-            "The aslib library is not available. Install it via 'pip install asf-lib[aslib]'."
+            "The aslib reader requires 'pyyaml' and 'liac-arff'. "
+            "Install them via 'pip install asf[aslib]'."
         )
 
     description_path = os.path.join(path, "description.txt")
     performance_path = os.path.join(path, "algorithm_runs.arff")
     features_path = os.path.join(path, "feature_values.arff")
     features_runstatus_path = os.path.join(path, "feature_runstatus.arff")
-    features_running_time = os.path.join(path, "feature_costs.arff")
+    features_running_time_path = os.path.join(path, "feature_costs.arff")
     cv_path = os.path.join(path, "cv.arff")
     algorithm_features_path = os.path.join(path, "algorithm_feature_values.arff")
     algorithm_features_runstatus_path = os.path.join(
@@ -59,35 +89,30 @@ def read_aslib_scenario(
 
     # Load description file
     with open(description_path, "r") as f:
-        description: dict = yaml.load(f, Loader=Loader)
+        description: dict[str, Any] = yaml.load(f, Loader=Loader)
 
-    features: list[str] = description["features_deterministic"]
-    feature_groups: list[str] = description["feature_steps"]
-    algorithm_feature_groups: dict = description.get("algorithm_feature_steps", {})
+    feature_groups: dict[str, Any] = description["feature_steps"]
+    algorithm_feature_groups: dict[str, Any] = description.get(
+        "algorithm_feature_steps", {}
+    )
     maximize: bool = description["maximize"]
-    if type(maximize) is not bool:
-        maximize = maximize[0]
+    if not isinstance(maximize, bool):
+        maximize = bool(maximize[0])
     budget: float = description["algorithm_cutoff_time"]
 
     # Load performance data
     with open(performance_path, "r") as f:
-        performance: dict = load(f)
+        performance_data: dict[str, Any] = load(f)
     performance = pd.DataFrame(
-        performance["data"], columns=[a[0] for a in performance["attributes"]]
+        performance_data["data"],
+        columns=[a[0] for a in performance_data["attributes"]],  # type: ignore[arg-type]
     )
 
-    # Identify which column contains runtime information
-    # e.g. SAT12-INDU = "runtime", CSP-Minizinc-Obj-2016 = "time"
     runtime_col = description["performance_measures"][0]
 
-    # Handle failed runs: if runstatus is not "ok", set runtime to budget + 1 (timeout)
-    # This ensures crashes, memouts, and other failures are treated as timeouts
-    # We use budget + 1 (not exactly budget) so that apply_par correctly penalizes
-    # these instances with PAR10 (values > budget get penalized)
     if "runstatus" in performance.columns:
         performance.loc[performance["runstatus"] != "ok", runtime_col] = budget + 1
 
-    # Aggregate over repetitions (e.g., take mean)
     group_cols = ["instance_id", "algorithm"]
     performance = performance.groupby(group_cols, as_index=False)[runtime_col].mean()
 
@@ -97,31 +122,26 @@ def read_aslib_scenario(
 
     # Load feature values
     with open(features_path, "r") as f:
-        features: dict = load(f)
+        features_data: dict[str, Any] = load(f)
     features = pd.DataFrame(
-        features["data"], columns=[a[0] for a in features["attributes"]]
+        features_data["data"],
+        columns=[a[0] for a in features_data["attributes"]],  # type: ignore[arg-type]
     )
 
-    # Load feature runstatus and set features to NaN where runstatus != "ok"
     if os.path.exists(features_runstatus_path):
         with open(features_runstatus_path, "r") as f:
-            feature_runstatus: dict = load(f)
+            feature_runstatus_data: dict[str, Any] = load(f)
         feature_runstatus = pd.DataFrame(
-            feature_runstatus["data"],
-            columns=[a[0] for a in feature_runstatus["attributes"]],
+            feature_runstatus_data["data"],
+            columns=[a[0] for a in feature_runstatus_data["attributes"]],  # type: ignore[arg-type]
         )
-        # For each feature step, if runstatus != "ok", set corresponding features to NaN
-        # Get feature step to features mapping from description
         for step_name, step_info in feature_groups.items():
             if step_name in feature_runstatus.columns:
-                # Find instances where this step failed
                 failed_mask = feature_runstatus[step_name] != "ok"
                 failed_instances = feature_runstatus.loc[
                     failed_mask, "instance_id"
                 ].values
-                # Get features belonging to this step
                 step_features = step_info.get("provides", [])
-                # Set those features to NaN for failed instances
                 for feat in step_features:
                     if feat in features.columns:
                         features.loc[
@@ -129,80 +149,73 @@ def read_aslib_scenario(
                         ] = float("nan")
 
     features = features.groupby("instance_id").mean()
-    features = features.drop(columns=["repetition"])
+    if "repetition" in features.columns:
+        features = features.drop(columns=["repetition"])
 
-    # Optionally load running time features
-    if add_running_time_features:
-        with open(features_running_time, "r") as f:
-            features_running_time: dict = load(f)
+    features_running_time = pd.DataFrame(
+        0.0,
+        index=performance.index,
+        columns=["feature_time"],  # type: ignore[arg-type]
+    )
+    if add_running_time_features and os.path.exists(features_running_time_path):
+        with open(features_running_time_path, "r") as f:
+            ft_data: dict[str, Any] = load(f)
         features_running_time = pd.DataFrame(
-            features_running_time["data"],
-            columns=[a[0] for a in features_running_time["attributes"]],
+            ft_data["data"],
+            columns=[a[0] for a in ft_data["attributes"]],  # type: ignore[arg-type]
         )
         features_running_time = features_running_time.groupby("instance_id").mean()
+        if "repetition" in features_running_time.columns:
+            features_running_time = features_running_time.drop(columns=["repetition"])
 
-        features.index.name = "instance_id"
-        features_running_time.index.name = "instance_id"
-
-        features = pd.concat([features, features_running_time], axis=1)
-
-    # Apply PAR penalization to training data so the selector learns to avoid timeouts
+    # Apply PAR penalization to training data
     if training_par_factor is not None:
         performance = apply_par(performance, budget, training_par_factor)
 
     # Load cross-validation data
     with open(cv_path, "r") as f:
-        cv: dict = load(f)
-    cv = pd.DataFrame(cv["data"], columns=[a[0] for a in cv["attributes"]])
+        cv_data: dict[str, Any] = load(f)
+    cv = pd.DataFrame(cv_data["data"], columns=[a[0] for a in cv_data["attributes"]])  # type: ignore[arg-type]
     cv = cv.set_index("instance_id")
 
     # Sort indices for consistency
     features = features.sort_index()
     performance = performance.sort_index()
     cv = cv.sort_index()
+    features_running_time = features_running_time.sort_index()  # type: ignore[attr-defined]
 
     # Load algorithm features if available
     algorithm_features = None
     if os.path.exists(algorithm_features_path):
         with open(algorithm_features_path, "r") as f:
-            algorithm_features_data: dict = load(f)
+            af_data: dict[str, Any] = load(f)
         algorithm_features = pd.DataFrame(
-            algorithm_features_data["data"],
-            columns=[a[0] for a in algorithm_features_data["attributes"]],
+            af_data["data"],
+            columns=[a[0] for a in af_data["attributes"]],  # type: ignore[arg-type]
         )
 
-        # Load algorithm feature runstatus and set features to NaN where runstatus != "ok"
         if os.path.exists(algorithm_features_runstatus_path):
             with open(algorithm_features_runstatus_path, "r") as f:
-                algorithm_feature_runstatus: dict = load(f)
-            algorithm_feature_runstatus = pd.DataFrame(
-                algorithm_feature_runstatus["data"],
-                columns=[a[0] for a in algorithm_feature_runstatus["attributes"]],
+                af_rs_data: dict[str, Any] = load(f)
+            af_runstatus = pd.DataFrame(
+                af_rs_data["data"],
+                columns=[a[0] for a in af_rs_data["attributes"]],  # type: ignore[arg-type]
             )
-            # For each feature step, if runstatus != "ok", set corresponding features to NaN
             for step_name, step_info in algorithm_feature_groups.items():
-                if step_name in algorithm_feature_runstatus.columns:
-                    # Find algorithms where this step failed
-                    failed_mask = algorithm_feature_runstatus[step_name] != "ok"
-                    failed_algorithms = algorithm_feature_runstatus.loc[
-                        failed_mask, "algorithm"
-                    ].values
-                    # Get features belonging to this step
+                if step_name in af_runstatus.columns:
+                    failed_mask = af_runstatus[step_name] != "ok"
+                    failed_algos = af_runstatus.loc[failed_mask, "algorithm"].values
                     step_features = step_info.get("provides", [])
-                    # Set those features to NaN for failed algorithms
                     for feat in step_features:
                         if feat in algorithm_features.columns:
                             algorithm_features.loc[
-                                algorithm_features["algorithm"].isin(failed_algorithms),
-                                feat,
+                                algorithm_features["algorithm"].isin(failed_algos), feat
                             ] = float("nan")
 
-        # Aggregate over repetitions (e.g., take mean) and set algorithm as index
         algorithm_features = algorithm_features.groupby("algorithm").mean()
         algorithm_features = algorithm_features.drop(
             columns=["repetition"], errors="ignore"
         )
-
         algorithm_features = algorithm_features.sort_index()
 
     return (
@@ -218,36 +231,47 @@ def read_aslib_scenario(
 
 
 def evaluate_selector(
-    selector_class,
+    selector_class: type,
     scenario_path: str,
     fold: int,
-    hpo_func=None,
-    hpo_kwargs={},
-    algorithm_pre_selector=None,
-    metric=running_time_closed_gap,
+    hpo_func: Callable[..., Any] | None = None,
+    hpo_kwargs: dict[str, Any] | None = None,
+    algorithm_pre_selector: Any | None = None,
+    metric: Callable[..., float] = running_time_closed_gap,
     return_per_instance: bool = False,
-):
+) -> tuple[float, Any] | tuple[float, Any, dict[str, float]]:
     """
     Runs HPO for a selector on a given ASlib scenario and fold, returns test performance.
 
-    Args:
-        selector_class: Selector class or callable
-        scenario_path: Path to ASlib scenario
-        fold: Which fold to use as test
-        hpo_func: Function for HPO, must return a fitted selector
-        hpo_kwargs: Optional dict of extra kwargs for HPO
-        algorithm_pre_selector: Optional preselector object (e.g., KneeOfCurvePreSelector instance)
-        metric: Metric function to evaluate the selector
-        return_per_instance: If True, also return per-instance scores dict
-        training_par_factor: PAR factor to apply to training performance data. Timeouts
-            (values > budget) are replaced with budget * training_par_factor. This helps
-            the selector learn to avoid timeouts. Set to None to disable. Defaults to 10.0.
+    Parameters
+    ----------
+    selector_class : type
+        Selector class to evaluate.
+    scenario_path : str
+        Path to ASlib scenario directory.
+    fold : int
+        Which fold to use as test set.
+    hpo_func : Callable or None, default=None
+        Function for HPO, must return a fitted selector.
+    hpo_kwargs : dict or None, default=None
+        Additional keyword arguments for hpo_func.
+    algorithm_pre_selector : Any or None, default=None
+        Optional preselector object.
+    metric : Callable, default=running_time_closed_gap
+        Metric function to evaluate the selector.
+    return_per_instance : bool, default=False
+        If True, also return per-instance scores dictionary.
 
-    Returns:
-        test_score: The test performance (e.g., PAR10 or other metric)
-        selector: The fitted selector
-        per_instance_scores: (only if return_per_instance=True) Dict mapping instance_id to running time
+    Returns
+    -------
+    test_score : float
+        The test performance metric value.
+    selector : Any
+        The fitted selector (returned if return_per_instance is False or True).
+    per_instance_scores : dict[str, float]
+        Dictionary mapping instance IDs to performance (returned if return_per_instance=True).
     """
+    hpo_kwargs = hpo_kwargs or {}
 
     # Load scenario
     (
@@ -280,6 +304,7 @@ def evaluate_selector(
     features_running_time_test = features_running_time.loc[test_instance_ids]
 
     if hpo_func is None:
+        # Create base selector with provided class and params
         base_selector = selector_class(
             budget=budget, maximize=maximize, feature_groups=feature_groups
         )
@@ -306,27 +331,30 @@ def evaluate_selector(
         )
 
     selector.fit(X_train, y_train, algorithm_features=algorithm_features)
+
     # Predict and evaluate
-    # Pass y_test to predict() for oracle selectors (VBS) that need true performance
     if selector_class is VirtualBestSolver:
         predictions = selector.predict(X_test, performance=y_test)
     else:
         predictions = selector.predict(X_test)
 
-    # max_feature_time is no longer passed to metric; budgets are in the schedule itself
     test_score = metric(predictions, y_test, budget, features_running_time_test)
 
     if return_per_instance:
         from asf.metrics.baselines import running_time_selector_performance
 
         per_instance_scores = running_time_selector_performance(
-            predictions,
+            predictions,  # type: ignore[arg-type]
             y_test,
             budget,
             features_running_time_test,
             par=10,
             return_per_instance=True,
         )
-        return test_score, selector, per_instance_scores
+        # Ensure it's a dict and cast to float
+        if isinstance(per_instance_scores, dict):
+            typed_scores = {k: float(v) for k, v in per_instance_scores.items()}
+            return test_score, selector, typed_scores
+        return test_score, selector, {}
 
     return test_score, selector

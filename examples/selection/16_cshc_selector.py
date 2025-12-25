@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import Any
 
 from asf.selectors.cshc import CSHCSelector
 from asf.selectors.osl_linear import OSLLinearSelector
@@ -12,8 +13,8 @@ def make_data(n_instances=300, n_algorithms=5, n_inst_feats=10, seed=42, budget=
 
     features = pd.DataFrame(
         rng.normal(size=(n_instances, n_inst_feats)),
-        columns=[f"f{i}" for i in range(n_inst_feats)],
-        index=[f"inst_{i}" for i in range(n_instances)],
+        columns=[f"f{i}" for i in range(n_inst_feats)],  # type: ignore[arg-type]
+        index=[f"inst_{i}" for i in range(n_instances)],  # type: ignore[arg-type]
     )
 
     alg_names = [f"algo{i + 1}" for i in range(n_algorithms)]
@@ -36,7 +37,7 @@ def make_data(n_instances=300, n_algorithms=5, n_inst_feats=10, seed=42, budget=
     return features, perf
 
 
-def evaluate_solve_rate(preds: dict, perf: pd.DataFrame, budget: float) -> float:
+def evaluate_solve_rate(preds: Any, perf: pd.DataFrame, budget: float) -> float:
     """Helper function to evaluate the solve rate of predictions."""
     solved = 0
     total = 0

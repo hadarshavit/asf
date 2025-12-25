@@ -1,53 +1,59 @@
-from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
-import pandas as pd
+"""
+Random local search algorithm for algorithm pre-selection.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Callable
+
 import numpy as np
-from typing import Callable
+import pandas as pd
+
+from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
+
+try:
+    from ConfigSpace import Configuration, ConfigurationSpace
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
 
 
 class RandomLocalSearchPreSelector(AbstractPreSelector):
     """
-    RandomLocalSearchPreSelector is a pre-selector that combines random sampling
-    with local search to find a good subset of algorithms.
+    Random local search algorithm for algorithm pre-selection.
 
-    The algorithm works as follows:
-    1. Generate multiple random subsets of algorithms
-    2. For each subset, perform local search by swapping algorithms to improve the metric
-    3. Return the best subset found across all restarts
+    This selector identifies a good subset of algorithms by combining random
+    sampling with local search.
 
-    This approach balances exploration (random restarts) with exploitation (local search),
-    making it efficient for large search spaces while still finding good solutions.
-
-    Attributes:
-        metric (Callable): A function to evaluate the performance of the selected algorithms.
-        n_algorithms (int): The number of algorithms to select.
-        maximize (bool): Whether to maximize or minimize the performance metric.
-        n_restarts (int): Number of random restarts (random initial subsets to try).
-        max_iterations (int): Maximum number of local search iterations per restart.
-        seed (int | None): Random seed for reproducibility.
+    Parameters
+    ----------
+    metric : Callable
+        A function that takes a DataFrame of performance values and returns a single value.
+    n_algorithms : int
+        The number of algorithms to select.
+    maximize : bool, default=False
+        Whether to maximize or minimize the performance metric.
+    n_restarts : int, default=10
+        Number of random restarts.
+    max_iterations : int, default=100
+        Maximum number of local search iterations per restart.
+    seed : int or None, default=None
+        Random seed for reproducibility.
+    **kwargs : Any
+        Additional arguments passed to the parent class.
     """
 
     def __init__(
         self,
-        metric: Callable,
+        metric: Callable[[pd.DataFrame], float],
         n_algorithms: int,
         maximize: bool = False,
         n_restarts: int = 10,
         max_iterations: int = 100,
         seed: int | None = None,
-        **kwargs,
-    ):
-        """
-        Initializes the RandomLocalSearchPreSelector with the given configuration.
-
-        Args:
-            metric (Callable): A function to evaluate the performance of the selected algorithms.
-            n_algorithms (int): The number of algorithms to select.
-            maximize (bool, optional): Whether to maximize the performance metric. Defaults to False.
-            n_restarts (int, optional): Number of random restarts. Defaults to 10.
-            max_iterations (int, optional): Maximum local search iterations per restart. Defaults to 100.
-            seed (int | None, optional): Random seed for reproducibility. Defaults to None.
-            **kwargs: Additional arguments passed to the parent class.
-        """
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         self.metric = metric
         self.n_algorithms = n_algorithms
@@ -57,48 +63,33 @@ class RandomLocalSearchPreSelector(AbstractPreSelector):
         self.seed = seed
 
     def _is_better(self, new_score: float, old_score: float) -> bool:
-        """Check if new_score is better than old_score based on maximize flag."""
+        """Check if new_score is better than old_score."""
         if self.maximize:
             return new_score > old_score
         return new_score < old_score
 
     def _local_search(
         self,
-        current_subset: list,
-        all_algorithms: list,
+        current_subset: list[str],
+        all_algorithms: list[str],
         performance_frame: pd.DataFrame,
         rng: np.random.Generator,
-    ) -> tuple[list, float]:
-        """
-        Perform local search by swapping algorithms in the current subset.
-
-        Args:
-            current_subset: Current selected algorithms.
-            all_algorithms: All available algorithms.
-            performance_frame: Performance data.
-            rng: Random number generator.
-
-        Returns:
-            Tuple of (best_subset, best_score).
-        """
+    ) -> tuple[list[str], float]:
+        """Perform local search by swapping algorithms."""
         current_score = self.metric(performance_frame[current_subset])
         best_subset = current_subset.copy()
         best_score = current_score
 
         for _ in range(self.max_iterations):
             improved = False
-
-            # Try swapping each algorithm in subset with each algorithm not in subset
-            # Randomize order to avoid bias
             subset_indices = list(range(len(current_subset)))
-            rng.shuffle(subset_indices)
+            rng.shuffle(subset_indices)  # type: ignore
 
             not_in_subset = [a for a in all_algorithms if a not in current_subset]
-            rng.shuffle(not_in_subset)
+            rng.shuffle(not_in_subset)  # type: ignore
 
             for i in subset_indices:
                 for new_algo in not_in_subset:
-                    # Create new subset by swapping
                     new_subset = current_subset.copy()
                     new_subset[i] = new_algo
 
@@ -110,76 +101,75 @@ class RandomLocalSearchPreSelector(AbstractPreSelector):
                         current_subset = new_subset
                         current_score = new_score
                         improved = True
-                        break  # First improvement strategy
+                        break
 
                 if improved:
                     break
 
-            # If no improvement found, local optimum reached
             if not improved:
                 break
 
         return best_subset, best_score
 
     def fit_transform(
-        self, performance: pd.DataFrame | np.ndarray
+        self,
+        performance: pd.DataFrame | np.ndarray,
     ) -> pd.DataFrame | np.ndarray:
         """
-        Selects the best subset of algorithms using random sampling with local search.
+        Fit the pre-selector and transform the performance data.
 
-        Args:
-            performance (pd.DataFrame | np.ndarray): A DataFrame or NumPy array containing
-                the performance data of algorithms. Rows represent instances, and columns
-                represent algorithms.
+        Parameters
+        ----------
+        performance : pd.DataFrame or np.ndarray
+            The performance data.
 
-        Returns:
-            pd.DataFrame | np.ndarray: A DataFrame or NumPy array containing the performance
-                data of the selected algorithms.
+        Returns
+        -------
+        pd.DataFrame or np.ndarray
+            The performance data with only the selected algorithms.
         """
         if isinstance(performance, np.ndarray):
             performance_frame = pd.DataFrame(
                 performance,
-                columns=[f"Algorithm_{i}" for i in range(performance.shape[1])],
+                columns=[f"Algorithm_{i}" for i in range(performance.shape[1])],  # type: ignore[arg-type]
             )
-            numpy = True
+            is_numpy = True
         else:
             performance_frame = performance
-            numpy = False
+            is_numpy = False
+
+        if self.n_algorithms is None:
+            raise ValueError("n_algorithms must be set")
 
         all_algorithms = list(performance_frame.columns)
         n_total = len(all_algorithms)
 
-        # Handle edge case where n_algorithms >= total algorithms
         if self.n_algorithms >= n_total:
-            if numpy:
+            if is_numpy:
                 return performance_frame.values
             return performance_frame.reset_index(drop=True)
 
         rng = np.random.default_rng(self.seed)
 
-        # Initialize best solution
         best_overall_subset = None
         best_overall_score = float("-inf") if self.maximize else float("inf")
 
         for _ in range(self.n_restarts):
-            # Generate random initial subset
             initial_subset = list(
                 rng.choice(all_algorithms, size=self.n_algorithms, replace=False)
             )
 
-            # Perform local search from this starting point
             local_best_subset, local_best_score = self._local_search(
                 initial_subset, all_algorithms, performance_frame, rng
             )
 
-            # Update global best if this is better
             if self._is_better(local_best_score, best_overall_score):
                 best_overall_subset = local_best_subset
                 best_overall_score = local_best_score
 
         selected_performance = performance_frame[best_overall_subset]
 
-        if numpy:
+        if is_numpy:
             selected_performance = selected_performance.values
         else:
             selected_performance = selected_performance.reset_index(drop=True)
@@ -188,14 +178,16 @@ class RandomLocalSearchPreSelector(AbstractPreSelector):
 
     @staticmethod
     def get_configuration_space(
-        cs=None,
-        cs_transform=None,
-        parent_param=None,
-        parent_value=None,
-        n_algorithms_max=None,
-        **kwargs,
-    ):
-        """Get the configuration space for RandomLocalSearchPreSelector."""
+        cs: ConfigurationSpace | None = None,
+        cs_transform: dict[str, Any] | None = None,
+        parent_param: Any | None = None,
+        parent_value: Any | None = None,
+        n_algorithms_max: int | None = None,
+        **kwargs: Any,
+    ) -> tuple[ConfigurationSpace, dict[str, Any]]:
+        """
+        Get the configuration space.
+        """
         return AbstractPreSelector.get_configuration_space(
             cs=cs,
             cs_transform=cs_transform,
@@ -207,13 +199,15 @@ class RandomLocalSearchPreSelector(AbstractPreSelector):
 
     @staticmethod
     def get_from_configuration(
-        configuration,
-        cs_transform,
-        maximize=False,
-        pre_selector_name=None,
-        **kwargs,
-    ):
-        """Create a RandomLocalSearchPreSelector instance from a configuration."""
+        configuration: Configuration | dict[str, Any],
+        cs_transform: dict[str, Any],
+        maximize: bool = False,
+        pre_selector_name: str | None = None,
+        **kwargs: Any,
+    ) -> RandomLocalSearchPreSelector:
+        """
+        Create a RandomLocalSearchPreSelector instance from a configuration.
+        """
         n_algorithms = AbstractPreSelector.get_from_configuration(
             configuration=configuration,
             cs_transform=cs_transform,

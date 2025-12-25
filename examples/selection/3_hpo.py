@@ -68,13 +68,16 @@ if __name__ == "__main__":
     # Load the data
     features, performance = get_data()
 
-    preprocessors = [StandardScaler(), MinMaxScaler(), PowerTransformer()]
-    presolvers = [ASAPv2()]
+    from sklearn.preprocessing import StandardScaler, MinMaxScaler, PowerTransformer
+
+    preprocessors = [StandardScaler, MinMaxScaler, PowerTransformer]
+    presolvers = [ASAPv2]
 
     selector = tune_selector(
         features,
         performance,
         selector_class=[PairwiseClassifier, PairwiseRegressor],
+        features_running_time=pd.DataFrame(0.0, index=features.index, columns=[]),
         budget=5000,
         runcount_limit=10,
         preprocessing_class=preprocessors,
@@ -106,6 +109,7 @@ if __name__ == "__main__":
             (PairwiseClassifier, {"model_class": [SVMClassifierWrapper]}),
             (PairwiseRegressor, {"model_class": [SVMRegressorWrapper]}),
         ],
+        features_running_time=pd.DataFrame(0.0, index=features.index, columns=[]),
         budget=5000,
         runcount_limit=10,
         preprocessing_class=preprocessors,
@@ -158,6 +162,7 @@ if __name__ == "__main__":
             selector_class=[
                 (PairwiseRegressor, {"model_class": [SVMRegressorWrapper]}),
             ],
+            features_running_time=features_running_time,
             budget=budget,
             runcount_limit=10,
             preprocessing_class=preprocessors,

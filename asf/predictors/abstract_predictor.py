@@ -32,7 +32,7 @@ class AbstractPredictor(ABC):
         Get a predictor instance from a configuration.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs: Any) -> None:
         """
         Initialize the predictor.
         """
@@ -85,8 +85,9 @@ class AbstractPredictor(ABC):
         """
         pass
 
+    @classmethod
     @abstractmethod
-    def load(self, file_path: str) -> None:
+    def load(cls, file_path: str) -> AbstractPredictor:
         """
         Load the model from a file.
 
@@ -94,6 +95,11 @@ class AbstractPredictor(ABC):
         ----------
         file_path : str
             Path to the file from which the model will be loaded.
+
+        Returns
+        -------
+        AbstractPredictor
+            The loaded model.
         """
         pass
 
@@ -102,19 +108,26 @@ class AbstractPredictor(ABC):
         cs: ConfigurationSpace | None = None,
         pre_prefix: str = "",
         parent_param: Hyperparameter | None = None,
-        parent_value: str | None = None,
-    ) -> Any:
+        parent_value: Any | None = None,
+    ) -> ConfigurationSpace:
         """
         Get the configuration space for the predictor.
 
         Parameters
         ----------
-        cs : Any | None, optional
-            The configuration space to add the parameters to. If None, a new configuration space will be created.
+        cs : ConfigurationSpace or None, default=None
+            The configuration space to add the parameters to.
+            If None, a new configuration space will be created.
+        pre_prefix : str, default=""
+            Prefix for all hyperparameters.
+        parent_param : Hyperparameter or None, default=None
+            Parent hyperparameter for conditions.
+        parent_value : Any or None, default=None
+            Value of the parent hyperparameter for conditions.
 
         Returns
         -------
-        Any
+        ConfigurationSpace
             The configuration space for the predictor.
 
         Raises
@@ -134,15 +147,19 @@ class AbstractPredictor(ABC):
 
     @staticmethod
     def get_from_configuration(
-        configuration: dict[str, Any], pre_prefix: str = "", **kwargs
-    ) -> "AbstractPredictor":
+        configuration: dict[str, Any], pre_prefix: str = "", **kwargs: Any
+    ) -> AbstractPredictor:
         """
         Get a predictor instance from a configuration.
 
         Parameters
         ----------
-        configuration : Any
+        configuration : dict[str, Any]
             The configuration to create the predictor from.
+        pre_prefix : str, default=""
+            Prefix used in the configuration.
+        **kwargs : Any
+            Additional arguments.
 
         Returns
         -------

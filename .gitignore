@@ -180,3 +180,4 @@ test*.ipynb
 logs/**
 bench/results*/**
 paper/**
+.ruff_cache/**

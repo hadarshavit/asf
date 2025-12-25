@@ -1,42 +1,63 @@
+"""
+Ridge models wrappers.
+"""
+
 from __future__ import annotations
 
-from asf.predictors.sklearn_wrapper import SklearnWrapper
+from functools import partial
 from typing import Any
+
 from sklearn.linear_model import Ridge, RidgeClassifier
 
 try:
-    from ConfigSpace import (  # noqa: F401
-        ConfigurationSpace,
-        Float,
+    from ConfigSpace import (
         Categorical,
-        EqualsCondition,
+        Float,
     )
-    from ConfigSpace.hyperparameters import Hyperparameter  # noqa: F401
+    from ConfigSpace.hyperparameters import Hyperparameter
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
-from functools import partial
-
-
+from asf.predictors.sklearn_wrapper import SklearnWrapper
 from asf.utils.configurable import ConfigurableMixin
 
 
 class RidgeRegressorWrapper(ConfigurableMixin, SklearnWrapper):
     """
-    Wrapper for sklearn.linear_model.Ridge
+    Wrapper for sklearn.linear_model.Ridge.
     """
 
-    PREFIX = "ridge_regressor"
+    PREFIX: str = "ridge_regressor"
 
-    def __init__(self, init_params: dict[str, Any] = {}):
-        super().__init__(Ridge, init_params)
+    def __init__(self, init_params: dict[str, Any] | None = None):
+        """
+        Initialize the RidgeRegressorWrapper.
+
+        Parameters
+        ----------
+        init_params : dict[str, Any] or None, default=None
+            A dictionary of initialization parameters for the Ridge regressor.
+        """
+        super().__init__(Ridge, init_params or {})
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(
+        **kwargs: Any,
+    ) -> tuple[list[Hyperparameter], list[Any], list[Any]]:
         """
         Define hyperparameters for the Ridge Regressor.
+
+        Parameters
+        ----------
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        tuple
+            (hyperparameters, conditions, forbiddens)
         """
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
@@ -65,10 +86,22 @@ class RidgeRegressorWrapper(ConfigurableMixin, SklearnWrapper):
     def _get_from_clean_configuration(
         cls,
         clean_config: dict[str, Any],
-        **kwargs,
-    ) -> partial:
+        **kwargs: Any,
+    ) -> partial[RidgeRegressorWrapper]:
         """
         Create a partial function from a clean (unprefixed) configuration.
+
+        Parameters
+        ----------
+        clean_config : dict[str, Any]
+            The clean configuration dictionary.
+        **kwargs : Any
+            Additional arguments.
+
+        Returns
+        -------
+        partial
+            A partial function for instantiating the wrapper.
         """
         params = {
             "alpha": clean_config["alpha"],
@@ -81,18 +114,38 @@ class RidgeRegressorWrapper(ConfigurableMixin, SklearnWrapper):
 
 class RidgeClassifierWrapper(ConfigurableMixin, SklearnWrapper):
     """
-    Wrapper for sklearn.linear_model.RidgeClassifier
+    Wrapper for sklearn.linear_model.RidgeClassifier.
     """
 
-    PREFIX = "ridge_classifier"
+    PREFIX: str = "ridge_classifier"
 
-    def __init__(self, init_params: dict[str, Any] = {}):
-        super().__init__(RidgeClassifier, init_params)
+    def __init__(self, init_params: dict[str, Any] | None = None):
+        """
+        Initialize the RidgeClassifierWrapper.
+
+        Parameters
+        ----------
+        init_params : dict[str, Any] or None, default=None
+            A dictionary of initialization parameters for the Ridge classifier.
+        """
+        super().__init__(RidgeClassifier, init_params or {})
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(
+        **kwargs: Any,
+    ) -> tuple[list[Hyperparameter], list[Any], list[Any]]:
         """
         Define hyperparameters for the Ridge Classifier.
+
+        Parameters
+        ----------
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        tuple
+            (hyperparameters, conditions, forbiddens)
         """
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
@@ -116,10 +169,10 @@ class RidgeClassifierWrapper(ConfigurableMixin, SklearnWrapper):
     def _get_from_clean_configuration(
         cls,
         clean_config: dict[str, Any],
-        **kwargs,
-    ) -> partial:
+        **kwargs: Any,
+    ) -> partial[RidgeClassifierWrapper]:
         """
-        Create a partial function from a clean (unprefixed) configuration.
+        Create a RidgeClassifierWrapper partial from a clean configuration.
         """
         params = {
             "alpha": clean_config["alpha"],

@@ -1,3 +1,7 @@
+"""
+Utilities for loading algorithm features from ASLib scenarios.
+"""
+
 import os
 import io
 
@@ -5,6 +9,19 @@ import pandas as pd
 
 
 def _load_arff_bytes(b: bytes) -> pd.DataFrame:
+    """
+    Load an ARFF file from bytes and return a pandas DataFrame.
+
+    Parameters
+    ----------
+    b : bytes
+        The ARFF file content as bytes.
+
+    Returns
+    -------
+    pd.DataFrame
+        The data from the ARFF file.
+    """
     try:
         import arff
     except Exception as e:
@@ -17,20 +34,38 @@ def _load_arff_bytes(b: bytes) -> pd.DataFrame:
         else str(b)
     )
     obj = arff.load(io.StringIO(text))
-    cols = [c[0] for c in obj["attributes"]]
-    return pd.DataFrame(obj["data"], columns=cols)
+    cols = [str(c[0]) for c in obj["attributes"]]
+    return pd.DataFrame(obj["data"], columns=cols)  # type: ignore[arg-type]
 
 
 def get_algorithm_features_from_aslib(scenario_dir: str) -> pd.DataFrame:
     """
-    Load algorithm_feature_values.arff from an ASLib scenario directory and
-    return a numeric DataFrame indexed by algorithm name.
+    Load algorithm_feature_values.arff from an ASLib scenario directory.
+
+    Returns a numeric DataFrame indexed by algorithm name.
 
     Assumptions / behavior:
       - scenario_dir must be a directory containing 'algorithm_feature_values.arff'.
       - The ARFF must contain a column naming the algorithm (exactly 'algorithm' or a column
         whose name contains 'algo' or 'name'). Otherwise an error is raised.
       - Non-numeric columns are dropped; if multiple repetitions exist rows are averaged per algorithm.
+
+    Parameters
+    ----------
+    scenario_dir : str
+        Path to the ASLib scenario directory.
+
+    Returns
+    -------
+    pd.DataFrame
+        Algorithm features, indexed by algorithm name.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the scenario directory or ARFF file is not found.
+    ValueError
+        If no algorithm name column or no numeric features are found.
     """
     if not os.path.isdir(scenario_dir):
         raise FileNotFoundError(f"Scenario directory not found: {scenario_dir}")

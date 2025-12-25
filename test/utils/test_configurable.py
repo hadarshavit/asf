@@ -64,7 +64,7 @@ class TestConfigurableMixin:
         cs = RandomForestClassifierWrapper.get_configuration_space()
 
         # Check that hyperparameters are present with correct prefix
-        hp_names = [hp.name for hp in cs.get_hyperparameters()]
+        hp_names = [hp.name for hp in list(cs.values())]
         assert "rf_classifier:n_estimators" in hp_names
         assert "rf_classifier:min_samples_split" in hp_names
         assert "rf_classifier:min_samples_leaf" in hp_names
@@ -77,7 +77,7 @@ class TestConfigurableMixin:
 
         cs = RandomForestClassifierWrapper.get_configuration_space(pre_prefix="parent")
 
-        hp_names = [hp.name for hp in cs.get_hyperparameters()]
+        hp_names = [hp.name for hp in list(cs.values())]
         assert "parent:rf_classifier:n_estimators" in hp_names
         assert "parent:rf_classifier:bootstrap" in hp_names
 
@@ -97,7 +97,7 @@ class TestConfigurableMixin:
         )
 
         # Check that conditions were added
-        conditions = cs.get_conditions()
+        conditions = cs.conditions
         assert len(conditions) == 5  # 5 hyperparameters, each with a condition
 
     def test_rf_classifier_get_from_configuration(self):
@@ -129,7 +129,7 @@ class TestConfigurableMixin:
                 self.verbose = verbose
 
             @staticmethod
-            def _define_hyperparameters():
+            def _define_hyperparameters(**kwargs):
                 return (
                     [
                         Integer("n_iter", (1, 100), default=10),
@@ -140,7 +140,7 @@ class TestConfigurableMixin:
                 )
 
         cs = SimpleClass.get_configuration_space()
-        hp_names = [hp.name for hp in cs.get_hyperparameters()]
+        hp_names = [hp.name for hp in list(cs.values())]
         assert "simple:n_iter" in hp_names
         assert "simple:verbose" in hp_names
 
@@ -165,7 +165,7 @@ class TestConfigurableMixin:
                 self.depth = depth
 
             @staticmethod
-            def _define_hyperparameters():
+            def _define_hyperparameters(**kwargs):
                 mode = Categorical("mode", items=["fast", "deep"], default="fast")
                 depth = Integer("depth", (1, 20), default=5)
 
@@ -177,11 +177,12 @@ class TestConfigurableMixin:
         cs = ConditionalClass.get_configuration_space()
 
         # Check conditions exist
-        conditions = cs.get_conditions()
+        conditions = cs.conditions
         assert len(conditions) == 1
 
         # Check the condition references the prefixed hyperparameters
         cond = conditions[0]
+        assert isinstance(cond, EqualsCondition)
         assert cond.child.name == "cond:depth"
         assert cond.parent.name == "cond:mode"
         assert cond.value == "deep"
@@ -202,7 +203,7 @@ class TestClassChoiceNested:
                 self.a_param = a_param
 
             @staticmethod
-            def _define_hyperparameters():
+            def _define_hyperparameters(**kwargs):
                 return [Integer("a_param", (1, 10), default=1)], [], []
 
         class ChildB(ConfigurableMixin):
@@ -212,7 +213,7 @@ class TestClassChoiceNested:
                 self.b_param = b_param
 
             @staticmethod
-            def _define_hyperparameters():
+            def _define_hyperparameters(**kwargs):
                 return [Integer("b_param", (1, 10), default=2)], [], []
 
         class Parent(ConfigurableMixin):
@@ -223,7 +224,7 @@ class TestClassChoiceNested:
                 self.value = value
 
             @staticmethod
-            def _define_hyperparameters():
+            def _define_hyperparameters(**kwargs):
                 return (
                     [
                         ClassChoice("child", choices=[ChildA, ChildB]),
@@ -234,7 +235,7 @@ class TestClassChoiceNested:
                 )
 
         cs = Parent.get_configuration_space()
-        hp_names = [hp.name for hp in cs.get_hyperparameters()]
+        hp_names = [hp.name for hp in list(cs.values())]
 
         # Parent's hyperparameters
         assert "parent:child" in hp_names
@@ -247,7 +248,7 @@ class TestClassChoiceNested:
         assert "parent:child:child_b:b_param" in hp_names
 
         # Check conditional dependencies
-        conditions = cs.get_conditions()
+        conditions = cs.conditions
         # At least 2 conditions: one for child_a params, one for child_b params
         assert len(conditions) >= 2
 
@@ -263,7 +264,7 @@ class TestClassChoiceNested:
                 self.a_param = a_param
 
             @staticmethod
-            def _define_hyperparameters():
+            def _define_hyperparameters(**kwargs):
                 return [Integer("a_param", (1, 10), default=1)], [], []
 
         class Parent(ConfigurableMixin):
@@ -274,7 +275,7 @@ class TestClassChoiceNested:
                 self.value = value
 
             @staticmethod
-            def _define_hyperparameters():
+            def _define_hyperparameters(**kwargs):
                 return (
                     [
                         ClassChoice("child", choices=[ChildA]),

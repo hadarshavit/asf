@@ -14,13 +14,15 @@ import shutil
 
 @pytest.fixture
 def dummy_data():
-    features = pd.DataFrame(np.random.randn(10, 3), columns=["f1", "f2", "f3"])
+    features = pd.DataFrame(np.random.randn(10, 3), columns=["f1", "f2", "f3"])  # type: ignore[arg-type]
     performance = pd.DataFrame(
-        np.random.exponential(15, (10, 3)), columns=["algo1", "algo2", "algo3"]
+        np.random.exponential(15, (10, 3)),
+        columns=["algo1", "algo2", "algo3"],  # type: ignore[arg-type]
     )
     # Feature running time (same shape as features, time to compute each feature for each instance)
     features_running_time = pd.DataFrame(
-        np.random.exponential(0.1, (10, 3)), columns=["f1", "f2", "f3"]
+        np.random.exponential(0.1, (10, 3)),
+        columns=["f1", "f2", "f3"],  # type: ignore[arg-type]
     )
     return features, performance, features_running_time
 

@@ -1,73 +1,92 @@
-from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
-import pandas as pd
-import numpy as np
+"""
+Brute-force algorithm for algorithm pre-selection.
+"""
+
+from __future__ import annotations
+
 from itertools import combinations
-from typing import Callable
+from typing import Any, Callable
+
+import numpy as np
+import pandas as pd
+
+from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
+
+try:
+    from ConfigSpace import Configuration, ConfigurationSpace
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
 
 
 class BruteForcePreSelector(AbstractPreSelector):
     """
-    BruteForcePreSelector selects the optimal subset of algorithms from a given set
-    by exhaustively evaluating all possible combinations of a specified size.
+    Brute-force algorithm for algorithm pre-selection.
 
-    This pre-selector uses a user-provided metric function to evaluate each combination
-    of algorithms and selects the subset that either maximizes or minimizes the metric,
-    depending on the `maximize` flag.
+    This selector evaluates all possible combinations of a specified size and
+    selects the subset that optimizes the given metric.
 
-    Attributes:
-        metric (Callable): A function to evaluate the performance of a subset of algorithms.
-        n_algorithms (int): The number of algorithms to select.
-        maximize (bool): Whether to maximize or minimize the metric.
+    Parameters
+    ----------
+    metric : Callable
+        A function that takes a DataFrame of performance values and returns a single value.
+    n_algorithms : int
+        The number of algorithms to select.
+    maximize : bool, default=False
+        Whether to maximize the metric.
+    **kwargs : Any
+        Additional keyword arguments passed to the parent class.
     """
 
-    def __init__(self, metric: Callable, n_algorithms: int, maximize=False, **kwargs):
-        """
-        Initializes the MarginalContributionBasedPreSelector with the given configuration.
-
-        Args:
-            config (dict): Configuration for the pre-selector.
-        """
+    def __init__(
+        self,
+        metric: Callable[[pd.DataFrame], float],
+        n_algorithms: int,
+        maximize: bool = False,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         self.metric = metric
         self.n_algorithms = n_algorithms
         self.maximize = maximize
 
     def fit_transform(
-        self, performance: pd.DataFrame | np.ndarray
+        self,
+        performance: pd.DataFrame | np.ndarray,
     ) -> pd.DataFrame | np.ndarray:
         """
-        Selects the best subset of algorithms based on the provided performance data and metric.
+        Fit the pre-selector and transform the performance data.
 
-        This method evaluates all possible combinations of algorithms of size `n_algorithms` and selects
-        the combination that optimizes the given metric (either maximizes or minimizes, depending on the
-        `maximize` flag).
+        Parameters
+        ----------
+        performance : pd.DataFrame or np.ndarray
+            The performance data.
 
-        Args:
-            performance (pd.DataFrame | np.ndarray): A DataFrame or ndarray containing the performance
-                scores of algorithms. Rows correspond to instances, columns to algorithms.
-
-        Returns:
-            pd.DataFrame | np.ndarray: The performance data of the selected subset of algorithms,
-                in the same format as the input (DataFrame or ndarray).
+        Returns
+        -------
+        pd.DataFrame or np.ndarray
+            The performance data with only the selected algorithms.
         """
-
         if isinstance(performance, np.ndarray):
             performance_frame = pd.DataFrame(
                 performance,
-                columns=[f"Algorithm_{i}" for i in range(performance.shape[1])],
+                columns=[f"Algorithm_{i}" for i in range(performance.shape[1])],  # type: ignore[arg-type]
             )
-            numpy = True
+            is_numpy = True
         else:
             performance_frame = performance
-            numpy = False
+            is_numpy = False
 
-        # Generate all possible combinations of algorithms
+        if self.n_algorithms is None:
+            raise ValueError("n_algorithms must be set")
 
         all_combinations = list(
             combinations(performance_frame.columns, self.n_algorithms)
         )
         best_combination = None
         best_performance = float("-inf") if self.maximize else float("inf")
+
         for combination in all_combinations:
             selected_performance = self.metric(performance_frame[list(combination)])
             if (self.maximize and selected_performance > best_performance) or (
@@ -75,8 +94,13 @@ class BruteForcePreSelector(AbstractPreSelector):
             ):
                 best_performance = selected_performance
                 best_combination = combination
+
+        if best_combination is None:
+            raise ValueError("No valid combination found")
+
         selected_performance = performance_frame[list(best_combination)]
-        if numpy:
+
+        if is_numpy:
             selected_performance = selected_performance.to_numpy()
         else:
             selected_performance = selected_performance.reset_index(drop=True)
@@ -84,14 +108,16 @@ class BruteForcePreSelector(AbstractPreSelector):
 
     @staticmethod
     def get_configuration_space(
-        cs=None,
-        cs_transform=None,
-        parent_param=None,
-        parent_value=None,
-        n_algorithms_max=None,
-        **kwargs,
-    ):
-        """Get the configuration space for BruteForcePreSelector."""
+        cs: ConfigurationSpace | None = None,
+        cs_transform: dict[str, Any] | None = None,
+        parent_param: Any | None = None,
+        parent_value: Any | None = None,
+        n_algorithms_max: int | None = None,
+        **kwargs: Any,
+    ) -> tuple[ConfigurationSpace, dict[str, Any]]:
+        """
+        Get the configuration space.
+        """
         return AbstractPreSelector.get_configuration_space(
             cs=cs,
             cs_transform=cs_transform,
@@ -103,13 +129,15 @@ class BruteForcePreSelector(AbstractPreSelector):
 
     @staticmethod
     def get_from_configuration(
-        configuration,
-        cs_transform,
-        maximize=False,
-        pre_selector_name=None,
-        **kwargs,
-    ):
-        """Create a BruteForcePreSelector instance from a configuration."""
+        configuration: Configuration | dict[str, Any],
+        cs_transform: dict[str, Any],
+        maximize: bool = False,
+        pre_selector_name: str | None = None,
+        **kwargs: Any,
+    ) -> BruteForcePreSelector:
+        """
+        Create a BruteForcePreSelector instance from a configuration.
+        """
         n_algorithms = AbstractPreSelector.get_from_configuration(
             configuration=configuration,
             cs_transform=cs_transform,

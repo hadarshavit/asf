@@ -1,24 +1,18 @@
-"""
-Feature analysis functions for ASF.
+from __future__ import annotations
 
-This module provides functions for analyzing features in algorithm selection scenarios,
-including correlation analysis, clustering, box/violin plots, and feature importance.
-All plotting functions use Plotly and provide an option to return data without plotting.
-"""
+from itertools import combinations
+from typing import Any
 
 import numpy as np
 import pandas as pd
-from numpy import corrcoef
-from scipy.cluster.hierarchy import linkage
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
-from sklearn.ensemble import RandomForestClassifier
-from itertools import combinations
-
 import plotly.express as px
 import plotly.graph_objects as go
+from scipy.cluster.hierarchy import linkage
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import silhouette_score
+from sklearn.preprocessing import StandardScaler
 
 
 def get_feature_statistics(
@@ -27,10 +21,14 @@ def get_feature_statistics(
     """
     Compute basic statistics for each feature.
 
-    Args:
-        features: DataFrame with feature values, rows are instances, columns are features.
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values, rows are instances, columns are features.
 
-    Returns:
+    Returns
+    -------
+    pd.DataFrame
         DataFrame with statistics (mean, std, min, max, median, missing count) for each feature.
     """
     stats = pd.DataFrame(
@@ -41,9 +39,9 @@ def get_feature_statistics(
             "max": features.max(),
             "median": features.median(),
             "missing_count": features.isna().sum(),
-            "missing_pct": features.isna().sum() / len(features) * 100,
+            "missing_pct": (features.isna().sum() / len(features) * 100),
         }
-    )
+    ).astype(float)
     return stats
 
 
@@ -54,11 +52,16 @@ def compute_feature_correlation(
     """
     Compute correlation matrix between features using hierarchical clustering for ordering.
 
-    Args:
-        features: DataFrame with feature values, rows are instances, columns are features.
-        method: Correlation method ('pearson' or 'spearman').
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values, rows are instances, columns are features.
+    method : str, default="pearson"
+        Correlation method ('pearson' or 'spearman').
 
-    Returns:
+    Returns
+    -------
+    tuple[pd.DataFrame, list[str]]
         Tuple of:
             - Correlation matrix as DataFrame with features ordered by hierarchical clustering.
             - List of feature names in clustered order.
@@ -69,29 +72,31 @@ def compute_feature_correlation(
 
     # Compute correlation matrix
     if method == "pearson":
-        data = np.zeros((n_features, n_features)) + 1
+        data = np.zeros((n_features, n_features)) + 1.0
         feature_values = feature_data.values
         for i in range(n_features):
             for j in range(i + 1, n_features):
-                rho = corrcoef([feature_values[:, i], feature_values[:, j]])[0, 1]
+                rho = float(
+                    np.corrcoef([feature_values[:, i], feature_values[:, j]])[0, 1]
+                )
                 if np.isnan(rho):  # is nan if one feature vec is constant
-                    rho = 0
+                    rho = 0.0
                 data[i, j] = rho
                 data[j, i] = rho
     else:  # spearman
         data = feature_data.corr(method="spearman").values
-        data = np.nan_to_num(data, nan=0)
+        data = np.nan_to_num(data, nan=0.0).astype(float)
 
     # Hierarchical clustering for ordering
     link = linkage(data * -1, "ward")  # input is distance -> * -1
 
-    sorted_features = [[a] for a in feature_names]
+    sorted_features_list = [[a] for a in feature_names]
     for link_item in link:
-        new_cluster = sorted_features[int(link_item[0])][:]
-        new_cluster.extend(sorted_features[int(link_item[1])][:])
-        sorted_features.append(new_cluster)
+        new_cluster = sorted_features_list[int(link_item[0])][:]
+        new_cluster.extend(sorted_features_list[int(link_item[1])][:])
+        sorted_features_list.append(new_cluster)
 
-    sorted_features = sorted_features[-1]
+    sorted_features = sorted_features_list[-1]
 
     # Resort data according to clustering
     indx_list = []
@@ -101,7 +106,9 @@ def compute_feature_correlation(
     data = data[indx_list, :]
     data = data[:, indx_list]
 
-    correlation_df = pd.DataFrame(data, index=sorted_features, columns=sorted_features)
+    correlation_df = pd.DataFrame(
+        data, index=pd.Index(sorted_features), columns=pd.Index(sorted_features)
+    )
 
     return correlation_df, sorted_features
 
@@ -114,13 +121,19 @@ def plot_feature_correlation(
     """
     Plot correlation heatmap between features with hierarchical clustering.
 
-    Args:
-        features: DataFrame with feature values, rows are instances, columns are features.
-        method: Correlation method ('pearson' or 'spearman').
-        return_data: If True, also return the correlation data.
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values, rows are instances, columns are features.
+    method : str, default="pearson"
+        Correlation method ('pearson' or 'spearman').
+    return_data : bool, default=False
+        If True, also return the correlation data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, correlation_df, sorted_features) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, correlation_df, sorted_features).
     """
     correlation_df, sorted_features = compute_feature_correlation(features, method)
 
@@ -152,30 +165,35 @@ def plot_feature_correlation(
 def compute_box_plot_data(
     features: pd.DataFrame,
     feature_name: str,
-) -> dict:
+) -> dict[str, Any]:
     """
     Compute box plot statistics for a single feature.
 
-    Args:
-        features: DataFrame with feature values.
-        feature_name: Name of the feature to analyze.
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values.
+    feature_name : str
+        Name of the feature to analyze.
 
-    Returns:
+    Returns
+    -------
+    dict
         Dictionary with statistics for the feature.
     """
     vec = features[feature_name].dropna().values
     return {
         "feature_name": feature_name,
         "values": vec,
-        "mean": np.mean(vec),
-        "median": np.median(vec),
-        "std": np.std(vec),
-        "min": np.min(vec),
-        "max": np.max(vec),
-        "q25": np.percentile(vec, 25),
-        "q75": np.percentile(vec, 75),
+        "mean": float(np.mean(vec)) if len(vec) > 0 else 0.0,
+        "median": float(np.median(vec)) if len(vec) > 0 else 0.0,
+        "std": float(np.std(vec)) if len(vec) > 0 else 0.0,
+        "min": float(np.min(vec)) if len(vec) > 0 else 0.0,
+        "max": float(np.max(vec)) if len(vec) > 0 else 0.0,
+        "q25": float(np.percentile(vec, 25)) if len(vec) > 0 else 0.0,
+        "q75": float(np.percentile(vec, 75)) if len(vec) > 0 else 0.0,
         "count": len(vec),
-        "missing": features[feature_name].isna().sum(),
+        "missing": int(features[feature_name].isna().sum()),
     }
 
 
@@ -186,18 +204,26 @@ def plot_feature_box(
 ) -> (
     go.Figure
     | list[tuple[str, go.Figure]]
-    | tuple[go.Figure | list[tuple[str, go.Figure]], list[dict]]
+    | tuple[
+        go.Figure | list[tuple[str, go.Figure]], dict[str, Any] | list[dict[str, Any]]
+    ]
 ):
     """
     Create box plots for features.
 
-    Args:
-        features: DataFrame with feature values.
-        feature_name: Name of specific feature to plot. If None, plots all features.
-        return_data: If True, also return the statistics data.
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values.
+    feature_name : str or None, default=None
+        Name of specific feature to plot. If None, plots all features.
+    return_data : bool, default=False
+        If True, also return the statistics data.
 
-    Returns:
-        If feature_name is provided: Plotly Figure (or tuple with data if return_data).
+    Returns
+    -------
+    go.Figure or list or tuple
+        If feature_name is provided: Plotly Figure (or tuple with data).
         If feature_name is None: List of (feature_name, Figure) tuples (or tuple with list of data dicts).
     """
     if feature_name is not None:
@@ -257,13 +283,20 @@ def compute_feature_importance(
     Trains random forests for each pair of algorithms to predict which performs better,
     then averages the feature importances across all forests.
 
-    Args:
-        features: DataFrame with feature values, rows are instances, columns are features.
-        performance: DataFrame with performance values, rows are instances, columns are algorithms.
-        n_estimators: Number of trees in each random forest.
-        top_n: Number of top features to return.
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values, rows are instances, columns are features.
+    performance : pd.DataFrame
+        DataFrame with performance values, rows are instances, columns are algorithms.
+    n_estimators : int, default=100
+        Number of trees in each random forest.
+    top_n : int, default=15
+        Number of top features to return.
 
-    Returns:
+    Returns
+    -------
+    pd.DataFrame
         DataFrame with feature importance statistics (median, q25, q75) for top features.
     """
     # Fill missing values
@@ -303,10 +336,10 @@ def compute_feature_importance(
     if not importances:
         return pd.DataFrame()
 
-    importances = np.array(importances)
-    median_importance = np.median(importances, axis=0)
-    q25 = np.percentile(importances, 25, axis=0)
-    q75 = np.percentile(importances, 75, axis=0)
+    importances_arr = np.array(importances)
+    median_importance = np.median(importances_arr, axis=0)
+    q25 = np.percentile(importances_arr, 25, axis=0)
+    q75 = np.percentile(importances_arr, 75, axis=0)
 
     feature_names = np.array(features.columns)
 
@@ -336,15 +369,23 @@ def plot_feature_importance(
     """
     Plot feature importance based on pairwise random forest classification.
 
-    Args:
-        features: DataFrame with feature values.
-        performance: DataFrame with performance values.
-        n_estimators: Number of trees in each random forest.
-        top_n: Number of top features to show.
-        return_data: If True, also return the importance data.
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values.
+    performance : pd.DataFrame
+        DataFrame with performance values.
+    n_estimators : int, default=100
+        Number of trees in each random forest.
+    top_n : int, default=15
+        Number of top features to show.
+    return_data : bool, default=False
+        If True, also return the importance data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, importance_df) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, importance_df).
     """
     importance_df = compute_feature_importance(
         features, performance, n_estimators, top_n
@@ -391,24 +432,25 @@ def compute_feature_clusters(
     features: pd.DataFrame,
     n_clusters_range: tuple[int, int] = (2, 12),
     random_state: int = 42,
-) -> dict:
+) -> dict[str, Any]:
     """
     Cluster instances in feature space using PCA and k-means.
 
     Uses silhouette score to determine optimal number of clusters.
 
-    Args:
-        features: DataFrame with feature values.
-        n_clusters_range: Range of cluster numbers to try (min, max).
-        random_state: Random seed for reproducibility.
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values.
+    n_clusters_range : tuple[int, int], default=(2, 12)
+        Range of cluster numbers to try (min, max).
+    random_state : int, default=42
+        Random seed for reproducibility.
 
-    Returns:
-        Dictionary with clustering results including:
-            - features_2d: 2D PCA-transformed features
-            - labels: Cluster labels for each instance
-            - n_clusters: Optimal number of clusters
-            - silhouette_scores: Silhouette scores for each k
-            - instances: Instance names
+    Returns
+    -------
+    dict
+        Dictionary with clustering results including 2D PCA features, labels, and statistics.
     """
     # Fill missing values
     features_filled = features.fillna(features.mean())
@@ -427,10 +469,10 @@ def compute_feature_clusters(
     for n_clusters in range(n_clusters_range[0], n_clusters_range[1]):
         km = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=10)
         y_pred = km.fit_predict(features_2d)
-        score = silhouette_score(features_2d, y_pred)
+        score = float(silhouette_score(features_2d, y_pred))
         scores.append(score)
 
-    # Use maximum silhouette score (not minimum as in original)
+    # Use maximum silhouette score
     best_score = max(scores)
     best_k = scores.index(best_score) + n_clusters_range[0]
 
@@ -441,10 +483,10 @@ def compute_feature_clusters(
     return {
         "features_2d": features_2d,
         "labels": labels,
-        "n_clusters": best_k,
+        "n_clusters": int(best_k),
         "silhouette_scores": scores,
         "instances": features.index.tolist(),
-        "pca_explained_variance": pca.explained_variance_ratio_,
+        "pca_explained_variance": pca.explained_variance_ratio_.tolist(),
     }
 
 
@@ -453,18 +495,25 @@ def plot_feature_clusters(
     n_clusters_range: tuple[int, int] = (2, 12),
     random_state: int = 42,
     return_data: bool = False,
-) -> go.Figure | tuple[go.Figure, dict]:
+) -> go.Figure | tuple[go.Figure, dict[str, Any]]:
     """
     Plot instances clustered in 2D PCA feature space.
 
-    Args:
-        features: DataFrame with feature values.
-        n_clusters_range: Range of cluster numbers to try.
-        random_state: Random seed for reproducibility.
-        return_data: If True, also return the clustering data.
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values.
+    n_clusters_range : tuple[int, int], default=(2, 12)
+        Range of cluster numbers to try.
+    random_state : int, default=42
+        Random seed for reproducibility.
+    return_data : bool, default=False
+        If True, also return the clustering data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, cluster_data) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, cluster_data).
     """
     cluster_data = compute_feature_clusters(features, n_clusters_range, random_state)
 
@@ -511,11 +560,16 @@ def compute_feature_runstatus_distribution(
     """
     Compute the distribution of run statuses for each feature group.
 
-    Args:
-        feature_runstatus: DataFrame with runstatus for each feature group.
-        stati: List of status values to include. Defaults to common statuses.
+    Parameters
+    ----------
+    feature_runstatus : pd.DataFrame
+        DataFrame with runstatus for each feature group.
+    stati : list[str] or None, default=None
+        List of status values to include. Defaults to common statuses.
 
-    Returns:
+    Returns
+    -------
+    pd.DataFrame
         DataFrame with frequency of each status per feature group.
     """
     if stati is None:
@@ -523,7 +577,7 @@ def compute_feature_runstatus_distribution(
 
     n_instances = len(feature_runstatus)
 
-    distribution = {}
+    distribution: dict[str, pd.Series] = {}
     for status in stati:
         distribution[status] = (feature_runstatus == status).sum() / n_instances
 
@@ -538,13 +592,19 @@ def plot_feature_runstatus_bar(
     """
     Plot stacked bar chart of feature run status distribution.
 
-    Args:
-        feature_runstatus: DataFrame with runstatus for each feature group.
-        stati: List of status values to include.
-        return_data: If True, also return the distribution data.
+    Parameters
+    ----------
+    feature_runstatus : pd.DataFrame
+        DataFrame with runstatus for each feature group.
+    stati : list[str] or None, default=None
+        List of status values to include.
+    return_data : bool, default=False
+        If True, also return the distribution data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, distribution_df) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, distribution_df).
     """
     if stati is None:
         stati = ["ok", "timeout", "memout", "presolved", "crash", "other", "unknown"]
@@ -588,30 +648,35 @@ def compute_feature_cost_cdf(
     """
     Compute CDF data for feature computation costs.
 
-    Args:
-        feature_costs: DataFrame with feature costs for each feature group.
-        n_points: Number of points to sample for CDF.
+    Parameters
+    ----------
+    feature_costs : pd.DataFrame
+        DataFrame with feature costs for each feature group.
+    n_points : int, default=1000
+        Number of points to sample for CDF.
 
-    Returns:
+    Returns
+    -------
+    dict
         Dictionary mapping feature group names to (x, y) CDF data.
     """
-    min_val = max(0.0005, feature_costs.min().min())
+    min_val = float(max(0.0005, feature_costs.min().min()))
 
-    cdfs = {}
+    cdfs: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     for col in feature_costs.columns:
         values = feature_costs[col].dropna().sort_values()
         if len(values) == 0:
             continue
 
         # Create CDF
-        x = np.sort(values)
+        x = np.sort(values.values)
         y = np.arange(1, len(x) + 1) / len(x)
 
         # Add start point
         x = np.concatenate([[min_val], x])
-        y = np.concatenate([[0], y])
+        y = np.concatenate([[0.0], y])
 
-        cdfs[col] = (x, y)
+        cdfs[str(col)] = (x, y)
 
     return cdfs
 
@@ -620,17 +685,23 @@ def plot_feature_cost_cdf(
     feature_costs: pd.DataFrame,
     log_scale: bool = True,
     return_data: bool = False,
-) -> go.Figure | tuple[go.Figure, dict]:
+) -> go.Figure | tuple[go.Figure, dict[str, tuple[np.ndarray, np.ndarray]]]:
     """
     Plot CDF of feature computation costs.
 
-    Args:
-        feature_costs: DataFrame with feature costs for each feature group.
-        log_scale: Whether to use log scale for x-axis.
-        return_data: If True, also return the CDF data.
+    Parameters
+    ----------
+    feature_costs : pd.DataFrame
+        DataFrame with feature costs for each feature group.
+    log_scale : bool, default=True
+        Whether to use log scale for x-axis.
+    return_data : bool, default=False
+        If True, also return the CDF data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, cdf_data) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, cdf_data).
     """
     cdf_data = compute_feature_cost_cdf(feature_costs)
 
@@ -670,11 +741,16 @@ def compute_pca_features(
     """
     Apply PCA to reduce feature dimensionality.
 
-    Args:
-        features: DataFrame with feature values.
-        n_components: Number of PCA components.
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values.
+    n_components : int, default=2
+        Number of PCA components.
 
-    Returns:
+    Returns
+    -------
+    tuple
         Tuple of (transformed features, fitted PCA, fitted scaler).
     """
     features_filled = features.fillna(features.mean())
@@ -696,13 +772,19 @@ def plot_feature_pca(
     """
     Plot instances in 2D PCA feature space.
 
-    Args:
-        features: DataFrame with feature values.
-        color_by: Optional series to color points by (e.g., algorithm performance).
-        return_data: If True, also return the PCA data.
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values.
+    color_by : pd.Series or None, default=None
+        Optional series to color points by (e.g., algorithm performance).
+    return_data : bool, default=False
+        If True, also return the PCA data.
 
-    Returns:
-        Plotly Figure, or tuple of (Figure, features_2d, pca) if return_data is True.
+    Returns
+    -------
+    go.Figure or tuple
+        Plotly Figure, or tuple of (Figure, features_2d, pca).
     """
     features_2d, pca, _ = compute_pca_features(features, n_components=2)
 
@@ -752,33 +834,41 @@ def summarize_features(
     features: pd.DataFrame,
     feature_costs: pd.DataFrame | None = None,
     feature_runstatus: pd.DataFrame | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """
     Generate a comprehensive summary of feature data.
 
-    Args:
-        features: DataFrame with feature values.
-        feature_costs: Optional DataFrame with feature computation costs.
-        feature_runstatus: Optional DataFrame with feature runstatus.
+    Parameters
+    ----------
+    features : pd.DataFrame
+        DataFrame with feature values.
+    feature_costs : pd.DataFrame or None, default=None
+        Optional DataFrame with feature computation costs.
+    feature_runstatus : pd.DataFrame or None, default=None
+        Optional DataFrame with feature runstatus.
 
-    Returns:
+    Returns
+    -------
+    dict
         Dictionary with summary statistics and information.
     """
-    summary = {
+    summary: dict[str, Any] = {
         "n_instances": len(features),
         "n_features": len(features.columns),
         "feature_names": features.columns.tolist(),
-        "missing_values": features.isna().sum().sum(),
-        "missing_pct": features.isna().sum().sum() / features.size * 100,
+        "missing_values": int(features.isna().sum().sum()),
+        "missing_pct": float(features.isna().sum().sum() / features.size * 100)
+        if features.size > 0
+        else 0.0,
         "feature_statistics": get_feature_statistics(features),
     }
 
     if feature_costs is not None:
         summary["feature_cost_stats"] = {
-            "total_mean": feature_costs.sum(axis=1).mean(),
-            "total_std": feature_costs.sum(axis=1).std(),
-            "per_group_mean": feature_costs.mean(),
-            "per_group_std": feature_costs.std(),
+            "total_mean": float(feature_costs.sum(axis=1).mean()),
+            "total_std": float(feature_costs.sum(axis=1).std()),
+            "per_group_mean": feature_costs.mean().astype(float),
+            "per_group_std": feature_costs.std().astype(float),
         }
 
     if feature_runstatus is not None:

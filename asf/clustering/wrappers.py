@@ -1,15 +1,20 @@
 from __future__ import annotations
+
 from functools import partial
-from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
-from asf.utils.g_means import GMeans
+from typing import Any
+
+import numpy as np
+import pandas as pd
+from sklearn.cluster import DBSCAN, AgglomerativeClustering, KMeans
+
 from asf.utils.configurable import ConfigurableMixin
+from asf.utils.g_means import GMeans
 
 try:
-    from ConfigSpace import (  # noqa: F401
-        ConfigurationSpace,
+    from ConfigSpace import (
         Categorical,
-        Integer,
         Float,
+        Integer,
     )
 
     CONFIGSPACE_AVAILABLE = True
@@ -18,20 +23,58 @@ except ImportError:
 
 
 class GMeansWrapper(ConfigurableMixin):
-    PREFIX = "gmeans"
+    """
+    Wrapper for GMeans clustering.
 
-    def __init__(self, **kwargs):
+    Parameters
+    ----------
+    **kwargs : Any
+        Keyword arguments passed to GMeans.
+    """
+
+    PREFIX: str = "gmeans"
+
+    def __init__(self, **kwargs: Any) -> None:
         self.model = GMeans(**kwargs)
 
-    def fit(self, X):
-        self.model.fit(X)
+    def fit(self, X: pd.DataFrame | np.ndarray) -> GMeansWrapper:
+        """
+        Fit the model.
+
+        Parameters
+        ----------
+        X : pd.DataFrame or np.ndarray
+            The input data.
+
+        Returns
+        -------
+        GMeansWrapper
+            The fitted wrapper.
+        """
+        self.model.fit(X.values if isinstance(X, pd.DataFrame) else X)
         return self
 
-    def predict(self, X):
-        return self.model.predict(X)
+    def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
+        """
+        Predict cluster labels.
+
+        Parameters
+        ----------
+        X : pd.DataFrame or np.ndarray
+            The input data.
+
+        Returns
+        -------
+        np.ndarray
+            The predicted labels.
+        """
+        return self.model.predict(X.values if isinstance(X, pd.DataFrame) else X)
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """Define hyperparameters for GMeans."""
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
 
@@ -43,27 +86,68 @@ class GMeansWrapper(ConfigurableMixin):
         return params, [], []
 
     @classmethod
-    def _get_from_clean_configuration(cls, clean_config, **kwargs):
+    def _get_from_clean_configuration(
+        cls, clean_config: dict[str, Any], **kwargs: Any
+    ) -> partial:
+        """Create a partial class wrapper."""
         config = clean_config.copy()
         config.update(kwargs)
         return partial(GMeansWrapper, **config)
 
 
 class KMeansWrapper(ConfigurableMixin):
-    PREFIX = "kmeans"
+    """
+    Wrapper for KMeans clustering.
 
-    def __init__(self, **kwargs):
+    Parameters
+    ----------
+    **kwargs : Any
+        Keyword arguments passed to KMeans.
+    """
+
+    PREFIX: str = "kmeans"
+
+    def __init__(self, **kwargs: Any) -> None:
         self.model = KMeans(**kwargs)
 
-    def fit(self, X):
-        self.model.fit(X)
+    def fit(self, X: pd.DataFrame | np.ndarray) -> KMeansWrapper:
+        """
+        Fit the model.
+
+        Parameters
+        ----------
+        X : pd.DataFrame or np.ndarray
+            The input data.
+
+        Returns
+        -------
+        KMeansWrapper
+            The fitted wrapper.
+        """
+        self.model.fit(X.values if isinstance(X, pd.DataFrame) else X)
         return self
 
-    def predict(self, X):
-        return self.model.predict(X)
+    def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
+        """
+        Predict cluster labels.
+
+        Parameters
+        ----------
+        X : pd.DataFrame or np.ndarray
+            The input data.
+
+        Returns
+        -------
+        np.ndarray
+            The predicted labels.
+        """
+        return self.model.predict(X.values if isinstance(X, pd.DataFrame) else X)
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """Define hyperparameters for KMeans."""
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
 
@@ -73,30 +157,75 @@ class KMeansWrapper(ConfigurableMixin):
         return params, [], []
 
     @classmethod
-    def _get_from_clean_configuration(cls, clean_config, **kwargs):
+    def _get_from_clean_configuration(
+        cls, clean_config: dict[str, Any], **kwargs: Any
+    ) -> partial:
+        """Create a partial class wrapper."""
         config = clean_config.copy()
         config.update(kwargs)
         return partial(KMeansWrapper, **config)
 
 
 class AgglomerativeClusteringWrapper(ConfigurableMixin):
-    PREFIX = "agglomerative_clustering"
+    """
+    Wrapper for AgglomerativeClustering.
 
-    def __init__(self, **kwargs):
+    Parameters
+    ----------
+    **kwargs : Any
+        Keyword arguments passed to AgglomerativeClustering.
+    """
+
+    PREFIX: str = "agglomerative_clustering"
+
+    def __init__(self, **kwargs: Any) -> None:
         self.model = AgglomerativeClustering(**kwargs)
 
-    def fit(self, X):
-        self.model.fit(X)
+    def fit(self, X: pd.DataFrame | np.ndarray) -> AgglomerativeClusteringWrapper:
+        """
+        Fit the model.
+
+        Parameters
+        ----------
+        X : pd.DataFrame or np.ndarray
+            The input data.
+
+        Returns
+        -------
+        AgglomerativeClusteringWrapper
+            The fitted wrapper.
+        """
+        self.model.fit(X.values if isinstance(X, pd.DataFrame) else X)
         return self
 
-    def predict(self, X):
-        # AgglomerativeClustering does not support predict()
+    def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
+        """
+                Predict labels (not supported by default).
+
+                Parameters
+                ----------
+                X : pd.DataFrame or np.ndarray
+                    The input data.
+
+                Returns
+        -------
+                np.ndarray
+                    The predicted labels.
+
+                Raises
+                ------
+                NotImplementedError
+                    If predict is not supported.
+        """
         if hasattr(self.model, "predict"):
-            return self.model.predict(X)
+            return getattr(self.model, "predict")(X)
         raise NotImplementedError("AgglomerativeClustering does not support predict()")
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """Define hyperparameters for AgglomerativeClustering."""
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
 
@@ -109,30 +238,75 @@ class AgglomerativeClusteringWrapper(ConfigurableMixin):
         return params, [], []
 
     @classmethod
-    def _get_from_clean_configuration(cls, clean_config, **kwargs):
+    def _get_from_clean_configuration(
+        cls, clean_config: dict[str, Any], **kwargs: Any
+    ) -> partial:
+        """Create a partial class wrapper."""
         config = clean_config.copy()
         config.update(kwargs)
         return partial(AgglomerativeClusteringWrapper, **config)
 
 
 class DBSCANWrapper(ConfigurableMixin):
-    PREFIX = "dbscan"
+    """
+    Wrapper for DBSCAN clustering.
 
-    def __init__(self, **kwargs):
+    Parameters
+    ----------
+    **kwargs : Any
+        Keyword arguments passed to DBSCAN.
+    """
+
+    PREFIX: str = "dbscan"
+
+    def __init__(self, **kwargs: Any) -> None:
         self.model = DBSCAN(**kwargs)
 
-    def fit(self, X):
-        self.model.fit(X)
+    def fit(self, X: pd.DataFrame | np.ndarray) -> DBSCANWrapper:
+        """
+        Fit the model.
+
+        Parameters
+        ----------
+        X : pd.DataFrame or np.ndarray
+            The input data.
+
+        Returns
+        -------
+        DBSCANWrapper
+            The fitted wrapper.
+        """
+        self.model.fit(X.values if isinstance(X, pd.DataFrame) else X)
         return self
 
-    def predict(self, X):
-        # DBSCAN does not support predict()
+    def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
+        """
+                Predict labels (not supported by default).
+
+                Parameters
+                ----------
+                X : pd.DataFrame or np.ndarray
+                    The input data.
+
+                Returns
+        -------
+                np.ndarray
+                    The predicted labels.
+
+                Raises
+                ------
+                NotImplementedError
+                    If predict is not supported.
+        """
         if hasattr(self.model, "predict"):
-            return self.model.predict(X)
+            return getattr(self.model, "predict")(X)
         raise NotImplementedError("DBSCAN does not support predict()")
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """Define hyperparameters for DBSCAN."""
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
 
@@ -143,7 +317,10 @@ class DBSCANWrapper(ConfigurableMixin):
         return params, [], []
 
     @classmethod
-    def _get_from_clean_configuration(cls, clean_config, **kwargs):
+    def _get_from_clean_configuration(
+        cls, clean_config: dict[str, Any], **kwargs: Any
+    ) -> partial:
+        """Create a partial class wrapper."""
         config = clean_config.copy()
         config.update(kwargs)
         return partial(DBSCANWrapper, **config)

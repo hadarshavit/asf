@@ -1,9 +1,24 @@
+"""
+ASAPv2 presolver - Algorithm Selector and Prescheduler.
+"""
+
+from __future__ import annotations
+
+from itertools import product
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from itertools import product
 from scipy.optimize import differential_evolution, minimize_scalar
 
 from asf.presolving.presolver import AbstractPresolver
+
+try:
+    from ConfigSpace import Configuration
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
 
 
 class ASAPv2(AbstractPresolver):
@@ -15,6 +30,30 @@ class ASAPv2(AbstractPresolver):
     Prescheduler in the ICON challenge.
 
     Uses differential evolution instead of CMA-ES for optimization.
+
+    Parameters
+    ----------
+    runcount_limit : float, default=100.0
+        Maximum number of iterations for differential evolution.
+    budget : float, default=30.0
+        Total time budget (timeout) for solving.
+    maximize : bool, default=False
+        Whether to maximize performance (False for runtime minimization).
+    size_preschedule : int, default=3
+        Number of algorithms to include in the preschedule.
+    max_runtime_preschedule : float, default=-1
+        Maximum time for preschedule. If < 0, uses 10% of budget.
+        If < 1, uses this fraction of budget. Otherwise uses the value directly.
+    regularization_weight : float, default=0.0
+        Weight for regularization term in objective function.
+    variance_weight : float, default=0.0
+        Weight for variance penalty in objective function.
+    de_popsize : int, default=15
+        Population size for differential evolution.
+    seed : int, default=42
+        Random seed for reproducibility.
+    verbosity : int, default=0
+        Verbosity level (0=silent, 1=basic, 2=detailed).
     """
 
     def __init__(
@@ -29,7 +68,7 @@ class ASAPv2(AbstractPresolver):
         de_popsize: int = 15,
         seed: int = 42,
         verbosity: int = 0,
-    ):
+    ) -> None:
         """
         Initialize ASAPv2 presolver.
 
@@ -79,30 +118,53 @@ class ASAPv2(AbstractPresolver):
         # Will be set during fit
         self.algorithms: list[str] = []
         self.numAlg: int = 0
-        self.ialgos_preschedule: np.ndarray = (
+        self.ialgos_preschedule: np.ndarray | None = (
             None  # Indices of algorithms in preschedule
         )
-        self.runtimes_preschedule: np.ndarray = None
-        self.features = None
-        self.performance = None
+        self.runtimes_preschedule: np.ndarray | None = None
+        self.features: pd.DataFrame | None = None
+        self.performance: pd.DataFrame | None = None
         self.schedule: list[tuple[str, float]] = []
 
-    def fit(self, features: pd.DataFrame, performance: pd.DataFrame):
-        """Train the ASAP v2 presolver"""
+    def fit(
+        self,
+        features: pd.DataFrame | np.ndarray | None,
+        performance: pd.DataFrame | np.ndarray | None,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Train the ASAP v2 presolver.
+
+        Parameters
+        ----------
+        features : pd.DataFrame or np.ndarray
+            The instance features.
+        performance : pd.DataFrame or np.ndarray
+            The algorithm performances.
+        """
+        if features is None or performance is None:
+            raise ValueError(
+                "ASAPv2 requires features and performance data for fitting."
+            )
         # Convert to DataFrame if needed
         if isinstance(features, np.ndarray):
-            features = pd.DataFrame(features)
-        if isinstance(performance, np.ndarray):
-            performance = pd.DataFrame(performance)
+            features_frame = pd.DataFrame(features)
+        else:
+            features_frame = features
 
-        self.features = features
-        self.performance = performance
-        self.algorithms = list(performance.columns)
+        if isinstance(performance, np.ndarray):
+            performance_frame = pd.DataFrame(performance)
+        else:
+            performance_frame = performance
+
+        self.features = features_frame
+        self.performance = performance_frame
+        self.algorithms = list(performance_frame.columns)
         self.numAlg = len(self.algorithms)
 
         # Convert to numpy - apply PAR10 penalty for unsolved instances
-        self.feature_train = features.values
-        self.performance_train = performance.values.copy()
+        self.feature_train = features_frame.values
+        self.performance_train = performance_frame.values.copy()
 
         # PAR10: instances with runtime >= budget are penalized with 10x budget
         self.performance_train[self.performance_train >= self.budget] = 10 * self.budget
@@ -131,7 +193,7 @@ class ASAPv2(AbstractPresolver):
         # Build final schedule
         self._build_schedule()
 
-    def _identify_algorithms_for_preschedule(self):
+    def _identify_algorithms_for_preschedule(self) -> None:
         """
         Identify which algorithms should be included in the preschedule.
 
@@ -198,7 +260,9 @@ class ASAPv2(AbstractPresolver):
             print(f"Initial preschedule times: {self.runtimes_preschedule}")
             print(f"Solved rate: {best_config['rate_solved_instances'][step_lim]:.3f}")
 
-    def _identify_end_preschedule(self, timesteps, rate, max_time_schedule):
+    def _identify_end_preschedule(
+        self, timesteps: np.ndarray, rate: np.ndarray, max_time_schedule: float
+    ) -> int:
         """
         Identify the optimal endpoint for the preschedule based on
         the trade-off between time spent and instances solved.
@@ -212,11 +276,11 @@ class ASAPv2(AbstractPresolver):
         ) * (timesteps[-1] - timesteps)
 
         if timesteps[np.argmin(criterion)] < max_time_schedule / self.size_preschedule:
-            return np.argmin(criterion)
+            return int(np.argmin(criterion))
         else:
             return len(timesteps) - 1
 
-    def _optimize_preschedule_de(self):
+    def _optimize_preschedule_de(self) -> None:
         """
         Optimize preschedule time allocations using differential evolution.
 
@@ -227,6 +291,9 @@ class ASAPv2(AbstractPresolver):
         """
         if self.verbosity > 0:
             print("Optimizing preschedule with differential evolution...")
+
+        if self.runtimes_preschedule is None or self.ialgos_preschedule is None:
+            return
 
         # Total time allocated to preschedule (selector gets remaining time)
         total_runtime_preschedule = np.sum(self.runtimes_preschedule)
@@ -253,7 +320,7 @@ class ASAPv2(AbstractPresolver):
             max(self.budget - np.sum(self.runtimes_preschedule), 0.0),
         )
 
-        def encode_runtimes(rt):
+        def encode_runtimes(rt: np.ndarray) -> np.ndarray:
             """Encode runtime for optimization (all but last 2 elements)"""
             rt_ = rt / total_runtime_preschedule
             x_ = np.zeros((rt_.size - 2,))
@@ -267,7 +334,7 @@ class ASAPv2(AbstractPresolver):
                         x_[irt] = 1.0 - np.sum(x_[:irt])
             return x_
 
-        def decode_runtimes(x):
+        def decode_runtimes(x: np.ndarray) -> np.ndarray:
             """Decode runtime from optimization variables"""
             x_ = np.abs(x)
             rt = np.zeros((x_.size + 2,))
@@ -293,7 +360,7 @@ class ASAPv2(AbstractPresolver):
 
             return rt
 
-        def objective_function(x_):
+        def objective_function(x_: np.ndarray) -> float:
             """Evaluate preschedule performance with regularization"""
             x = decode_runtimes(np.abs(x_))
             rts_p = x[:-1]  # Preschedule runtimes (excluding selector's remaining time)
@@ -321,7 +388,7 @@ class ASAPv2(AbstractPresolver):
                 partial_var = np.var(time_to_solve[time_to_solve < self.budget])
                 var_pen = self.variance_weight * partial_var
 
-            return runtime_res + reg + var_pen
+            return float(runtime_res + reg + var_pen)
 
         # Encode initial guess
         schedule_ini = encode_runtimes(runtimes_preschedule_ext.astype(float)).reshape(
@@ -368,7 +435,12 @@ class ASAPv2(AbstractPresolver):
                 if self.verbosity > 0:
                     print(f"Scalar optimization failed: {e}")
 
-    def _get_time_to_solve(self, performance_matrix, i_solvers, runtimes):
+    def _get_time_to_solve(
+        self,
+        performance_matrix: np.ndarray,
+        i_solvers: np.ndarray,
+        runtimes: np.ndarray,
+    ) -> np.ndarray:
         """
         Compute time to solve for each instance given a schedule.
 
@@ -408,16 +480,20 @@ class ASAPv2(AbstractPresolver):
 
         return time_to_solve
 
-    def _build_schedule(self):
+    def _build_schedule(self) -> None:
         """Build the final schedule from preschedule algorithms"""
         schedule = []
 
-        for i, (alg_idx, time_alloc) in enumerate(
-            zip(self.ialgos_preschedule, self.runtimes_preschedule)
+        if (
+            self.ialgos_preschedule is not None
+            and self.runtimes_preschedule is not None
         ):
-            if time_alloc > 0:
-                alg_name = self.algorithms[alg_idx]
-                schedule.append((alg_name, round(float(time_alloc), 3)))
+            for i, (alg_idx, time_alloc) in enumerate(
+                zip(self.ialgos_preschedule, self.runtimes_preschedule)
+            ):
+                if time_alloc > 0:
+                    alg_name = self.algorithms[alg_idx]
+                    schedule.append((alg_name, round(float(time_alloc), 3)))
 
         self.schedule = schedule
 
@@ -426,15 +502,40 @@ class ASAPv2(AbstractPresolver):
             print(f"Final preschedule: {self.schedule}")
             print("+ " * 40)
 
-    def predict(self, features: pd.DataFrame | None = None) -> list[tuple[str, float]]:
+    def predict(
+        self,
+        features: pd.DataFrame | np.ndarray | None = None,
+        performance: pd.DataFrame | np.ndarray | None = None,
+        **kwargs: Any,
+    ) -> list[tuple[str, float]] | dict[str, list[tuple[str, float]]]:
         """
-        Returns the optimized preschedule (same for all features).
+        Return the predicted schedule.
+
+        Parameters
+        ----------
+        features : pd.DataFrame or None, default=None
+            The features for the instances.
+        performance : pd.DataFrame or None, default=None
+            The algorithm performances.
+
+        Returns
+        -------
+        list or dict
+            The presolving schedule.
         """
+        if features is not None:
+            if isinstance(features, np.ndarray):
+                features = pd.DataFrame(features)
+            return {str(inst): self.schedule for inst in features.index}
         return self.schedule
 
     def get_preschedule_config(self) -> dict[str, float]:
         """Get the optimized preschedule configuration (only non-zero times)"""
-        if self.algorithms and self.runtimes_preschedule is not None:
+        if (
+            self.algorithms
+            and self.runtimes_preschedule is not None
+            and self.ialgos_preschedule is not None
+        ):
             return {
                 self.algorithms[alg_idx]: time
                 for alg_idx, time in zip(
@@ -446,27 +547,33 @@ class ASAPv2(AbstractPresolver):
 
     @classmethod
     def get_from_configuration(
-        cls, configuration: dict, pre_prefix: str = "", **kwargs
-    ) -> "ASAPv2":
+        cls,
+        configuration: Configuration | dict[str, Any],
+        cs_transform: dict[str, Any] | None = None,
+        budget: float | None = None,
+        maximize: bool = False,
+        presolver_name: str | None = None,
+        **kwargs: Any,
+    ) -> ASAPv2:
         """
         Create an ASAPv2 presolver from a configuration.
 
         Parameters
         ----------
-        configuration : dict
-            The configuration dictionary.
-        pre_prefix : str
+        configuration : Configuration or dict
+            The configuration.
+        pre_prefix : str, default=""
             Prefix for the configuration keys.
-        **kwargs
-            Additional arguments.
+        **kwargs : Any
+            Additional keyword arguments.
 
         Returns
         -------
         ASAPv2
             The initialized presolver.
         """
-        if pre_prefix:
-            prefix = f"{pre_prefix}:"
+        if presolver_name:
+            prefix = f"{presolver_name}:"
         else:
             prefix = ""
 

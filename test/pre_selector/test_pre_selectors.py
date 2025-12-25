@@ -122,9 +122,11 @@ class _RecordingOptimizer:
         self.values = np.array(values, dtype=float)
         self.called_with = None
 
-    def __call__(self, objective_function, bounds):
+    def __call__(self, objective_function, x0=None, bounds=None, **kwargs):
         self.called_with = {
             "bounds": bounds,
+            "x0": x0,
+            "kwargs": kwargs,
         }
         # Call once to ensure objective is valid.
         objective_function(self.values)

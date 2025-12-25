@@ -1,37 +1,59 @@
-from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
-import pandas as pd
+"""
+Genetic Algorithm-based pre-selector for algorithm pre-selection.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Callable
+
 import numpy as np
-from typing import Callable
+import pandas as pd
+
+from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
+
+try:
+    from ConfigSpace import Configuration, ConfigurationSpace
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
 
 
 class GeneticAlgorithmPreSelector(AbstractPreSelector):
     """
     Genetic Algorithm-based pre-selector for finding optimal algorithm subsets.
 
-    Uses evolutionary principles to search for the best subset of algorithms:
-    1. Initialize a population of random subsets
-    2. Evaluate fitness of each individual
-    3. Select parents based on fitness (tournament selection)
-    4. Create offspring through crossover
-    5. Apply mutation
-    6. Repeat until convergence or max generations
+    Uses evolutionary principles to search for the best subset of algorithms.
 
-    Attributes:
-        metric (Callable): A function to evaluate the performance of the selected algorithms.
-        n_algorithms (int): The number of algorithms to select.
-        maximize (bool): Whether to maximize or minimize the performance metric.
-        population_size (int): Number of individuals in the population.
-        n_generations (int): Maximum number of generations.
-        crossover_rate (float): Probability of crossover (0-1).
-        mutation_rate (float): Probability of mutation per gene (0-1).
-        tournament_size (int): Number of individuals in tournament selection.
-        elitism (int): Number of best individuals to preserve each generation.
-        seed (int | None): Random seed for reproducibility.
+    Parameters
+    ----------
+    metric : Callable
+        A function to evaluate the performance of the selected algorithms.
+    n_algorithms : int
+        The number of algorithms to select.
+    maximize : bool, default=False
+        Whether to maximize or minimize the performance metric.
+    population_size : int, default=50
+        Number of individuals in the population.
+    n_generations : int, default=100
+        Maximum number of generations.
+    crossover_rate : float, default=0.8
+        Probability of crossover (0-1).
+    mutation_rate : float, default=0.1
+        Probability of mutation per gene (0-1).
+    tournament_size : int, default=3
+        Number of individuals in tournament selection.
+    elitism : int, default=2
+        Number of best individuals to preserve each generation.
+    seed : int or None, default=None
+        Random seed for reproducibility.
+    **kwargs : Any
+        Additional arguments passed to the parent class.
     """
 
     def __init__(
         self,
-        metric: Callable,
+        metric: Callable[[pd.DataFrame], float],
         n_algorithms: int,
         maximize: bool = False,
         population_size: int = 50,
@@ -41,24 +63,8 @@ class GeneticAlgorithmPreSelector(AbstractPreSelector):
         tournament_size: int = 3,
         elitism: int = 2,
         seed: int | None = None,
-        **kwargs,
-    ):
-        """
-        Initializes the GeneticAlgorithmPreSelector.
-
-        Args:
-            metric (Callable): A function to evaluate the performance of the selected algorithms.
-            n_algorithms (int): The number of algorithms to select.
-            maximize (bool, optional): Whether to maximize the performance metric. Defaults to False.
-            population_size (int, optional): Population size. Defaults to 50.
-            n_generations (int, optional): Maximum generations. Defaults to 100.
-            crossover_rate (float, optional): Crossover probability. Defaults to 0.8.
-            mutation_rate (float, optional): Mutation probability per gene. Defaults to 0.1.
-            tournament_size (int, optional): Tournament selection size. Defaults to 3.
-            elitism (int, optional): Number of elite individuals to preserve. Defaults to 2.
-            seed (int | None, optional): Random seed. Defaults to None.
-            **kwargs: Additional arguments passed to the parent class.
-        """
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         self.metric = metric
         self.n_algorithms = n_algorithms
@@ -72,7 +78,7 @@ class GeneticAlgorithmPreSelector(AbstractPreSelector):
         self.seed = seed
 
     def _create_individual(self, n_total: int, rng: np.random.Generator) -> np.ndarray:
-        """Create a random individual (binary array with exactly n_algorithms 1s)."""
+        """Create a random individual."""
         individual = np.zeros(n_total, dtype=np.int8)
         selected_indices = rng.choice(n_total, size=self.n_algorithms, replace=False)
         individual[selected_indices] = 1
@@ -157,7 +163,7 @@ class GeneticAlgorithmPreSelector(AbstractPreSelector):
         return child1, child2
 
     def _mutate(self, individual: np.ndarray, rng: np.random.Generator) -> np.ndarray:
-        """Apply mutation by flipping bits with mutation_rate probability."""
+        """Apply mutation."""
         individual = individual.copy()
         mutation_mask = rng.random(len(individual)) < self.mutation_rate
 
@@ -172,30 +178,34 @@ class GeneticAlgorithmPreSelector(AbstractPreSelector):
         """
         Selects the best subset of algorithms using a genetic algorithm.
 
-        Args:
-            performance (pd.DataFrame | np.ndarray): A DataFrame or NumPy array containing
-                the performance data of algorithms. Rows represent instances, and columns
-                represent algorithms.
+        Parameters
+        ----------
+        performance : pd.DataFrame or np.ndarray
+            The performance data.
 
-        Returns:
-            pd.DataFrame | np.ndarray: A DataFrame or NumPy array containing the performance
-                data of the selected algorithms.
+        Returns
+        -------
+        pd.DataFrame or np.ndarray
+            The performance data with only the selected algorithms.
         """
         if isinstance(performance, np.ndarray):
             performance_frame = pd.DataFrame(
                 performance,
-                columns=[f"Algorithm_{i}" for i in range(performance.shape[1])],
+                columns=[f"Algorithm_{i}" for i in range(performance.shape[1])],  # type: ignore[arg-type]
             )
-            numpy = True
+            is_numpy = True
         else:
             performance_frame = performance
-            numpy = False
+            is_numpy = False
+
+        if self.n_algorithms is None:
+            raise ValueError("n_algorithms must be set")
 
         n_total = len(performance_frame.columns)
 
         # Handle edge case
         if self.n_algorithms >= n_total:
-            if numpy:
+            if is_numpy:
                 return performance_frame.values
             return performance_frame.reset_index(drop=True)
 
@@ -259,6 +269,9 @@ class GeneticAlgorithmPreSelector(AbstractPreSelector):
             population = new_population
 
         # Extract selected algorithms from best individual
+        if best_individual is None:
+            raise RuntimeError("No best individual found")
+
         selected_cols = [
             col
             for col, selected in zip(performance_frame.columns, best_individual)
@@ -267,7 +280,7 @@ class GeneticAlgorithmPreSelector(AbstractPreSelector):
 
         selected_performance = performance_frame[selected_cols]
 
-        if numpy:
+        if is_numpy:
             selected_performance = selected_performance.values
         else:
             selected_performance = selected_performance.reset_index(drop=True)
@@ -276,14 +289,16 @@ class GeneticAlgorithmPreSelector(AbstractPreSelector):
 
     @staticmethod
     def get_configuration_space(
-        cs=None,
-        cs_transform=None,
-        parent_param=None,
-        parent_value=None,
-        n_algorithms_max=None,
-        **kwargs,
-    ):
-        """Get the configuration space for GeneticAlgorithmPreSelector."""
+        cs: ConfigurationSpace | None = None,
+        cs_transform: dict[str, Any] | None = None,
+        parent_param: Any | None = None,
+        parent_value: Any | None = None,
+        n_algorithms_max: int | None = None,
+        **kwargs: Any,
+    ) -> tuple[ConfigurationSpace, dict[str, Any]]:
+        """
+        Get the configuration space.
+        """
         return AbstractPreSelector.get_configuration_space(
             cs=cs,
             cs_transform=cs_transform,
@@ -295,13 +310,15 @@ class GeneticAlgorithmPreSelector(AbstractPreSelector):
 
     @staticmethod
     def get_from_configuration(
-        configuration,
-        cs_transform,
-        maximize=False,
-        pre_selector_name=None,
-        **kwargs,
-    ):
-        """Create a GeneticAlgorithmPreSelector instance from a configuration."""
+        configuration: Configuration | dict[str, Any],
+        cs_transform: dict[str, Any],
+        maximize: bool = False,
+        pre_selector_name: str | None = None,
+        **kwargs: Any,
+    ) -> GeneticAlgorithmPreSelector:
+        """
+        Create a GeneticAlgorithmPreSelector instance from a configuration.
+        """
         n_algorithms = AbstractPreSelector.get_from_configuration(
             configuration=configuration,
             cs_transform=cs_transform,

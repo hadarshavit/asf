@@ -9,16 +9,18 @@ This module provides:
 from __future__ import annotations
 
 from functools import partial
-from typing import Any
+from typing import Any, Sequence, cast
 
 try:
     from ConfigSpace import (
-        ConfigurationSpace,
-        Categorical,
         Configuration,
+        ConfigurationSpace,
         EqualsCondition,
     )
-    from ConfigSpace.hyperparameters import Hyperparameter, CategoricalHyperparameter
+    from ConfigSpace.hyperparameters import (
+        CategoricalHyperparameter,
+        Hyperparameter,
+    )
 
     CONFIGSPACE_AVAILABLE = True
 
@@ -29,11 +31,12 @@ try:
         This eliminates the need for cs_transform by storing the actual class
         references and using class names as the categorical items.
 
-        Example:
-            model_class = ClassChoice(
-                "model_class",
-                choices=[RandomForestWrapper, XGBoostWrapper],
-            )
+        Example
+        -------
+        >>> model_class = ClassChoice(
+        ...     "model_class",
+        ...     choices=[RandomForestWrapper, XGBoostWrapper],
+        ... )
         """
 
         def __init__(
@@ -41,7 +44,7 @@ try:
             name: str,
             choices: list[type | bool],
             default: type | bool | None = None,
-            weights: tuple[float, ...] | None = None,
+            weights: Sequence[float] | None = None,
         ):
             """
             Initialize a ClassChoice hyperparameter.
@@ -55,51 +58,85 @@ try:
                 ConfigurableMixin if it has its own hyperparameters. Can also include False.
             default : type, bool, or None, optional
                 Default choice. If None, the first choice is used.
-            weights : tuple[float, ...] or None, optional
+            weights : Sequence[float] or None, optional
                 Weights for sampling, passed to CategoricalHyperparameter.
             """
             self._class_choices = choices  # Store actual choice list
-            self._choice_map = {}
+            self._choice_map: dict[str, type | bool] = {}
             items = []
 
             for choice in choices:
-                if choice is False:
-                    self._choice_map["False"] = False
-                    items.append("False")
-                else:
+                if isinstance(choice, type):
                     self._choice_map[choice.__name__] = choice
                     items.append(choice.__name__)
+                elif choice is False:
+                    self._choice_map["False"] = False
+                    items.append("False")
 
             if default is False:
                 default_value = "False"
-            elif default is not None:
+            elif isinstance(default, type):
                 default_value = default.__name__
+            elif hasattr(default, "__name__"):
+                default_value = getattr(default, "__name__")
             else:
                 default_value = items[0]
 
             super().__init__(
-                name, choices=tuple(items), default_value=default_value, weights=weights
+                name,
+                choices=tuple(items),
+                default_value=default_value,
+                weights=weights,
             )
 
-        def get_class(self, name: str) -> type:
-            """Get the class corresponding to a class name."""
+        def get_class(self, name: str) -> type | bool:
+            """
+            Get the class corresponding to a class name.
+
+            Parameters
+            ----------
+            name : str
+                The name of the class to retrieve.
+
+            Returns
+            -------
+            type or bool
+                The class reference or False.
+            """
             return self._choice_map[name]
 
-        def to_categorical(self) -> Categorical:
+        def to_categorical(self) -> CategoricalHyperparameter:
             """
             Convert to a regular Categorical hyperparameter for SMAC serialization.
 
             This is needed because SMAC only knows how to serialize built-in
             ConfigSpace types, not custom subclasses like ClassChoice.
+
+            Returns
+            -------
+            CategoricalHyperparameter
+                A standard Categorical hyperparameter with class names as choices.
             """
             weights = None
             if hasattr(self, "probabilities") and self.probabilities is not None:
-                weights = tuple(self.probabilities)
+                weights = tuple(float(w) for w in self.probabilities)
 
-            # Store actual class choices in meta to allow recovery after conversion
-            meta = (self.meta if hasattr(self, "meta") else {}) or {}
-            meta = meta.copy()
-            meta["__class_choices__"] = self._class_choices
+            meta_raw = (self.meta if hasattr(self, "meta") else {}) or {}
+            meta = cast(dict[str, Any], meta_raw).copy()
+
+            # Store class names in meta to allow recovery after conversion
+            # Using strings to ensure JSON serializability for SMAC
+            class_paths = []
+            for choice in self._class_choices:
+                if choice is False:
+                    class_paths.append("False")
+                elif isinstance(choice, type):
+                    class_paths.append(f"{choice.__module__}:{choice.__name__}")
+                else:
+                    class_paths.append(str(choice))
+            meta["__class_choices__"] = class_paths
+
+            from ConfigSpace import Categorical
 
             return Categorical(
                 name=self.name,
@@ -107,10 +144,22 @@ try:
                 default=self.default_value,
                 weights=weights,
                 meta=meta,
-            )
+            )  # type: ignore[return-value]
 
-        def clone_with_prefix(self, prefix: str) -> "ClassChoice":
-            """Create a copy of this hyperparameter with a prefixed name."""
+        def clone_with_prefix(self, prefix: str) -> ClassChoice:
+            """
+            Create a copy of this hyperparameter with a prefixed name.
+
+            Parameters
+            ----------
+            prefix : str
+                The prefix to add to the name.
+
+            Returns
+            -------
+            ClassChoice
+                A new ClassChoice instance with the prefixed name.
+            """
             new_name = f"{prefix}{self.name}" if prefix else self.name
             # Use stored _class_choices (actual classes) not inherited choices (strings)
             # Convert probabilities to tuple if it exists (stored as numpy array)
@@ -136,10 +185,22 @@ except ImportError:
     class ClassChoice:  # type: ignore
         """Dummy ClassChoice when ConfigSpace is not installed."""
 
+        name: str
+        choices: tuple[Any, ...]
+        _choice_map: dict[str, Any]
+
         def __init__(self, *args, **kwargs):
             raise RuntimeError(
                 "ConfigSpace is not installed. Install with: pip install 'asf[configspace]'"
             )
+
+        def get_class(self, name: str) -> Any:
+            """Dummy get_class."""
+            raise RuntimeError("ConfigSpace is not installed.")
+
+        def clone_with_prefix(self, prefix: str) -> Any:
+            """Dummy clone_with_prefix."""
+            raise RuntimeError("ConfigSpace is not installed.")
 
 
 def convert_class_choices_to_categorical(cs: ConfigurationSpace) -> ConfigurationSpace:
@@ -173,7 +234,7 @@ def convert_class_choices_to_categorical(cs: ConfigurationSpace) -> Configuratio
     # First pass: convert all hyperparameters
     for hp in cs.values():
         if isinstance(hp, ClassChoice):
-            new_hp = hp.to_categorical()
+            new_hp = hp.to_categorical()  # type: ignore[attr-defined]
         else:
             new_hp = hp  # Keep as-is
         hp_map[hp.name] = new_hp
@@ -185,7 +246,7 @@ def convert_class_choices_to_categorical(cs: ConfigurationSpace) -> Configuratio
         child = hp_map[condition.child.name]
         parent = hp_map[condition.parent.name]
         new_condition = type(condition)(
-            child=child, parent=parent, value=condition.value
+            child=child, parent=parent, value=getattr(condition, "value", None)
         )
         new_cs.add(new_condition)
 
@@ -196,7 +257,7 @@ def convert_class_choices_to_categorical(cs: ConfigurationSpace) -> Configuratio
     return new_cs
 
 
-def _clone_hyperparameter(hp: Hyperparameter, prefix: str) -> Hyperparameter:
+def _clone_hyperparameter(hp: Any, prefix: str) -> Any:
     """
     Clone a hyperparameter with a new prefixed name.
 
@@ -222,13 +283,13 @@ def _clone_hyperparameter(hp: Hyperparameter, prefix: str) -> Hyperparameter:
 
     # Handle different hyperparameter types - use actual classes not factory functions
     from ConfigSpace.hyperparameters import (
-        IntegerHyperparameter,
-        FloatHyperparameter,
         CategoricalHyperparameter,
-        OrdinalHyperparameter as OrdinalHP,
         Constant as ConstantHP,
+        FloatHyperparameter,
+        IntegerHyperparameter,
+        OrdinalHyperparameter as OrdinalHP,
     )
-    from ConfigSpace import Integer, Float, Categorical, Constant
+    from ConfigSpace import Categorical, Constant, Float, Integer
 
     if isinstance(hp, IntegerHyperparameter):
         return Integer(
@@ -250,7 +311,8 @@ def _clone_hyperparameter(hp: Hyperparameter, prefix: str) -> Hyperparameter:
         # Convert probabilities to tuple if it exists (stored as numpy array)
         weights = None
         if hasattr(hp, "probabilities") and hp.probabilities is not None:
-            weights = tuple(hp.probabilities)
+            weights = tuple(float(w) for w in hp.probabilities)
+
         return Categorical(
             name=new_name,
             items=list(hp.choices),
@@ -259,12 +321,10 @@ def _clone_hyperparameter(hp: Hyperparameter, prefix: str) -> Hyperparameter:
             meta=meta,
         )
     elif isinstance(hp, OrdinalHP):
-        from ConfigSpace import OrdinalHyperparameter
-
-        return OrdinalHyperparameter(
+        return OrdinalHP(  # type: ignore[call-arg]
             name=new_name,
             sequence=list(hp.sequence),
-            default=hp.default_value,
+            default_value=hp.default_value,
             meta=meta,
         )
     elif isinstance(hp, ConstantHP):
@@ -277,7 +337,9 @@ def _clone_hyperparameter(hp: Hyperparameter, prefix: str) -> Hyperparameter:
         raise TypeError(f"Unknown hyperparameter type: {type(hp)}")
 
 
-def _clone_condition(condition, prefix: str, hp_map: dict[str, Hyperparameter]):
+def _clone_condition(
+    condition: Any, prefix: str, hp_map: dict[str, Hyperparameter]
+) -> Any:
     """
     Clone a condition with prefixed hyperparameter references.
 
@@ -287,16 +349,21 @@ def _clone_condition(condition, prefix: str, hp_map: dict[str, Hyperparameter]):
         The condition to clone.
     prefix : str
         The prefix that was added to hyperparameter names.
-    hp_map : dict
+    hp_map : dict[str, Hyperparameter]
         Mapping from original names to prefixed hyperparameters.
+
+    Returns
+    -------
+    Condition
+        A cloned condition with prefixed hyperparameter references.
     """
     from ConfigSpace.conditions import (
+        AndConjunction,
         EqualsCondition,
-        NotEqualsCondition,
-        LessThanCondition,
         GreaterThanCondition,
         InCondition,
-        AndConjunction,
+        LessThanCondition,
+        NotEqualsCondition,
         OrConjunction,
     )
 
@@ -327,14 +394,30 @@ def _clone_condition(condition, prefix: str, hp_map: dict[str, Hyperparameter]):
         raise TypeError(f"Unknown condition type: {type(condition)}")
 
 
-def _clone_forbidden(forbidden, prefix: str, hp_map: dict[str, Hyperparameter]):
+def _clone_forbidden(
+    forbidden: Any, prefix: str, hp_map: dict[str, Hyperparameter]
+) -> Any:
     """
     Clone a forbidden clause with prefixed hyperparameter references.
+
+    Parameters
+    ----------
+    forbidden : ForbiddenClause
+        The forbidden clause to clone.
+    prefix : str
+        The prefix that was added to hyperparameter names.
+    hp_map : dict[str, Hyperparameter]
+        Mapping from original names to prefixed hyperparameters.
+
+    Returns
+    -------
+    ForbiddenClause
+        A cloned forbidden clause with prefixed hyperparameter references.
     """
     from ConfigSpace.forbidden import (
+        ForbiddenAndConjunction,
         ForbiddenEqualsClause,
         ForbiddenInClause,
-        ForbiddenAndConjunction,
     )
 
     if isinstance(forbidden, ForbiddenAndConjunction):
@@ -362,41 +445,28 @@ class ConfigurableMixin:
     The mixin provides default implementations of:
     - get_configuration_space(): Builds ConfigSpace with proper prefixes
     - get_from_configuration(): Extracts values and returns a partial
-
-    Example
-    -------
-    class MySelector(AbstractSelector, ConfigurableMixin):
-        PREFIX = "my_selector"
-
-        @staticmethod
-        def _define_hyperparameters():
-            from ConfigSpace import Categorical, Integer
-
-            model = ClassChoice("model", [ModelA, ModelB])
-            num_iter = Integer("num_iter", (10, 100), default=50)
-
-            hyperparameters = [model, num_iter]
-            conditions = []
-            forbiddens = []
-
-            return hyperparameters, conditions, forbiddens
     """
 
     PREFIX: str  # Must be defined by subclass
 
     @staticmethod
     def _define_hyperparameters(
-        **kwargs,
+        **kwargs: Any,
     ) -> tuple[
         list[Hyperparameter],
-        list,  # conditions
-        list,  # forbiddens
+        list[Any],  # conditions
+        list[Any],  # forbiddens
     ]:
         """
         Define hyperparameters for this class.
 
         Override this method to define hyperparameters WITHOUT prefixes.
         The mixin will handle all prefix management.
+
+        Parameters
+        ----------
+        **kwargs : Any
+            Additional keyword arguments.
 
         Returns
         -------
@@ -419,28 +489,41 @@ class ConfigurableMixin:
         if not CONFIGSPACE_AVAILABLE:
             return None
 
-        from asf.utils.configurable import ClassChoice
-        from ConfigSpace.hyperparameters import CategoricalHyperparameter
-
         if isinstance(hp, ClassChoice):
             return hp.get_class(value)
 
-        if isinstance(hp, CategoricalHyperparameter):
-            meta = hp.meta if hasattr(hp, "meta") else getattr(hp, "_meta", None)
-            if meta and "__class_choices__" in meta:
-                choices = meta["__class_choices__"]
-                for choice in choices:
-                    if choice is False and value == "False":
+        # Handle CategoricalHyperparameter that was converted from ClassChoice
+        meta = hp.meta if hasattr(hp, "meta") else getattr(hp, "_meta", None)
+        if meta and "__class_choices__" in meta:
+            choices = meta["__class_choices__"]
+            for choice_path in choices:
+                if choice_path == "False":
+                    if value == "False":
                         return False
-                    if hasattr(choice, "__name__") and choice.__name__ == value:
-                        return choice
+                    continue
+
+                # choice_path is suspected to be "module:name" or just "name"
+                name = choice_path.split(":")[-1]
+                if name == value:
+                    if ":" in choice_path:
+                        import importlib
+
+                        module_name, class_name = choice_path.split(":")
+                        try:
+                            module = importlib.import_module(module_name)
+                            return getattr(module, class_name)
+                        except (ImportError, AttributeError):
+                            pass
+                    # Fallback to search in subclasses or registry if needed
+                    # For now, if it matches name and we can't import, we might be in trouble
+                    # unless it's already in the global namespace or something.
         return None
 
     @classmethod
     def _get_from_clean_configuration(
         cls,
         clean_config: dict[str, Any],
-        **kwargs,
+        **kwargs: Any,
     ) -> partial:
         """
         Create a partial function from a clean (unprefixed) configuration.
@@ -451,10 +534,10 @@ class ConfigurableMixin:
 
         Parameters
         ----------
-        clean_config : dict
+        clean_config : dict[str, Any]
             Dictionary containing the configuration parameters with prefixes removed.
             Only contains parameters defined in _define_hyperparameters.
-        **kwargs
+        **kwargs : Any
             Additional keyword arguments.
 
         Returns
@@ -472,23 +555,23 @@ class ConfigurableMixin:
         cs: ConfigurationSpace | None = None,
         pre_prefix: str = "",
         parent_param: Hyperparameter | None = None,
-        parent_value: str | None = None,
-        **kwargs,
+        parent_value: str | Any | None = None,
+        **kwargs: Any,
     ) -> ConfigurationSpace:
         """
         Get the configuration space for this class with proper prefixes.
 
         Parameters
         ----------
-        cs : ConfigurationSpace or None
+        cs : ConfigurationSpace or None, default=None
             Existing configuration space to add to. If None, creates a new one.
-        pre_prefix : str
+        pre_prefix : str, default=""
             Prefix from parent configuration spaces.
-        parent_param : Hyperparameter or None
+        parent_param : Hyperparameter or None, default=None
             Parent hyperparameter for conditional activation.
-        parent_value : str or None
+        parent_value : str or Any or None, default=None
             Value of parent_param that activates this class's parameters.
-        **kwargs
+        **kwargs : Any
             Additional arguments passed to _define_hyperparameters and child spaces.
 
         Returns
@@ -573,20 +656,20 @@ class ConfigurableMixin:
     @classmethod
     def get_from_configuration(
         cls,
-        configuration: Configuration | dict,
+        configuration: Configuration | dict[str, Any],
         pre_prefix: str = "",
-        **kwargs,
+        **kwargs: Any,
     ) -> partial:
         """
         Create a partial function from a configuration.
 
         Parameters
         ----------
-        configuration : Configuration or dict
+        configuration : Configuration or dict[str, Any]
             The configuration to extract values from.
-        pre_prefix : str
+        pre_prefix : str, default=""
             Prefix from parent configuration spaces.
-        **kwargs
+        **kwargs : Any
             Additional keyword arguments to pass to the constructor.
 
         Returns

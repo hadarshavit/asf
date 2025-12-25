@@ -25,28 +25,48 @@ def test_tune_epm_with_mock_smac_returns_configured_epm(monkeypatch):
     # Arrange: mock SMAC availability and inject fake Scenario/Facade so no external dependency is needed
     import asf.epm.epm_tuner as tuner
     from asf.epm.epm import EPM
+    from asf.predictors.abstract_predictor import AbstractPredictor
 
     rng = np.random.RandomState(42)
     X = rng.rand(12, 3)
     # ensure strictly positive targets for LogNormalization default
     y = np.exp(rng.randn(12))
 
-    class DummyPredictor:
+    class DummyPredictor(AbstractPredictor):
         @staticmethod
-        def get_configuration_space():
+        def get_configuration_space(**kwargs):
             return {"any": "space"}
 
         @staticmethod
         def get_from_configuration(config, **kwargs):
-            class Model:
-                def fit(self, X, y, sample_weight=None):
+            class Model(AbstractPredictor):
+                def fit(self, X, y, sample_weight=None, **kwargs):
                     # simple constant regressor on normalized target
                     self.mean_ = float(np.mean(y))
 
-                def predict(self, X):
+                def predict(self, X, **kwargs):
                     return np.full(len(X), self.mean_)
 
+                def save(self, path):
+                    pass
+
+                def load(self, path):
+                    pass
+
             return Model
+
+        # Implement abstract methods for DummyPredictor itself too, though not used as instance here
+        def fit(self, X, y, **kwargs):
+            pass
+
+        def predict(self, X, **kwargs):
+            return []
+
+        def save(self, path):
+            pass
+
+        def load(self, path):
+            pass
 
     class FakeScenario:
         def __init__(

@@ -183,7 +183,7 @@ def run_fold_benchmark(
     n_algorithms: int = 5,
     par_factor: float = 10.0,
     output: str = "results",
-) -> list[dict]:
+) -> None:
     """
     Run benchmark for all pre-selectors on a single fold.
 
@@ -193,7 +193,7 @@ def run_fold_benchmark(
         par_factor: PAR factor for penalization.
 
     Returns:
-        List of result dictionaries.
+        None
     """
     for fold in range(1, 11):
         scenario_name = os.path.basename(scenario_path)

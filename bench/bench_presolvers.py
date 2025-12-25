@@ -282,7 +282,7 @@ def run_fold_benchmark(
     presolver_budget: float = 30.0,
     par_factor: float = 10.0,
     output: str = "results",
-) -> list[dict]:
+) -> None:
     """
     Run benchmark for all presolvers on a single fold.
 

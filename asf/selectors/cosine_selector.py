@@ -1,53 +1,62 @@
-from typing import Optional, Dict, List, Any, Union, Type
+from __future__ import annotations
 
+import inspect
 import re
+from functools import partial
+from typing import Any, Callable
+
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import TruncatedSVD
+from sklearn.preprocessing import StandardScaler
 
-from asf.selectors.abstract_selector import AbstractSelector
 from asf.predictors.ridge import RidgeRegressorWrapper
-import inspect
-
-
-from asf.utils.configurable import ConfigurableMixin, ClassChoice
+from asf.selectors.abstract_selector import AbstractSelector
+from asf.utils.configurable import ClassChoice, ConfigurableMixin
 
 try:
     from ConfigSpace import (  # noqa: F401
-        ConfigurationSpace,
         Categorical,
-        Integer,
+        ConfigurationSpace,
         Float,
+        Integer,
     )
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
-from functools import partial
 
 
 class CosineSelector(ConfigurableMixin, AbstractSelector):
     """
-    Cosine similarity based selector using a shared latent space learned from
-    the performance (interaction) matrix Y.
+    Cosine similarity based selector using a shared latent space.
 
-    Parameters
+    Attributes
     ----------
     normalize_features : bool
-        If True, standardize instance and algorithm features (per-column StandardScaler).
+        If True, standardize instance and algorithm features.
     shared_latent_dim : int
-        Dimensionality of the shared latent space (number of factors extracted from Y).
-    ridge_alpha : float
+        Dimensionality of the shared latent space.
+    _ridge_alpha : float
         Regularization strength for the default Ridge projection wrapper.
-    svd_random_state : int
+    _svd_random_state : int
         Random seed for TruncatedSVD.
-    projection_model : Optional[Type | object]
-        Optional projection model class or instantiated object. If None, the default
-        RidgeRegressorWrapper is used. If a wrapper class (e.g. RandomForestRegressorWrapper)
-        is provided, projection_model_kwargs are passed on construction.
-    projection_model_kwargs : Optional[dict]
-        Keyword arguments forwarded to projection_model when it is a class.
+    _projection_model : type or Callable or Any or None
+        Optional projection model class or instantiated object.
+    _projection_model_kwargs : dict
+        Keyword arguments forwarded to projection_model.
+    _svd : TruncatedSVD or None
+        Truncated SVD model.
+    _proj : Any or None
+        Projection model instance.
+    _alg_feats : pd.DataFrame or None
+        Processed algorithm features.
+    _alg_matrix : np.ndarray or None
+        Algorithm embeddings in latent space.
+    _scaler_inst : StandardScaler or None
+        StandardScaler for instance features.
+    _scaler_alg : StandardScaler or None
+        StandardScaler for algorithm features.
     """
 
     PREFIX = "cosine"
@@ -59,10 +68,30 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
         shared_latent_dim: int = 4,
         ridge_alpha: float = 1.0,
         svd_random_state: int = 0,
-        projection_model: Optional[Union[Type, Any]] = None,
-        projection_model_kwargs: Optional[Dict[str, Any]] = None,
-        **kwargs,
-    ):
+        projection_model: type | Callable[..., Any] | Any | None = None,
+        projection_model_kwargs: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Initialize the CosineSelector.
+
+        Parameters
+        ----------
+        normalize_features : bool, default=True
+            If True, standardize instance and algorithm features.
+        shared_latent_dim : int, default=4
+            Dimensionality of the shared latent space.
+        ridge_alpha : float, default=1.0
+            Regularization strength for the default Ridge projection wrapper.
+        svd_random_state : int, default=0
+            Random seed for TruncatedSVD.
+        projection_model : type or Callable or Any, default=None
+            Optional projection model class or instantiated object.
+        projection_model_kwargs : dict, default=None
+            Keyword arguments forwarded to projection_model.
+        **kwargs : Any
+            Additional keyword arguments.
+        """
         super().__init__(**kwargs)
         self.normalize_features = bool(normalize_features)
         self.shared_latent_dim = int(shared_latent_dim)
@@ -71,13 +100,12 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
         self._projection_model = projection_model
         self._projection_model_kwargs = projection_model_kwargs or {}
 
-        self._svd: Optional[TruncatedSVD] = None
-        self._proj: Optional[RidgeRegressorWrapper] = None
-        self._alg_feats: Optional[pd.DataFrame] = None
-        self._alg_matrix: Optional[np.ndarray] = None
-        self._scaler_inst: Optional[StandardScaler] = None
-        self._scaler_alg: Optional[StandardScaler] = None
-        self.algorithms: List[str] = []
+        self._svd: TruncatedSVD | None = None
+        self._proj: Any | None = None
+        self._alg_feats: pd.DataFrame | None = None
+        self._alg_matrix: np.ndarray | None = None
+        self._scaler_inst: StandardScaler | None = None
+        self._scaler_alg: StandardScaler | None = None
 
     def _normalize_rows(self, X: np.ndarray, eps: float = 1e-12) -> np.ndarray:
         """
@@ -89,6 +117,11 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
             2D array whose rows should be normalized.
         eps : float
             Small value to avoid division by zero.
+
+        Returns
+        -------
+        np.ndarray
+            L2-normalized array.
         """
         norms = np.linalg.norm(X, axis=1, keepdims=True)
         norms = np.where(norms < eps, 1.0, norms)
@@ -96,12 +129,24 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
 
     def _norm(self, s: str) -> str:
         """
-        Minimal string normalization used for matching algorithm identifiers.
+        Minimal string normalization for matching algorithm identifiers.
+
+        Parameters
+        ----------
+        s : str
+            String to normalize.
+
+        Returns
+        -------
+        str
+            Normalized string.
         """
         s = str(s).lower().strip()
         return re.sub(r"[\W_]+", "", s)
 
-    def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
+    def _fit(
+        self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
+    ) -> None:
         """
         Fit the cosine selector.
 
@@ -111,6 +156,8 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
             Instance feature matrix (rows = instances).
         performance : pd.DataFrame
             Performance matrix (rows = instances, columns = algorithms).
+        **kwargs : Any
+            Additional keyword arguments.
         """
         alg_df = getattr(self, "algorithm_features", None)
         if alg_df is None or not isinstance(alg_df, pd.DataFrame):
@@ -118,7 +165,7 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
                 "Set selector.algorithm_features (pd.DataFrame indexed by algorithm names) before fit()"
             )
 
-        self.algorithms = list(performance.columns)
+        self.algorithms = [str(a) for a in performance.columns]
         alg_df.index = alg_df.index.astype(str)
         norm_to_orig = {self._norm(n): n for n in alg_df.index}
         mapped = []
@@ -147,10 +194,7 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
             self._scaler_inst = StandardScaler().fit(X_inst)
             X_inst = self._scaler_inst.transform(X_inst)
 
-        # Interaction-matrix SVD (learn shared latent space from performance Y)
-        # Align performance rows with features and columns with algorithms
         Y = performance.loc[features.index, self.algorithms].to_numpy(dtype=float)
-        # simple NaN handling: replace per-column NaN with column mean
         col_mean = np.nanmean(Y, axis=0)
         inds = np.where(np.isnan(Y))
         if inds[0].size:
@@ -159,82 +203,85 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
         n_comp = min(self.shared_latent_dim, min(Y.shape[0] - 1, Y.shape[1]))
         n_comp = max(1, n_comp)
         svd = TruncatedSVD(n_components=n_comp, random_state=self._svd_random_state)
-        inst_emb = svd.fit_transform(Y)  # shape (n_instances, n_comp)
-        alg_emb = svd.components_.T  # shape (n_algorithms, n_comp)
+        inst_emb = svd.fit_transform(Y)
+        alg_emb = svd.components_.T
         self._svd = svd
 
-        # fit projection model X_inst -> inst_emb (default: Ridge wrapper)
         if self._projection_model is None:
             proj = RidgeRegressorWrapper(init_params={"alpha": self._ridge_alpha})
         elif isinstance(self._projection_model, type):
-            # Some wrapper classes (e.g. RandomForestRegressorWrapper) expect a single
-            # 'init_params' dict argument. Detect that and adapt kwargs automatically.
-            kwargs = dict(self._projection_model_kwargs or {})
+            init_kwargs = dict(self._projection_model_kwargs or {})
             try:
                 sig = inspect.signature(self._projection_model.__init__)
-                if "init_params" in sig.parameters and "init_params" not in kwargs:
-                    kwargs = {"init_params": kwargs}
+                if "init_params" in sig.parameters and "init_params" not in init_kwargs:
+                    init_kwargs = {"init_params": init_kwargs}
             except Exception:
-                # Safely ignore any exception when inspecting the __init__ signature,
-                # as not all classes may have a standard signature or may not be inspectable.
                 pass
-            proj = self._projection_model(**kwargs)
-            proj = self._projection_model(**kwargs)
+            proj = self._projection_model(**init_kwargs)
         elif isinstance(self._projection_model, partial):
             proj = self._projection_model()
         else:
             proj = self._projection_model
 
-        proj.fit(X_inst, inst_emb)
+        proj.fit(X_inst, inst_emb)  # type: ignore[attr-defined]
         self._proj = proj
 
         self._alg_matrix = self._normalize_rows(alg_emb)
 
-    def _predict(self, features: pd.DataFrame) -> Dict[str, list[tuple[str, float]]]:
+    def _predict(
+        self,
+        features: pd.DataFrame | None,
+        performance: pd.DataFrame | None = None,
+    ) -> dict[str, list[tuple[str, float]]]:
         """
         Predict the best algorithm for each query instance.
-
-        Parameters
-        ----------
-        features : pd.DataFrame
-            Query instance features (rows = instances).
-
-        Returns
-        -------
-        Dict[str, list[tuple[str, float]]]
-            Mapping from instance id to a single recommendation (algorithm name, score_or_budget).
         """
         if self._alg_matrix is None:
             raise ValueError("fit() must be called before predict()")
+
+        if features is None:
+            raise ValueError("CosineSelector requires features for prediction.")
+        if self._proj is None:
+            raise RuntimeError(
+                "internal projection model missing; fit() must produce a mapper"
+            )
 
         Xq = features.fillna(0.0).to_numpy(dtype=float)
         if self.normalize_features and self._scaler_inst is not None:
             Xq = self._scaler_inst.transform(Xq)
 
-        # project queries into the same instance-embedding space via learned mapper
-        if self._proj is None:
-            raise RuntimeError(
-                "internal projection model missing; fit() must produce a mapper"
-            )
         Xq_emb = self._proj.predict(Xq)
         Xq_n = self._normalize_rows(Xq_emb)
 
         sims = Xq_n.dot(self._alg_matrix.T)
 
-        out: Dict[str, list[tuple[str, float]]] = {}
-        budget = getattr(self, "budget", None)
-
+        out: dict[str, list[tuple[str, float]]] = {}
         for i, inst in enumerate(features.index):
             row = sims[i]
             j = int(np.argmax(row))
-            chosen = self.algorithms[j]
-            score = float(budget) if budget is not None else float(row[j])
-            out[inst] = [(chosen, score)]
+            chosen = str(self.algorithms[j])
+            out[str(inst)] = [(chosen, float(self.budget or 0))]
         return out
 
     @staticmethod
-    def _define_hyperparameters(projection_model=None, **kwargs):
-        """Define hyperparameters for CosineSelector."""
+    def _define_hyperparameters(
+        projection_model: list[type] | None = None, **kwargs: Any
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """
+        Define hyperparameters for CosineSelector.
+
+        Parameters
+        ----------
+        projection_model : list[type] or None, default=None
+            List of projection model classes.
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        tuple
+            Tuple of (hyperparameters, conditions, forbiddens).
+        """
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
 
@@ -279,10 +326,22 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
     def _get_from_clean_configuration(
         cls,
         clean_config: dict[str, Any],
-        **kwargs,
-    ) -> partial:
+        **kwargs: Any,
+    ) -> partial[CosineSelector]:
         """
-        Create a partial function from a clean (unprefixed) configuration.
+                Create a partial function from a clean configuration.
+
+                Parameters
+                ----------
+                clean_config : dict
+                    The clean configuration.
+                **kwargs : Any
+                    Additional keyword arguments.
+
+                Returns
+        -------
+                partial
+                    Partial function for CosineSelector.
         """
         config = clean_config.copy()
         config.update(kwargs)

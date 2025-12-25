@@ -46,7 +46,7 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         self,
         model: Any | None = None,
         input_size: int | None = None,
-        loss: Callable = None,
+        loss: Callable | None = None,
         optimizer: Callable[..., Any] | None = None,
         batch_size: int = 128,
         epochs: int = 500,
@@ -70,6 +70,7 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         torch.manual_seed(seed)
 
         if model is None:
+            assert input_size is not None
             self.model = get_mlp(input_size=input_size, output_size=1)
         else:
             self.model = model
@@ -100,11 +101,18 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
 
     def fit(
         self,
-        features: pd.DataFrame,
-        performance: pd.DataFrame,
-        algorithm_features: pd.DataFrame,
-    ) -> "RankingMLP":
-        dataloader = self._get_dataloader(features, performance, algorithm_features)
+        X: Any,
+        Y: Any,
+        **kwargs: Any,
+    ) -> None:
+        # Extract algorithm_features from kwargs
+        algorithm_features = kwargs.get("algorithm_features")
+        if algorithm_features is None:
+            raise ValueError(
+                "algorithm_features must be provided in kwargs for RankingMLP.fit"
+            )
+
+        dataloader = self._get_dataloader(X, Y, algorithm_features)
 
         optimizer = self.optimizer(
             self.model.parameters(),
@@ -144,21 +152,22 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
 
             logging.debug(f"Epoch {epoch}, Loss: {total_loss / len(dataloader)}")
 
-        return self
+        return None
 
-    def predict(self, features: pd.DataFrame) -> pd.DataFrame:
+    def predict(self, X: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
         self.model.eval()
 
-        features = torch.from_numpy(features.values).to(self.device).float()
-        predictions = self.model(features).detach().numpy()
+        features_tensor = torch.from_numpy(X.values).to(self.device).float()
+        predictions = self.model(features_tensor).detach().numpy()
 
         return predictions
 
     def save(self, file_path: str) -> None:
-        torch.save(self.model, file_path)
+        torch.save(self, file_path)
 
-    def load(self, file_path: str) -> None:
-        self.model = torch.load(file_path)
+    @classmethod
+    def load(cls, file_path: str) -> AbstractPredictor:
+        return torch.load(file_path)
 
     PREFIX = "ranking_mlp"
 

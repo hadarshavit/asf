@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+from typing import Any, cast
 from asf.predictors.random_forest import RandomForestRegressorWrapper
 
 from asf.selectors.cosine_selector import CosineSelector
@@ -8,7 +9,7 @@ from asf.scenario.aslib_reader import read_aslib_scenario
 from asf.utils.aslib_algorithm_features import get_algorithm_features_from_aslib
 
 
-def evaluate_solve_rate(preds: dict, perf: pd.DataFrame, budget: float) -> float:
+def evaluate_solve_rate(preds: Any, perf: pd.DataFrame, budget: float) -> float:
     solved = 0
     total = 0
     for inst, rec in preds.items():
@@ -28,9 +29,16 @@ def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
             f"ASLib scenario directory not found: {aslib_scenario_dir}"
         )
 
-    features, performance, _, cv, feature_groups, maximize, budget = (
-        read_aslib_scenario(aslib_scenario_dir)
-    )
+    (
+        features,
+        performance,
+        _,
+        cv,
+        feature_groups,
+        maximize,
+        budget,
+        algorithm_features,
+    ) = read_aslib_scenario(aslib_scenario_dir)
     budget = budget / 2
 
     alg_df = get_algorithm_features_from_aslib(aslib_scenario_dir)
@@ -76,7 +84,7 @@ def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
     print()
     print("Sample decisions (first 12):")
     for inst in list(X_test.index)[:12]:
-        algo, score = preds.get(inst, [(None, None)])[0]
+        algo, score = cast(dict, preds).get(inst, [(None, None)])[0]
         rt = Y_test.at[inst, algo] if algo is not None else float("nan")
         print(f"{inst}: chosen={algo} predicted_score={score:.4f} true_rt={rt:.2f}")
     print("=" * 60)

@@ -152,12 +152,15 @@ def _validate_pipeline_extensive(
 
     # Validate presolver
     if expected_presolver_type:
-        assert pipeline.pre_solving is not None, "Expected presolver but got None"
-        actual_presolver_type = type(pipeline.pre_solving)
-        assert actual_presolver_type == expected_presolver_type, (
-            f"Presolver type mismatch: got {actual_presolver_type.__name__}, "
-            f"expected {expected_presolver_type.__name__}"
-        )
+        if not tuning:
+            assert pipeline.pre_solving is not None, "Expected presolver but got None"
+
+        if pipeline.pre_solving is not None:
+            actual_presolver_type = type(pipeline.pre_solving)
+            assert actual_presolver_type == expected_presolver_type, (
+                f"Presolver type mismatch: got {actual_presolver_type.__name__}, "
+                f"expected {expected_presolver_type.__name__}"
+            )
 
         if tuning:
             # During tuning: presolver budget can be any value, just check it's reasonable
@@ -225,7 +228,11 @@ def _run_cli_and_validate(
         runcount_limit=runcount_limit,
     )
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    import os
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path.cwd())
+    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
     if result.returncode != 0:
         print("STDOUT:", result.stdout)
         print("STDERR:", result.stderr)

@@ -1,30 +1,35 @@
 from __future__ import annotations
 
+from functools import partial
+from typing import Any
 
 import numpy as np
 import pandas as pd
-
-from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
-from asf.utils.configurable import ConfigurableMixin, ClassChoice
-
-try:
-    import ConfigSpace  # noqa: F401
-
-    CONFIGSPACE_AVAILABLE = True
-except ImportError:
-    CONFIGSPACE_AVAILABLE = False
 
 from asf.predictors import (
     AbstractPredictor,
     RandomForestClassifierWrapper,
     XGBoostClassifierWrapper,
 )
+from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
+from asf.utils.configurable import ClassChoice, ConfigurableMixin
+
+try:
+    from ConfigSpace import ConfigurationSpace  # noqa: F401
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
 
 
 class MultiClassClassifier(ConfigurableMixin, AbstractModelBasedSelector):
     """
-    A selector that uses a multi-class classification model to predict the best algorithm
-    for a given set of features and performance data.
+    Multi-class classification algorithm selector.
+
+    Attributes
+    ----------
+    classifier : AbstractPredictor or None
+        The trained classification model.
     """
 
     PREFIX = "multi_class_classifier"
@@ -33,68 +38,97 @@ class MultiClassClassifier(ConfigurableMixin, AbstractModelBasedSelector):
     def __init__(
         self,
         model_class: type[AbstractPredictor] = RandomForestClassifierWrapper,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         """
-        Initializes the MultiClassClassifier.
+        Initialize the MultiClassClassifier.
 
-        Args:
-            model_class: The class of the model to be used for classification.
-            **kwargs: Additional keyword arguments to be passed to the parent class.
+        Parameters
+        ----------
+        model_class : type[AbstractPredictor], default=RandomForestClassifierWrapper
+            The class of the model to be used for classification.
+        **kwargs : Any
+            Additional keyword arguments.
         """
         AbstractModelBasedSelector.__init__(self, model_class, **kwargs)
-        self.classifier: object = None
+        self.classifier: AbstractPredictor | None = None
 
-    def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
+    def _fit(
+        self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
+    ) -> None:
         """
-        Fits the classification model to the given feature and performance data.
+        Fit the classification model.
 
-        Args:
-            features (pd.DataFrame): DataFrame containing the feature data.
-                Each row corresponds to an instance, and each column corresponds to a feature.
-            performance (pd.DataFrame): DataFrame containing the performance data.
-                Each row corresponds to an instance, and each column corresponds to an algorithm.
+        Parameters
+        ----------
+        features : pd.DataFrame
+            The input features.
+        performance : pd.DataFrame
+            The algorithm performance data.
         """
-        assert self.algorithm_features is None, (
-            "MultiClassClassifier does not use algorithm features."
-        )
+        if self.algorithm_features is not None:
+            raise ValueError("MultiClassClassifier does not use algorithm features.")
+
         self.classifier = self.model_class()
-        # Use the index of the algorithm with the best performance (lowest value) as the target
-        self.classifier.fit(features, np.argmin(performance.values, axis=1))
+        if self.classifier is None:
+            raise RuntimeError("Classifier could not be initialized.")
 
-    def _predict(self, features: pd.DataFrame) -> dict:
+        # Best algorithm (lowest value) per instance
+        target = np.argmin(performance.values, axis=1)
+        self.classifier.fit(features, target)
+
+    def _predict(
+        self,
+        features: pd.DataFrame | None,
+        performance: pd.DataFrame | None = None,
+    ) -> dict[str, list[tuple[str, float]]]:
         """
-        Predicts the best algorithm for each instance in the given feature data using simple multi-class classification.
+        Predict the best algorithm for each instance.
 
-        Args:
-            features (pd.DataFrame): DataFrame containing the feature data.
-                Each row corresponds to an instance, and each column corresponds to a feature.
+        Parameters
+        ----------
+        features : pd.DataFrame
+            The input features.
 
-        Returns:
-            dict: A dictionary mapping instance names (index of the features DataFrame)
-                  to a list containing a tuple of the predicted best algorithm and the budget.
-                  Example: {instance_name: [(algorithm_name, budget)]}
+        Returns
+        -------
+        dict
+            Mapping from instance names to algorithm schedules.
         """
+        if self.classifier is None:
+            raise RuntimeError("Classifier has not been fitted.")
+
+        if features is None:
+            raise ValueError("MultiClassClassifier require features for prediction.")
         predictions = self.classifier.predict(features)
 
-        return {
-            instance_name: [(self.algorithms[predictions[i]], self.budget)]
-            for i, instance_name in enumerate(features.index)
-        }
+        results: dict[str, list[tuple[str, float]]] = {}
+        for i, instance_name in enumerate(features.index):
+            idx = int(predictions[i])
+            results[str(instance_name)] = [
+                (str(self.algorithms[idx]), float(self.budget or 0))
+            ]
+        return results
 
     @staticmethod
     def _define_hyperparameters(
-        model_class: list[type[AbstractPredictor]] = None,
-        **kwargs,  # Accept additional kwargs from mixin
-    ):
+        model_class: list[type[AbstractPredictor]] | None = None,
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
         """
         Define hyperparameters for MultiClassClassifier.
 
         Parameters
         ----------
-        model_class : list[type[AbstractPredictor]], optional
+        model_class : list[type[AbstractPredictor]] or None, default=None
             List of model classes to include in the configuration space.
-            Defaults to [RandomForestClassifierWrapper, XGBoostClassifierWrapper].
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        tuple
+            Tuple of (hyperparameters, conditions, forbiddens).
         """
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
@@ -103,6 +137,31 @@ class MultiClassClassifier(ConfigurableMixin, AbstractModelBasedSelector):
             model_class = [RandomForestClassifierWrapper, XGBoostClassifierWrapper]
 
         hyperparameters = [
-            ClassChoice("model_class", choices=model_class),
+            ClassChoice("model_class", choices=model_class, default=model_class[0]),
         ]
         return hyperparameters, [], []
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs: Any,
+    ) -> partial[MultiClassClassifier]:
+        """
+        Create a partial function from a clean configuration.
+
+        Parameters
+        ----------
+        clean_config : dict
+            The clean configuration.
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        partial
+            Partial function for MultiClassClassifier.
+        """
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(MultiClassClassifier, **config)

@@ -1,12 +1,10 @@
 """
 Greedy Presolver - SATzilla-style pre-solver selection.
-
-This presolver greedily selects algorithms that solve the most instances
-within a given time cutoff, similar to the pre-solver approach described
-in the SATzilla paper (Xu et al., 2008).
 """
 
-from typing import List, Tuple
+from __future__ import annotations
+
+from typing import Any
 import numpy as np
 import pandas as pd
 
@@ -15,26 +13,33 @@ from asf.presolving.presolver import AbstractPresolver
 
 class GreedyPresolver(AbstractPresolver):
     """
-    A greedy presolver that selects algorithms based on how many instances
-    they can solve within a given time cutoff.
+    A greedy presolver that selects algorithms based on instance coverage.
 
     This follows the SATzilla approach where pre-solvers are selected to:
-    1. Solve easy instances quickly before feature computation
-    2. Filter out easy instances so empirical hardness models train on harder ones
+    1. Solve easy instances quickly before feature computation.
+    2. Filter out easy instances so empirical hardness models train on harder ones.
 
     The greedy selection picks the algorithm that solves the most unsolved
     instances within the cutoff time, then repeats until the budget is exhausted
     or no more instances can be solved.
 
-    Attributes:
-        budget (float): Total time budget for the pre-solve schedule.
-        cutoff_per_solver (float): Maximum time to allocate per solver (default 5s).
-        max_presolvers (int): Maximum number of pre-solvers to include.
-        min_coverage (float): Minimum fraction of instances a presolver must solve
-                              to be included (default 0.01 = 1%).
+    Parameters
+    ----------
+    budget : float, default=30.0
+        Total time budget for the pre-solve schedule.
+    cutoff_per_solver : float, default=5.0
+        Maximum time to allocate per solver.
+    max_presolvers : int, default=3
+        Maximum number of pre-solvers to include.
+    min_coverage : float, default=0.01
+        Minimum fraction of instances a presolver must solve to be included.
+    maximize : bool, default=False
+        If True, maximize performance values instead of minimize.
+    **kwargs : Any
+        Additional keyword arguments.
     """
 
-    PREFIX = "greedy_presolver"
+    PREFIX: str = "greedy_presolver"
 
     def __init__(
         self,
@@ -43,37 +48,41 @@ class GreedyPresolver(AbstractPresolver):
         max_presolvers: int = 3,
         min_coverage: float = 0.01,
         maximize: bool = False,
-        **kwargs,
-    ):
-        """
-        Initialize the GreedyPresolver.
-
-        Args:
-            budget: Total time budget for pre-solving (sum of all pre-solver cutoffs).
-            cutoff_per_solver: Time cutoff per solver to consider instances "solved".
-            max_presolvers: Maximum number of pre-solvers to select.
-            min_coverage: Minimum fraction of remaining instances a presolver must
-                          solve to be included in the schedule.
-            maximize: If True, maximize performance values instead of minimize.
-        """
+        **kwargs: Any,
+    ) -> None:
         super().__init__(budget=budget, maximize=maximize)
         self.cutoff_per_solver = cutoff_per_solver
         self.max_presolvers = max_presolvers
         self.min_coverage = min_coverage
-        self.schedule: List[Tuple[str, float]] = []
-        self.algorithms: List[str] = []
+        self.schedule: list[tuple[str, float]] = []
+        self.algorithms: list[str] = []
 
-    def fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
+    def fit(
+        self,
+        features: pd.DataFrame | np.ndarray | None,
+        performance: pd.DataFrame | np.ndarray | None,
+        **kwargs: Any,
+    ) -> None:
         """
-        Fit the greedy presolver by selecting algorithms that solve the most instances.
+        Fit the greedy presolver.
 
-        Args:
-            features: DataFrame of instance features (not used, but required by interface).
-            performance: DataFrame of runtimes/performance (n_instances x n_algorithms).
-                         Lower values are better (unless maximize=True).
+        Parameters
+        ----------
+        features : pd.DataFrame or np.ndarray
+            The instance features.
+        performance : pd.DataFrame or np.ndarray
+            The algorithm performances.
         """
-        perf = performance.copy()
-        self.algorithms = list(perf.columns)
+        if performance is None:
+            raise ValueError("GreedyPresolver requires performance data for fitting.")
+
+        if isinstance(performance, pd.DataFrame):
+            perf = performance.copy()
+            self.algorithms = list(perf.columns)
+        else:
+            perf = pd.DataFrame(performance)
+            self.algorithms = [f"a{i}" for i in range(performance.shape[1])]
+
         n_instances = len(perf)
 
         # Track which instances are "solved" by the schedule
@@ -106,7 +115,7 @@ class GreedyPresolver(AbstractPresolver):
                     # For minimize (runtime), "solved" means runtime <= cutoff
                     can_solve = (algo_times <= actual_cutoff) & (~solved_mask)
 
-                count = np.sum(can_solve)
+                count = int(np.sum(can_solve))
 
                 if count > best_count:
                     best_count = count
@@ -141,11 +150,29 @@ class GreedyPresolver(AbstractPresolver):
             if np.all(solved_mask):
                 break
 
-    def predict(self) -> List[Tuple[str, float]]:
+    def predict(
+        self,
+        features: pd.DataFrame | np.ndarray | None = None,
+        performance: pd.DataFrame | np.ndarray | None = None,
+        **kwargs: Any,
+    ) -> list[tuple[str, float]] | dict[str, list[tuple[str, float]]]:
         """
         Return the computed pre-solve schedule.
 
-        Returns:
-            List of (algorithm_name, cutoff_time) tuples representing the schedule.
+        Parameters
+        ----------
+        features : pd.DataFrame or None, default=None
+            The features for the instances.
+        performance : pd.DataFrame or None, default=None
+            The algorithm performances.
+
+        Returns
+        -------
+        list or dict
+            The presolving schedule.
         """
+        if features is not None:
+            if isinstance(features, np.ndarray):
+                features = pd.DataFrame(features)
+            return {str(inst): self.schedule for inst in features.index}
         return self.schedule

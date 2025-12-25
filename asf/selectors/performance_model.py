@@ -1,47 +1,52 @@
+from __future__ import annotations
+
 import inspect
+from functools import partial
+from typing import Any
 
 import numpy as np
 import pandas as pd
-
-from asf.preprocessing.performance_scaling import (
-    AbstractNormalization,
-    LogNormalization,
-)
-from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
-from asf.utils.configurable import ConfigurableMixin, ClassChoice
-
-try:
-    import ConfigSpace  # noqa: F401
-
-    CONFIGSPACE_AVAILABLE = True
-except ImportError:
-    CONFIGSPACE_AVAILABLE = False
 
 from asf.predictors import (
     AbstractPredictor,
     RandomForestRegressorWrapper,
     XGBoostRegressorWrapper,
 )
+from asf.preprocessing.performance_scaling import (
+    AbstractNormalization,
+    LogNormalization,
+)
+from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 from asf.selectors.feature_generator import AbstractFeatureGenerator
+from asf.utils.configurable import ClassChoice, ConfigurableMixin
+
+try:
+    from ConfigSpace import ConfigurationSpace  # noqa: F401
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
 
 
 class PerformanceModel(
     ConfigurableMixin, AbstractModelBasedSelector, AbstractFeatureGenerator
 ):
     """
-    PerformanceModel is a class that predicts the performance of algorithms
-    based on given features. It can handle both single-target and multi-target
+    PerformanceModel predicts algorithm performance based on instance features.
+
+    It can handle both single-target (one model per algorithm) and multi-target
     regression models.
 
-    Attributes:
-        model_class (type): The class of the regression model to be used.
-        use_multi_target (bool): Indicates whether to use multi-target regression.
-        normalize (str): Method to normalize the performance data. Default is "log".
-        regressors (list | object): List of trained regression models or a single model for multi-target regression.
-        algorithm_features (pd.DataFrame | None): Features specific to each algorithm, if applicable.
-        algorithms (list[str]): List of algorithm names.
-        maximize (bool): Whether to maximize or minimize the performance metric.
-        budget (float): Budget associated with the predictions.
+    Attributes
+    ----------
+    model_class : type
+        The class of the regression model to be used.
+    use_multi_target : bool
+        Whether to use multi-target regression.
+    normalize : AbstractNormalization
+        Method to normalize the performance data.
+    regressors : list or object
+        Trained regression models.
     """
 
     PREFIX = "performance_model"
@@ -49,145 +54,198 @@ class PerformanceModel(
 
     def __init__(
         self,
-        model_class: type = RandomForestRegressorWrapper,
+        model_class: type[AbstractPredictor] = RandomForestRegressorWrapper,
         use_multi_target: bool = False,
-        normalize: AbstractNormalization = LogNormalization(),
-        **kwargs,
-    ):
+        normalize: AbstractNormalization | None = None,
+        **kwargs: Any,
+    ) -> None:
         """
-        Initializes the PerformanceModel with the given parameters.
+        Initialize the PerformanceModel.
 
-        Args:
-            model_class (type): The class of the regression model to be used.
-            use_multi_target (bool): Indicates whether to use multi-target regression.
-            normalize (AbstractNormalization): Method to normalize the performance data. Default is LogNormalization.
-            **kwargs: Additional arguments for the parent classes.
+        Parameters
+        ----------
+        model_class : type[AbstractPredictor], default=RandomForestRegressorWrapper
+            The class of the regression model to be used.
+        use_multi_target : bool, default=False
+            Indicates whether to use multi-target regression.
+        normalize : AbstractNormalization or None, default=None
+            Method to normalize performance data. If None, defaults to LogNormalization().
+        **kwargs : Any
+            Additional arguments for the parent classes.
         """
         AbstractModelBasedSelector.__init__(self, model_class, **kwargs)
         AbstractFeatureGenerator.__init__(self)
-        self.regressors: list | object = []
-        self.use_multi_target: bool = use_multi_target
-        self.normalize: AbstractNormalization = normalize
+        self.regressors: list[AbstractPredictor] | AbstractPredictor | None = None
+        self.use_multi_target = bool(use_multi_target)
+        self.normalize = normalize if normalize is not None else LogNormalization()
 
-    def _fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
+    def _fit(
+        self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
+    ) -> None:
         """
-        Fits the regression models to the given features and performance data.
+        Fit the regression models.
 
-        Args:
-            features (pd.DataFrame): DataFrame containing the feature data.
-            performance (pd.DataFrame): DataFrame containing the performance data.
+        Parameters
+        ----------
+        features : pd.DataFrame
+            The input features.
+        performance : pd.DataFrame
+            The performance data.
         """
-
         if self.normalize is not None:
             performance = self.normalize.fit_transform(performance)
 
-        regressor_init_args = {}
-        if "input_size" in inspect.signature(self.model_class).parameters.keys():
-            regressor_init_args["input_size"] = features.shape[1]
+        regressor_init_args: dict[str, Any] = {}
+        # Safely check for input_size if it's a type (standard wrapper classes usually have it)
+        try:
+            sig = inspect.signature(self.model_class)
+            if "input_size" in sig.parameters:
+                regressor_init_args["input_size"] = features.shape[1]
+        except (ValueError, TypeError):
+            pass
 
         if self.use_multi_target:
-            assert self.algorithm_features is None, (
-                "PerformanceModel does not use algorithm features for multi-target regression."
-            )
+            if self.algorithm_features is not None:
+                raise ValueError(
+                    "PerformanceModel does not use algorithm features for multi-target regression."
+                )
             self.regressors = self.model_class(**regressor_init_args)
             self.regressors.fit(features, performance)
         else:
             if self.algorithm_features is None:
-                for i, algorithm in enumerate(self.algorithms):
+                self.regressors = []
+                for i, _ in enumerate(self.algorithms):
                     algo_times = performance.iloc[:, i]
-
                     cur_model = self.model_class(**regressor_init_args)
                     cur_model.fit(features, algo_times)
                     self.regressors.append(cur_model)
             else:
-                train_data = []
+                train_data_list = []
                 for i, algorithm in enumerate(self.algorithms):
+                    # Align algorithm features with instance features
                     data = pd.merge(
                         features,
-                        self.algorithm_features.loc[algorithm],
+                        self.algorithm_features.loc[[algorithm]]
+                        .reindex([algorithm] * len(features))
+                        .set_index(features.index),
                         left_index=True,
                         right_index=True,
                     )
                     data = pd.merge(
-                        data, performance.iloc[:, i], left_index=True, right_index=True
+                        data,
+                        performance.iloc[:, [i]],
+                        left_index=True,
+                        right_index=True,
                     )
-                    train_data.append(data)
-                train_data = pd.concat(train_data)
+                    train_data_list.append(data)
+                train_data = pd.concat(train_data_list)
                 self.regressors = self.model_class(**regressor_init_args)
                 self.regressors.fit(train_data.iloc[:, :-1], train_data.iloc[:, -1])
 
-    def _predict(self, features: pd.DataFrame) -> dict[str, list[tuple]]:
+    def _predict(
+        self,
+        features: pd.DataFrame | None,
+        performance: pd.DataFrame | None = None,
+    ) -> dict[str, list[tuple[str, float]]]:
         """
-        Predicts the performance of algorithms for the given features.
+        Predict the best algorithm for each instance.
 
-        Args:
-            features (pd.DataFrame): DataFrame containing the feature data.
+        Parameters
+        ----------
+        features : pd.DataFrame
+            The input features.
 
-        Returns:
-            dict[str, list[tuple]]: A dictionary mapping instance names to the predicted best algorithm
-            and the associated budget.
+        Returns
+        -------
+        dict
+            Mapping from instance name to algorithm schedules.
         """
+        if features is None:
+            raise ValueError("PerformanceModel require features for prediction.")
         predictions = self.generate_features(features)
 
-        return {
-            instance_name: [
-                (
-                    self.algorithms[
-                        np.argmax(predictions[i])
-                        if self.maximize
-                        else np.argmin(predictions[i])
-                    ],
-                    self.budget,
-                )
+        results: dict[str, list[tuple[str, float]]] = {}
+        for i, instance_name in enumerate(features.index):
+            idx = (
+                int(np.argmax(predictions[i]))
+                if self.maximize
+                else int(np.argmin(predictions[i]))
+            )
+            results[str(instance_name)] = [
+                (str(self.algorithms[idx]), float(self.budget or 0))
             ]
-            for i, instance_name in enumerate(features.index)
-        }
+        return results
 
-    def generate_features(self, features: pd.DataFrame) -> np.ndarray:
+    def generate_features(self, base_features: pd.DataFrame) -> pd.DataFrame:
         """
-        Generates predictions for the given features using the trained models.
+        Generate predictions for each algorithm.
 
-        Args:
-            features (pd.DataFrame): DataFrame containing the feature data.
+        Parameters
+        ----------
+        features : pd.DataFrame
+            The input features.
 
-        Returns:
-            np.ndarray: Array containing the predictions for each algorithm.
+        Returns
+        -------
+        np.ndarray
+            Predicted performance for each algorithm (n_instances x n_algorithms).
         """
+        if self.regressors is None:
+            raise RuntimeError("Model has not been fitted.")
+
+        predictions = np.zeros((base_features.shape[0], len(self.algorithms)))
+
         if self.use_multi_target:
-            predictions = self.regressors.predict(features)
+            if not isinstance(self.regressors, AbstractPredictor):
+                raise RuntimeError("Multi-target regressor missing.")
+            predictions = self.regressors.predict(base_features)
+            if isinstance(predictions, pd.DataFrame):
+                predictions = predictions.values
         else:
             if self.algorithm_features is None:
-                predictions = np.zeros((features.shape[0], len(self.algorithms)))
-                for i, algorithm in enumerate(self.algorithms):
-                    prediction = self.regressors[i].predict(features)
-                    predictions[:, i] = prediction
+                if not isinstance(self.regressors, list):
+                    raise RuntimeError("Individual regressors missing.")
+                for i, _ in enumerate(self.algorithms):
+                    predictions[:, i] = np.asarray(
+                        self.regressors[i].predict(base_features)
+                    ).flatten()
             else:
-                predictions = np.zeros((features.shape[0], len(self.algorithms)))
+                if not isinstance(self.regressors, AbstractPredictor):
+                    raise RuntimeError("Joint regressor missing.")
                 for i, algorithm in enumerate(self.algorithms):
                     data = pd.merge(
-                        features,
-                        self.algorithm_features.loc[algorithm],
+                        base_features,
+                        self.algorithm_features.loc[[algorithm]]
+                        .reindex([algorithm] * len(base_features))
+                        .set_index(base_features.index),
                         left_index=True,
                         right_index=True,
                     )
-                    prediction = self.regressors.predict(data)
-                    predictions[:, i] = prediction
+                    predictions[:, i] = self.regressors.predict(data)
 
-        return predictions
+        return pd.DataFrame(
+            predictions, index=base_features.index, columns=list(self.algorithms)
+        )  # type: ignore[arg-type]
 
     @staticmethod
     def _define_hyperparameters(
-        model_class: list[type[AbstractPredictor]] = None,
-        **kwargs,  # Accept additional kwargs from mixin
-    ):
+        model_class: list[type[AbstractPredictor]] | None = None,
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
         """
         Define hyperparameters for PerformanceModel.
 
         Parameters
         ----------
-        model_class : list[type[AbstractPredictor]], optional
+        model_class : list[type[AbstractPredictor]] or None, default=None
             List of model classes to include in the configuration space.
-            Defaults to [RandomForestRegressorWrapper, XGBoostRegressorWrapper].
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        tuple
+            Tuple of (hyperparameters, conditions, forbiddens).
         """
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
@@ -196,6 +254,31 @@ class PerformanceModel(
             model_class = [RandomForestRegressorWrapper, XGBoostRegressorWrapper]
 
         hyperparameters = [
-            ClassChoice("model_class", choices=model_class),
+            ClassChoice("model_class", choices=model_class, default=model_class[0]),
         ]
         return hyperparameters, [], []
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs: Any,
+    ) -> partial[PerformanceModel]:
+        """
+        Create a partial function from a clean configuration.
+
+        Parameters
+        ----------
+        clean_config : dict
+            The clean configuration.
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        partial
+            Partial function for PerformanceModel.
+        """
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(PerformanceModel, **config)

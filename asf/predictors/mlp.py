@@ -1,32 +1,35 @@
+"""
+Multi-Layer Perceptron (MLP) wrappers from scikit-learn.
+"""
+
 from __future__ import annotations
 
+from functools import partial
+from typing import Any
+
+from sklearn.neural_network import MLPClassifier, MLPRegressor
+
+from asf.predictors.sklearn_wrapper import SklearnWrapper
+from asf.utils.configurable import ConfigurableMixin
+
 try:
-    from ConfigSpace import ConfigurationSpace, Float, Integer, EqualsCondition  # noqa: F401
-    from ConfigSpace.hyperparameters import Hyperparameter  # noqa: F401
+    from ConfigSpace import (
+        Float,
+        Integer,
+    )
+    from ConfigSpace.hyperparameters import Hyperparameter
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
-from sklearn.neural_network import MLPClassifier, MLPRegressor
-
-from asf.predictors.sklearn_wrapper import SklearnWrapper
-
-from typing import Any
-
-from functools import partial
-
-
-from asf.utils.configurable import ConfigurableMixin
-
 
 class MLPClassifierWrapper(ConfigurableMixin, SklearnWrapper):
     """
-    A wrapper for the MLPClassifier from scikit-learn, providing additional functionality
-    for configuration space and parameter handling.
+    A wrapper for the MLPClassifier from scikit-learn.
     """
 
-    PREFIX = "mlp_classifier"
+    PREFIX: str = "mlp_classifier"
 
     def __init__(self, init_params: dict[str, Any] | None = None):
         """
@@ -34,13 +37,17 @@ class MLPClassifierWrapper(ConfigurableMixin, SklearnWrapper):
 
         Parameters
         ----------
-        init_params : dict, optional
+        init_params : dict[str, Any] or None, default=None
             Initial parameters for the MLPClassifier.
         """
         super().__init__(MLPClassifier, init_params or {})
 
     def fit(
-        self, X: Any, Y: Any, sample_weight: Any | None = None, **kwargs: Any
+        self,
+        X: Any,
+        Y: Any,
+        sample_weight: Any | None = None,
+        **kwargs: Any,
     ) -> None:
         """
         Fit the model to the data.
@@ -51,10 +58,15 @@ class MLPClassifierWrapper(ConfigurableMixin, SklearnWrapper):
             Training data.
         Y : array-like
             Target values.
-        sample_weight : array-like, optional
+        sample_weight : array-like or None, default=None
             Sample weights. Not supported for MLPClassifier.
-        kwargs : dict
+        **kwargs : Any
             Additional arguments for the fit method.
+
+        Raises
+        ------
+        AssertionError
+            If sample_weight is provided.
         """
         assert sample_weight is None, (
             "Sample weights are not supported for MLPClassifier"
@@ -62,31 +74,39 @@ class MLPClassifierWrapper(ConfigurableMixin, SklearnWrapper):
         self.model_class.fit(X, Y, **kwargs)
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(
+        **kwargs: Any,
+    ) -> tuple[list[Hyperparameter], list[Any], list[Any]]:
         """
         Define hyperparameters for the MLP Classifier.
+
+        Parameters
+        ----------
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        tuple
+            (hyperparameters, conditions, forbiddens)
         """
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
 
         depth = Integer("depth", (1, 3), default=3, log=False)
-
         width = Integer("width", (16, 1024), default=64, log=True)
-
         batch_size = Integer(
             "batch_size",
             (256, 1024),
             default=256,
             log=True,
-        )  # MODIFIED from HPOBENCH
-
+        )
         alpha = Float(
             "alpha",
             (10**-8, 1),
             default=10**-3,
             log=True,
         )
-
         learning_rate_init = Float(
             "learning_rate_init",
             (10**-5, 1),
@@ -101,8 +121,8 @@ class MLPClassifierWrapper(ConfigurableMixin, SklearnWrapper):
     def _get_from_clean_configuration(
         cls,
         clean_config: dict[str, Any],
-        **kwargs,
-    ) -> partial:
+        **kwargs: Any,
+    ) -> partial[MLPClassifierWrapper]:
         """
         Create a partial function from a clean (unprefixed) configuration.
         """
@@ -126,11 +146,10 @@ class MLPClassifierWrapper(ConfigurableMixin, SklearnWrapper):
 
 class MLPRegressorWrapper(ConfigurableMixin, SklearnWrapper):
     """
-    A wrapper for the MLPRegressor from scikit-learn, providing additional functionality
-    for configuration space and parameter handling.
+    A wrapper for the MLPRegressor from scikit-learn.
     """
 
-    PREFIX = "mlp_regressor"
+    PREFIX: str = "mlp_regressor"
 
     def __init__(self, init_params: dict[str, Any] | None = None):
         """
@@ -138,13 +157,17 @@ class MLPRegressorWrapper(ConfigurableMixin, SklearnWrapper):
 
         Parameters
         ----------
-        init_params : dict, optional
+        init_params : dict[str, Any] or None, default=None
             Initial parameters for the MLPRegressor.
         """
         super().__init__(MLPRegressor, init_params or {})
 
     def fit(
-        self, X: Any, Y: Any, sample_weight: Any | None = None, **kwargs: Any
+        self,
+        X: Any,
+        Y: Any,
+        sample_weight: Any | None = None,
+        **kwargs: Any,
     ) -> None:
         """
         Fit the model to the data.
@@ -155,10 +178,15 @@ class MLPRegressorWrapper(ConfigurableMixin, SklearnWrapper):
             Training data.
         Y : array-like
             Target values.
-        sample_weight : array-like, optional
+        sample_weight : array-like or None, default=None
             Sample weights. Not supported for MLPRegressor.
-        kwargs : dict
+        **kwargs : Any
             Additional arguments for the fit method.
+
+        Raises
+        ------
+        AssertionError
+            If sample_weight is provided.
         """
         assert sample_weight is None, (
             "Sample weights are not supported for MLPRegressor"
@@ -166,15 +194,29 @@ class MLPRegressorWrapper(ConfigurableMixin, SklearnWrapper):
         self.model_class.fit(X, Y, **kwargs)
 
     @staticmethod
-    def _define_hyperparameters(dataset_size: str = "large", **kwargs):
+    def _define_hyperparameters(
+        dataset_size: str = "large",
+        **kwargs: Any,
+    ) -> tuple[list[Hyperparameter], list[Any], list[Any]]:
         """
         Define hyperparameters for the MLP Regressor.
+
+        Parameters
+        ----------
+        dataset_size : str, default="large"
+            The size of the dataset ('small', 'medium', or 'large').
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        tuple
+            (hyperparameters, conditions, forbiddens)
         """
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
 
         depth = Integer("depth", (1, 3), default=3, log=False)
-
         width = Integer("width", (16, 1024), default=64, log=True)
 
         if dataset_size == "small":
@@ -224,10 +266,10 @@ class MLPRegressorWrapper(ConfigurableMixin, SklearnWrapper):
     def _get_from_clean_configuration(
         cls,
         clean_config: dict[str, Any],
-        **kwargs,
-    ) -> partial:
+        **kwargs: Any,
+    ) -> partial[MLPRegressorWrapper]:
         """
-        Create a partial function from a clean (unprefixed) configuration.
+        Create a MLPRegressorWrapper partial from a clean configuration.
         """
         hidden_layers = [clean_config["width"]] * clean_config["depth"]
 

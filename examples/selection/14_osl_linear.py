@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import cast
 
 from asf.selectors.osl_linear import OSLLinearSelector
 
@@ -8,8 +9,8 @@ def make_data(n_instances=200, n_algorithms=5, seed=1, budget=200.0):
     rng = np.random.RandomState(seed)
     features = pd.DataFrame(
         rng.normal(size=(n_instances, 6)),
-        columns=[f"f{i}" for i in range(6)],
-        index=[f"inst_{i}" for i in range(n_instances)],
+        columns=[f"f{i}" for i in range(6)],  # type: ignore[arg-type]
+        index=[f"inst_{i}" for i in range(n_instances)],  # type: ignore[arg-type]
     )
 
     perf = pd.DataFrame(index=features.index)
@@ -57,7 +58,7 @@ def main():
 
     # simple validation of structure
     assert isinstance(preds, dict)
-    for v in preds.values():
+    for v in cast(dict, preds).values():
         assert isinstance(v, list) and len(v) == 1
         algo, score = v[0]
         assert algo in list(Y.columns) or algo is None

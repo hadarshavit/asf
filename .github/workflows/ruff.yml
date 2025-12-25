@@ -18,8 +18,10 @@ jobs:
       with:
         python-version: '3.x'
     - name: Install the code linting and formatting tool Ruff
-      run: pip install ruff
+      run: pip install ruff ty
     - name: Lint code with Ruff
       run: ruff check --output-format=github --target-version=py311
     - name: Check code formatting with Ruff
       run: ruff format --diff --target-version=py311
+    - name: Check type annotations with ty
+      run: ty check --output-format=github

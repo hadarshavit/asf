@@ -38,7 +38,7 @@ def test_regression_mlp_fit_predict():
         optimizer=torch.optim.SGD,
         epochs=1,
         batch_size=2,
-        compile=False,
+        compile_model=False,
     )
 
     model.fit(features, performance)
@@ -72,7 +72,7 @@ def test_ranking_mlp_fit_predict():
         optimizer=torch.optim.SGD,
         epochs=1,
         batch_size=2,
-        compile=False,
+        compile_model=False,
     )
 
     model.fit(features, performance, algorithm_features)

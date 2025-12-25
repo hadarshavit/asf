@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from asf.predictors.epm_random_forest import EPMRandomForest as ForestRegressorWrapper
-from asf.predictors.epm_extra_trees import EPMRandomForest as ExtraTreesWrapper
+from asf.predictors.epm_extra_trees import EPMExtraTrees as ExtraTreesWrapper
 
 
 @pytest.mark.parametrize(

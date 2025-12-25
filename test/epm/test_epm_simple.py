@@ -4,10 +4,14 @@ import numpy as np
 from asf.epm.epm import EPM
 
 
-class DummyPredictor:
+from asf.predictors.abstract_predictor import AbstractPredictor
+
+
+class DummyPredictor(AbstractPredictor):
     """A tiny predictor that stores mean of y and predicts it for any X."""
 
     def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self._mean = None
 
     def fit(self, X, y, sample_weight=None):
@@ -18,6 +22,12 @@ class DummyPredictor:
         # return the mean for each row in X
         n = len(X)
         return np.array([self._mean] * n)
+
+    def save(self, path):
+        pass
+
+    def load(self, path):
+        pass
 
 
 class IdentityNorm:

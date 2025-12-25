@@ -37,7 +37,7 @@ def run(selector, scenario, fold, base_path="/home/shavit/asf/paper/aslib_data")
     print(f"Evaluating fold: {fold}")
 
     if selector == SingleBestSolver or selector == VirtualBestSolver:
-        score, result_selector, per_instance_scores = evaluate_selector(
+        score, result_selector, per_instance_scores = evaluate_selector(  # type: ignore[misc]
             selector_class=selector,
             scenario_path=os.path.join(base_path, scenario),
             fold=fold,
@@ -45,7 +45,7 @@ def run(selector, scenario, fold, base_path="/home/shavit/asf/paper/aslib_data")
             return_per_instance=True,
         )
     else:
-        score, result_selector, per_instance_scores = evaluate_selector(
+        score, result_selector, per_instance_scores = evaluate_selector(  # type: ignore[misc]
             selector_class=selector,
             scenario_path=os.path.join(base_path, scenario),
             fold=fold,
@@ -102,7 +102,7 @@ def run_baseline(
     print(f"Evaluating fold: {fold}")
 
     # Run without HPO for baseline selectors
-    score, result_selector, per_instance_scores = evaluate_selector(
+    score, result_selector, per_instance_scores = evaluate_selector(  # type: ignore[misc]
         selector_class=selector,
         scenario_path=os.path.join(base_path, scenario),
         fold=fold,

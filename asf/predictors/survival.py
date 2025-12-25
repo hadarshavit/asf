@@ -1,18 +1,24 @@
+"""
+Lightweight wrapper around sksurv's RandomSurvivalForest model.
+"""
+
 from __future__ import annotations
 
+from functools import partial
 from typing import Any
+
+import joblib
 
 from asf.predictors.abstract_predictor import AbstractPredictor
 from asf.utils.configurable import ConfigurableMixin
-from functools import partial
 
 try:
-    from ConfigSpace import (  # noqa: F401
-        ConfigurationSpace,
-        Integer,
-        Float,
+    from ConfigSpace import (
         Categorical,
+        Float,
+        Integer,
     )
+    from ConfigSpace.hyperparameters import Hyperparameter
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
@@ -22,29 +28,57 @@ try:
     from sksurv.ensemble import RandomSurvivalForest
 
     SKSURV_AVAILABLE = True
-except ImportError:  # pragma: no cover - optional dependency
-    RandomSurvivalForest = None  # type: ignore[assignment]
+except ImportError:
     SKSURV_AVAILABLE = False
 
 
 if SKSURV_AVAILABLE:
 
     class RandomSurvivalForestWrapper(ConfigurableMixin, AbstractPredictor):
-        """Lightweight wrapper around ``sksurv``'s ``RandomSurvivalForest`` model."""
+        """
+        Lightweight wrapper around ``sksurv``'s ``RandomSurvivalForest`` model.
+        """
 
-        PREFIX = "random_survival_forest"
+        PREFIX: str = "random_survival_forest"
 
         def __init__(self, init_params: dict[str, Any] | None = None) -> None:
+            """
+            Initialize the RandomSurvivalForestWrapper.
+
+            Parameters
+            ----------
+            init_params : dict[str, Any] or None, default=None
+                Initial parameters for the RandomSurvivalForest model.
+
+            Raises
+            ------
+            ImportError
+                If sksurv is not installed.
+            """
             if not SKSURV_AVAILABLE:
                 raise ImportError(
                     "sksurv is not installed. Install scikit-survival to use RandomSurvivalForestWrapper."
                 )
             params = init_params or {}
-            self.model = RandomSurvivalForest(**params)  # type: ignore[misc]
+            self.model = RandomSurvivalForest(**params)
 
         @staticmethod
-        def _define_hyperparameters(**kwargs):
-            """Define hyperparameters for RandomSurvivalForestWrapper."""
+        def _define_hyperparameters(
+            **kwargs: Any,
+        ) -> tuple[list[Hyperparameter], list[Any], list[Any]]:
+            """
+            Define hyperparameters for RandomSurvivalForestWrapper.
+
+            Parameters
+            ----------
+            **kwargs : Any
+                Additional keyword arguments.
+
+            Returns
+            -------
+            tuple
+                (hyperparameters, conditions, forbiddens)
+            """
             if not CONFIGSPACE_AVAILABLE:
                 return [], [], []
 
@@ -61,34 +95,66 @@ if SKSURV_AVAILABLE:
         def _get_from_clean_configuration(
             cls,
             clean_config: dict[str, Any],
-            **kwargs,
+            **kwargs: Any,
         ) -> partial:
             """
             Create a partial function from a clean (unprefixed) configuration.
             """
             config = clean_config.copy()
             config.update(kwargs)
-            return partial(RandomSurvivalForestWrapper, init_params=config)
+            return partial(cls, init_params=config)
 
-        def fit(self, X: Any, y: Any, **kwargs: Any) -> None:
-            self.model.fit(X, y, **kwargs)
+        def fit(self, X: Any, Y: Any, **kwargs: Any) -> None:
+            """
+            Fit the model to the data.
+
+            Parameters
+            ----------
+            X : Any
+                Training data.
+            y : Any
+                Target values.
+            **kwargs : Any
+                Additional arguments for the fit method.
+            """
+            self.model.fit(X, Y, **kwargs)
 
         def predict(self, X: Any, **kwargs: Any) -> Any:
+            """
+            Predict using the model.
+
+            Parameters
+            ----------
+            X : Any
+                Data to predict on.
+            **kwargs : Any
+                Additional arguments for the predict method.
+
+            Returns
+            -------
+            Any
+                Predicted values.
+            """
             return self.model.predict(X, **kwargs)
 
         def predict_survival_function(self, X: Any, **kwargs: Any) -> Any:
+            """
+            Predict survival function.
+            """
             return self.model.predict_survival_function(X, **kwargs)
 
         def save(self, file_path: str) -> None:
-            import joblib
+            """
+            Save the model to a file.
+            """
+            joblib.dump(self, file_path)
 
-            joblib.dump(self.model, file_path)
-
-        def load(self, file_path: str) -> "RandomSurvivalForestWrapper":
-            import joblib
-
-            self.model = joblib.load(file_path)
-            return self
+        @classmethod
+        def load(cls, file_path: str) -> AbstractPredictor:
+            """
+            Load the model from a file.
+            """
+            return joblib.load(file_path)
 
 else:
-    RandomSurvivalForestWrapper = None  # type: ignore[assignment]
+    RandomSurvivalForestWrapper = None

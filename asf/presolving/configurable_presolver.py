@@ -9,19 +9,19 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from asf.presolving.presolver import AbstractPresolver
 
 try:
     from ConfigSpace import (
-        ConfigurationSpace,
-        Configuration,
         Categorical,
-        Float,
+        Configuration,
+        ConfigurationSpace,
         EqualsCondition,
+        Float,
     )
-    from ConfigSpace.hyperparameters import Hyperparameter
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
@@ -38,47 +38,58 @@ class ConfigurablePresolver(AbstractPresolver):
 
     This enables hyperparameter optimization of the presolving schedule.
 
-    Attributes:
-        schedule (list[tuple[str, float]]): The configured schedule of (algorithm, time) pairs.
-        algorithm_config (dict[str, tuple[bool, float]]): Per-algorithm configuration
-            mapping algorithm name to (use_algorithm, time_budget).
+    Parameters
+    ----------
+    budget : float, default=30.0
+        Total time budget for pre-solving.
+    maximize : bool, default=False
+        If True, maximize performance values instead of minimize.
+    algorithm_config : dict[str, tuple[bool, float]] or None, default=None
+        Dictionary mapping algorithm names to (use_algorithm, time_budget).
+    **kwargs : Any
+        Additional keyword arguments.
     """
 
-    PREFIX = "configurable_presolver"
+    PREFIX: str = "configurable_presolver"
 
     def __init__(
         self,
         budget: float = 30.0,
         maximize: bool = False,
         algorithm_config: dict[str, tuple[bool, float]] | None = None,
-        **kwargs,
-    ):
-        """
-        Initialize the ConfigurablePresolver.
-
-        Args:
-            budget: Total time budget for pre-solving (used as upper bound for validation).
-            maximize: If True, maximize performance values instead of minimize.
-            algorithm_config: Dictionary mapping algorithm names to (use_algorithm, time_budget).
-                If None, the presolver will not have any algorithms in its schedule.
-        """
+        **kwargs: Any,
+    ) -> None:
         super().__init__(budget=budget, maximize=maximize)
         self.algorithm_config = algorithm_config or {}
         self.schedule: list[tuple[str, float]] = []
         self.algorithms: list[str] = []
 
-    def fit(self, features: pd.DataFrame, performance: pd.DataFrame) -> None:
+    def fit(
+        self,
+        features: pd.DataFrame | np.ndarray | None,
+        performance: pd.DataFrame | np.ndarray | None,
+        **kwargs: Any,
+    ) -> None:
         """
         Fit the presolver - builds the schedule from the algorithm_config.
 
-        The fit method validates that configured algorithms exist in the performance
-        data and builds the final schedule.
-
-        Args:
-            features: DataFrame of instance features (not used, but required by interface).
-            performance: DataFrame of runtimes/performance (n_instances x n_algorithms).
+        Parameters
+        ----------
+        features : pd.DataFrame or np.ndarray
+            The instance features.
+        performance : pd.DataFrame or np.ndarray
+            The algorithm performances.
         """
-        self.algorithms = list(performance.columns)
+        if performance is None:
+            raise ValueError(
+                "ConfigurablePresolver requires performance data for fitting."
+            )
+
+        if isinstance(performance, pd.DataFrame):
+            self.algorithms = list(performance.columns)
+        else:
+            self.algorithms = [f"a{i}" for i in range(performance.shape[1])]
+
         self.schedule = []
 
         # Build schedule from algorithm_config
@@ -89,50 +100,86 @@ class ConfigurablePresolver(AbstractPresolver):
         # Sort by time budget (shorter times first - run quick solvers first)
         self.schedule.sort(key=lambda x: x[1])
 
-    def predict(self) -> list[tuple[str, float]]:
+    def predict(
+        self,
+        features: pd.DataFrame | np.ndarray | None = None,
+        performance: pd.DataFrame | np.ndarray | None = None,
+        **kwargs: Any,
+    ) -> list[tuple[str, float]] | dict[str, list[tuple[str, float]]]:
         """
         Return the configured pre-solve schedule.
 
-        Returns:
-            List of (algorithm_name, cutoff_time) tuples representing the schedule.
+        Parameters
+        ----------
+        features : pd.DataFrame or None, default=None
+            The features for the instances. If provided, the schedule will be
+            returned as a dictionary mapping instance IDs to the schedule.
+        performance : pd.DataFrame or None, default=None
+            The algorithm performances. Not used by ConfigurablePresolver.
+
+        Returns
+        -------
+        list or dict
+            The presolving schedule. If `features` is None, returns a list of
+            (algorithm_name, time_budget) pairs. If `features` is provided,
+            returns a dictionary mapping instance IDs to their respective schedules.
         """
+        if features is not None:
+            if isinstance(features, np.ndarray):
+                features = pd.DataFrame(features)
+            return {str(inst): self.schedule for inst in features.index}
         return self.schedule
 
-    @staticmethod
+    @classmethod
     def get_configuration_space(
+        cls,
         cs: ConfigurationSpace | None = None,
-        cs_transform: dict[str, dict[str, type]] | None = None,
+        cs_transform: dict[str, Any] | None = None,
+        parent_param: Any | None = None,
+        parent_value: str | None = None,
+        total_budget: float | None = None,
         algorithms: list[str] | None = None,
         max_time_per_algo: float = 30.0,
         pre_prefix: str = "",
-        parent_param: Hyperparameter | None = None,
-        parent_value: str | None = None,
-        **kwargs,
-    ) -> tuple[ConfigurationSpace, dict[str, dict[str, type]]]:
+        **kwargs: Any,
+    ) -> tuple[ConfigurationSpace, dict[str, Any]]:
         """
-        Get the configuration space for the ConfigurablePresolver.
+        Get the configuration space.
 
         The configuration space includes:
         - For each algorithm: a boolean to enable/disable it
-        - For each algorithm: a float for the time budget (conditional on being enabled)
+        - For each algorithm: a float for the time budget (conditional)
 
-        Args:
-            cs: The configuration space to use. If None, a new one will be created.
-            cs_transform: A dictionary for transforming configuration space values.
-            algorithms: List of algorithm names to include in the configuration space.
-                If None, raises ValueError.
-            max_time_per_algo: Maximum time budget that can be allocated per algorithm.
-            pre_prefix: Prefix for parameter names (for hierarchical configuration spaces).
-            parent_param: Parent parameter for conditional configuration.
-            parent_value: Value of parent parameter that activates these parameters.
-            **kwargs: Additional keyword arguments (unused).
+        Parameters
+        ----------
+        cs : ConfigurationSpace or None, default=None
+            The configuration space to use.
+        cs_transform : dict or None, default=None
+            A dictionary for transforming configuration space values.
+        algorithms : list[str] or None, default=None
+            List of algorithm names to include in the configuration space.
+        max_time_per_algo : float, default=30.0
+            Maximum time budget that can be allocated per algorithm.
+        pre_prefix : str, default=""
+            Prefix for parameter names.
+        parent_param : Any or None, default=None
+            Parent parameter for conditional configuration.
+        parent_value : str or None, default=None
+            Value of parent parameter that activates these parameters.
+        **kwargs : Any
+            Additional keyword arguments.
 
-        Returns:
-            Tuple of (ConfigurationSpace, transformation dictionary).
+        Returns
+        -------
+        tuple
+            The configuration space and transformation dictionary.
 
-        Raises:
-            RuntimeError: If ConfigSpace is not installed.
-            ValueError: If algorithms list is None or empty.
+        Raises
+        ------
+        RuntimeError
+            If ConfigSpace is not installed.
+        ValueError
+            If algorithms list is None or empty.
         """
         if not CONFIGSPACE_AVAILABLE:
             raise RuntimeError(
@@ -151,9 +198,9 @@ class ConfigurablePresolver(AbstractPresolver):
             cs_transform = {}
 
         if pre_prefix != "":
-            prefix = f"{pre_prefix}:{ConfigurablePresolver.PREFIX}"
+            prefix = f"{pre_prefix}:{cls.PREFIX}"
         else:
-            prefix = ConfigurablePresolver.PREFIX
+            prefix = cls.PREFIX
 
         all_params = []
         all_conditions = []
@@ -175,7 +222,7 @@ class ConfigurablePresolver(AbstractPresolver):
                 name=f"{prefix}:time_{safe_algo_name}",
                 bounds=(0.1, max_time_per_algo),
                 default=min(5.0, max_time_per_algo),
-                log=True,  # Log scale for time values
+                log=True,
             )
             all_params.append(time_param)
 
@@ -203,24 +250,40 @@ class ConfigurablePresolver(AbstractPresolver):
 
         return cs, cs_transform
 
-    @staticmethod
+    @classmethod
     def get_from_configuration(
+        cls,
         configuration: Configuration | dict[str, Any],
-        cs_transform: dict[str, dict[str, type]],
+        cs_transform: dict[str, Any] | None = None,
+        budget: float | None = None,
+        maximize: bool = False,
+        presolver_name: str | None = None,
         pre_prefix: str = "",
-        **kwargs,
-    ) -> "ConfigurablePresolver":
+        **kwargs: Any,
+    ) -> ConfigurablePresolver:
         """
         Create a ConfigurablePresolver instance from a configuration.
 
-        Args:
-            configuration: The configuration object or dictionary.
-            cs_transform: The transformation dictionary for the configuration space.
-            pre_prefix: Prefix for parameter names.
-            **kwargs: Additional keyword arguments passed to the constructor.
+        Parameters
+        ----------
+        configuration : Configuration or dict
+            The configuration object or dictionary.
+        cs_transform : dict
+            The transformation dictionary.
+        pre_prefix : str, default=""
+            Prefix for parameter names.
+        **kwargs : Any
+            Additional keyword arguments.
 
-        Returns:
-            A ConfigurablePresolver instance configured according to the configuration.
+        Returns
+        -------
+        ConfigurablePresolver
+            A ConfigurablePresolver instance.
+
+        Raises
+        ------
+        RuntimeError
+            If ConfigSpace is not installed.
         """
         if not CONFIGSPACE_AVAILABLE:
             raise RuntimeError(
@@ -233,7 +296,7 @@ class ConfigurablePresolver(AbstractPresolver):
             prefix = ConfigurablePresolver.PREFIX
 
         # Get algorithms list from transform
-        algorithms = cs_transform.get(f"{prefix}:algorithms", [])
+        algorithms = (cs_transform or {}).get(f"{prefix}:algorithms", [])
 
         # Build algorithm_config from configuration
         algorithm_config = {}
@@ -247,7 +310,7 @@ class ConfigurablePresolver(AbstractPresolver):
             use_algo = configuration.get(use_key, False)
             if use_algo:
                 time_budget = configuration.get(time_key, 5.0)
-                algorithm_config[algo] = (True, time_budget)
+                algorithm_config[algo] = (True, float(time_budget))
                 total_budget += time_budget
             else:
                 algorithm_config[algo] = (False, 0.0)

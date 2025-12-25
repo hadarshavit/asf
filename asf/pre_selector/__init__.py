@@ -1,3 +1,9 @@
+"""
+This module provides various algorithms for algorithm pre-selection.
+"""
+
+from __future__ import annotations
+
 from asf.pre_selector.marginal_contribution_based import (
     MarginalContributionBasedPreSelector,
 )

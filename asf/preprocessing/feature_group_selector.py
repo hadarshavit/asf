@@ -5,8 +5,17 @@ This module provides a sklearn-compatible transformer that selects features
 based on feature groups defined in ASlib scenarios.
 """
 
+from __future__ import annotations
+
+from typing import Any
+
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
+
+try:
+    from ConfigSpace import Configuration
+except ImportError:
+    Configuration: Any = Any
 
 
 class MissingPrerequisiteGroupError(ValueError):
@@ -25,14 +34,14 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
 
     Parameters
     ----------
-    feature_groups : dict
+    feature_groups : dict[str, Any]
         Dictionary mapping feature group names to their metadata.
         Each value should be a dict with a 'provides' key listing the feature names
         in that group, and optionally a 'requires' key listing prerequisite groups.
-    selected_groups : list[str] | None
+    selected_groups : list[str] | None, default=None
         List of feature group names to include. If None, all groups are included.
-    validate_requirements : bool
-        If True (default), validate that all required prerequisite groups are included
+    validate_requirements : bool, default=True
+        If True, validate that all required prerequisite groups are included
         when selecting a group.
 
     Attributes
@@ -63,7 +72,7 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
 
     def __init__(
         self,
-        feature_groups: dict,
+        feature_groups: dict[str, Any],
         selected_groups: list[str] | None = None,
         validate_requirements: bool = True,
     ):
@@ -107,7 +116,7 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
 
     @staticmethod
     def validate_feature_group_selection(
-        feature_groups: dict,
+        feature_groups: dict[str, Any],
         selected_groups: list[str],
     ) -> None:
         """
@@ -118,7 +127,7 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
 
         Parameters
         ----------
-        feature_groups : dict
+        feature_groups : dict[str, Any]
             Dictionary of all feature groups with their metadata.
         selected_groups : list[str]
             List of selected feature group names.
@@ -145,7 +154,7 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
                         f"Selected groups: {list(selected_groups)}"
                     )
 
-    def fit(self, X: pd.DataFrame, y=None):
+    def fit(self, X: pd.DataFrame, y: Any = None) -> FeatureGroupSelector:
         """
         Fit the selector by determining which features to select.
 
@@ -153,12 +162,13 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
         ----------
         X : pd.DataFrame
             Input features.
-        y : ignored
+        y : Any, default=None
             Not used, present for API compatibility.
 
         Returns
         -------
-        self
+        FeatureGroupSelector
+            The fitted selector instance.
         """
         # Determine which groups to include
         if self.selected_groups is None:
@@ -203,13 +213,13 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
             return X
         return X[available_features]
 
-    def get_feature_names_out(self, input_features=None):
+    def get_feature_names_out(self, input_features: Any = None) -> list[str]:
         """
         Get output feature names.
 
         Parameters
         ----------
-        input_features : ignored
+        input_features : Any, default=None
             Not used, present for API compatibility.
 
         Returns
@@ -221,26 +231,26 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
 
     @staticmethod
     def get_selected_groups_from_config(
-        feature_groups: dict,
-        config: dict,
+        feature_groups: dict[str, Any],
+        config: dict[str, Any] | Configuration,
         prefix: str = "feature_group_",
-    ) -> dict:
+    ) -> dict[str, Any] | None:
         """
         Extract selected feature groups from a SMAC configuration.
 
         Parameters
         ----------
-        feature_groups : dict
+        feature_groups : dict[str, Any]
             Dictionary of all feature groups.
-        config : dict
+        config : dict[str, Any]
             SMAC configuration dictionary.
-        prefix : str
+        prefix : str, default="feature_group_"
             Prefix used for feature group parameters in the config.
 
         Returns
         -------
-        dict
-            Dictionary of selected feature groups.
+        dict[str, Any] or None
+            Dictionary of selected feature groups, or None if no groups selected.
         """
         selected = {}
         for fg_name, fg_info in feature_groups.items():

@@ -4,7 +4,10 @@ import pandas as pd
 from asf.selectors.performance_model import PerformanceModel
 
 
-class DummyRegressor:
+from asf.predictors.abstract_predictor import AbstractPredictor
+
+
+class DummyRegressor(AbstractPredictor):
     def __init__(self, **kwargs):
         self._y = None
         self._X_cols = None
@@ -25,6 +28,13 @@ class DummyRegressor:
         else:
             # multi-target prediction
             return np.tile(self._y, (n, 1))
+
+    def save(self, path):
+        pass
+
+    @classmethod
+    def load(cls, path):
+        return cls()
 
 
 def small_df():
