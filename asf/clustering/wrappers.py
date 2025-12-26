@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from functools import partial
 from typing import Any
 
 import numpy as np
@@ -105,6 +106,15 @@ class GMeansWrapper(AbstractClustering):
         ]
         return params, [], []
 
+    @classmethod
+    def _get_from_clean_configuration(
+        cls, clean_config: dict[str, Any], **kwargs: Any
+    ) -> partial:
+        """Create a partial class wrapper."""
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(GMeansWrapper, **config)
+
 
 class KMeansWrapper(AbstractClustering):
     """
@@ -166,6 +176,15 @@ class KMeansWrapper(AbstractClustering):
             Integer("n_clusters", (2, 20), default=5),
         ]
         return params, [], []
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls, clean_config: dict[str, Any], **kwargs: Any
+    ) -> partial:
+        """Create a partial class wrapper."""
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(KMeansWrapper, **config)
 
 
 class AgglomerativeClusteringWrapper(AbstractClustering):
@@ -239,6 +258,15 @@ class AgglomerativeClusteringWrapper(AbstractClustering):
         ]
         return params, [], []
 
+    @classmethod
+    def _get_from_clean_configuration(
+        cls, clean_config: dict[str, Any], **kwargs: Any
+    ) -> partial:
+        """Create a partial class wrapper."""
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(AgglomerativeClusteringWrapper, **config)
+
 
 class DBSCANWrapper(AbstractClustering):
     """
@@ -308,3 +336,12 @@ class DBSCANWrapper(AbstractClustering):
             Integer("min_samples", (2, 10), default=5),
         ]
         return params, [], []
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls, clean_config: dict[str, Any], **kwargs: Any
+    ) -> partial:
+        """Create a partial class wrapper."""
+        config = clean_config.copy()
+        config.update(kwargs)
+        return partial(DBSCANWrapper, **config)

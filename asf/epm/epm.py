@@ -77,6 +77,7 @@ class EPM:
         self.predictor_kwargs = predictor_kwargs or {}
         self.imputer = imputer
         self.feature_names_: list[str] | None = None
+        self.numpy: bool = False
 
         if features_preprocessing == "default":
             self.features_preprocessing = get_default_preprocessor(
@@ -143,6 +144,7 @@ class EPM:
                 else [f"f_{i}" for i in range(X.shape[1])]
             )
             X_df = pd.DataFrame(X, columns=pd.Index(cols))
+            self.numpy = True
         else:
             X_df = pd.DataFrame(X) if not isinstance(X, pd.DataFrame) else X
 
