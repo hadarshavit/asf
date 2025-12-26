@@ -443,7 +443,7 @@ if SKSURV_AVAILABLE:
 
 
 else:
-    from asf.selectors.model_based_selector import AbstractModelBasedSelector
+    from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 
     class SurvivalAnalysis(ConfigurableMixin, AbstractModelBasedSelector):
         def __init__(self, *args: Any, **kwargs: Any) -> None:
