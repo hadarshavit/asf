@@ -8,12 +8,18 @@ from asf.selectors.collaborative_filtering_selector import (
 )
 from asf.selectors.cosine_selector import CosineSelector
 from asf.selectors.cshc import CSHCSelector
+from asf.selectors.ensembles import (
+    BaggingSelector,
+    StackingSelector,
+    VotingSelector,
+)
 from asf.selectors.feature_generator import (
     AbstractFeatureGenerator,
     DummyFeatureGenerator,
 )
 from asf.selectors.isac import ISAC
 from asf.selectors.isa import ISA
+from asf.selectors.meta_selector import MetaSelector
 from asf.selectors.joint_ranking import JointRanking
 from asf.selectors.multi_class import MultiClassClassifier
 from asf.selectors.osl_linear import OSLLinearSelector
@@ -45,6 +51,7 @@ __all__ = [
     "CollaborativeFilteringSelector",
     "SUNNY",
     "SATzilla",
+    "MetaSelector",
     "ISAC",
     "ISA",
     "SNNAP",
@@ -53,4 +60,7 @@ __all__ = [
     "CosineSelector",
     "SingleBestSolver",
     "VirtualBestSolver",
+    "BaggingSelector",
+    "VotingSelector",
+    "StackingSelector",
 ]

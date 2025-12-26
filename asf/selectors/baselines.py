@@ -24,10 +24,11 @@ class SingleBestSolver(ConfigurableMixin, AbstractSelector):
     """
 
     PREFIX = "sbs"
+    RETURN_TYPE = "single"
 
     def __init__(
         self,
-        budget: int | None = None,
+        budget: float | None = None,
         maximize: bool = False,
         feature_groups: list[str] | None = None,
         **kwargs: Any,
@@ -37,7 +38,7 @@ class SingleBestSolver(ConfigurableMixin, AbstractSelector):
 
         Parameters
         ----------
-        budget : int or None, default=None
+        budget : float or None, default=None
             The budget for the selector.
         maximize : bool, default=False
             Indicates whether to maximize the performance metric.
@@ -143,10 +144,11 @@ class VirtualBestSolver(ConfigurableMixin, AbstractSelector):
     """
 
     PREFIX = "vbs"
+    RETURN_TYPE = "single"
 
     def __init__(
         self,
-        budget: int | None = None,
+        budget: float | None = None,
         maximize: bool = False,
         feature_groups: list[str] | None = None,
         **kwargs: Any,
@@ -156,7 +158,7 @@ class VirtualBestSolver(ConfigurableMixin, AbstractSelector):
 
         Parameters
         ----------
-        budget : int or None, default=None
+        budget : float or None, default=None
             The budget for the selector.
         maximize : bool, default=False
             Indicates whether to maximize the performance metric.

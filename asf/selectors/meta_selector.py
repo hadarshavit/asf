@@ -76,7 +76,7 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
 
         if not self.base_selectors:
             raise ValueError("`base_selectors` list cannot be empty.")
-        if not self.meta_selector:
+        if self.meta_selector is None:
             raise ValueError("`meta_selector` cannot be None.")
 
         for sel in self.base_selectors:

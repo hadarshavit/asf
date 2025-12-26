@@ -1,11 +1,10 @@
 import numpy as np
 import pandas as pd
+import pytest
 from typing import Any
-
-from asf.selectors.performance_model import PerformanceModel
-
-
+from asf.selectors import PerformanceModel
 from asf.predictors.abstract_predictor import AbstractPredictor
+from asf.predictors import RegressionMLP, XGBoostRegressorWrapper
 
 
 class DummyRegressor(AbstractPredictor):
@@ -14,9 +13,7 @@ class DummyRegressor(AbstractPredictor):
         self._X_cols = None
 
     def fit(self, X: Any, Y: Any, **kwargs: Any) -> None:
-        # X is DataFrame, y is Series or DataFrame
         self._X_cols = list(X.columns)
-        # Learn column-wise means if 2D, else scalar mean
         if hasattr(Y, "shape") and len(getattr(Y, "shape", ())) == 2:
             self._y = np.asarray(Y).mean(axis=0)
         else:
@@ -24,11 +21,12 @@ class DummyRegressor(AbstractPredictor):
 
     def predict(self, X: Any, **kwargs: Any) -> Any:
         n = len(X)
-        if isinstance(self._y, float):
+        if isinstance(self._y, float) or (
+            hasattr(self._y, "ndim") and self._y.ndim == 0
+        ):
             return np.full(n, self._y)
         else:
-            # multi-target prediction
-            return np.tile(self._y, (n, 1))  # type: ignore[call-overload]
+            return np.tile(self._y, (n, 1))
 
     def save(self, file_path: str) -> None:
         pass
@@ -51,9 +49,8 @@ def test_performance_model_single_target_branch():
     pm = PerformanceModel(model_class=DummyRegressor, budget=5.0, normalize=None)
     pm.fit(X, Y)
     preds = pm.predict(X)
-    # Should choose algorithm with min predicted mean per-row; Dummy predicts per-algo means -> tie-breaking by argmin
-    assert set(preds.keys()) == set(X.index)  # type: ignore[attr-defined]
-    for lst in preds.values():  # type: ignore[attr-defined]
+    assert set(preds.keys()) == set(X.index)
+    for lst in preds.values():
         algo, bud = lst[0]
         assert algo in ("a", "b")
         assert bud == 5.0
@@ -61,11 +58,19 @@ def test_performance_model_single_target_branch():
 
 def test_performance_model_multi_target_only():
     X, Y = small_df()
-
-    # Case 1: use_multi_target=True -> fit single model that outputs 2 targets
     pm_mt = PerformanceModel(
         model_class=DummyRegressor, use_multi_target=True, normalize=None, budget=7.0
     )
     pm_mt.fit(X, Y)
     preds_mt = pm_mt.predict(X)
-    assert set(preds_mt.keys()) == set(X.index)  # type: ignore[attr-defined]
+    assert set(preds_mt.keys()) == set(X.index)
+
+
+@pytest.mark.parametrize("model_class", [RegressionMLP, XGBoostRegressorWrapper])
+def test_performance_model(
+    dummy_performance, dummy_features, model_class, validate_predictions
+):
+    selector = PerformanceModel(model_class=model_class)
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+    validate_predictions(predictions)

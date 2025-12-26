@@ -110,7 +110,16 @@ class PerformanceModel(
             The performance data.
         """
         if self.normalize is not None:
-            performance = self.normalize.fit_transform(performance)
+            normalized = self.normalize.fit_transform(performance)
+            # Preserve DataFrame type if normalize returns ndarray
+            if isinstance(normalized, np.ndarray):
+                performance = pd.DataFrame(
+                    normalized,
+                    index=performance.index,
+                    columns=performance.columns,
+                )
+            else:
+                performance = normalized
 
         regressor_init_args: dict[str, Any] = {}
         # Safely check for input_size if it's a type (standard wrapper classes usually have it)

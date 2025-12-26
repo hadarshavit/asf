@@ -580,11 +580,13 @@ class SelectorPipeline(ConfigurableMixin):
         cs = getattr(configuration, "config_space", None)
 
         def resolve(hp_name: str, val: Any) -> Any:
+            if isinstance(val, (type, partial)) or callable(val):
+                return val
             if cs and val:
                 hp = cs.get(hp_name)
                 if hp:
                     return cls._resolve_class_from_hp(hp, str(val))
-            return None
+            return val if isinstance(val, type) else None
 
         # 1. Presolver (do this first to get the budget)
         use_ps = configuration.get(f"{prefix}use_presolver")
