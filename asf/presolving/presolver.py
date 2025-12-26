@@ -4,26 +4,23 @@ Abstract base class for algorithm presolvers.
 
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
+from asf.utils.configurable import ConfigurableMixin
+
 try:
-    from ConfigSpace import (
-        Configuration,
-        ConfigurationSpace,
-        EqualsCondition,
-        UniformFloatHyperparameter,
-    )
+    import ConfigSpace  # noqa: F401
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
 
-class AbstractPresolver:
+class AbstractPresolver(ABC, ConfigurableMixin):
     """
     Abstract base class for algorithm presolvers.
 
@@ -32,7 +29,7 @@ class AbstractPresolver:
 
     Parameters
     ----------
-    budget : float
+    presolver_budget : float
         The total time budget for the presolver.
     maximize : bool, default=False
         Whether to maximize or minimize the performance metric.
@@ -40,11 +37,12 @@ class AbstractPresolver:
 
     def __init__(
         self,
-        budget: float,
+        presolver_budget: float,
         maximize: bool = False,
+        **kwargs: Any,
     ) -> None:
-        self.budget = budget
-        self.maximize = maximize
+        self.presolver_budget = float(presolver_budget)
+        self.maximize = bool(maximize)
 
     @abstractmethod
     def fit(
@@ -93,120 +91,34 @@ class AbstractPresolver:
         """
         pass
 
-    @classmethod
-    def get_configuration_space(
-        cls,
-        cs: ConfigurationSpace | None = None,
-        cs_transform: dict[str, Any] | None = None,
-        parent_param: Any | None = None,
-        parent_value: str | None = None,
+    @staticmethod
+    def _define_hyperparameters(
         total_budget: float | None = None,
         **kwargs: Any,
-    ) -> Any:
+    ) -> tuple[list[Any], list[Any], list[Any]]:
         """
-        Get the configuration space.
-
-        Parameters
-        ----------
-        cs : ConfigurationSpace or None, default=None
-            The configuration space to use.
-        cs_transform : dict or None, default=None
-            A dictionary for transforming configuration space values.
-        parent_param : Any or None, default=None
-            Parent parameter for conditional configuration.
-        parent_value : str or None, default=None
-            Value of parent parameter that activates these parameters.
-        total_budget : float or None, default=None
-            Total budget available.
-        **kwargs : Any
-            Additional keyword arguments.
-
-        Returns
-        -------
-        Any
-            The configuration space and transformation dictionary (or just CS).
-
-        Raises
-        ------
-        RuntimeError
-            If ConfigSpace is not installed.
+        Define common hyperparameters for presolvers.
         """
         if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
+            return [], [], []
 
-        if cs is None:
-            cs = ConfigurationSpace()
-        if cs_transform is None:
-            cs_transform = {}
+        from ConfigSpace import Float
 
-        if parent_param is not None and parent_value is not None:
-            if total_budget is not None:
-                upper_budget = max(1.1, 0.1 * total_budget)
-                presolver_budget_param = UniformFloatHyperparameter(
-                    name=f"{parent_value}:presolver_budget",
-                    lower=1,
-                    upper=upper_budget,
-                    default_value=min(10, upper_budget),
+        # Normalize budget parameter name
+        if total_budget is None:
+            total_budget = kwargs.get("budget", kwargs.get("total_budget"))
+
+        hyperparameters = []
+        if total_budget is not None:
+            total_budget = float(total_budget)
+            upper_budget = max(1.1, 0.1 * total_budget)
+            hyperparameters.append(
+                Float(
+                    name="presolver_budget",
+                    bounds=(1.0, upper_budget),
+                    default=min(10.0, upper_budget),
                     log=True,
                 )
-                cs.add(presolver_budget_param)
-
-                condition = EqualsCondition(
-                    presolver_budget_param, parent_param, parent_value
-                )
-                cs.add(condition)
-
-        return cs, cs_transform
-
-    @classmethod
-    def get_from_configuration(
-        cls,
-        configuration: Configuration | dict[str, Any],
-        cs_transform: dict[str, Any] | None = None,
-        budget: float | None = None,
-        maximize: bool = False,
-        presolver_name: str | None = None,
-        **kwargs: Any,
-    ) -> Any:
-        """
-        Create a presolver instance from a configuration.
-
-        Parameters
-        ----------
-        configuration : Configuration or dict
-            The configuration object or dictionary.
-        cs_transform : dict or None
-            The transformation dictionary.
-        budget : float or None, default=None
-            Budget for the presolver.
-        maximize : bool, default=False
-            Whether to maximize the metric.
-        presolver_name : str or None, default=None
-            Name of the presolver.
-        **kwargs : Any
-            Additional keyword arguments.
-
-        Returns
-        -------
-        Any
-            The presolver instance.
-        """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
             )
 
-        if budget is None and presolver_name is not None and cs_transform is None:
-            # Fallback logic if cs_transform is not provided or needed
-            pass
-
-        if budget is None and presolver_name is not None:
-            budget_key = f"{presolver_name}:presolver_budget"
-            if budget_key in configuration:
-                budget = configuration[budget_key]
-
-        raise NotImplementedError(
-            "get_from_configuration() is not implemented for this presolver"
-        )
+        return hyperparameters, [], []

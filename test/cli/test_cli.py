@@ -100,7 +100,7 @@ def _validate_pipeline_extensive(
 
     presolver_budget = 0.0
     if pipeline.pre_solving is not None:
-        presolver_budget = getattr(pipeline.pre_solving, "budget", 0.0)
+        presolver_budget = getattr(pipeline.pre_solving, "presolver_budget", 0.0)
 
     total_budget = selector_budget + presolver_budget
     assert pytest.approx(total_budget, rel=1e-3, abs=1e-6) == expected_budget, (

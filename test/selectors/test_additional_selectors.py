@@ -15,8 +15,8 @@ class TestStatic3SPresolver:
         """Test initialization."""
         from asf.presolving.static_3s import Static3S
 
-        presolver = Static3S(budget=30.0)
-        assert presolver.budget == 30.0
+        presolver = Static3S(presolver_budget=30.0)
+        assert presolver.presolver_budget == 30.0
 
     def test_fit_with_simple_data(self):
         """Test fit with simple performance data."""
@@ -30,7 +30,7 @@ class TestStatic3SPresolver:
             }
         )
 
-        presolver = Static3S(budget=30.0)
+        presolver = Static3S(presolver_budget=30.0)
         presolver.fit(features=None, performance=performance)
 
         assert hasattr(presolver, "schedule")
@@ -46,7 +46,7 @@ class TestStatic3SPresolver:
             }
         )
 
-        presolver = Static3S(budget=30.0)
+        presolver = Static3S(presolver_budget=30.0)
         presolver.fit(features=None, performance=performance)
         result = presolver.predict()
 
@@ -64,7 +64,7 @@ class TestStatic3SPresolver:
         )
         features = pd.DataFrame({"f1": [1.0, 2.0]}, index=["i1", "i2"])
 
-        presolver = Static3S(budget=30.0)
+        presolver = Static3S(presolver_budget=30.0)
         presolver.fit(features=None, performance=performance)
         result = presolver.predict(features=features)
 
@@ -75,7 +75,7 @@ class TestStatic3SPresolver:
         """Test that fit requires performance data."""
         from asf.presolving.static_3s import Static3S
 
-        presolver = Static3S(budget=30.0)
+        presolver = Static3S(presolver_budget=30.0)
         with pytest.raises(ValueError):
             presolver.fit(features=None, performance=None)
 
@@ -85,7 +85,7 @@ class TestStatic3SPresolver:
 
         performance = pd.DataFrame({"algo1": [1.0, 2.0], "algo2": [2.0, 1.0]})
 
-        presolver = Static3S(budget=30.0)
+        presolver = Static3S(presolver_budget=30.0)
         presolver.fit(features=None, performance=performance)
         config = presolver.get_preschedule_config()
 
@@ -97,7 +97,7 @@ class TestStatic3SPresolver:
 
         performance = pd.DataFrame({"algo1": [1.0, 2.0], "algo2": [2.0, 1.0]})
 
-        presolver = Static3S(budget=30.0)
+        presolver = Static3S(presolver_budget=30.0)
         presolver.fit(features=None, performance=performance)
         config = presolver.get_configuration()
 

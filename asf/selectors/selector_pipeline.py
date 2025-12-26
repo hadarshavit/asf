@@ -589,35 +589,50 @@ class SelectorPipeline(ConfigurableMixin):
                     return cls._resolve_class_from_hp(hp, str(val))
             return None
 
-        # 1. Selector
+        # 1. Presolver (do this first to get the budget)
+        use_ps = configuration.get(f"{prefix}use_presolver")
+        clean_config["use_presolver"] = use_ps
+        ps_val = configuration.get(f"{prefix}presolver")
+        ps_cls = resolve(f"{prefix}presolver", ps_val)
+
+        presolver_budget = 0.0
+        if use_ps and ps_cls:
+            if hasattr(ps_cls, "get_from_configuration"):
+                clean_config["presolver"] = ps_cls.get_from_configuration(
+                    configuration,
+                    pre_prefix=f"{prefix}presolver",
+                    total_budget=budget,
+                    **kwargs,
+                )
+                # Try to extract the budget from the configuration to subtract it from the selector budget
+                # The parameter name is f"{prefix}presolver:{ps_cls.PREFIX}:presolver_budget"
+                ps_prefix = f"{prefix}presolver:{ps_cls.PREFIX}:"
+                presolver_budget = configuration.get(
+                    f"{ps_prefix}presolver_budget", 0.0
+                )
+            else:
+                clean_config["presolver"] = ps_cls()
+
+        # 2. Selector
         s_val = configuration.get(f"{prefix}selector")
         s_cls = resolve(f"{prefix}selector", s_val)
-        if s_cls is None and callable(s_val):
-            s_cls = s_val
+
+        selector_budget = budget
+        if budget is not None:
+            selector_budget = max(0.0, budget - presolver_budget)
 
         if s_cls:
             if hasattr(s_cls, "get_from_configuration"):
                 clean_config["selector"] = s_cls.get_from_configuration(
                     configuration,
                     pre_prefix=f"{prefix}selector",
-                    budget=budget,
+                    budget=selector_budget,
                     **kwargs,
                 )
             else:
-                clean_config["selector"] = s_cls(budget=budget) if budget else s_cls()
-
-        # 2. Presolver
-        use_ps = configuration.get(f"{prefix}use_presolver")
-        clean_config["use_presolver"] = use_ps
-        ps_val = configuration.get(f"{prefix}presolver")
-        ps_cls = resolve(f"{prefix}presolver", ps_val)
-        if use_ps and ps_cls:
-            if hasattr(ps_cls, "get_from_configuration"):
-                clean_config["presolver"] = ps_cls.get_from_configuration(
-                    configuration, pre_prefix=f"{prefix}presolver", **kwargs
+                clean_config["selector"] = (
+                    s_cls(budget=selector_budget) if selector_budget else s_cls()
                 )
-            else:
-                clean_config["presolver"] = ps_cls()
 
         # 3. Preprocessors
         if cs:

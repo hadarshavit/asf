@@ -713,6 +713,7 @@ class ConfigurableMixin:
                     value = chosen_cls.get_from_configuration(  # type: ignore[operator]
                         configuration=configuration,
                         pre_prefix=child_pre_prefix,
+                        **kwargs,
                     )
                 else:
                     value = chosen_cls

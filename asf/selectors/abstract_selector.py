@@ -9,14 +9,6 @@ from sklearn.preprocessing import OneHotEncoder
 
 from asf.selectors.feature_generator import AbstractFeatureGenerator
 
-try:
-    from ConfigSpace import Configuration, ConfigurationSpace
-    from ConfigSpace.hyperparameters import CategoricalHyperparameter as Categorical
-
-    CONFIGSPACE_AVAILABLE = True
-except ImportError:
-    CONFIGSPACE_AVAILABLE = False
-
 
 class AbstractSelector(ABC):
     """
@@ -249,48 +241,6 @@ class AbstractSelector(ABC):
         """
         raise NotImplementedError(f"{cls.__name__} does not support loading from file.")
 
-    @staticmethod
-    def get_configuration_space(
-        cs: ConfigurationSpace | None = None, **kwargs: Any
-    ) -> ConfigurationSpace:
-        """
-        Get the configuration space.
-
-        Parameters
-        ----------
-        cs : ConfigurationSpace or None, optional
-            Base configuration space.
-        **kwargs : Any
-            Additional options.
-
-        Returns
-        -------
-        ConfigurationSpace
-            The configuration space.
-        """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError("ConfigSpace is not available.")
-        raise NotImplementedError("Subclasses must implement get_configuration_space.")
-
-    @staticmethod
-    def get_from_configuration(configuration: Configuration) -> AbstractSelector:
-        """
-        Create an instance from a configuration.
-
-        Parameters
-        ----------
-        configuration : Configuration
-            The configuration object.
-
-        Returns
-        -------
-        AbstractSelector
-            The initialized selector.
-        """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError("ConfigSpace is not available.")
-        raise NotImplementedError("Subclasses must implement get_from_configuration.")
-
     def _fit(
         self,
         features: pd.DataFrame,
@@ -311,25 +261,3 @@ class AbstractSelector(ABC):
         Internal predict implementation.
         """
         raise NotImplementedError("Subclasses must implement _predict.")
-
-    @staticmethod
-    def _add_hierarchical_generator_space(
-        cs: ConfigurationSpace,
-        hierarchical_generator: list[AbstractFeatureGenerator] | None = None,
-        **kwargs: Any,
-    ) -> ConfigurationSpace:
-        """
-        Add hierarchical generator options to the configuration space.
-        """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError("ConfigSpace is not available.")
-        if hierarchical_generator:
-            if "hierarchical_generator" not in cs:
-                cs.add(
-                    Categorical(
-                        name="hierarchical_generator", choices=hierarchical_generator
-                    )
-                )
-            for g in hierarchical_generator:
-                g.get_configuration_space(cs=cs, **kwargs)
-        return cs

@@ -4,7 +4,6 @@ Lightweight wrapper around sksurv's RandomSurvivalForest model.
 
 from __future__ import annotations
 
-from functools import partial
 from typing import Any
 
 import joblib
@@ -41,26 +40,15 @@ if SKSURV_AVAILABLE:
 
         PREFIX: str = "random_survival_forest"
 
-        def __init__(self, init_params: dict[str, Any] | None = None) -> None:
+        def __init__(self, **kwargs: Any) -> None:
             """
             Initialize the RandomSurvivalForestWrapper.
-
-            Parameters
-            ----------
-            init_params : dict[str, Any] or None, default=None
-                Initial parameters for the RandomSurvivalForest model.
-
-            Raises
-            ------
-            ImportError
-                If sksurv is not installed.
             """
             if not SKSURV_AVAILABLE:
                 raise ImportError(
                     "sksurv is not installed. Install scikit-survival to use RandomSurvivalForestWrapper."
                 )
-            params = init_params or {}
-            self.model = RandomSurvivalForest(**params)
+            self.model = RandomSurvivalForest(**kwargs)
 
         @staticmethod
         def _define_hyperparameters(
@@ -90,19 +78,6 @@ if SKSURV_AVAILABLE:
                 Categorical("bootstrap", items=[True, False], default=True),
             ]
             return hyperparameters, [], []
-
-        @classmethod
-        def _get_from_clean_configuration(
-            cls,
-            clean_config: dict[str, Any],
-            **kwargs: Any,
-        ) -> partial:
-            """
-            Create a partial function from a clean (unprefixed) configuration.
-            """
-            config = clean_config.copy()
-            config.update(kwargs)
-            return partial(cls, init_params=config)
 
         def fit(self, X: Any, Y: Any, **kwargs: Any) -> None:
             """

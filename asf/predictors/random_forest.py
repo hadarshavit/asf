@@ -4,7 +4,6 @@ Random Forest wrappers.
 
 from __future__ import annotations
 
-from functools import partial
 from typing import Any
 
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -32,16 +31,16 @@ class RandomForestClassifierWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "rf_classifier"
 
-    def __init__(self, init_params: dict[str, Any] | None = None):
+    def __init__(self, **kwargs: Any):
         """
         Initialize the RandomForestClassifierWrapper.
 
         Parameters
         ----------
-        init_params : dict[str, Any] or None, default=None
-            A dictionary of initialization parameters for the RandomForestClassifier.
+        **kwargs : Any
+            Parameters for the RandomForestClassifier.
         """
-        super().__init__(RandomForestClassifier, init_params or {})
+        super().__init__(RandomForestClassifier, **kwargs)
 
     @staticmethod
     def _define_hyperparameters(
@@ -72,31 +71,6 @@ class RandomForestClassifierWrapper(ConfigurableMixin, SklearnWrapper):
         ]
         return hyperparameters, [], []
 
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[RandomForestClassifierWrapper]:
-        """
-        Create a partial function from a clean (unprefixed) configuration.
-
-        Parameters
-        ----------
-        clean_config : dict[str, Any]
-            The clean configuration dictionary.
-        **kwargs : Any
-            Additional arguments.
-
-        Returns
-        -------
-        partial
-            A partial function for instantiating the wrapper.
-        """
-        rf_params = clean_config.copy()
-        rf_params.update(kwargs)
-        return partial(RandomForestClassifierWrapper, init_params=rf_params)
-
 
 class RandomForestRegressorWrapper(ConfigurableMixin, SklearnWrapper):
     """
@@ -105,16 +79,16 @@ class RandomForestRegressorWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "rf_regressor"
 
-    def __init__(self, init_params: dict[str, Any] | None = None):
+    def __init__(self, **kwargs: Any):
         """
         Initialize the RandomForestRegressorWrapper.
 
         Parameters
         ----------
-        init_params : dict[str, Any] or None, default=None
-            A dictionary of initialization parameters for the RandomForestRegressor.
+        **kwargs : Any
+            Parameters for the RandomForestRegressor.
         """
-        super().__init__(RandomForestRegressor, init_params or {})
+        super().__init__(RandomForestRegressor, **kwargs)
 
     @staticmethod
     def _define_hyperparameters(
@@ -144,28 +118,3 @@ class RandomForestRegressorWrapper(ConfigurableMixin, SklearnWrapper):
             Categorical("bootstrap", items=[True, False], default=False),
         ]
         return hyperparameters, [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[RandomForestRegressorWrapper]:
-        """
-        Create a partial function from a clean (unprefixed) configuration.
-
-        Parameters
-        ----------
-        clean_config : dict[str, Any]
-            The clean configuration dictionary.
-        **kwargs : Any
-            Additional arguments.
-
-        Returns
-        -------
-        partial
-            A partial function for instantiating the wrapper.
-        """
-        rf_params = clean_config.copy()
-        rf_params.update(kwargs)
-        return partial(RandomForestRegressorWrapper, init_params=rf_params)

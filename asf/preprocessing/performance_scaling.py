@@ -10,11 +10,17 @@ from __future__ import annotations
 import numpy as np
 import scipy.special
 import scipy.stats
+from typing import Any
 from sklearn.base import BaseEstimator, OneToOneFeatureMixin, TransformerMixin
 from sklearn.preprocessing import MinMaxScaler, PowerTransformer, StandardScaler
 
 
-class AbstractNormalization(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
+from asf.utils.configurable import ConfigurableMixin
+
+
+class AbstractNormalization(
+    OneToOneFeatureMixin, TransformerMixin, BaseEstimator, ConfigurableMixin
+):
     """
     Abstract base class for normalization techniques.
 
@@ -22,7 +28,7 @@ class AbstractNormalization(OneToOneFeatureMixin, TransformerMixin, BaseEstimato
     the `transform` and `inverse_transform` methods.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__()
 
     def fit(
@@ -88,7 +94,11 @@ class MinMaxNormalization(AbstractNormalization):
     Normalization using Min-Max scaling.
     """
 
-    def __init__(self, feature_range: tuple[float, float] = (0, 1)) -> None:
+    PREFIX = "min_max"
+
+    def __init__(
+        self, feature_range: tuple[float, float] = (0, 1), **kwargs: Any
+    ) -> None:
         """
         Initialize MinMaxNormalization.
 
@@ -97,7 +107,7 @@ class MinMaxNormalization(AbstractNormalization):
         feature_range : tuple[float, float], default=(0, 1)
             Desired range of transformed data.
         """
-        super().__init__()
+        super().__init__(**kwargs)
         self.feature_range = feature_range
 
     def fit(
@@ -165,8 +175,10 @@ class ZScoreNormalization(AbstractNormalization):
     Normalization using Z-Score scaling.
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    PREFIX = "z_score"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     def fit(
         self,
@@ -233,7 +245,9 @@ class LogNormalization(AbstractNormalization):
     Normalization using logarithmic scaling.
     """
 
-    def __init__(self, base: float = 10.0, eps: float = 1e-6) -> None:
+    PREFIX = "log"
+
+    def __init__(self, base: float = 10.0, eps: float = 1e-6, **kwargs: Any) -> None:
         """
         Initialize LogNormalization.
 
@@ -244,9 +258,10 @@ class LogNormalization(AbstractNormalization):
         eps : float, default=1e-6
             Small constant to avoid log(0).
         """
-        super().__init__()
-        self.base = base
-        self.eps = eps
+        super().__init__(**kwargs)
+        self.base = float(base)
+        self.eps = float(eps)
+        self.min_val: float = 0.0
 
     def fit(
         self,
@@ -322,7 +337,9 @@ class SqrtNormalization(AbstractNormalization):
     Normalization using square root scaling.
     """
 
-    def __init__(self, eps: float = 1e-6) -> None:
+    PREFIX = "sqrt"
+
+    def __init__(self, eps: float = 1e-6, **kwargs: Any) -> None:
         """
         Initialize SqrtNormalization.
 
@@ -331,7 +348,7 @@ class SqrtNormalization(AbstractNormalization):
         eps : float, default=1e-6
             Small constant to avoid sqrt(0).
         """
-        super().__init__()
+        super().__init__(**kwargs)
         self.eps = eps
 
     def fit(
@@ -406,8 +423,10 @@ class InvSigmoidNormalization(AbstractNormalization):
     Normalization using inverse sigmoid scaling.
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    PREFIX = "inv_sigmoid"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     def fit(
         self,
@@ -476,8 +495,10 @@ class NegExpNormalization(AbstractNormalization):
     Normalization using negative exponential scaling.
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    PREFIX = "neg_exp"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     def fit(
         self,
@@ -542,8 +563,10 @@ class DummyNormalization(AbstractNormalization):
     Normalization that does not change the data.
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    PREFIX = "dummy"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     def fit(
         self,
@@ -608,8 +631,10 @@ class BoxCoxNormalization(AbstractNormalization):
     Normalization using Box-Cox transformation (Yeo-Johnson variant).
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    PREFIX = "box_cox"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     def fit(
         self,

@@ -30,9 +30,20 @@ class SklearnWrapper(AbstractPredictor):
         self,
         model_class: Any,
         init_params: dict[str, Any] | None = None,
+        **kwargs: Any,
     ):
         super().__init__()
-        self.model_class: Any = model_class(**(init_params or {}))
+        params = init_params if isinstance(init_params, dict) else {}
+        params.update(kwargs)
+
+        # Filter out parameters that are for the selector/pipeline and not the model
+        model_params = {
+            k: v
+            for k, v in params.items()
+            if k not in ["budget", "maximize", "n_algorithms"]
+        }
+
+        self.model_class: Any = model_class(**model_params)
 
     def fit(
         self,

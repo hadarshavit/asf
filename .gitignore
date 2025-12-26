@@ -181,3 +181,4 @@ logs/**
 bench/results*/**
 paper/**
 .ruff_cache/**
+smac_output/**

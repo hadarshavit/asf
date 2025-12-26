@@ -17,7 +17,6 @@ except Exception:
 from asf.predictors.abstract_predictor import AbstractPredictor
 
 from asf.utils.configurable import ConfigurableMixin
-from functools import partial
 
 try:
     from ConfigSpace import (  # noqa: F401
@@ -44,6 +43,7 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
 
     def __init__(
         self,
+        init_params: dict[str, Any] | None = None,
         model: Any | None = None,
         input_size: int | None = None,
         loss: Callable | None = None,
@@ -57,7 +57,23 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         weight_decay: float = 0.0,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        params = init_params if isinstance(init_params, dict) else {}
+        params.update(kwargs)
+
+        # Extract parameters from params with defaults
+        model = params.pop("model", model)
+        input_size = params.pop("input_size", input_size)
+        loss = params.pop("loss", loss)
+        optimizer = params.pop("optimizer", optimizer)
+        batch_size = params.pop("batch_size", batch_size)
+        epochs = params.pop("epochs", epochs)
+        seed = params.pop("seed", seed)
+        device = params.pop("device", device)
+        params.pop("compile", compile)
+        learning_rate = params.pop("learning_rate", learning_rate)
+        weight_decay = params.pop("weight_decay", weight_decay)
+
+        super().__init__(**params)
         if not TORCH_AVAILABLE:
             raise RuntimeError(
                 "PyTorch is not installed. Install it with: pip install torch"
@@ -184,16 +200,3 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
             Float("weight_decay", (1e-6, 1e-2), log=True, default=1e-5),
         ]
         return hyperparameters, [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs,
-    ) -> partial:
-        """
-        Create a partial function from a clean (unprefixed) configuration.
-        """
-        config = clean_config.copy()
-        config.update(kwargs)
-        return partial(RankingMLP, **config)

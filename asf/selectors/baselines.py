@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import partial
 from typing import Any
 
 import numpy as np
@@ -130,31 +129,6 @@ class SingleBestSolver(ConfigurableMixin, AbstractSelector):
             Empty hyperparameters, conditions, and forbiddens.
         """
         return [], [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[SingleBestSolver]:
-        """
-                Create a SingleBestSolver from a clean configuration.
-
-                Parameters
-                ----------
-                clean_config : dict
-                    The clean configuration.
-                **kwargs : Any
-                    Additional keyword arguments.
-
-                Returns
-        -------
-                partial
-                    Partial function for SingleBestSolver.
-        """
-        config = clean_config.copy()
-        config.update(kwargs)
-        return partial(SingleBestSolver, **config)
 
 
 class VirtualBestSolver(ConfigurableMixin, AbstractSelector):
@@ -295,28 +269,3 @@ class VirtualBestSolver(ConfigurableMixin, AbstractSelector):
             Empty hyperparameters, conditions, and forbiddens.
         """
         return [], [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[VirtualBestSolver]:
-        """
-        Create a VirtualBestSolver from a clean configuration.
-
-        Parameters
-        ----------
-        clean_config : dict
-            The clean configuration.
-        **kwargs : Any
-            Additional keyword arguments.
-
-        Returns
-        -------
-        partial
-            Partial function for VirtualBestSolver.
-        """
-        config = clean_config.copy()
-        config.update(kwargs)
-        return partial(VirtualBestSolver, **config)

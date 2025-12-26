@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import inspect
-from functools import partial
 from typing import Any
 
 import numpy as np
@@ -57,6 +56,7 @@ class PerformanceModel(
         model_class: type[AbstractPredictor] = RandomForestRegressorWrapper,
         use_multi_target: bool = False,
         normalize: AbstractNormalization | None = None,
+        init_params: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -70,14 +70,31 @@ class PerformanceModel(
             Indicates whether to use multi-target regression.
         normalize : AbstractNormalization or None, default=None
             Method to normalize performance data. If None, defaults to LogNormalization().
+        init_params : dict[str, Any] or None, default=None
+            Initialization parameters from configuration.
         **kwargs : Any
             Additional arguments for the parent classes.
         """
-        AbstractModelBasedSelector.__init__(self, model_class, **kwargs)
+        params = init_params if isinstance(init_params, dict) else {}
+        params.update(kwargs)
+
+        model_class = params.pop("model_class", model_class)
+        use_multi_target = params.pop("use_multi_target", use_multi_target)
+        normalize = params.pop("normalize", normalize)
+
+        AbstractModelBasedSelector.__init__(self, model_class, **params)
         AbstractFeatureGenerator.__init__(self)
+
         self.regressors: list[AbstractPredictor] | AbstractPredictor | None = None
         self.use_multi_target = bool(use_multi_target)
-        self.normalize = normalize if normalize is not None else LogNormalization()
+
+        # Instantiate normalize if it is a partial or class
+        if callable(normalize):
+            self.normalize = normalize()
+        elif normalize is not None:
+            self.normalize = normalize
+        else:
+            self.normalize = LogNormalization()
 
     def _fit(
         self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
@@ -255,32 +272,31 @@ class PerformanceModel(
         if model_class is None:
             model_class = [RandomForestRegressorWrapper, XGBoostRegressorWrapper]
 
+        # Get all normalization options from asf.preprocessing.performance_scaling
+        from asf.preprocessing.performance_scaling import (
+            BoxCoxNormalization,
+            DummyNormalization,
+            InvSigmoidNormalization,
+            LogNormalization,
+            MinMaxNormalization,
+            NegExpNormalization,
+            SqrtNormalization,
+            ZScoreNormalization,
+        )
+
+        norm_choices = [
+            LogNormalization,
+            MinMaxNormalization,
+            ZScoreNormalization,
+            SqrtNormalization,
+            InvSigmoidNormalization,
+            NegExpNormalization,
+            DummyNormalization,
+            BoxCoxNormalization,
+        ]
+
         hyperparameters = [
             ClassChoice("model_class", choices=model_class, default=model_class[0]),
+            ClassChoice("normalize", choices=norm_choices, default=LogNormalization),
         ]
         return hyperparameters, [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[PerformanceModel]:
-        """
-        Create a partial function from a clean configuration.
-
-        Parameters
-        ----------
-        clean_config : dict
-            The clean configuration.
-        **kwargs : Any
-            Additional keyword arguments.
-
-        Returns
-        -------
-        partial
-            Partial function for PerformanceModel.
-        """
-        config = clean_config.copy()
-        config.update(kwargs)
-        return partial(PerformanceModel, **config)

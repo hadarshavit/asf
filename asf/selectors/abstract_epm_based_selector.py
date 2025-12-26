@@ -21,19 +21,28 @@ class AbstractEPMBasedSelector(AbstractSelector):
         Keyword arguments for the EPM.
     """
 
-    def __init__(self, epm_kwargs: dict[str, Any] | None = None, **kwargs: Any) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         """
         Initialize the AbstractEPMBasedSelector.
-
-        Parameters
-        ----------
-        epm_kwargs : dict[str, Any] or None, default=None
-            Keyword arguments for the EPM.
-        **kwargs : Any
-            Additional keyword arguments passed to the parent class initializer.
         """
+        self.epm_kwargs = {}
+        # Pull em_ prefixed arguments into epm_kwargs
+        to_del = []
+        for k, v in kwargs.items():
+            if k.startswith("em_"):
+                self.epm_kwargs[k] = v
+                to_del.append(k)
+
+        # Pull other EPM related arguments if they exist
+        for k in ["use_log10"]:
+            if k in kwargs:
+                self.epm_kwargs[k] = kwargs[k]
+                to_del.append(k)
+
+        for k in to_del:
+            del kwargs[k]
+
         super().__init__(**kwargs)
-        self.epm_kwargs = epm_kwargs or {}
 
     def save(self, path: str | Path) -> None:
         """

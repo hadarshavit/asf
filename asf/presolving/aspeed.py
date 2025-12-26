@@ -28,7 +28,7 @@ class Aspeed(AbstractPresolver):
 
     Parameters
     ----------
-    budget : float, default=30.0
+    presolver_budget : float, default=30.0
         The total time budget for the presolver.
     aspeed_cutoff : int, default=60
         Time limit for the ASP solver in seconds.
@@ -42,26 +42,83 @@ class Aspeed(AbstractPresolver):
         Fraction of instances to use for subsampling if above data_threshold.
     """
 
+    PREFIX: str = "aspeed"
+
     def __init__(
         self,
-        budget: float = 30.0,
+        init_params: dict[str, Any] | None = None,
+        presolver_budget: float = 30.0,
         aspeed_cutoff: int = 60,
         maximize: bool = False,
         cores: int = 1,
         data_threshold: int = 300,
         data_fraction: float = 0.3,
+        **kwargs: Any,
     ) -> None:
         if not CLINGO_AVAIL:
             raise ImportError(
                 "clingo is not installed. Please install it to use the Aspeed presolver."
             )
-        super().__init__(budget=budget, maximize=maximize)
-        self.cores = cores
-        self.data_threshold = data_threshold
-        self.data_fraction = data_fraction
-        self.aspeed_cutoff = aspeed_cutoff
+        params = init_params if isinstance(init_params, dict) else {}
+        params.update(kwargs)
+
+        if "presolver_budget" in params:
+            presolver_budget = params.pop("presolver_budget")
+            params.pop("budget", None)
+        else:
+            presolver_budget = params.pop("budget", presolver_budget)
+        maximize = params.pop("maximize", maximize)
+        aspeed_cutoff = params.pop("aspeed_cutoff", aspeed_cutoff)
+        cores = params.pop("cores", cores)
+        data_threshold = params.pop("data_threshold", data_threshold)
+        data_fraction = params.pop("data_fraction", data_fraction)
+
+        super().__init__(presolver_budget=presolver_budget, maximize=maximize, **params)
+        self.cores = int(cores)
+        self.data_threshold = int(data_threshold)
+        self.data_fraction = float(data_fraction)
+        self.aspeed_cutoff = int(aspeed_cutoff)
         self.schedule: list[tuple[str, float]] = []
         self.algorithms: list[str] = []
+
+    @staticmethod
+    def _define_hyperparameters(
+        total_budget: float | None = None,
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """
+        Define hyperparameters for Aspeed.
+        """
+        from ConfigSpace import (
+            Float,
+            Integer,
+        )
+
+        hps, conds, forbs = AbstractPresolver._define_hyperparameters(
+            total_budget=total_budget, **kwargs
+        )
+
+        hps.extend(
+            [
+                Integer(
+                    "aspeed_cutoff",
+                    bounds=(30, 300),
+                    default=60,
+                ),
+                Integer(
+                    "data_threshold",
+                    bounds=(100, 1000),
+                    default=300,
+                ),
+                Float(
+                    "data_fraction",
+                    bounds=(0.1, 1.0),
+                    default=0.3,
+                ),
+            ]
+        )
+
+        return hps, conds, forbs
 
     def fit(
         self,
@@ -168,7 +225,7 @@ solved(I)   :- solved(I,_).
             for j in range(perf_frame.shape[1])
         ]
 
-        kappa = "kappa(%d)." % (self.budget)
+        kappa = "kappa(%d)." % (self.presolver_budget)
         data_in = "\n".join(times) + "\n" + kappa
         ctl.add(data_in)
 

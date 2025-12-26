@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 try:
-    from ConfigSpace import Configuration
+    from ConfigSpace import Configuration  # noqa: F401
 
     _HAS_CONFIGSPACE = True
 except ImportError:
@@ -38,7 +38,7 @@ class Static3S(AbstractPresolver):
     ----------
     runcount_limit : float, default=0.0
         Dummy parameter for compatibility.
-    budget : float, default=200.0
+    presolver_budget : float, default=200.0
         Overall time budget for the preschedule.
     max_candidates_per_solver : int, default=20
         Max distinct candidate times per solver to consider.
@@ -50,17 +50,54 @@ class Static3S(AbstractPresolver):
 
     def __init__(
         self,
+        init_params: dict[str, Any] | None = None,
         runcount_limit: float = 0.0,
-        budget: float = 200.0,
+        presolver_budget: float = 200.0,
         max_candidates_per_solver: int = 20,
         **kwargs: Any,
     ) -> None:
-        super().__init__(budget=budget)
+        params = init_params if isinstance(init_params, dict) else {}
+        params.update(kwargs)
+
+        if "presolver_budget" in params:
+            presolver_budget = params.pop("presolver_budget")
+            params.pop("budget", None)
+        else:
+            presolver_budget = params.pop("budget", presolver_budget)
+        runcount_limit = params.pop("runcount_limit", runcount_limit)
+        max_candidates_per_solver = params.pop(
+            "max_candidates_per_solver", max_candidates_per_solver
+        )
+
+        super().__init__(presolver_budget=presolver_budget, **params)
         self.runcount_limit = float(runcount_limit)
-        self.budget = float(budget)
         self.max_candidates_per_solver = int(max_candidates_per_solver)
         self.schedule: list[tuple[str, float]] | None = None
         self.algorithms: list[str] = []
+
+    @staticmethod
+    def _define_hyperparameters(
+        total_budget: float | None = None,
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """
+        Define hyperparameters for Static3S.
+        """
+        from ConfigSpace import Integer
+
+        hps, conds, forbs = AbstractPresolver._define_hyperparameters(
+            total_budget=total_budget, **kwargs
+        )
+
+        hps.append(
+            Integer(
+                "max_candidates_per_solver",
+                bounds=(5, 100),
+                default=20,
+            )
+        )
+
+        return hps, conds, forbs
 
     def fit(
         self,
@@ -94,7 +131,7 @@ class Static3S(AbstractPresolver):
         candidates = {}
         for s in self.algorithms:
             vals = perf[s].replace([np.inf, -np.inf], np.nan).dropna()
-            vals = vals[vals <= self.budget]
+            vals = vals[vals <= self.presolver_budget]
             if vals.empty:
                 candidates[s] = []
                 continue
@@ -132,7 +169,7 @@ class Static3S(AbstractPresolver):
             y_vars[i] = pulp.LpVariable(f"y_{i}", cat=pulp.LpBinary)
 
         # Objective: (C+1)*sum y_i + sum t * x_{s,t}
-        bigC = self.budget + 1.0
+        bigC = self.presolver_budget + 1.0
         prob += bigC * pulp.lpSum([y_vars[i] for i in instances]) + pulp.lpSum(
             [t * var for (s, t), var in x_vars.items()]
         )
@@ -154,7 +191,10 @@ class Static3S(AbstractPresolver):
             prob += pulp.lpSum(terms) >= 1
 
         # Resource constraint
-        prob += pulp.lpSum([t * var for (s, t), var in x_vars.items()]) <= self.budget
+        prob += (
+            pulp.lpSum([t * var for (s, t), var in x_vars.items()])
+            <= self.presolver_budget
+        )
 
         # Solver selection constraints
         for s in self.algorithms:
@@ -176,8 +216,8 @@ class Static3S(AbstractPresolver):
         chosen.sort(key=lambda x: x[1])
 
         total_time = sum(t for _, t in chosen)
-        if total_time < float(self.budget) and chosen:
-            remaining = float(self.budget) - total_time
+        if total_time < float(self.presolver_budget) and chosen:
+            remaining = float(self.presolver_budget) - total_time
             alg, last_t = chosen[-1]
             chosen[-1] = (alg, float(last_t + remaining))
 
@@ -222,54 +262,6 @@ class Static3S(AbstractPresolver):
         """Get the configuration of the fitted presolver."""
         return {
             "algorithms": self.algorithms,
-            "budget": self.budget,
+            "presolver_budget": self.presolver_budget,
             "preschedule_config": self.get_preschedule_config(),
         }
-
-    @classmethod
-    def get_from_configuration(
-        cls,
-        configuration: Configuration | dict[str, Any],
-        cs_transform: dict[str, Any] | None = None,
-        budget: float | None = None,
-        maximize: bool = False,
-        presolver_name: str | None = None,
-        **kwargs: Any,
-    ) -> Static3S:
-        """
-        Create a Static3S presolver instance from a configuration.
-
-        Parameters
-        ----------
-        configuration : dict
-            The configuration.
-        cs_transform : dict
-            The transformation dictionary.
-        budget : float or None, default=None
-            Budget for the presolver.
-        maximize : bool, default=False
-            Whether to maximize the metric (not used).
-        presolver_name : str or None, default=None
-            Name of the presolver.
-        **kwargs : Any
-            Additional keyword arguments.
-
-        Returns
-        -------
-        Static3S
-            The Static3S presolver instance.
-
-        Raises
-        ------
-        ValueError
-            If budget is not provided.
-        """
-        if budget is None and presolver_name is not None:
-            budget_key = f"{presolver_name}:presolver_budget"
-            if budget_key in configuration:
-                budget = configuration[budget_key]
-
-        if budget is None:
-            raise ValueError("Budget must be provided for Static3S presolver")
-
-        return cls(budget=budget, **kwargs)

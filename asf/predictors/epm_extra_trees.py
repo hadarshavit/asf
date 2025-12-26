@@ -4,7 +4,6 @@ Empirical Performance Model (EPM) based on Extra Trees.
 
 from __future__ import annotations
 
-from functools import partial
 from typing import Any
 
 import joblib
@@ -46,12 +45,15 @@ class EPMExtraTrees(ExtraTreesRegressor, AbstractPredictor, ConfigurableMixin):
 
     def __init__(
         self,
-        *,
-        log: bool = False,
         **kwargs: Any,
     ) -> None:
         # Separate args for EPMExtraTrees and ExtraTreesRegressor
-        self.log = log
+        self.log = kwargs.pop("log", False)
+
+        # Filter out parameters that are for the selector/pipeline and not the model
+        for k in ["budget", "maximize", "n_algorithms"]:
+            kwargs.pop(k, None)
+
         # Pass remaining kwargs to ExtraTreesRegressor
         super().__init__(**kwargs)
 
@@ -84,19 +86,6 @@ class EPMExtraTrees(ExtraTreesRegressor, AbstractPredictor, ConfigurableMixin):
             Categorical("log", items=[True, False], default=False),
         ]
         return hyperparameters, [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial:
-        """
-        Create a partial function from a clean (unprefixed) configuration.
-        """
-        config = clean_config.copy()
-        config.update(kwargs)
-        return partial(EPMExtraTrees, **config)
 
     def fit(
         self,

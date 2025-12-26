@@ -36,7 +36,7 @@ def _validate_predictions(preds, n):
 @pytest.mark.skipif(not PULP_AVAILABLE, reason="pulp is not installed")
 def test_static3s_basic_flow_and_predict(dummy_data):
     X, Y = dummy_data
-    s = Static3S(runcount_limit=5, budget=30.0, max_candidates_per_solver=8)
+    s = Static3S(runcount_limit=5, presolver_budget=30.0, max_candidates_per_solver=8)
     s.fit(X, Y)
     assert isinstance(s.schedule, list)
     s.fit(X, Y)
@@ -47,7 +47,7 @@ def test_static3s_basic_flow_and_predict(dummy_data):
 
 def test_predict_before_fit_raises(dummy_data):
     X, _ = dummy_data
-    s = Static3S(budget=30.0)
+    s = Static3S(presolver_budget=30.0)
     with pytest.raises(ValueError, match="Static3S has not been fitted yet"):
         s.predict()
 
@@ -56,7 +56,7 @@ def test_predict_before_fit_raises(dummy_data):
 def test_schedule_time_and_ordering(dummy_data):
     X, Y = dummy_data
     budget = 40.0
-    s = Static3S(runcount_limit=5, budget=budget, max_candidates_per_solver=8)
+    s = Static3S(runcount_limit=5, presolver_budget=budget, max_candidates_per_solver=8)
     s.fit(X, Y)
     assert s.schedule is not None
     assert len(s.schedule) > 0
@@ -68,7 +68,7 @@ def test_schedule_time_and_ordering(dummy_data):
 @pytest.mark.skipif(not PULP_AVAILABLE, reason="pulp is not installed")
 def test_configuration_and_algorithms(dummy_data):
     X, Y = dummy_data
-    s = Static3S(budget=30.0)
+    s = Static3S(presolver_budget=30.0)
     s.fit(X, Y)
     cfg = s.get_configuration()
     assert "algorithms" in cfg and cfg["algorithms"] == list(Y.columns)
