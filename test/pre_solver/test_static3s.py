@@ -72,5 +72,5 @@ def test_configuration_and_algorithms(dummy_data):
     s.fit(X, Y)
     cfg = s.get_configuration()
     assert "algorithms" in cfg and cfg["algorithms"] == list(Y.columns)
-    assert "budget" in cfg and cfg["budget"] == pytest.approx(30.0)
+    assert "presolver_budget" in cfg and cfg["presolver_budget"] == pytest.approx(30.0)
     assert "preschedule_config" in cfg and isinstance(cfg["preschedule_config"], dict)
