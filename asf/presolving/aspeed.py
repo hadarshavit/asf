@@ -46,7 +46,6 @@ class Aspeed(AbstractPresolver):
 
     def __init__(
         self,
-        init_params: dict[str, Any] | None = None,
         presolver_budget: float = 30.0,
         aspeed_cutoff: int = 60,
         maximize: bool = False,
@@ -59,21 +58,14 @@ class Aspeed(AbstractPresolver):
             raise ImportError(
                 "clingo is not installed. Please install it to use the Aspeed presolver."
             )
-        params = init_params if isinstance(init_params, dict) else {}
-        params.update(kwargs)
 
-        if "presolver_budget" in params:
-            presolver_budget = params.pop("presolver_budget")
-            params.pop("budget", None)
-        else:
-            presolver_budget = params.pop("budget", presolver_budget)
-        maximize = params.pop("maximize", maximize)
-        aspeed_cutoff = params.pop("aspeed_cutoff", aspeed_cutoff)
-        cores = params.pop("cores", cores)
-        data_threshold = params.pop("data_threshold", data_threshold)
-        data_fraction = params.pop("data_fraction", data_fraction)
+        # Handle 'budget' as an alias for 'presolver_budget' if needed
+        actual_budget = kwargs.pop("budget", presolver_budget)
+        if "presolver_budget" in kwargs:
+            actual_budget = kwargs.pop("presolver_budget")
 
-        super().__init__(presolver_budget=presolver_budget, maximize=maximize, **params)
+        super().__init__(presolver_budget=actual_budget, maximize=maximize, **kwargs)
+
         self.cores = int(cores)
         self.data_threshold = int(data_threshold)
         self.data_fraction = float(data_fraction)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
@@ -21,7 +22,27 @@ except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
 
-class GMeansWrapper(ConfigurableMixin):
+class AbstractClustering(ABC, ConfigurableMixin):
+    """
+    Abstract base class for all clustering wrappers.
+    """
+
+    @abstractmethod
+    def fit(self, X: pd.DataFrame | np.ndarray) -> AbstractClustering:
+        """Fit the clustering model."""
+        pass
+
+    @abstractmethod
+    def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
+        """Predict cluster labels."""
+        pass
+
+    def _ensure_array(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
+        """Ensure input is a numpy array."""
+        return X.values if isinstance(X, pd.DataFrame) else X
+
+
+class GMeansWrapper(AbstractClustering):
     """
     Wrapper for GMeans clustering.
 
@@ -50,7 +71,7 @@ class GMeansWrapper(ConfigurableMixin):
         GMeansWrapper
             The fitted wrapper.
         """
-        self.model.fit(X.values if isinstance(X, pd.DataFrame) else X)
+        self.model.fit(self._ensure_array(X))
         return self
 
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
@@ -85,7 +106,7 @@ class GMeansWrapper(ConfigurableMixin):
         return params, [], []
 
 
-class KMeansWrapper(ConfigurableMixin):
+class KMeansWrapper(AbstractClustering):
     """
     Wrapper for KMeans clustering.
 
@@ -114,7 +135,7 @@ class KMeansWrapper(ConfigurableMixin):
         KMeansWrapper
             The fitted wrapper.
         """
-        self.model.fit(X.values if isinstance(X, pd.DataFrame) else X)
+        self.model.fit(self._ensure_array(X))
         return self
 
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
@@ -131,7 +152,7 @@ class KMeansWrapper(ConfigurableMixin):
         np.ndarray
             The predicted labels.
         """
-        return self.model.predict(X.values if isinstance(X, pd.DataFrame) else X)
+        return self.model.predict(self._ensure_array(X))
 
     @staticmethod
     def _define_hyperparameters(
@@ -147,7 +168,7 @@ class KMeansWrapper(ConfigurableMixin):
         return params, [], []
 
 
-class AgglomerativeClusteringWrapper(ConfigurableMixin):
+class AgglomerativeClusteringWrapper(AbstractClustering):
     """
     Wrapper for AgglomerativeClustering.
 
@@ -176,7 +197,7 @@ class AgglomerativeClusteringWrapper(ConfigurableMixin):
         AgglomerativeClusteringWrapper
             The fitted wrapper.
         """
-        self.model.fit(X.values if isinstance(X, pd.DataFrame) else X)
+        self.model.fit(self._ensure_array(X))
         return self
 
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
@@ -219,7 +240,7 @@ class AgglomerativeClusteringWrapper(ConfigurableMixin):
         return params, [], []
 
 
-class DBSCANWrapper(ConfigurableMixin):
+class DBSCANWrapper(AbstractClustering):
     """
     Wrapper for DBSCAN clustering.
 
@@ -248,7 +269,7 @@ class DBSCANWrapper(ConfigurableMixin):
         DBSCANWrapper
             The fitted wrapper.
         """
-        self.model.fit(X.values if isinstance(X, pd.DataFrame) else X)
+        self.model.fit(self._ensure_array(X))
         return self
 
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:

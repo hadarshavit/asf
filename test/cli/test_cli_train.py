@@ -35,10 +35,10 @@ def test_build_cli_command_with_partial_and_direct_model(tmp_path):
 
         # Unused abstract methods in this test
         # Unused abstract methods in this test
-        def fit(self, features, performance, algorithm_features=None, **kwargs):
+        def _fit(self, features, performance, **kwargs):
             pass
 
-        def predict(self, features, performance=None):
+        def _predict(self, features, performance=None):
             return {}
 
         def save(self, path):

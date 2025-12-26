@@ -9,6 +9,8 @@ class AbstractPredictor(ABC):
     """
     Abstract base class for all predictors.
 
+    Provides a framework for fitting, predicting, and managing model persistence.
+
     Methods
     -------
     fit(X, Y, **kwargs)

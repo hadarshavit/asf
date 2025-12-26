@@ -164,7 +164,6 @@ class SelectorPipeline(ConfigurableMixin):
         )
         start = time.time()
 
-        # Update y (performance) alias for local usage
         y = performance
 
         if self.algorithm_pre_selector:
@@ -172,7 +171,6 @@ class SelectorPipeline(ConfigurableMixin):
                 y = self.algorithm_pre_selector.fit_transform(X, y)  # type: ignore
             else:
                 self.algorithm_pre_selector.fit(X, y)  # type: ignore
-                # Some pre-selectors might not have transform for y, checking usage
                 if hasattr(self.algorithm_pre_selector, "transform"):
                     y = self.algorithm_pre_selector.transform(y)  # type: ignore
 
@@ -243,7 +241,6 @@ class SelectorPipeline(ConfigurableMixin):
 
         X = self._filter_features(X)
 
-        # Pass performance to selector (needed for oracle selectors like VBS)
         predictions = self.selector.predict(X, performance=performance)
 
         feature_steps: list[Any] = []

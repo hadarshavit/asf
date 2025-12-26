@@ -87,6 +87,9 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
         """
         Validate that all required prerequisite groups are included.
 
+        This method performs a deep check of selected groups against their
+        requirements as defined in the `feature_groups` metadata.
+
         Parameters
         ----------
         selected_groups : list[str]
@@ -96,6 +99,7 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
         ------
         MissingPrerequisiteGroupError
             If a selected group requires another group that is not selected.
+            The error message details which group is missing its prerequisite.
         """
         selected_set = set(selected_groups)
 
@@ -187,8 +191,14 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
         # Filter to only features that exist in X
         self.selected_features_ = [f for f in selected_features if f in X.columns]
 
-        # If no features selected, use all columns
         if not self.selected_features_:
+            import warnings
+
+            warnings.warn(
+                "No features selected by FeatureGroupSelector from the provided groups. "
+                "Defaulting to using all columns in X.",
+                UserWarning,
+            )
             self.selected_features_ = list(X.columns)
 
         return self

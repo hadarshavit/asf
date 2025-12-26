@@ -88,6 +88,14 @@ class AbstractNormalization(
         """
         raise NotImplementedError
 
+    def _reshape_input(self, X: np.ndarray) -> np.ndarray:
+        """Reshape input for sklearn scalers (n_samples, 1)."""
+        return np.asarray(X).reshape(-1, 1)
+
+    def _reshape_output(self, X: np.ndarray) -> np.ndarray:
+        """Reshape output from sklearn scalers back to 1D."""
+        return np.asarray(X).reshape(-1)
+
 
 class MinMaxNormalization(AbstractNormalization):
     """
@@ -134,7 +142,7 @@ class MinMaxNormalization(AbstractNormalization):
             The fitted normalization instance.
         """
         self.min_max_scale = MinMaxScaler(feature_range=self.feature_range)
-        self.min_max_scale.fit(X.reshape(-1, 1))
+        self.min_max_scale.fit(self._reshape_input(X))
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
@@ -151,7 +159,9 @@ class MinMaxNormalization(AbstractNormalization):
         np.ndarray
             Transformed data.
         """
-        return self.min_max_scale.transform(X.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(
+            self.min_max_scale.transform(self._reshape_input(X))
+        )
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
@@ -167,7 +177,9 @@ class MinMaxNormalization(AbstractNormalization):
         np.ndarray
             Original data.
         """
-        return self.min_max_scale.inverse_transform(X.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(
+            self.min_max_scale.inverse_transform(self._reshape_input(X))
+        )
 
 
 class ZScoreNormalization(AbstractNormalization):
@@ -204,7 +216,7 @@ class ZScoreNormalization(AbstractNormalization):
             The fitted normalization instance.
         """
         self.scaler = StandardScaler()
-        self.scaler.fit(X.reshape(-1, 1))
+        self.scaler.fit(self._reshape_input(X))
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
@@ -221,7 +233,7 @@ class ZScoreNormalization(AbstractNormalization):
         np.ndarray
             Transformed data.
         """
-        return self.scaler.transform(X.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(self.scaler.transform(self._reshape_input(X)))
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
@@ -237,7 +249,9 @@ class ZScoreNormalization(AbstractNormalization):
         np.ndarray
             Original data.
         """
-        return self.scaler.inverse_transform(X.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(
+            self.scaler.inverse_transform(self._reshape_input(X))
+        )
 
 
 class LogNormalization(AbstractNormalization):
@@ -309,7 +323,9 @@ class LogNormalization(AbstractNormalization):
                 np.ndarray
                     Transformed data.
         """
-        X_shifted = X - self.min_val + self.eps
+        X_shifted = np.asarray(X) - self.min_val + self.eps
+        # Clip to avoid non-positive values for log
+        X_shifted = np.clip(X_shifted, self.eps, None)
         return np.log(X_shifted) / np.log(self.base)
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
@@ -395,7 +411,9 @@ class SqrtNormalization(AbstractNormalization):
                 np.ndarray
                     Transformed data.
         """
-        X_shifted = X + self.min_val + self.eps
+        X_shifted = np.asarray(X) - self.min_val + self.eps
+        # Clip to avoid negative values for sqrt
+        X_shifted = np.clip(X_shifted, 0, None)
         return np.sqrt(X_shifted)
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
@@ -414,7 +432,7 @@ class SqrtNormalization(AbstractNormalization):
         """
         X_orig = np.power(X, 2)
         if self.min_val != 0:
-            X_orig = X_orig - self.min_val - self.eps
+            X_orig = X_orig + self.min_val - self.eps
         return X_orig
 
 
@@ -452,7 +470,7 @@ class InvSigmoidNormalization(AbstractNormalization):
             The fitted normalization instance.
         """
         self.min_max_scale = MinMaxScaler(feature_range=(1e-6, 1 - 1e-6))
-        self.min_max_scale.fit(np.asarray(X).reshape(-1, 1))
+        self.min_max_scale.fit(self._reshape_input(X))
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
@@ -469,7 +487,9 @@ class InvSigmoidNormalization(AbstractNormalization):
                 np.ndarray
                     Transformed data.
         """
-        X_scaled = self.min_max_scale.transform(X.reshape(-1, 1)).reshape(-1)
+        X_scaled = self._reshape_output(
+            self.min_max_scale.transform(self._reshape_input(X))
+        )
         return np.log(X_scaled / (1 - X_scaled))
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
@@ -487,7 +507,9 @@ class InvSigmoidNormalization(AbstractNormalization):
                     Original data.
         """
         X_logit = scipy.special.expit(X)
-        return self.min_max_scale.inverse_transform(X_logit.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(
+            self.min_max_scale.inverse_transform(self._reshape_input(X_logit))
+        )
 
 
 class NegExpNormalization(AbstractNormalization):
@@ -660,7 +682,7 @@ class BoxCoxNormalization(AbstractNormalization):
             The fitted normalization instance.
         """
         self.box_cox = PowerTransformer(method="yeo-johnson")
-        self.box_cox.fit(X.reshape(-1, 1))
+        self.box_cox.fit(self._reshape_input(X))
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
@@ -677,7 +699,7 @@ class BoxCoxNormalization(AbstractNormalization):
                 np.ndarray
                     Transformed data.
         """
-        return self.box_cox.transform(X.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(self.box_cox.transform(self._reshape_input(X)))
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
@@ -693,5 +715,7 @@ class BoxCoxNormalization(AbstractNormalization):
                 np.ndarray
                     Original data.
         """
-        X_orig = self.box_cox.inverse_transform(X.reshape(-1, 1)).reshape(-1)
+        X_orig = self._reshape_output(
+            self.box_cox.inverse_transform(self._reshape_input(X))
+        )
         return X_orig

@@ -24,6 +24,167 @@ except ImportError:
     ASLIB_AVAILABLE = False
 
 
+def _load_aslib_description(
+    path: str,
+) -> tuple[dict[str, Any], float, bool, dict[str, Any], dict[str, Any]]:
+    """Internal helper to load ASlib description.txt."""
+    description_path = os.path.join(path, "description.txt")
+    with open(description_path, "r") as f:
+        description: dict[str, Any] = yaml.load(f, Loader=Loader)
+
+    feature_groups = description["feature_steps"]
+    algorithm_feature_groups = description.get("algorithm_feature_steps", {})
+    maximize = description["maximize"]
+    if not isinstance(maximize, bool):
+        maximize = bool(maximize[0])
+    budget = float(description["algorithm_cutoff_time"])
+    return description, budget, maximize, feature_groups, algorithm_feature_groups
+
+
+def _load_aslib_performance(
+    path: str, runtime_col: str, budget: float, training_par_factor: float | None
+) -> pd.DataFrame:
+    """Internal helper to load algorithm_runs.arff."""
+    performance_path = os.path.join(path, "algorithm_runs.arff")
+    with open(performance_path, "r") as f:
+        performance_data: dict[str, Any] = load(f)
+    performance = pd.DataFrame(
+        performance_data["data"],
+        columns=[a[0] for a in performance_data["attributes"]],  # type: ignore[arg-type]
+    )
+
+    if "runstatus" in performance.columns:
+        performance.loc[performance["runstatus"] != "ok", runtime_col] = budget + 1
+
+    group_cols = ["instance_id", "algorithm"]
+    performance = performance.groupby(group_cols, as_index=False)[runtime_col].mean()
+    performance = performance.pivot(
+        index="instance_id", columns="algorithm", values=runtime_col
+    )
+
+    if training_par_factor is not None:
+        performance = apply_par(performance, budget, training_par_factor)
+    return performance.sort_index()
+
+
+def _load_aslib_features(
+    path: str, feature_groups: dict[str, Any], add_running_time_features: bool
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Internal helper to load feature_values.arff and related files."""
+    features_path = os.path.join(path, "feature_values.arff")
+    features_runstatus_path = os.path.join(path, "feature_runstatus.arff")
+    features_running_time_path = os.path.join(path, "feature_costs.arff")
+
+    with open(features_path, "r") as f:
+        features_data: dict[str, Any] = load(f)
+    features = pd.DataFrame(
+        features_data["data"],
+        columns=[a[0] for a in features_data["attributes"]],  # type: ignore[arg-type]
+    )
+
+    if os.path.exists(features_runstatus_path):
+        with open(features_runstatus_path, "r") as f:
+            feature_runstatus_data: dict[str, Any] = load(f)
+        feature_runstatus = pd.DataFrame(
+            feature_runstatus_data["data"],
+            columns=[a[0] for a in feature_runstatus_data["attributes"]],  # type: ignore[arg-type]
+        )
+        for step_name, step_info in feature_groups.items():
+            if step_name in feature_runstatus.columns:
+                failed_mask = feature_runstatus[step_name] != "ok"
+                failed_instances = feature_runstatus.loc[
+                    failed_mask, "instance_id"
+                ].values
+                step_features = step_info.get("provides", [])
+                for feat in step_features:
+                    if feat in features.columns:
+                        features.loc[
+                            features["instance_id"].isin(failed_instances), feat
+                        ] = float("nan")
+
+    features = (
+        features.groupby("instance_id")
+        .mean()
+        .drop(columns=["repetition"], errors="ignore")
+    )
+
+    performance_indices = features.index
+    features_running_time = pd.DataFrame(
+        0.0,
+        index=performance_indices,
+        columns=["feature_time"],  # type: ignore[arg-type]
+    )
+    if add_running_time_features and os.path.exists(features_running_time_path):
+        with open(features_running_time_path, "r") as f:
+            ft_data: dict[str, Any] = load(f)
+        features_running_time = pd.DataFrame(
+            ft_data["data"],
+            columns=[a[0] for a in ft_data["attributes"]],  # type: ignore[arg-type]
+        )
+        features_running_time = (
+            features_running_time.groupby("instance_id")
+            .mean()
+            .drop(columns=["repetition"], errors="ignore")
+        )
+
+    return features.sort_index(), features_running_time.sort_index()
+
+
+def _load_aslib_cv(path: str) -> pd.DataFrame:
+    """Internal helper to load cv.arff."""
+    cv_path = os.path.join(path, "cv.arff")
+    with open(cv_path, "r") as f:
+        cv_data: dict[str, Any] = load(f)
+    cv = pd.DataFrame(cv_data["data"], columns=[a[0] for a in cv_data["attributes"]])  # type: ignore[arg-type]
+    cv = cv.set_index("instance_id").drop(columns=["repetition"], errors="ignore")
+    return cv.sort_index()
+
+
+def _load_aslib_algorithm_features(
+    path: str, algorithm_feature_groups: dict[str, Any]
+) -> pd.DataFrame | None:
+    """Internal helper to load algorithm_feature_values.arff."""
+    algorithm_features_path = os.path.join(path, "algorithm_feature_values.arff")
+    algorithm_features_runstatus_path = os.path.join(
+        path, "algorithm_feature_runstatus.arff"
+    )
+
+    if not os.path.exists(algorithm_features_path):
+        return None
+
+    with open(algorithm_features_path, "r") as f:
+        af_data: dict[str, Any] = load(f)
+    algorithm_features = pd.DataFrame(
+        af_data["data"],
+        columns=[a[0] for a in af_data["attributes"]],  # type: ignore[arg-type]
+    )
+
+    if os.path.exists(algorithm_features_runstatus_path):
+        with open(algorithm_features_runstatus_path, "r") as f:
+            af_rs_data: dict[str, Any] = load(f)
+        af_runstatus = pd.DataFrame(
+            af_rs_data["data"],
+            columns=[a[0] for a in af_rs_data["attributes"]],  # type: ignore[arg-type]
+        )
+        for step_name, step_info in algorithm_feature_groups.items():
+            if step_name in af_runstatus.columns:
+                failed_mask = af_runstatus[step_name] != "ok"
+                failed_algos = af_runstatus.loc[failed_mask, "algorithm"].values
+                step_features = step_info.get("provides", [])
+                for feat in step_features:
+                    if feat in algorithm_features.columns:
+                        algorithm_features.loc[
+                            algorithm_features["algorithm"].isin(failed_algos), feat
+                        ] = float("nan")
+
+    algorithm_features = (
+        algorithm_features.groupby("algorithm")
+        .mean()
+        .drop(columns=["repetition"], errors="ignore")
+    )
+    return algorithm_features.sort_index()
+
+
 def read_aslib_scenario(
     path: str,
     add_running_time_features: bool = True,
@@ -76,149 +237,24 @@ def read_aslib_scenario(
             "Install them via 'pip install asf[aslib]'."
         )
 
-    description_path = os.path.join(path, "description.txt")
-    performance_path = os.path.join(path, "algorithm_runs.arff")
-    features_path = os.path.join(path, "feature_values.arff")
-    features_runstatus_path = os.path.join(path, "feature_runstatus.arff")
-    features_running_time_path = os.path.join(path, "feature_costs.arff")
-    cv_path = os.path.join(path, "cv.arff")
-    algorithm_features_path = os.path.join(path, "algorithm_feature_values.arff")
-    algorithm_features_runstatus_path = os.path.join(
-        path, "algorithm_feature_runstatus.arff"
+    description, budget, maximize, feature_groups, algorithm_feature_groups = (
+        _load_aslib_description(path)
     )
 
-    # Load description file
-    with open(description_path, "r") as f:
-        description: dict[str, Any] = yaml.load(f, Loader=Loader)
-
-    feature_groups: dict[str, Any] = description["feature_steps"]
-    algorithm_feature_groups: dict[str, Any] = description.get(
-        "algorithm_feature_steps", {}
-    )
-    maximize: bool = description["maximize"]
-    if not isinstance(maximize, bool):
-        maximize = bool(maximize[0])
-    budget: float = description["algorithm_cutoff_time"]
-
-    # Load performance data
-    with open(performance_path, "r") as f:
-        performance_data: dict[str, Any] = load(f)
-    performance = pd.DataFrame(
-        performance_data["data"],
-        columns=[a[0] for a in performance_data["attributes"]],  # type: ignore[arg-type]
+    performance = _load_aslib_performance(
+        path,
+        description["performance_measures"][0],
+        budget,
+        training_par_factor,
     )
 
-    runtime_col = description["performance_measures"][0]
-
-    if "runstatus" in performance.columns:
-        performance.loc[performance["runstatus"] != "ok", runtime_col] = budget + 1
-
-    group_cols = ["instance_id", "algorithm"]
-    performance = performance.groupby(group_cols, as_index=False)[runtime_col].mean()
-
-    performance = performance.pivot(
-        index="instance_id", columns="algorithm", values=runtime_col
+    features, features_running_time = _load_aslib_features(
+        path, feature_groups, add_running_time_features
     )
 
-    # Load feature values
-    with open(features_path, "r") as f:
-        features_data: dict[str, Any] = load(f)
-    features = pd.DataFrame(
-        features_data["data"],
-        columns=[a[0] for a in features_data["attributes"]],  # type: ignore[arg-type]
-    )
+    cv = _load_aslib_cv(path)
 
-    if os.path.exists(features_runstatus_path):
-        with open(features_runstatus_path, "r") as f:
-            feature_runstatus_data: dict[str, Any] = load(f)
-        feature_runstatus = pd.DataFrame(
-            feature_runstatus_data["data"],
-            columns=[a[0] for a in feature_runstatus_data["attributes"]],  # type: ignore[arg-type]
-        )
-        for step_name, step_info in feature_groups.items():
-            if step_name in feature_runstatus.columns:
-                failed_mask = feature_runstatus[step_name] != "ok"
-                failed_instances = feature_runstatus.loc[
-                    failed_mask, "instance_id"
-                ].values
-                step_features = step_info.get("provides", [])
-                for feat in step_features:
-                    if feat in features.columns:
-                        features.loc[
-                            features["instance_id"].isin(failed_instances), feat
-                        ] = float("nan")
-
-    features = features.groupby("instance_id").mean()
-    if "repetition" in features.columns:
-        features = features.drop(columns=["repetition"])
-
-    features_running_time = pd.DataFrame(
-        0.0,
-        index=performance.index,
-        columns=["feature_time"],  # type: ignore[arg-type]
-    )
-    if add_running_time_features and os.path.exists(features_running_time_path):
-        with open(features_running_time_path, "r") as f:
-            ft_data: dict[str, Any] = load(f)
-        features_running_time = pd.DataFrame(
-            ft_data["data"],
-            columns=[a[0] for a in ft_data["attributes"]],  # type: ignore[arg-type]
-        )
-        features_running_time = features_running_time.groupby("instance_id").mean()
-        if "repetition" in features_running_time.columns:
-            features_running_time = features_running_time.drop(columns=["repetition"])
-
-    # Apply PAR penalization to training data
-    if training_par_factor is not None:
-        performance = apply_par(performance, budget, training_par_factor)
-
-    # Load cross-validation data
-    with open(cv_path, "r") as f:
-        cv_data: dict[str, Any] = load(f)
-    cv = pd.DataFrame(cv_data["data"], columns=[a[0] for a in cv_data["attributes"]])  # type: ignore[arg-type]
-    cv = cv.set_index("instance_id")
-    if "repetition" in cv.columns:
-        cv = cv.drop(columns=["repetition"])
-
-    # Sort indices for consistency
-    features = features.sort_index()  # type: ignore[attr-defined]
-    performance = performance.sort_index()  # type: ignore[attr-defined]
-    cv = cv.sort_index()  # type: ignore[attr-defined]
-    features_running_time = features_running_time.sort_index()  # type: ignore[attr-defined]
-
-    # Load algorithm features if available
-    algorithm_features = None
-    if os.path.exists(algorithm_features_path):
-        with open(algorithm_features_path, "r") as f:
-            af_data: dict[str, Any] = load(f)
-        algorithm_features = pd.DataFrame(
-            af_data["data"],
-            columns=[a[0] for a in af_data["attributes"]],  # type: ignore[arg-type]
-        )
-
-        if os.path.exists(algorithm_features_runstatus_path):
-            with open(algorithm_features_runstatus_path, "r") as f:
-                af_rs_data: dict[str, Any] = load(f)
-            af_runstatus = pd.DataFrame(
-                af_rs_data["data"],
-                columns=[a[0] for a in af_rs_data["attributes"]],  # type: ignore[arg-type]
-            )
-            for step_name, step_info in algorithm_feature_groups.items():
-                if step_name in af_runstatus.columns:
-                    failed_mask = af_runstatus[step_name] != "ok"
-                    failed_algos = af_runstatus.loc[failed_mask, "algorithm"].values
-                    step_features = step_info.get("provides", [])
-                    for feat in step_features:
-                        if feat in algorithm_features.columns:
-                            algorithm_features.loc[
-                                algorithm_features["algorithm"].isin(failed_algos), feat
-                            ] = float("nan")
-
-        algorithm_features = algorithm_features.groupby("algorithm").mean()
-        algorithm_features = algorithm_features.drop(
-            columns=["repetition"], errors="ignore"
-        )
-        algorithm_features = algorithm_features.sort_index()
+    algorithm_features = _load_aslib_algorithm_features(path, algorithm_feature_groups)
 
     return (
         features,

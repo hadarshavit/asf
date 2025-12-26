@@ -1,6 +1,5 @@
 from __future__ import annotations
-
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
@@ -178,7 +177,6 @@ class AbstractSelector(ABC):
                 axis=1,
             )
 
-        # Call the internal _predict
         scheds = self._predict(df_features, performance=performance)
 
         if self.prediction_mode == "aslib":
@@ -222,10 +220,12 @@ class AbstractSelector(ABC):
         path : str
             File path to save to.
         """
-        pass
+        import joblib
+
+        joblib.dump(self, path)
 
     @classmethod
-    def load(cls, path: str) -> "AbstractSelector":
+    def load(cls, path: str) -> AbstractSelector:
         """
         Load a selector instance.
 
@@ -239,8 +239,11 @@ class AbstractSelector(ABC):
         AbstractSelector
             The loaded selector instance.
         """
-        raise NotImplementedError(f"{cls.__name__} does not support loading from file.")
+        import joblib
 
+        return joblib.load(path)
+
+    @abstractmethod
     def _fit(
         self,
         features: pd.DataFrame,
@@ -250,8 +253,9 @@ class AbstractSelector(ABC):
         """
         Internal fit implementation.
         """
-        raise NotImplementedError("Subclasses must implement _fit.")
+        pass
 
+    @abstractmethod
     def _predict(
         self,
         features: pd.DataFrame | None,
@@ -260,4 +264,4 @@ class AbstractSelector(ABC):
         """
         Internal predict implementation.
         """
-        raise NotImplementedError("Subclasses must implement _predict.")
+        pass

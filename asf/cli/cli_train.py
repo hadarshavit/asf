@@ -11,17 +11,7 @@ from typing import Any, Callable
 import pandas as pd
 from sklearn import preprocessing
 
-from asf import presolving, selectors
-from asf.predictors.linear_model import LinearClassifierWrapper, LinearRegressorWrapper
-from asf.predictors.mlp import MLPClassifierWrapper, MLPRegressorWrapper
-from asf.predictors.random_forest import (
-    RandomForestClassifierWrapper,
-    RandomForestRegressorWrapper,
-)
-from asf.predictors.ridge import RidgeRegressorWrapper
-from asf.predictors.survival import RandomSurvivalForestWrapper
-from asf.predictors.svm import SVMClassifierWrapper, SVMRegressorWrapper
-from asf.predictors.xgboost import XGBoostClassifierWrapper, XGBoostRegressorWrapper
+from asf import predictors, presolving, selectors
 from asf.selectors import (
     AbstractModelBasedSelector,
     AbstractSelector,
@@ -41,19 +31,12 @@ pandas_read_map: dict[str, Callable] = {
     ".xml": pd.read_xml,
 }
 
+# Dynamically discover models from asf.predictors
 model_list: dict[str, Any] = {
-    "RandomForestClassifier": RandomForestClassifierWrapper,
-    "RandomForestRegressor": RandomForestRegressorWrapper,
-    "Ridge": RidgeRegressorWrapper,
-    "RandomSurvivalForest": RandomSurvivalForestWrapper,
-    "SVMClassifier": SVMClassifierWrapper,
-    "SVMRegressor": SVMRegressorWrapper,
-    "XGBoostClassifier": XGBoostClassifierWrapper,
-    "XGBoostRegressor": XGBoostRegressorWrapper,
-    "LinearClassifier": LinearClassifierWrapper,
-    "LinearRegressor": LinearRegressorWrapper,
-    "MLPClassifier": MLPClassifierWrapper,
-    "MLPRegressor": MLPRegressorWrapper,
+    name.replace("Wrapper", ""): getattr(predictors, name)
+    for name in predictors.__all__
+    if not name.startswith("Abstract")
+    and name not in ["SklearnWrapper", "RankingMLP", "RegressionMLP", "EPMRandomForest"]
 }
 
 
@@ -111,8 +94,8 @@ def parser_function() -> argparse.ArgumentParser:
     parser.add_argument(
         "--model",
         default="RandomForestClassifier",
-        help="Model to use for the selector. "
-        "Make sure to specify as an attribute of sklearn.ensemble.",
+        choices=list(model_list.keys()),
+        help="Model to use for the selector.",
     )
     parser.add_argument(
         "--budget",
