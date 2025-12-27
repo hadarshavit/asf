@@ -10,11 +10,17 @@ from __future__ import annotations
 import numpy as np
 import scipy.special
 import scipy.stats
+from typing import Any
 from sklearn.base import BaseEstimator, OneToOneFeatureMixin, TransformerMixin
 from sklearn.preprocessing import MinMaxScaler, PowerTransformer, StandardScaler
 
 
-class AbstractNormalization(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
+from asf.utils.configurable import ConfigurableMixin
+
+
+class AbstractNormalization(
+    OneToOneFeatureMixin, TransformerMixin, BaseEstimator, ConfigurableMixin
+):
     """
     Abstract base class for normalization techniques.
 
@@ -22,7 +28,7 @@ class AbstractNormalization(OneToOneFeatureMixin, TransformerMixin, BaseEstimato
     the `transform` and `inverse_transform` methods.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__()
 
     def fit(
@@ -82,13 +88,25 @@ class AbstractNormalization(OneToOneFeatureMixin, TransformerMixin, BaseEstimato
         """
         raise NotImplementedError
 
+    def _reshape_input(self, X: np.ndarray) -> np.ndarray:
+        """Reshape input for sklearn scalers (n_samples, 1)."""
+        return np.asarray(X).reshape(-1, 1)
+
+    def _reshape_output(self, X: np.ndarray) -> np.ndarray:
+        """Reshape output from sklearn scalers back to 1D."""
+        return np.asarray(X).reshape(-1)
+
 
 class MinMaxNormalization(AbstractNormalization):
     """
     Normalization using Min-Max scaling.
     """
 
-    def __init__(self, feature_range: tuple[float, float] = (0, 1)) -> None:
+    PREFIX = "min_max"
+
+    def __init__(
+        self, feature_range: tuple[float, float] = (0, 1), **kwargs: Any
+    ) -> None:
         """
         Initialize MinMaxNormalization.
 
@@ -97,7 +115,7 @@ class MinMaxNormalization(AbstractNormalization):
         feature_range : tuple[float, float], default=(0, 1)
             Desired range of transformed data.
         """
-        super().__init__()
+        super().__init__(**kwargs)
         self.feature_range = feature_range
 
     def fit(
@@ -124,7 +142,7 @@ class MinMaxNormalization(AbstractNormalization):
             The fitted normalization instance.
         """
         self.min_max_scale = MinMaxScaler(feature_range=self.feature_range)
-        self.min_max_scale.fit(X.reshape(-1, 1))
+        self.min_max_scale.fit(self._reshape_input(X))
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
@@ -141,7 +159,9 @@ class MinMaxNormalization(AbstractNormalization):
         np.ndarray
             Transformed data.
         """
-        return self.min_max_scale.transform(X.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(
+            self.min_max_scale.transform(self._reshape_input(X))
+        )
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
@@ -157,7 +177,9 @@ class MinMaxNormalization(AbstractNormalization):
         np.ndarray
             Original data.
         """
-        return self.min_max_scale.inverse_transform(X.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(
+            self.min_max_scale.inverse_transform(self._reshape_input(X))
+        )
 
 
 class ZScoreNormalization(AbstractNormalization):
@@ -165,8 +187,10 @@ class ZScoreNormalization(AbstractNormalization):
     Normalization using Z-Score scaling.
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    PREFIX = "z_score"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     def fit(
         self,
@@ -192,7 +216,7 @@ class ZScoreNormalization(AbstractNormalization):
             The fitted normalization instance.
         """
         self.scaler = StandardScaler()
-        self.scaler.fit(X.reshape(-1, 1))
+        self.scaler.fit(self._reshape_input(X))
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
@@ -209,7 +233,7 @@ class ZScoreNormalization(AbstractNormalization):
         np.ndarray
             Transformed data.
         """
-        return self.scaler.transform(X.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(self.scaler.transform(self._reshape_input(X)))
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
@@ -225,7 +249,9 @@ class ZScoreNormalization(AbstractNormalization):
         np.ndarray
             Original data.
         """
-        return self.scaler.inverse_transform(X.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(
+            self.scaler.inverse_transform(self._reshape_input(X))
+        )
 
 
 class LogNormalization(AbstractNormalization):
@@ -233,7 +259,9 @@ class LogNormalization(AbstractNormalization):
     Normalization using logarithmic scaling.
     """
 
-    def __init__(self, base: float = 10.0, eps: float = 1e-6) -> None:
+    PREFIX = "log"
+
+    def __init__(self, base: float = 10.0, eps: float = 1e-6, **kwargs: Any) -> None:
         """
         Initialize LogNormalization.
 
@@ -244,9 +272,10 @@ class LogNormalization(AbstractNormalization):
         eps : float, default=1e-6
             Small constant to avoid log(0).
         """
-        super().__init__()
-        self.base = base
-        self.eps = eps
+        super().__init__(**kwargs)
+        self.base = float(base)
+        self.eps = float(eps)
+        self.min_val: float = 0.0
 
     def fit(
         self,
@@ -294,7 +323,9 @@ class LogNormalization(AbstractNormalization):
                 np.ndarray
                     Transformed data.
         """
-        X_shifted = X - self.min_val + self.eps
+        X_shifted = np.asarray(X) - self.min_val + self.eps
+        # Clip to avoid non-positive values for log
+        X_shifted = np.clip(X_shifted, self.eps, None)
         return np.log(X_shifted) / np.log(self.base)
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
@@ -322,7 +353,9 @@ class SqrtNormalization(AbstractNormalization):
     Normalization using square root scaling.
     """
 
-    def __init__(self, eps: float = 1e-6) -> None:
+    PREFIX = "sqrt"
+
+    def __init__(self, eps: float = 1e-6, **kwargs: Any) -> None:
         """
         Initialize SqrtNormalization.
 
@@ -331,7 +364,7 @@ class SqrtNormalization(AbstractNormalization):
         eps : float, default=1e-6
             Small constant to avoid sqrt(0).
         """
-        super().__init__()
+        super().__init__(**kwargs)
         self.eps = eps
 
     def fit(
@@ -378,7 +411,9 @@ class SqrtNormalization(AbstractNormalization):
                 np.ndarray
                     Transformed data.
         """
-        X_shifted = X + self.min_val + self.eps
+        X_shifted = np.asarray(X) - self.min_val + self.eps
+        # Clip to avoid negative values for sqrt
+        X_shifted = np.clip(X_shifted, 0, None)
         return np.sqrt(X_shifted)
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
@@ -397,7 +432,7 @@ class SqrtNormalization(AbstractNormalization):
         """
         X_orig = np.power(X, 2)
         if self.min_val != 0:
-            X_orig = X_orig - self.min_val - self.eps
+            X_orig = X_orig + self.min_val - self.eps
         return X_orig
 
 
@@ -406,8 +441,10 @@ class InvSigmoidNormalization(AbstractNormalization):
     Normalization using inverse sigmoid scaling.
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    PREFIX = "inv_sigmoid"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     def fit(
         self,
@@ -433,7 +470,7 @@ class InvSigmoidNormalization(AbstractNormalization):
             The fitted normalization instance.
         """
         self.min_max_scale = MinMaxScaler(feature_range=(1e-6, 1 - 1e-6))
-        self.min_max_scale.fit(np.asarray(X).reshape(-1, 1))
+        self.min_max_scale.fit(self._reshape_input(X))
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
@@ -450,7 +487,9 @@ class InvSigmoidNormalization(AbstractNormalization):
                 np.ndarray
                     Transformed data.
         """
-        X_scaled = self.min_max_scale.transform(X.reshape(-1, 1)).reshape(-1)
+        X_scaled = self._reshape_output(
+            self.min_max_scale.transform(self._reshape_input(X))
+        )
         return np.log(X_scaled / (1 - X_scaled))
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
@@ -468,7 +507,9 @@ class InvSigmoidNormalization(AbstractNormalization):
                     Original data.
         """
         X_logit = scipy.special.expit(X)
-        return self.min_max_scale.inverse_transform(X_logit.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(
+            self.min_max_scale.inverse_transform(self._reshape_input(X_logit))
+        )
 
 
 class NegExpNormalization(AbstractNormalization):
@@ -476,8 +517,10 @@ class NegExpNormalization(AbstractNormalization):
     Normalization using negative exponential scaling.
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    PREFIX = "neg_exp"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     def fit(
         self,
@@ -542,8 +585,10 @@ class DummyNormalization(AbstractNormalization):
     Normalization that does not change the data.
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    PREFIX = "dummy"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     def fit(
         self,
@@ -608,8 +653,10 @@ class BoxCoxNormalization(AbstractNormalization):
     Normalization using Box-Cox transformation (Yeo-Johnson variant).
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    PREFIX = "box_cox"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     def fit(
         self,
@@ -635,7 +682,7 @@ class BoxCoxNormalization(AbstractNormalization):
             The fitted normalization instance.
         """
         self.box_cox = PowerTransformer(method="yeo-johnson")
-        self.box_cox.fit(X.reshape(-1, 1))
+        self.box_cox.fit(self._reshape_input(X))
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
@@ -652,7 +699,7 @@ class BoxCoxNormalization(AbstractNormalization):
                 np.ndarray
                     Transformed data.
         """
-        return self.box_cox.transform(X.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(self.box_cox.transform(self._reshape_input(X)))
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
@@ -668,5 +715,7 @@ class BoxCoxNormalization(AbstractNormalization):
                 np.ndarray
                     Original data.
         """
-        X_orig = self.box_cox.inverse_transform(X.reshape(-1, 1)).reshape(-1)
+        X_orig = self._reshape_output(
+            self.box_cox.inverse_transform(self._reshape_input(X))
+        )
         return X_orig

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import partial
 from typing import Any
 
 import numpy as np
@@ -52,13 +51,6 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
     ) -> None:
         """
         Initialize the SATzilla selector.
-
-        Parameters
-        ----------
-        model_class : type, default=RandomForestClassifierWrapper
-            The class of the model used for label classification.
-        **kwargs : Any
-            Additional keyword arguments.
         """
         super().__init__(model_class=model_class, **kwargs)
         self.epms: dict[str, dict[str, EPM]] = {}
@@ -245,28 +237,3 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
         ]
 
         return params, [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[SATzilla]:
-        """
-        Create a partial function from a clean configuration.
-
-        Parameters
-        ----------
-        clean_config : dict
-            The clean configuration.
-        **kwargs : Any
-            Additional keyword arguments.
-
-        Returns
-        -------
-        partial
-            Partial function for SATzilla.
-        """
-        config = clean_config.copy()
-        config.update(kwargs)
-        return partial(SATzilla, **config)

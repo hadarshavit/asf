@@ -4,7 +4,6 @@ Multi-Layer Perceptron (MLP) wrappers from scikit-learn.
 
 from __future__ import annotations
 
-from functools import partial
 from typing import Any
 
 from sklearn.neural_network import MLPClassifier, MLPRegressor
@@ -31,16 +30,24 @@ class MLPClassifierWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "mlp_classifier"
 
-    def __init__(self, init_params: dict[str, Any] | None = None):
+    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
         """
         Initialize the MLPClassifierWrapper.
-
-        Parameters
-        ----------
-        init_params : dict[str, Any] or None, default=None
-            Initial parameters for the MLPClassifier.
         """
-        super().__init__(MLPClassifier, init_params or {})
+        params = init_params if isinstance(init_params, dict) else {}
+        params.update(kwargs)
+
+        if "width" in params and "depth" in params:
+            width = params.pop("width")
+            depth = params.pop("depth")
+            params["hidden_layer_sizes"] = tuple([width] * depth)
+
+        if "activation" not in params:
+            params["activation"] = "relu"
+        if "solver" not in params:
+            params["solver"] = "adam"
+
+        super().__init__(MLPClassifier, **params)
 
     def fit(
         self,
@@ -117,32 +124,6 @@ class MLPClassifierWrapper(ConfigurableMixin, SklearnWrapper):
         params = [depth, width, batch_size, alpha, learning_rate_init]
         return params, [], []
 
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[MLPClassifierWrapper]:
-        """
-        Create a partial function from a clean (unprefixed) configuration.
-        """
-        hidden_layers = [clean_config["width"]] * clean_config["depth"]
-
-        if "activation" not in kwargs:
-            kwargs["activation"] = "relu"
-        if "solver" not in kwargs:
-            kwargs["solver"] = "adam"
-
-        mlp_params = {
-            "hidden_layer_sizes": tuple(hidden_layers),
-            "batch_size": clean_config["batch_size"],
-            "alpha": clean_config["alpha"],
-            "learning_rate_init": clean_config["learning_rate_init"],
-            **kwargs,
-        }
-
-        return partial(MLPClassifierWrapper, init_params=mlp_params)
-
 
 class MLPRegressorWrapper(ConfigurableMixin, SklearnWrapper):
     """
@@ -151,16 +132,24 @@ class MLPRegressorWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "mlp_regressor"
 
-    def __init__(self, init_params: dict[str, Any] | None = None):
+    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
         """
         Initialize the MLPRegressorWrapper.
-
-        Parameters
-        ----------
-        init_params : dict[str, Any] or None, default=None
-            Initial parameters for the MLPRegressor.
         """
-        super().__init__(MLPRegressor, init_params or {})
+        params = init_params if isinstance(init_params, dict) else {}
+        params.update(kwargs)
+
+        if "width" in params and "depth" in params:
+            width = params.pop("width")
+            depth = params.pop("depth")
+            params["hidden_layer_sizes"] = tuple([width] * depth)
+
+        if "activation" not in params:
+            params["activation"] = "relu"
+        if "solver" not in params:
+            params["solver"] = "adam"
+
+        super().__init__(MLPRegressor, **params)
 
     def fit(
         self,
@@ -261,29 +250,3 @@ class MLPRegressorWrapper(ConfigurableMixin, SklearnWrapper):
 
         params = [depth, width, batch_size, alpha, learning_rate_init]
         return params, [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[MLPRegressorWrapper]:
-        """
-        Create a MLPRegressorWrapper partial from a clean configuration.
-        """
-        hidden_layers = [clean_config["width"]] * clean_config["depth"]
-
-        if "activation" not in kwargs:
-            kwargs["activation"] = "relu"
-        if "solver" not in kwargs:
-            kwargs["solver"] = "adam"
-
-        mlp_params = {
-            "hidden_layer_sizes": tuple(hidden_layers),
-            "batch_size": clean_config["batch_size"],
-            "alpha": clean_config["alpha"],
-            "learning_rate_init": clean_config["learning_rate_init"],
-            **kwargs,
-        }
-
-        return partial(MLPRegressorWrapper, init_params=mlp_params)

@@ -37,7 +37,7 @@ class SubmodularPresolver(AbstractPresolver):
 
     Parameters
     ----------
-    budget : float, default=30.0
+    presolver_budget : float, default=30.0
         Total time budget for the pre-solve schedule.
     time_discretization : list[float] or None, default=None
         Discrete time values to consider for actions.
@@ -56,7 +56,8 @@ class SubmodularPresolver(AbstractPresolver):
 
     def __init__(
         self,
-        budget: float = 30.0,
+        init_params: dict[str, Any] | None = None,
+        presolver_budget: float = 30.0,
         time_discretization: list[float] | None = None,
         max_actions: int = 10,
         epsilon: float = 1e-9,
@@ -66,13 +67,61 @@ class SubmodularPresolver(AbstractPresolver):
         """
         Initialize the SubmodularPresolver.
         """
-        super().__init__(budget=budget, maximize=maximize)
+        params = init_params if isinstance(init_params, dict) else {}
+        params.update(kwargs)
+
+        if "presolver_budget" in params:
+            presolver_budget = params.pop("presolver_budget")
+            params.pop("budget", None)
+        else:
+            presolver_budget = params.pop("budget", presolver_budget)
+        maximize = params.pop("maximize", maximize)
+        time_discretization = params.pop("time_discretization", time_discretization)
+        max_actions = params.pop("max_actions", max_actions)
+        epsilon = params.pop("epsilon", epsilon)
+
+        super().__init__(presolver_budget=presolver_budget, maximize=maximize, **params)
         self.time_discretization = time_discretization or [1.0, 2.0, 5.0, 10.0, 20.0]
-        self.max_actions = max_actions
-        self.epsilon = epsilon
+        self.max_actions = int(max_actions)
+        self.epsilon = float(epsilon)
         self.schedule: list[tuple[str, float]] = []
         self.algorithms: list[str] = []
         self._performance: pd.DataFrame | None = None
+
+    @staticmethod
+    def _define_hyperparameters(
+        total_budget: float | None = None,
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """
+        Define hyperparameters for SubmodularPresolver.
+        """
+        from ConfigSpace import (
+            Float,
+            Integer,
+        )
+
+        hps, conds, forbs = AbstractPresolver._define_hyperparameters(
+            total_budget=total_budget, **kwargs
+        )
+
+        hps.extend(
+            [
+                Integer(
+                    "max_actions",
+                    bounds=(1, 20),
+                    default=10,
+                ),
+                Float(
+                    "epsilon",
+                    bounds=(1e-12, 1e-5),
+                    default=1e-9,
+                    log=True,
+                ),
+            ]
+        )
+
+        return hps, conds, forbs
 
     def _compute_f(
         self,
@@ -221,7 +270,7 @@ class SubmodularPresolver(AbstractPresolver):
         algo_indices = {algo: i for i, algo in enumerate(self.algorithms)}
 
         self.schedule = []
-        remaining_budget = self.budget
+        remaining_budget = self.presolver_budget
 
         for _ in range(self.max_actions):
             if remaining_budget <= self.epsilon:
@@ -353,6 +402,6 @@ class SubmodularPresolver(AbstractPresolver):
         if f_final < 1.0:
             # Instances not solved within budget contribute budget to cost
             remaining_unsolved = 1.0 - f_final
-            total_cost += remaining_unsolved * self.budget
+            total_cost += remaining_unsolved * self.presolver_budget
 
         return float(total_cost)

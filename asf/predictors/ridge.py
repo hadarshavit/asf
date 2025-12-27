@@ -4,7 +4,6 @@ Ridge models wrappers.
 
 from __future__ import annotations
 
-from functools import partial
 from typing import Any
 
 from sklearn.linear_model import Ridge, RidgeClassifier
@@ -31,16 +30,18 @@ class RidgeRegressorWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "ridge_regressor"
 
-    def __init__(self, init_params: dict[str, Any] | None = None):
+    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
         """
         Initialize the RidgeRegressorWrapper.
 
         Parameters
         ----------
-        init_params : dict[str, Any] or None, default=None
-            A dictionary of initialization parameters for the Ridge regressor.
+        init_params : dict or None
+            Parameters for the Ridge regressor (backward compatibility).
+        **kwargs : Any
+            Parameters for the Ridge regressor.
         """
-        super().__init__(Ridge, init_params or {})
+        super().__init__(Ridge, init_params=init_params, **kwargs)
 
     @staticmethod
     def _define_hyperparameters(
@@ -82,35 +83,6 @@ class RidgeRegressorWrapper(ConfigurableMixin, SklearnWrapper):
         params = [alpha, fit_intercept, solver]
         return params, [], []
 
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[RidgeRegressorWrapper]:
-        """
-        Create a partial function from a clean (unprefixed) configuration.
-
-        Parameters
-        ----------
-        clean_config : dict[str, Any]
-            The clean configuration dictionary.
-        **kwargs : Any
-            Additional arguments.
-
-        Returns
-        -------
-        partial
-            A partial function for instantiating the wrapper.
-        """
-        params = {
-            "alpha": clean_config["alpha"],
-            "fit_intercept": clean_config["fit_intercept"],
-            "solver": clean_config["solver"],
-            **kwargs,
-        }
-        return partial(RidgeRegressorWrapper, init_params=params)
-
 
 class RidgeClassifierWrapper(ConfigurableMixin, SklearnWrapper):
     """
@@ -119,16 +91,18 @@ class RidgeClassifierWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "ridge_classifier"
 
-    def __init__(self, init_params: dict[str, Any] | None = None):
+    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
         """
         Initialize the RidgeClassifierWrapper.
 
         Parameters
         ----------
-        init_params : dict[str, Any] or None, default=None
-            A dictionary of initialization parameters for the Ridge classifier.
+        init_params : dict or None
+            Parameters for the Ridge classifier (backward compatibility).
+        **kwargs : Any
+            Parameters for the Ridge classifier.
         """
-        super().__init__(RidgeClassifier, init_params or {})
+        super().__init__(RidgeClassifier, init_params=init_params, **kwargs)
 
     @staticmethod
     def _define_hyperparameters(
@@ -164,19 +138,3 @@ class RidgeClassifierWrapper(ConfigurableMixin, SklearnWrapper):
 
         params = [alpha, solver]
         return params, [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[RidgeClassifierWrapper]:
-        """
-        Create a RidgeClassifierWrapper partial from a clean configuration.
-        """
-        params = {
-            "alpha": clean_config["alpha"],
-            "solver": clean_config["solver"],
-            **kwargs,
-        }
-        return partial(RidgeClassifierWrapper, init_params=params)

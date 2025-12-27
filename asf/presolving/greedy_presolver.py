@@ -25,7 +25,7 @@ class GreedyPresolver(AbstractPresolver):
 
     Parameters
     ----------
-    budget : float, default=30.0
+    presolver_budget : float, default=30.0
         Total time budget for the pre-solve schedule.
     cutoff_per_solver : float, default=5.0
         Maximum time to allocate per solver.
@@ -43,19 +43,74 @@ class GreedyPresolver(AbstractPresolver):
 
     def __init__(
         self,
-        budget: float = 30.0,
+        init_params: dict[str, Any] | None = None,
+        presolver_budget: float = 30.0,
         cutoff_per_solver: float = 5.0,
         max_presolvers: int = 3,
         min_coverage: float = 0.01,
         maximize: bool = False,
         **kwargs: Any,
     ) -> None:
-        super().__init__(budget=budget, maximize=maximize)
-        self.cutoff_per_solver = cutoff_per_solver
-        self.max_presolvers = max_presolvers
-        self.min_coverage = min_coverage
+        params = init_params if isinstance(init_params, dict) else {}
+        params.update(kwargs)
+
+        if "presolver_budget" in params:
+            presolver_budget = params.pop("presolver_budget")
+            params.pop("budget", None)
+        else:
+            presolver_budget = params.pop("budget", presolver_budget)
+        maximize = params.pop("maximize", maximize)
+        cutoff_per_solver = params.pop("cutoff_per_solver", cutoff_per_solver)
+        max_presolvers = params.pop("max_presolvers", max_presolvers)
+        min_coverage = params.pop("min_coverage", min_coverage)
+
+        super().__init__(presolver_budget=presolver_budget, maximize=maximize, **params)
+        self.cutoff_per_solver = float(cutoff_per_solver)
+        self.max_presolvers = int(max_presolvers)
+        self.min_coverage = float(min_coverage)
         self.schedule: list[tuple[str, float]] = []
         self.algorithms: list[str] = []
+
+    @staticmethod
+    def _define_hyperparameters(
+        total_budget: float | None = None,
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """
+        Define hyperparameters for GreedyPresolver.
+        """
+        from ConfigSpace import (
+            Float,
+            Integer,
+        )
+
+        hps, conds, forbs = AbstractPresolver._define_hyperparameters(
+            total_budget=total_budget, **kwargs
+        )
+
+        hps.extend(
+            [
+                Float(
+                    "cutoff_per_solver",
+                    bounds=(0.1, 30.0),
+                    default=5.0,
+                    log=True,
+                ),
+                Integer(
+                    "max_presolvers",
+                    bounds=(1, 10),
+                    default=3,
+                ),
+                Float(
+                    "min_coverage",
+                    bounds=(0.001, 0.1),
+                    default=0.01,
+                    log=True,
+                ),
+            ]
+        )
+
+        return hps, conds, forbs
 
     def fit(
         self,
@@ -89,7 +144,7 @@ class GreedyPresolver(AbstractPresolver):
         solved_mask = np.zeros(n_instances, dtype=bool)
 
         self.schedule = []
-        remaining_budget = self.budget
+        remaining_budget = self.presolver_budget
 
         for _ in range(self.max_presolvers):
             if remaining_budget <= 0:

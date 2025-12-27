@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import partial
 from typing import Any
 
 import numpy as np
@@ -8,13 +7,12 @@ import pandas as pd
 from scipy.optimize import differential_evolution
 
 from asf.predictors.survival import SKSURV_AVAILABLE, RandomSurvivalForestWrapper
-from asf.selectors.abstract_selector import AbstractSelector
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
+
+from asf.utils.configurable import ClassChoice, ConfigurableMixin
 
 if SKSURV_AVAILABLE:
     from sksurv.util import Surv
-
-    from asf.utils.configurable import ClassChoice, ConfigurableMixin
 
     try:
         from ConfigSpace import (  # noqa: F401
@@ -443,33 +441,16 @@ if SKSURV_AVAILABLE:
 
             return params, conditions, []
 
-        @classmethod
-        def _get_from_clean_configuration(
-            cls,
-            clean_config: dict[str, Any],
-            **kwargs: Any,
-        ) -> partial[SurvivalAnalysis]:
-            """
-            Create a partial function from a clean configuration.
-
-            Parameters
-            ----------
-            clean_config : dict
-                The clean configuration.
-            **kwargs : Any
-                Additional keyword arguments.
-
-            Returns
-            -------
-            partial
-                Partial function for SurvivalAnalysis.
-            """
-            config = clean_config.copy()
-            config.update(kwargs)
-            return partial(SurvivalAnalysis, **config)
 
 else:
+    from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 
-    class SurvivalAnalysis(AbstractSelector):
+    class SurvivalAnalysis(ConfigurableMixin, AbstractModelBasedSelector):
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             raise ImportError("sksurv is not installed.")
+
+        @staticmethod
+        def _define_hyperparameters(
+            **kwargs: Any,
+        ) -> tuple[list[Any], list[Any], list[Any]]:
+            return [], [], []

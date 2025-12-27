@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import partial
 from typing import Any, Callable
 
 import numpy as np
@@ -205,28 +204,3 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
         )
 
         return [model_param], [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[JointRanking]:
-        """
-        Create a partial function from a clean configuration.
-
-        Parameters
-        ----------
-        clean_config : dict
-            The clean configuration.
-        **kwargs : Any
-            Additional keyword arguments.
-
-        Returns
-        -------
-        partial
-            Partial function for JointRanking.
-        """
-        config = clean_config.copy()
-        config.update(kwargs)
-        return partial(JointRanking, **config)

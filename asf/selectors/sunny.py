@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import partial
 from typing import Any
 
 import numpy as np
@@ -97,7 +96,17 @@ class SUNNY(ConfigurableMixin, AbstractSelector):
         self.k = int(k)
         self.use_v2 = bool(use_v2)
         self.n_folds = int(n_folds)
-        self.k_candidates = k_candidates or [3, 5, 7, 10, 20, 50]
+
+        if isinstance(k_candidates, str):
+            k_map = {
+                "small": [3, 5, 7],
+                "medium": [3, 5, 7, 10, 20],
+                "broad": [3, 5, 7, 10, 20, 50],
+            }
+            self.k_candidates = k_map.get(k_candidates, [3, 5, 7, 10, 20, 50])
+        else:
+            self.k_candidates = k_candidates or [3, 5, 7, 10, 20, 50]
+
         self.random_state = int(random_state)
         self.use_tsunny = bool(use_tsunny)
         self.algorithm_limit = algorithm_limit
@@ -442,27 +451,3 @@ class SUNNY(ConfigurableMixin, AbstractSelector):
             EqualsCondition(k_candidates_param, use_v2_param, True),
         ]
         return params, conditions, []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[SUNNY]:
-        """
-        Create a partial function from a clean configuration.
-        """
-        config = clean_config.copy()
-        k_map = {
-            "small": [3, 5, 7],
-            "medium": [3, 5, 7, 10, 20],
-            "broad": [3, 5, 7, 10, 20, 50],
-        }
-        if config.get("use_v2"):
-            config["k_candidates"] = k_map[config.get("k_candidates", "medium")]
-        else:
-            config["n_folds"] = 5
-            config["k_candidates"] = [3, 5, 7, 10, 20, 50]
-
-        config.update(kwargs)
-        return partial(SUNNY, **config)

@@ -1,6 +1,5 @@
 from __future__ import annotations
-
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
@@ -8,14 +7,6 @@ import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 
 from asf.selectors.feature_generator import AbstractFeatureGenerator
-
-try:
-    from ConfigSpace import Configuration, ConfigurationSpace
-    from ConfigSpace.hyperparameters import CategoricalHyperparameter as Categorical
-
-    CONFIGSPACE_AVAILABLE = True
-except ImportError:
-    CONFIGSPACE_AVAILABLE = False
 
 
 class AbstractSelector(ABC):
@@ -186,7 +177,6 @@ class AbstractSelector(ABC):
                 axis=1,
             )
 
-        # Call the internal _predict
         scheds = self._predict(df_features, performance=performance)
 
         if self.prediction_mode == "aslib":
@@ -230,10 +220,12 @@ class AbstractSelector(ABC):
         path : str
             File path to save to.
         """
-        pass
+        import joblib
+
+        joblib.dump(self, path)
 
     @classmethod
-    def load(cls, path: str) -> "AbstractSelector":
+    def load(cls, path: str) -> AbstractSelector:
         """
         Load a selector instance.
 
@@ -247,50 +239,11 @@ class AbstractSelector(ABC):
         AbstractSelector
             The loaded selector instance.
         """
-        raise NotImplementedError(f"{cls.__name__} does not support loading from file.")
+        import joblib
 
-    @staticmethod
-    def get_configuration_space(
-        cs: ConfigurationSpace | None = None, **kwargs: Any
-    ) -> ConfigurationSpace:
-        """
-        Get the configuration space.
+        return joblib.load(path)
 
-        Parameters
-        ----------
-        cs : ConfigurationSpace or None, optional
-            Base configuration space.
-        **kwargs : Any
-            Additional options.
-
-        Returns
-        -------
-        ConfigurationSpace
-            The configuration space.
-        """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError("ConfigSpace is not available.")
-        raise NotImplementedError("Subclasses must implement get_configuration_space.")
-
-    @staticmethod
-    def get_from_configuration(configuration: Configuration) -> AbstractSelector:
-        """
-        Create an instance from a configuration.
-
-        Parameters
-        ----------
-        configuration : Configuration
-            The configuration object.
-
-        Returns
-        -------
-        AbstractSelector
-            The initialized selector.
-        """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError("ConfigSpace is not available.")
-        raise NotImplementedError("Subclasses must implement get_from_configuration.")
-
+    @abstractmethod
     def _fit(
         self,
         features: pd.DataFrame,
@@ -300,8 +253,9 @@ class AbstractSelector(ABC):
         """
         Internal fit implementation.
         """
-        raise NotImplementedError("Subclasses must implement _fit.")
+        pass
 
+    @abstractmethod
     def _predict(
         self,
         features: pd.DataFrame | None,
@@ -310,26 +264,4 @@ class AbstractSelector(ABC):
         """
         Internal predict implementation.
         """
-        raise NotImplementedError("Subclasses must implement _predict.")
-
-    @staticmethod
-    def _add_hierarchical_generator_space(
-        cs: ConfigurationSpace,
-        hierarchical_generator: list[AbstractFeatureGenerator] | None = None,
-        **kwargs: Any,
-    ) -> ConfigurationSpace:
-        """
-        Add hierarchical generator options to the configuration space.
-        """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError("ConfigSpace is not available.")
-        if hierarchical_generator:
-            if "hierarchical_generator" not in cs:
-                cs.add(
-                    Categorical(
-                        name="hierarchical_generator", choices=hierarchical_generator
-                    )
-                )
-            for g in hierarchical_generator:
-                g.get_configuration_space(cs=cs, **kwargs)
-        return cs
+        pass

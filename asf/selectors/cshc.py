@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-from functools import partial
 from typing import Any, Callable, cast
 
 import numpy as np
@@ -70,25 +69,6 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
     ) -> None:
         """
         Initialize the CSHCSelector.
-
-        Parameters
-        ----------
-        primary_selector : AbstractSelector or Callable
-            The primary selector model.
-        backup_selector : AbstractSelector or Callable or None, default=None
-            The backup selector model.
-        n_estimators : int, default=100
-            Number of estimators for the guardian models.
-        guardian_kwargs : dict or None, default=None
-            Additional keyword arguments for guardian models.
-        n_folds : int, default=5
-            Number of folds for cross-validation.
-        threshold_grid : np.ndarray or None, default=None
-            Grid of thresholds to evaluate.
-        random_state : int, default=42
-            Random seed.
-        **kwargs : Any
-            Additional keyword arguments.
         """
         super().__init__(**kwargs)
 
@@ -376,35 +356,3 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
         ]
 
         return params, conditions, []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[CSHCSelector]:
-        """
-        Create a partial function from a clean configuration.
-
-        Parameters
-        ----------
-        clean_config : dict
-            The clean configuration.
-        **kwargs : Any
-            Additional keyword arguments.
-
-        Returns
-        -------
-        partial
-            Partial function for CSHCSelector.
-        """
-        config = clean_config.copy()
-
-        if not config.get("use_backup_selector", False):
-            config["backup_selector"] = None
-
-        if "use_backup_selector" in config:
-            del config["use_backup_selector"]
-
-        config.update(kwargs)
-        return partial(CSHCSelector, **config)

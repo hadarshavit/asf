@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-from functools import partial
 from typing import Any, Callable, cast
 
 import numpy as np
@@ -28,35 +27,23 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
 
     Trains multiple base selectors and uses another selector (the meta-selector)
     to choose among them for each instance based on their out-of-fold performance.
-
-    Attributes
-    ----------
-    base_selectors : list[AbstractSelector]
-        Initial list of algorithm selectors.
-    meta_selector : AbstractSelector
-        The selector used to choose among base selectors.
-    par_factor : int
-        Penalty factor for timeouts (PAR penalty).
-    n_folds : int
-        Number of folds for cross-validation to generate training data for
-        the meta-selector.
-    random_state : int
-        Random seed for reproducibility.
-    selector_names : list[str]
-        Names assigned to each base selector.
-    _selector_map : dict[str, AbstractSelector]
-        Mapping from selector names to selector instances.
-    base_selectors_ : list[AbstractSelector] or None
-        Trained base selector instances.
     """
+
+    base_selectors: list[AbstractSelector]
+    meta_selector: AbstractSelector
+    _selector_map: dict[str, AbstractSelector]
+    base_selectors_: list[AbstractSelector]
 
     PREFIX = "meta"
     RETURN_TYPE = "single"
 
     def __init__(
         self,
-        base_selectors: list[AbstractSelector] | Callable[[], list[AbstractSelector]],
-        meta_selector: AbstractSelector | Callable[[], AbstractSelector],
+        base_selectors: list[AbstractSelector]
+        | Callable[[], list[AbstractSelector]]
+        | None = None,
+        meta_selector: AbstractSelector | Callable[[], AbstractSelector] | None = None,
+        candidate_selectors: list[type] | None = None,
         par_factor: int = 10,
         n_folds: int = 5,
         random_state: int = 42,
@@ -64,38 +51,32 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
     ) -> None:
         """
         Initialize the MetaSelector.
-
-        Parameters
-        ----------
-        base_selectors : list[AbstractSelector] or Callable
-            A list of algorithm selectors or a callable that returns them.
-        meta_selector : AbstractSelector or Callable
-            The selector instance that will be trained to choose the best base
-            selector.
-        par_factor : int, default=10
-            The factor by which the penalty is increased for timeouts.
-        n_folds : int, default=5
-            The number of folds for cross-validation.
-        random_state : int, default=42
-            The random state for reproducibility.
-        **kwargs : Any
-            Additional keyword arguments for the parent class.
         """
         super().__init__(**kwargs)
+
+        if base_selectors is None and candidate_selectors is not None:
+            base_selectors = []
+            for sel_cls in candidate_selectors:
+                try:
+                    base_selectors.append(sel_cls())
+                except Exception:
+                    pass
 
         if callable(base_selectors):
             self.base_selectors = base_selectors()
         else:
-            self.base_selectors = list(base_selectors)
+            self.base_selectors = (
+                list(base_selectors) if base_selectors is not None else []
+            )
 
         if callable(meta_selector):
             self.meta_selector = meta_selector()
         else:
-            self.meta_selector = meta_selector
+            self.meta_selector = cast(AbstractSelector, meta_selector)
 
         if not self.base_selectors:
             raise ValueError("`base_selectors` list cannot be empty.")
-        if not self.meta_selector:
+        if self.meta_selector is None:
             raise ValueError("`meta_selector` cannot be None.")
 
         for sel in self.base_selectors:
@@ -294,41 +275,3 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
         ]
 
         return params, [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        candidate_selectors: list[type] | None = None,
-        **kwargs: Any,
-    ) -> partial[MetaSelector]:
-        """
-                Create a partial function from a clean configuration.
-
-                Parameters
-                ----------
-                clean_config : dict
-                    The clean configuration.
-                candidate_selectors : list[type] or None, default=None
-                    List of selector classes to include as base selectors.
-                **kwargs : Any
-                    Additional keyword arguments.
-
-                Returns
-        -------
-                partial
-                    Partial function for MetaSelector.
-        """
-        config = clean_config.copy()
-
-        if candidate_selectors:
-            base_selectors = []
-            for sel_cls in candidate_selectors:
-                try:
-                    base_selectors.append(sel_cls())
-                except Exception:
-                    pass
-            config["base_selectors"] = base_selectors
-
-        config.update(kwargs)
-        return partial(MetaSelector, **config)

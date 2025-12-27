@@ -126,10 +126,14 @@ class TestAbstractSelectorNumpyInput:
 class TestAbstractSelectorLoad:
     """Tests for load method."""
 
-    def test_load_raises_not_implemented(self):
-        """Test that load raises NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            SingleBestSolver.load("some_path")
+    def test_save_load(self, tmp_path):
+        """Test that save and load work correctly."""
+        save_path = tmp_path / "selector.joblib"
+        selector = SingleBestSolver()
+        selector.save(str(save_path))
+
+        loaded = SingleBestSolver.load(str(save_path))
+        assert isinstance(loaded, SingleBestSolver)
 
 
 class TestAbstractSelectorFeatureGroups:

@@ -20,7 +20,7 @@ def get_small_data():
 
 def test_aspeed_returns_schedule_non_empty():
     features, performance = get_small_data()
-    presolver = Aspeed(cores=1, aspeed_cutoff=10, budget=30)
+    presolver = Aspeed(cores=1, aspeed_cutoff=10, presolver_budget=30)
     # run fit and assert schedule is non-empty list
     presolver.fit(features, performance)
     assert isinstance(presolver.schedule, list)
@@ -29,7 +29,7 @@ def test_aspeed_returns_schedule_non_empty():
 
 def test_aspeed_schedule_entries_well_formed():
     _, performance = get_small_data()
-    presolver = Aspeed(cores=1, aspeed_cutoff=10, budget=30)
+    presolver = Aspeed(cores=1, aspeed_cutoff=10, presolver_budget=30)
     presolver.fit(None, performance)
     # each entry must be tuple (algorithm_name, allocated_time)
     for entry in presolver.schedule:

@@ -14,7 +14,7 @@ from scipy.optimize import differential_evolution, minimize_scalar
 from asf.presolving.presolver import AbstractPresolver
 
 try:
-    from ConfigSpace import Configuration
+    from ConfigSpace import Configuration  # noqa: F401
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
@@ -35,7 +35,7 @@ class ASAPv2(AbstractPresolver):
     ----------
     runcount_limit : float, default=100.0
         Maximum number of iterations for differential evolution.
-    budget : float, default=30.0
+    presolver_budget : float, default=30.0
         Total time budget (timeout) for solving.
     maximize : bool, default=False
         Whether to maximize performance (False for runtime minimization).
@@ -56,10 +56,13 @@ class ASAPv2(AbstractPresolver):
         Verbosity level (0=silent, 1=basic, 2=detailed).
     """
 
+    PREFIX: str = "asap_v2"
+
     def __init__(
         self,
+        init_params: dict[str, Any] | None = None,
         runcount_limit: float = 100.0,
-        budget: float = 30.0,
+        presolver_budget: float = 30.0,
         maximize: bool = False,
         size_preschedule: int = 3,
         max_runtime_preschedule: float = -1,
@@ -68,52 +71,53 @@ class ASAPv2(AbstractPresolver):
         de_popsize: int = 15,
         seed: int = 42,
         verbosity: int = 0,
+        **kwargs: Any,
     ) -> None:
         """
         Initialize ASAPv2 presolver.
-
-        Parameters
-        ----------
-        runcount_limit : float
-            Maximum number of iterations for differential evolution.
-        budget : float
-            Total time budget (timeout) for solving.
-        maximize : bool
-            Whether to maximize performance (False for runtime minimization).
-        size_preschedule : int
-            Number of algorithms to include in the preschedule.
-        max_runtime_preschedule : float
-            Maximum time for preschedule. If < 0, uses 10% of budget.
-            If < 1, uses this fraction of budget. Otherwise uses the value directly.
-        regularization_weight : float
-            Weight for regularization term in objective function.
-        variance_weight : float
-            Weight for variance penalty in objective function.
-        de_popsize : int
-            Population size for differential evolution.
-        seed : int
-            Random seed for reproducibility.
-        verbosity : int
-            Verbosity level (0=silent, 1=basic, 2=detailed).
         """
-        super().__init__(budget=budget, maximize=maximize)
+        params = init_params if isinstance(init_params, dict) else {}
+        params.update(kwargs)
 
-        self.size_preschedule = size_preschedule
-        self.regularization_weight = regularization_weight
-        self.variance_weight = variance_weight
-        self.de_popsize = de_popsize
+        if "presolver_budget" in params:
+            presolver_budget = params.pop("presolver_budget")
+            params.pop("budget", None)
+        else:
+            presolver_budget = params.pop("budget", presolver_budget)
+        maximize = params.pop("maximize", maximize)
+        runcount_limit = params.pop("runcount_limit", runcount_limit)
+        size_preschedule = params.pop("size_preschedule", size_preschedule)
+        max_runtime_preschedule = params.pop(
+            "max_runtime_preschedule", max_runtime_preschedule
+        )
+        regularization_weight = params.pop(
+            "regularization_weight", regularization_weight
+        )
+        variance_weight = params.pop("variance_weight", variance_weight)
+        de_popsize = params.pop("de_popsize", de_popsize)
+        seed = params.pop("seed", seed)
+        verbosity = params.pop("verbosity", verbosity)
+
+        super().__init__(presolver_budget=presolver_budget, maximize=maximize, **params)
+
+        self.size_preschedule = int(size_preschedule)
+        self.regularization_weight = float(regularization_weight)
+        self.variance_weight = float(variance_weight)
+        self.de_popsize = int(de_popsize)
         self.de_maxiter = int(runcount_limit)
-        self.seed = seed
-        self.verbosity = verbosity
-        self.rand_st = np.random.RandomState(seed)
+        self.seed = int(seed)
+        self.verbosity = int(verbosity)
+        self.rand_st = np.random.RandomState(self.seed)
 
         # Set max runtime for preschedule
         if max_runtime_preschedule < 0:
-            self.max_runtime_preschedule = 0.1 * budget
+            self.max_runtime_preschedule = 0.1 * self.presolver_budget
         elif max_runtime_preschedule < 1:
-            self.max_runtime_preschedule = max_runtime_preschedule * budget
+            self.max_runtime_preschedule = (
+                max_runtime_preschedule * self.presolver_budget
+            )
         else:
-            self.max_runtime_preschedule = max_runtime_preschedule
+            self.max_runtime_preschedule = float(max_runtime_preschedule)
 
         # Will be set during fit
         self.algorithms: list[str] = []
@@ -125,6 +129,50 @@ class ASAPv2(AbstractPresolver):
         self.features: pd.DataFrame | None = None
         self.performance: pd.DataFrame | None = None
         self.schedule: list[tuple[str, float]] = []
+
+    @staticmethod
+    def _define_hyperparameters(
+        total_budget: float | None = None,
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """
+        Define hyperparameters for ASAPv2.
+        """
+        from ConfigSpace import (
+            Float,
+            Integer,
+        )
+
+        hps, conds, forbs = AbstractPresolver._define_hyperparameters(
+            total_budget=total_budget, **kwargs
+        )
+
+        hps.extend(
+            [
+                Integer(
+                    "size_preschedule",
+                    bounds=(1, 5),
+                    default=3,
+                ),
+                Float(
+                    "regularization_weight",
+                    bounds=(0.0, 1.0),
+                    default=0.0,
+                ),
+                Float(
+                    "variance_weight",
+                    bounds=(0.0, 1.0),
+                    default=0.0,
+                ),
+                Integer(
+                    "de_popsize",
+                    bounds=(5, 50),
+                    default=15,
+                ),
+            ]
+        )
+
+        return hps, conds, forbs
 
     def fit(
         self,
@@ -166,8 +214,10 @@ class ASAPv2(AbstractPresolver):
         self.feature_train = features_frame.values
         self.performance_train = performance_frame.values.copy()
 
-        # PAR10: instances with runtime >= budget are penalized with 10x budget
-        self.performance_train[self.performance_train >= self.budget] = 10 * self.budget
+        # PAR10: instances with runtime >= presolver_budget are penalized with 10x budget
+        self.performance_train[self.performance_train >= self.presolver_budget] = (
+            10 * self.presolver_budget
+        )
 
         if self.verbosity > 0:
             print()
@@ -317,7 +367,7 @@ class ASAPv2(AbstractPresolver):
         ialgos_preschedule_ext = np.append(self.ialgos_preschedule, self.numAlg)
         runtimes_preschedule_ext = np.append(
             self.runtimes_preschedule,
-            max(self.budget - np.sum(self.runtimes_preschedule), 0.0),
+            max(self.presolver_budget - np.sum(self.runtimes_preschedule), 0.0),
         )
 
         def encode_runtimes(rt: np.ndarray) -> np.ndarray:
@@ -356,7 +406,7 @@ class ASAPv2(AbstractPresolver):
                 if len(x_) > 0
                 else total_runtime_preschedule
             )
-            rt[-1] = self.budget - np.sum(rt[:-1])
+            rt[-1] = self.presolver_budget - np.sum(rt[:-1])
 
             return rt
 
@@ -379,13 +429,15 @@ class ASAPv2(AbstractPresolver):
                 reg *= (
                     self.regularization_weight
                     * len(extd_performance_matrix)
-                    * self.budget
+                    * self.presolver_budget
                 )
 
             # Variance penalty
             var_pen = 0.0
             if self.variance_weight > 0:
-                partial_var = np.var(time_to_solve[time_to_solve < self.budget])
+                partial_var = np.var(
+                    time_to_solve[time_to_solve < self.presolver_budget]
+                )
                 var_pen = self.variance_weight * partial_var
 
             return float(runtime_res + reg + var_pen)
@@ -475,8 +527,10 @@ class ASAPv2(AbstractPresolver):
             time_to_solve[~is_already_solved] += np.abs(runtimes)[runid]
 
         # PAR10 penalty for unsolved instances
-        time_to_solve[time_to_solve > self.budget] = 10.0 * self.budget
-        time_to_solve[~is_already_solved] = 10.0 * self.budget
+        time_to_solve[time_to_solve > self.presolver_budget] = (
+            10.0 * self.presolver_budget
+        )
+        time_to_solve[~is_already_solved] = 10.0 * self.presolver_budget
 
         return time_to_solve
 
@@ -544,47 +598,3 @@ class ASAPv2(AbstractPresolver):
                 if time > 0
             }
         return {}
-
-    @classmethod
-    def get_from_configuration(
-        cls,
-        configuration: Configuration | dict[str, Any],
-        cs_transform: dict[str, Any] | None = None,
-        budget: float | None = None,
-        maximize: bool = False,
-        presolver_name: str | None = None,
-        **kwargs: Any,
-    ) -> ASAPv2:
-        """
-        Create an ASAPv2 presolver from a configuration.
-
-        Parameters
-        ----------
-        configuration : Configuration or dict
-            The configuration.
-        pre_prefix : str, default=""
-            Prefix for the configuration keys.
-        **kwargs : Any
-            Additional keyword arguments.
-
-        Returns
-        -------
-        ASAPv2
-            The initialized presolver.
-        """
-        if presolver_name:
-            prefix = f"{presolver_name}:"
-        else:
-            prefix = ""
-
-        # AbstractPresolver adds presolver_budget to the config
-        # We use it to set max_runtime_preschedule
-        presolver_budget = configuration.get(
-            f"{prefix}presolver_budget", configuration.get("presolver_budget")
-        )
-
-        init_params = kwargs.copy()
-        if presolver_budget is not None:
-            init_params["max_runtime_preschedule"] = presolver_budget
-
-        return cls(**init_params)

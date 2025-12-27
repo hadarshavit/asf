@@ -58,7 +58,7 @@ def test_build_cli_command(tmp_path: Path):
         feature_data=feats,
         performance_data=perf,
         destination=tmp_path / "model.pkl",
-        model="Ridge",  # type: ignore[arg-type]
+        model="RidgeRegressor",  # type: ignore[arg-type]
         tuning=True,
         budget=60,
         maximize=False,
@@ -70,7 +70,7 @@ def test_build_cli_command(tmp_path: Path):
     assert isinstance(cmd, list)
     assert "--selectors" in cmd
     assert "SATzilla" in cmd and "PairwiseRegressor" in cmd
-    assert "--model" in cmd and "Ridge" in cmd
+    assert "--model" in cmd and "RidgeRegressor" in cmd
     assert "--budget" in cmd and "60" in cmd
     assert "--presolver-budget" in cmd and "0.2" in cmd
     assert (
@@ -100,7 +100,7 @@ def _validate_pipeline_extensive(
 
     presolver_budget = 0.0
     if pipeline.pre_solving is not None:
-        presolver_budget = getattr(pipeline.pre_solving, "budget", 0.0)
+        presolver_budget = getattr(pipeline.pre_solving, "presolver_budget", 0.0)
 
     total_budget = selector_budget + presolver_budget
     assert pytest.approx(total_budget, rel=1e-3, abs=1e-6) == expected_budget, (
@@ -218,7 +218,7 @@ def _run_cli_and_validate(
         feature_data=feats,
         performance_data=perf,
         destination=out_model,
-        model="Ridge",  # type: ignore[arg-type]
+        model="RidgeRegressor",  # type: ignore[arg-type]
         tuning=tuning,
         budget=budget,
         maximize=False,

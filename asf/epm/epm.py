@@ -76,7 +76,8 @@ class EPM:
         self.predictor_config = predictor_config
         self.predictor_kwargs = predictor_kwargs or {}
         self.imputer = imputer
-        self.numpy = False
+        self.feature_names_: list[str] | None = None
+        self.numpy: bool = False
 
         if features_preprocessing == "default":
             self.features_preprocessing = get_default_preprocessor(
@@ -109,20 +110,8 @@ class EPM:
         EPM
             The fitted model.
         """
-        if isinstance(X, np.ndarray) and isinstance(y, np.ndarray):
-            X_df = pd.DataFrame(
-                X,
-                index=range(len(X)),
-                columns=pd.Index([f"f_{i}" for i in range(X.shape[1])]),
-            )
-            y_ser = pd.Series(
-                y,
-                index=range(len(y)),
-            )
-            self.numpy = True
-        else:
-            X_df = pd.DataFrame(X) if not isinstance(X, pd.DataFrame) else X
-            y_ser = pd.Series(y) if not isinstance(y, pd.Series) else y
+        X_df, y_ser = self._ensure_dataframe(X, y)
+        self.feature_names_ = list(X_df.columns)
 
         if self.features_preprocessing is not None and not isinstance(
             self.features_preprocessing, str
@@ -141,6 +130,29 @@ class EPM:
 
         self.predictor.fit(X_df, y_ser, sample_weight=sample_weight)
         return self
+
+    def _ensure_dataframe(
+        self,
+        X: pd.DataFrame | pd.Series | np.ndarray | list[Any],
+        y: pd.Series | np.ndarray | list[Any] | None = None,
+    ) -> tuple[pd.DataFrame, pd.Series | None]:
+        """Ensure input is converted to pandas DataFrame/Series."""
+        if isinstance(X, np.ndarray):
+            cols = (
+                self.feature_names_
+                if self.feature_names_ is not None
+                else [f"f_{i}" for i in range(X.shape[1])]
+            )
+            X_df = pd.DataFrame(X, columns=pd.Index(cols))
+            self.numpy = True
+        else:
+            X_df = pd.DataFrame(X) if not isinstance(X, pd.DataFrame) else X
+
+        y_ser = None
+        if y is not None:
+            y_ser = pd.Series(y) if not isinstance(y, pd.Series) else y
+
+        return X_df, y_ser
 
     def _get_predictor(self) -> AbstractPredictor:
         """Get the predictor instance."""
@@ -176,17 +188,7 @@ class EPM:
         np.ndarray
             Predicted values.
         """
-        if self.numpy:
-            if isinstance(X, np.ndarray):
-                X_df = pd.DataFrame(
-                    X,
-                    index=range(len(X)),
-                    columns=pd.Index([f"f_{i}" for i in range(X.shape[1])]),
-                )
-            else:
-                X_df = pd.DataFrame(X) if not isinstance(X, pd.DataFrame) else X
-        else:
-            X_df = pd.DataFrame(X) if not isinstance(X, pd.DataFrame) else X
+        X_df, _ = self._ensure_dataframe(X)
 
         if self.features_preprocessing is not None and not isinstance(
             self.features_preprocessing, str

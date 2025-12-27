@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import partial
 from typing import Any
 
 import pandas as pd
@@ -190,28 +189,3 @@ class PairwiseRegressor(
             ClassChoice("model_class", choices=model_class),
         ]
         return hyperparameters, [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[PairwiseRegressor]:
-        """
-                Create a partial function from a clean configuration.
-
-                Parameters
-        -------
-                clean_config : dict
-                    The clean configuration.
-                **kwargs : Any
-                    Additional keyword arguments.
-
-                Returns
-                -------
-                partial
-                    Partial function for PairwiseRegressor.
-        """
-        config = clean_config.copy()
-        config.update(kwargs)
-        return partial(PairwiseRegressor, **config)

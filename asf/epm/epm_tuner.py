@@ -4,7 +4,7 @@ EPM tuning logic using SMAC.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, cast
 from pathlib import Path
 
 import numpy as np
@@ -120,7 +120,7 @@ def tune_epm(
         y_ser = pd.Series(y) if not isinstance(y, pd.Series) else y
 
     scenario = Scenario(
-        configspace=model_class.get_configuration_space(),
+        configspace=cast(Any, model_class).get_configuration_space(),
         n_trials=runcount_limit,
         walltime_limit=timeout,
         deterministic=True,

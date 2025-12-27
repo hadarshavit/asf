@@ -179,28 +179,3 @@ class ISAC(ConfigurableMixin, AbstractSelector):
         )
 
         return [clusterer_param], [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[ISAC]:
-        """
-        Create a partial function from a clean configuration.
-
-        Parameters
-        ----------
-        clean_config : dict
-            The clean configuration.
-        **kwargs : Any
-            Additional keyword arguments.
-
-        Returns
-        -------
-        partial
-            Partial function for ISAC.
-        """
-        config = clean_config.copy()
-        config.update(kwargs)
-        return partial(ISAC, **config)

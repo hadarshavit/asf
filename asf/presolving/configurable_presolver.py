@@ -15,13 +15,7 @@ import pandas as pd
 from asf.presolving.presolver import AbstractPresolver
 
 try:
-    from ConfigSpace import (
-        Categorical,
-        Configuration,
-        ConfigurationSpace,
-        EqualsCondition,
-        Float,
-    )
+    import ConfigSpace  # noqa: F401
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
@@ -40,7 +34,7 @@ class ConfigurablePresolver(AbstractPresolver):
 
     Parameters
     ----------
-    budget : float, default=30.0
+    presolver_budget : float, default=30.0
         Total time budget for pre-solving.
     maximize : bool, default=False
         If True, maximize performance values instead of minimize.
@@ -54,12 +48,41 @@ class ConfigurablePresolver(AbstractPresolver):
 
     def __init__(
         self,
-        budget: float = 30.0,
+        init_params: dict[str, Any] | None = None,
+        presolver_budget: float = 30.0,
         maximize: bool = False,
         algorithm_config: dict[str, tuple[bool, float]] | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(budget=budget, maximize=maximize)
+        params = init_params if isinstance(init_params, dict) else {}
+        params.update(kwargs)
+
+        if "presolver_budget" in params:
+            presolver_budget = params.pop("presolver_budget")
+            params.pop("budget", None)
+        else:
+            presolver_budget = params.pop("budget", presolver_budget)
+        maximize = params.pop("maximize", maximize)
+        algorithm_config = params.pop("algorithm_config", algorithm_config)
+
+        # Special handling for reconstruction from configuration
+        if algorithm_config is None:
+            # Try to build it from leftovers in params if they follow the naming convention
+            # from _define_hyperparameters
+            algorithm_config = {}
+            # We need the algorithm list to know which keys to look for
+            # This information should be passed in init_params or kwargs
+            algorithms = params.pop("algorithms", [])
+            for algo in algorithms:
+                safe_algo_name = algo.replace(":", "_").replace(" ", "_")
+                use_key = f"use_{safe_algo_name}"
+                time_key = f"time_{safe_algo_name}"
+                if use_key in params:
+                    use_algo = params.pop(use_key)
+                    time_val = params.pop(time_key, 5.0)
+                    algorithm_config[algo] = (bool(use_algo), float(time_val))
+
+        super().__init__(presolver_budget=presolver_budget, maximize=maximize, **params)
         self.algorithm_config = algorithm_config or {}
         self.schedule: list[tuple[str, float]] = []
         self.algorithms: list[str] = []
@@ -130,80 +153,28 @@ class ConfigurablePresolver(AbstractPresolver):
             return {str(inst): self.schedule for inst in features.index}
         return self.schedule
 
-    @classmethod
-    def get_configuration_space(
-        cls,
-        cs: ConfigurationSpace | None = None,
-        cs_transform: dict[str, Any] | None = None,
-        parent_param: Any | None = None,
-        parent_value: str | None = None,
+    @staticmethod
+    def _define_hyperparameters(
         total_budget: float | None = None,
         algorithms: list[str] | None = None,
         max_time_per_algo: float = 30.0,
-        pre_prefix: str = "",
         **kwargs: Any,
-    ) -> tuple[ConfigurationSpace, dict[str, Any]]:
+    ) -> tuple[list[Any], list[Any], list[Any]]:
         """
-        Get the configuration space.
-
-        The configuration space includes:
-        - For each algorithm: a boolean to enable/disable it
-        - For each algorithm: a float for the time budget (conditional)
-
-        Parameters
-        ----------
-        cs : ConfigurationSpace or None, default=None
-            The configuration space to use.
-        cs_transform : dict or None, default=None
-            A dictionary for transforming configuration space values.
-        algorithms : list[str] or None, default=None
-            List of algorithm names to include in the configuration space.
-        max_time_per_algo : float, default=30.0
-            Maximum time budget that can be allocated per algorithm.
-        pre_prefix : str, default=""
-            Prefix for parameter names.
-        parent_param : Any or None, default=None
-            Parent parameter for conditional configuration.
-        parent_value : str or None, default=None
-            Value of parent parameter that activates these parameters.
-        **kwargs : Any
-            Additional keyword arguments.
-
-        Returns
-        -------
-        tuple
-            The configuration space and transformation dictionary.
-
-        Raises
-        ------
-        RuntimeError
-            If ConfigSpace is not installed.
-        ValueError
-            If algorithms list is None or empty.
+        Define hyperparameters for ConfigurablePresolver.
         """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
+        from ConfigSpace import (
+            Categorical,
+            EqualsCondition,
+            Float,
+        )
 
-        if algorithms is None or len(algorithms) == 0:
-            raise ValueError(
-                "algorithms must be provided to create ConfigurablePresolver configuration space"
-            )
+        hps, conds, forbs = AbstractPresolver._define_hyperparameters(
+            total_budget=total_budget, **kwargs
+        )
 
-        if cs is None:
-            cs = ConfigurationSpace()
-
-        if cs_transform is None:
-            cs_transform = {}
-
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{cls.PREFIX}"
-        else:
-            prefix = cls.PREFIX
-
-        all_params = []
-        all_conditions = []
+        if not algorithms:
+            return hps, conds, forbs
 
         for algo in algorithms:
             # Sanitize algorithm name for use as parameter name
@@ -211,20 +182,20 @@ class ConfigurablePresolver(AbstractPresolver):
 
             # Boolean parameter: whether to use this algorithm
             use_algo_param = Categorical(
-                name=f"{prefix}:use_{safe_algo_name}",
+                name=f"use_{safe_algo_name}",
                 items=[True, False],
                 default=False,
             )
-            all_params.append(use_algo_param)
+            hps.append(use_algo_param)
 
             # Float parameter: time budget for this algorithm (conditional on use_algo=True)
             time_param = Float(
-                name=f"{prefix}:time_{safe_algo_name}",
+                name=f"time_{safe_algo_name}",
                 bounds=(0.1, max_time_per_algo),
                 default=min(5.0, max_time_per_algo),
                 log=True,
             )
-            all_params.append(time_param)
+            hps.append(time_param)
 
             # Time is only relevant if the algorithm is enabled
             time_condition = EqualsCondition(
@@ -232,94 +203,9 @@ class ConfigurablePresolver(AbstractPresolver):
                 parent=use_algo_param,
                 value=True,
             )
-            all_conditions.append(time_condition)
+            conds.append(time_condition)
 
-            # If there's a parent parameter, add conditions for the use_algo param
-            if parent_param is not None:
-                parent_condition = EqualsCondition(
-                    child=use_algo_param,
-                    parent=parent_param,
-                    value=parent_value,
-                )
-                all_conditions.append(parent_condition)
-
-        # Store algorithm list in transform for reconstruction
-        cs_transform[f"{prefix}:algorithms"] = algorithms
-
-        cs.add(all_params + all_conditions)
-
-        return cs, cs_transform
-
-    @classmethod
-    def get_from_configuration(
-        cls,
-        configuration: Configuration | dict[str, Any],
-        cs_transform: dict[str, Any] | None = None,
-        budget: float | None = None,
-        maximize: bool = False,
-        presolver_name: str | None = None,
-        pre_prefix: str = "",
-        **kwargs: Any,
-    ) -> ConfigurablePresolver:
-        """
-        Create a ConfigurablePresolver instance from a configuration.
-
-        Parameters
-        ----------
-        configuration : Configuration or dict
-            The configuration object or dictionary.
-        cs_transform : dict
-            The transformation dictionary.
-        pre_prefix : str, default=""
-            Prefix for parameter names.
-        **kwargs : Any
-            Additional keyword arguments.
-
-        Returns
-        -------
-        ConfigurablePresolver
-            A ConfigurablePresolver instance.
-
-        Raises
-        ------
-        RuntimeError
-            If ConfigSpace is not installed.
-        """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{ConfigurablePresolver.PREFIX}"
-        else:
-            prefix = ConfigurablePresolver.PREFIX
-
-        # Get algorithms list from transform
-        algorithms = (cs_transform or {}).get(f"{prefix}:algorithms", [])
-
-        # Build algorithm_config from configuration
-        algorithm_config = {}
-        total_budget = 0.0
-
-        for algo in algorithms:
-            safe_algo_name = algo.replace(":", "_").replace(" ", "_")
-            use_key = f"{prefix}:use_{safe_algo_name}"
-            time_key = f"{prefix}:time_{safe_algo_name}"
-
-            use_algo = configuration.get(use_key, False)
-            if use_algo:
-                time_budget = configuration.get(time_key, 5.0)
-                algorithm_config[algo] = (True, float(time_budget))
-                total_budget += time_budget
-            else:
-                algorithm_config[algo] = (False, 0.0)
-
-        return ConfigurablePresolver(
-            budget=total_budget if total_budget > 0 else kwargs.get("budget", 30.0),
-            algorithm_config=algorithm_config,
-            **kwargs,
-        )
+        return hps, conds, forbs
 
     def __repr__(self) -> str:
         """Return a string representation of the presolver."""

@@ -4,7 +4,6 @@ Empirical Performance Model (EPM) based on Random Forest.
 
 from __future__ import annotations
 
-from functools import partial
 from typing import Any
 
 import joblib
@@ -85,29 +84,36 @@ class EPMRandomForest(ForestRegressor, AbstractPredictor, ConfigurableMixin):
 
     def __init__(
         self,
-        n_estimators: int = 100,
-        *,
-        log: bool = False,
-        return_var: bool = False,
-        criterion: str = "squared_error",
-        splitter: str = "random",
-        max_depth: int | None = None,
-        min_samples_split: int = 2,
-        min_samples_leaf: int = 1,
-        min_weight_fraction_leaf: float = 0.0,
-        max_features: float = 1.0,
-        max_leaf_nodes: int | None = None,
-        min_impurity_decrease: float = 0.0,
-        bootstrap: bool = False,
-        oob_score: bool = False,
-        n_jobs: int | None = None,
-        random_state: int | None = None,
-        verbose: int = 0,
-        warm_start: bool = False,
-        ccp_alpha: float = 0.0,
-        max_samples: int | float | None = None,
-        monotonic_cst: np.ndarray | None = None,
+        **kwargs: Any,
     ) -> None:
+        n_estimators = kwargs.pop("n_estimators", 100)
+        self.log = kwargs.pop("log", False)
+        self.return_var = kwargs.pop("return_var", False)
+        self.criterion = kwargs.pop("criterion", "squared_error")
+        self.max_depth = kwargs.pop("max_depth", None)
+        self.min_samples_split = kwargs.pop("min_samples_split", 2)
+        self.min_samples_leaf = kwargs.pop("min_samples_leaf", 1)
+        self.min_weight_fraction_leaf = kwargs.pop("min_weight_fraction_leaf", 0.0)
+        self.max_features = kwargs.pop("max_features", 1.0)
+        self.max_leaf_nodes = kwargs.pop("max_leaf_nodes", None)
+        self.min_impurity_decrease = kwargs.pop("min_impurity_decrease", 0.0)
+        self.ccp_alpha = kwargs.pop("ccp_alpha", 0.0)
+        self.monotonic_cst = kwargs.pop("monotonic_cst", None)
+        self.splitter = kwargs.pop("splitter", "random")
+
+        # Extract ExtraTreesRegressor specific params
+        bootstrap = kwargs.pop("bootstrap", False)
+        oob_score = kwargs.pop("oob_score", False)
+        n_jobs = kwargs.pop("n_jobs", None)
+        random_state = kwargs.pop("random_state", None)
+        verbose = kwargs.pop("verbose", 0)
+        warm_start = kwargs.pop("warm_start", False)
+        max_samples = kwargs.pop("max_samples", None)
+
+        # Filter out parameters that are for the selector/pipeline and not the model
+        for k in ["budget", "maximize", "n_algorithms"]:
+            kwargs.pop(k, None)
+
         super().__init__(
             DecisionTreeRegressor(),
             n_estimators,
@@ -132,19 +138,6 @@ class EPMRandomForest(ForestRegressor, AbstractPredictor, ConfigurableMixin):
             warm_start=warm_start,
             max_samples=max_samples,
         )
-        self.criterion = criterion
-        self.max_depth = max_depth
-        self.min_samples_split = min_samples_split
-        self.min_samples_leaf = min_samples_leaf
-        self.min_weight_fraction_leaf = min_weight_fraction_leaf
-        self.max_features = max_features
-        self.max_leaf_nodes = max_leaf_nodes
-        self.min_impurity_decrease = min_impurity_decrease
-        self.ccp_alpha = ccp_alpha
-        self.monotonic_cst = monotonic_cst
-        self.splitter = splitter
-        self.log = log
-        self.return_var = return_var
 
     @staticmethod
     def _define_hyperparameters(
@@ -175,19 +168,6 @@ class EPMRandomForest(ForestRegressor, AbstractPredictor, ConfigurableMixin):
             Categorical("log", items=[True, False], default=False),
         ]
         return hyperparameters, [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial:
-        """
-        Create a partial function from a clean (unprefixed) configuration.
-        """
-        config = clean_config.copy()
-        config.update(kwargs)
-        return partial(EPMRandomForest, **config)
 
     def fit(
         self,

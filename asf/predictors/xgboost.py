@@ -15,7 +15,6 @@ except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
 from typing import Any
-from functools import partial
 import numpy as np
 
 try:
@@ -36,20 +35,22 @@ class XGBoostClassifierWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "xgb_classifier"
 
-    def __init__(self, init_params: dict[str, Any] | None = None):
+    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
         """
         Initialize the XGBoostClassifierWrapper.
 
         Parameters
         ----------
-        init_params : dict, optional
+        init_params : dict or None
+            Initialization parameters for the XGBoost classifier (backward compatibility).
+        **kwargs : Any
             Initialization parameters for the XGBoost classifier.
         """
         if not XGB_AVAILABLE:
             raise ImportError(
                 "XGBoost is not installed. Please install it using pip install asf-lib[xgb]."
             )
-        super().__init__(XGBClassifier, init_params or {})
+        super().__init__(XGBClassifier, init_params=init_params, **kwargs)
 
     def fit(
         self,
@@ -124,20 +125,6 @@ class XGBoostClassifierWrapper(ConfigurableMixin, SklearnWrapper):
         ]
         return hyperparameters, [], []
 
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs,
-    ) -> partial:
-        """
-        Create a partial function from a clean (unprefixed) configuration.
-        """
-        xgb_params = clean_config.copy()
-        xgb_params.update(kwargs)
-
-        return partial(XGBoostClassifierWrapper, init_params=xgb_params)
-
 
 class XGBoostRegressorWrapper(ConfigurableMixin, SklearnWrapper):
     """
@@ -146,16 +133,18 @@ class XGBoostRegressorWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "xgb_regressor"
 
-    def __init__(self, init_params: dict[str, Any] | None = None):
+    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
         """
         Initialize the XGBoostRegressorWrapper.
 
         Parameters
         ----------
-        init_params : dict, optional
+        init_params : dict or None
+            Initialization parameters for the XGBoost regressor (backward compatibility).
+        **kwargs : Any
             Initialization parameters for the XGBoost regressor.
         """
-        super().__init__(XGBRegressor, init_params or {})
+        super().__init__(XGBRegressor, init_params=init_params, **kwargs)
 
     @staticmethod
     def _define_hyperparameters(**kwargs):
@@ -182,20 +171,6 @@ class XGBoostRegressorWrapper(ConfigurableMixin, SklearnWrapper):
         ]
         return hyperparameters, [], []
 
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs,
-    ) -> partial:
-        """
-        Create a partial function from a clean (unprefixed) configuration.
-        """
-        xgb_params = clean_config.copy()
-        xgb_params.update(kwargs)
-
-        return partial(XGBoostRegressorWrapper, init_params=xgb_params)
-
 
 class XGBoostRankerWrapper(ConfigurableMixin, SklearnWrapper):
     """
@@ -204,16 +179,18 @@ class XGBoostRankerWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "xgb_ranker"
 
-    def __init__(self, init_params: dict[str, Any] | None = None):
+    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
         """
         Initialize the XGBoostRankerWrapper.
 
         Parameters
         ----------
-        init_params : dict, optional
+        init_params : dict or None
+            Initialization parameters for the XGBoost ranker (backward compatibility).
+        **kwargs : Any
             Initialization parameters for the XGBoost ranker.
         """
-        super().__init__(XGBRanker, init_params or {})
+        super().__init__(XGBRanker, init_params=init_params, **kwargs)
 
     @staticmethod
     def _define_hyperparameters(**kwargs):
@@ -238,17 +215,3 @@ class XGBoostRankerWrapper(ConfigurableMixin, SklearnWrapper):
             ),
         ]
         return hyperparameters, [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs,
-    ) -> partial:
-        """
-        Create a partial function from a clean (unprefixed) configuration.
-        """
-        xgb_params = clean_config.copy()
-        xgb_params.update(kwargs)
-
-        return partial(XGBoostRankerWrapper, init_params=xgb_params)

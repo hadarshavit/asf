@@ -229,7 +229,7 @@ def convert_class_choices_to_categorical(cs: ConfigurationSpace) -> Configuratio
 
     # Create a new ConfigurationSpace with converted hyperparameters
     new_cs = ConfigurationSpace()
-    hp_map = {}  # Map old names to new hyperparameters
+    hp_map = {}
 
     # First pass: convert all hyperparameters
     for hp in cs.values():
@@ -376,7 +376,6 @@ def _clone_condition(
             *[_clone_condition(c, prefix, hp_map) for c in condition.components]
         )
 
-    # Get prefixed child and parent hyperparameters
     child = hp_map[condition.child.name]
     parent = hp_map[condition.parent.name]
 
@@ -600,7 +599,7 @@ class ConfigurableMixin:
             return cs
 
         # Clone hyperparameters with prefixes
-        hp_map = {}  # original name -> prefixed hyperparameter
+        hp_map = {}
         prefixed_hps = []
         class_choices = []  # Track ClassChoice hyperparameters for recursion
 
@@ -713,6 +712,7 @@ class ConfigurableMixin:
                     value = chosen_cls.get_from_configuration(  # type: ignore[operator]
                         configuration=configuration,
                         pre_prefix=child_pre_prefix,
+                        **kwargs,
                     )
                 else:
                     value = chosen_cls

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import partial
 from typing import Any, cast
 
 import numpy as np
@@ -95,7 +94,17 @@ class ISA(ConfigurableMixin, AbstractSelector):
         self.k = int(k)
         self.use_k_tuning = bool(use_k_tuning)
         self.n_folds = int(n_folds)
-        self.k_candidates = [3, 5, 10, 15, 20] if k_candidates is None else k_candidates
+
+        if isinstance(k_candidates, str):
+            k_map = {
+                "small": [3, 5, 10],
+                "medium": [3, 5, 10, 15, 20],
+                "broad": [3, 5, 10, 15, 20, 30, 50],
+            }
+            self.k_candidates = k_map.get(k_candidates, [3, 5, 10, 15, 20])
+        else:
+            self.k_candidates = k_candidates or [3, 5, 10, 15, 20]
+
         self.aspeed_cutoff = int(aspeed_cutoff)
         self.cores = int(cores)
         self.random_state = int(random_state)
@@ -348,45 +357,3 @@ class ISA(ConfigurableMixin, AbstractSelector):
         ]
 
         return params, conditions, []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[ISA]:
-        """
-        Create a partial function from a clean configuration.
-
-        Parameters
-        ----------
-        clean_config : dict
-            The clean configuration.
-        **kwargs : Any
-            Additional keyword arguments.
-
-        Returns
-        -------
-        partial
-            Partial function for ISA.
-        """
-        config = clean_config.copy()
-
-        k_candidates_map = {
-            "small": [3, 5, 10],
-            "medium": [3, 5, 10, 15, 20],
-            "broad": [3, 5, 10, 15, 20, 30, 50],
-        }
-
-        use_k = config.get("use_k_tuning", True)
-
-        if use_k:
-            k_candidates_str = config.get("k_candidates", "medium")
-            config["k_candidates"] = k_candidates_map[k_candidates_str]
-        else:
-            config["k_candidates"] = [3, 5, 10, 15, 20]
-            if "n_folds" not in config:
-                config["n_folds"] = 5
-
-        config.update(kwargs)
-        return partial(ISA, **config)

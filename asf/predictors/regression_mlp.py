@@ -4,7 +4,6 @@ Regression MLP predictor using PyTorch.
 
 from __future__ import annotations
 
-from functools import partial
 from typing import Any
 
 import numpy as np
@@ -44,6 +43,7 @@ class RegressionMLP(AbstractPredictor, ConfigurableMixin):
 
     def __init__(
         self,
+        init_params: dict[str, Any] | None = None,
         model: torch.nn.Module | None = None,
         loss: torch.nn.modules.loss._Loss | None = None,
         optimizer: type[torch.optim.Optimizer] | None = None,
@@ -56,7 +56,22 @@ class RegressionMLP(AbstractPredictor, ConfigurableMixin):
         weight_decay: float = 0.0,
         **kwargs: Any,
     ):
-        super().__init__(**kwargs)
+        params = init_params if isinstance(init_params, dict) else {}
+        params.update(kwargs)
+
+        # Extract parameters from params with defaults
+        model = params.pop("model", model)
+        loss = params.pop("loss", loss)
+        optimizer = params.pop("optimizer", optimizer)
+        batch_size = params.pop("batch_size", batch_size)
+        epochs = params.pop("epochs", epochs)
+        seed = params.pop("seed", seed)
+        device = params.pop("device", device)
+        compile_model = params.pop("compile_model", compile_model)
+        learning_rate = params.pop("learning_rate", learning_rate)
+        weight_decay = params.pop("weight_decay", weight_decay)
+
+        super().__init__(**params)
         if not TORCH_AVAILABLE:
             raise RuntimeError(
                 "PyTorch is not installed. Install it with: pip install torch"
@@ -209,16 +224,3 @@ class RegressionMLP(AbstractPredictor, ConfigurableMixin):
             Float("weight_decay", (1e-6, 1e-2), log=True, default=1e-5),
         ]
         return hyperparameters, [], []
-
-    @classmethod
-    def _get_from_clean_configuration(
-        cls,
-        clean_config: dict[str, Any],
-        **kwargs: Any,
-    ) -> partial[RegressionMLP]:
-        """
-        Create a partial function from a clean (unprefixed) configuration.
-        """
-        config = clean_config.copy()
-        config.update(kwargs)
-        return partial(RegressionMLP, **config)
