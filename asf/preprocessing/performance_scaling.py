@@ -1,32 +1,58 @@
+"""
+Normalization techniques for algorithm performance data.
+
+This module provides various scaling and transformation methods, primarily
+adapted to handle runtime data in algorithm selection.
+"""
+
+from __future__ import annotations
+
 import numpy as np
-from sklearn.base import OneToOneFeatureMixin, TransformerMixin, BaseEstimator
-from sklearn.preprocessing import MinMaxScaler, PowerTransformer, StandardScaler
-import scipy.stats
 import scipy.special
+import scipy.stats
+from typing import Any
+from sklearn.base import BaseEstimator, OneToOneFeatureMixin, TransformerMixin
+from sklearn.preprocessing import MinMaxScaler, PowerTransformer, StandardScaler
 
 
-class AbstractNormalization(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
+from asf.utils.configurable import ConfigurableMixin
+
+
+class AbstractNormalization(
+    OneToOneFeatureMixin, TransformerMixin, BaseEstimator, ConfigurableMixin
+):
     """
-    Abstract base class for normalization techniques. All normalization classes
-    should inherit from this class and implement the `transform` and `inverse_transform` methods.
+    Abstract base class for normalization techniques.
+
+    All normalization classes should inherit from this class and implement
+    the `transform` and `inverse_transform` methods.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__()
 
     def fit(
-        self, X: np.ndarray, y: np.ndarray = None, sample_weight: np.ndarray = None
-    ) -> "AbstractNormalization":
+        self,
+        X: np.ndarray,
+        y: np.ndarray | None = None,
+        sample_weight: np.ndarray | None = None,
+    ) -> AbstractNormalization:
         """
         Fit the normalization model to the data.
 
-        Args:
-            X (np.ndarray): Input data.
-            y (np.ndarray, optional): Target values. Defaults to None.
-            sample_weight (np.ndarray, optional): Sample weights. Defaults to None.
+        Parameters
+        ----------
+        X : np.ndarray
+            Input data.
+        y : np.ndarray or None, default=None
+            Target values.
+        sample_weight : np.ndarray or None, default=None
+            Sample weights.
 
-        Returns:
-            AbstractNormalization: The fitted normalization instance.
+        Returns
+        -------
+        AbstractNormalization
+            The fitted normalization instance.
         """
         return self
 
@@ -34,11 +60,15 @@ class AbstractNormalization(OneToOneFeatureMixin, TransformerMixin, BaseEstimato
         """
         Transform the input data.
 
-        Args:
-            X (np.ndarray): Input data.
+        Parameters
+        ----------
+        X : np.ndarray
+            Input data.
 
-        Returns:
-            np.ndarray: Transformed data.
+        Returns
+        -------
+        np.ndarray
+            Transformed data.
         """
         raise NotImplementedError
 
@@ -46,13 +76,25 @@ class AbstractNormalization(OneToOneFeatureMixin, TransformerMixin, BaseEstimato
         """
         Inverse transform the input data.
 
-        Args:
-            X (np.ndarray): Transformed data.
+        Parameters
+        ----------
+        X : np.ndarray
+            Transformed data.
 
-        Returns:
-            np.ndarray: Original data.
+        Returns
+        -------
+        np.ndarray
+            Original data.
         """
         raise NotImplementedError
+
+    def _reshape_input(self, X: np.ndarray) -> np.ndarray:
+        """Reshape input for sklearn scalers (n_samples, 1)."""
+        return np.asarray(X).reshape(-1, 1)
+
+    def _reshape_output(self, X: np.ndarray) -> np.ndarray:
+        """Reshape output from sklearn scalers back to 1D."""
+        return np.asarray(X).reshape(-1)
 
 
 class MinMaxNormalization(AbstractNormalization):
@@ -60,57 +102,84 @@ class MinMaxNormalization(AbstractNormalization):
     Normalization using Min-Max scaling.
     """
 
-    def __init__(self, feature_range: tuple[float, float] = (0, 1)) -> None:
+    PREFIX = "min_max"
+
+    def __init__(
+        self, feature_range: tuple[float, float] = (0, 1), **kwargs: Any
+    ) -> None:
         """
         Initialize MinMaxNormalization.
 
-        Args:
-            feature_range (tuple[float, float], optional): Desired range of transformed data. Defaults to (0, 1).
+        Parameters
+        ----------
+        feature_range : tuple[float, float], default=(0, 1)
+            Desired range of transformed data.
         """
-        super().__init__()
+        super().__init__(**kwargs)
         self.feature_range = feature_range
 
     def fit(
-        self, X: np.ndarray, y: np.ndarray = None, sample_weight: np.ndarray = None
-    ) -> "MinMaxNormalization":
+        self,
+        X: np.ndarray,
+        y: np.ndarray | None = None,
+        sample_weight: np.ndarray | None = None,
+    ) -> MinMaxNormalization:
         """
         Fit the Min-Max scaler to the data.
 
-        Args:
-            X (np.ndarray): Input data.
-            y (np.ndarray, optional): Target values. Defaults to None.
-            sample_weight (np.ndarray, optional): Sample weights. Defaults to None.
+        Parameters
+        ----------
+        X : np.ndarray
+            Input data.
+        y : np.ndarray or None, default=None
+            Target values.
+        sample_weight : np.ndarray or None, default=None
+            Sample weights.
 
-        Returns:
-            MinMaxNormalization: The fitted normalization instance.
+        Returns
+        -------
+        MinMaxNormalization
+            The fitted normalization instance.
         """
         self.min_max_scale = MinMaxScaler(feature_range=self.feature_range)
-        self.min_max_scale.fit(X.reshape(-1, 1))
+        self.min_max_scale.fit(self._reshape_input(X))
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
         """
         Transform the input data using Min-Max scaling.
 
-        Args:
-            X (np.ndarray): Input data.
+        Parameters
+        ----------
+        X : np.ndarray
+            Input data.
 
-        Returns:
-            np.ndarray: Transformed data.
+        Returns
+        -------
+        np.ndarray
+            Transformed data.
         """
-        return self.min_max_scale.transform(X.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(
+            self.min_max_scale.transform(self._reshape_input(X))
+        )
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
         Inverse transform the data back to the original scale.
 
-        Args:
-            X (np.ndarray): Transformed data.
+        Parameters
+        ----------
+        X : np.ndarray
+            Transformed data.
 
-        Returns:
-            np.ndarray: Original data.
+        Returns
+        -------
+        np.ndarray
+            Original data.
         """
-        return self.min_max_scale.inverse_transform(X.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(
+            self.min_max_scale.inverse_transform(self._reshape_input(X))
+        )
 
 
 class ZScoreNormalization(AbstractNormalization):
@@ -118,50 +187,71 @@ class ZScoreNormalization(AbstractNormalization):
     Normalization using Z-Score scaling.
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    PREFIX = "z_score"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     def fit(
-        self, X: np.ndarray, y: np.ndarray = None, sample_weight: np.ndarray = None
-    ) -> "ZScoreNormalization":
+        self,
+        X: np.ndarray,
+        y: np.ndarray | None = None,
+        sample_weight: np.ndarray | None = None,
+    ) -> ZScoreNormalization:
         """
         Fit the Z-Score scaler to the data.
 
-        Args:
-            X (np.ndarray): Input data.
-            y (np.ndarray, optional): Target values. Defaults to None.
-            sample_weight (np.ndarray, optional): Sample weights. Defaults to None.
+        Parameters
+        ----------
+        X : np.ndarray
+            Input data.
+        y : np.ndarray or None, default=None
+            Target values.
+        sample_weight : np.ndarray or None, default=None
+            Sample weights.
 
-        Returns:
-            ZScoreNormalization: The fitted normalization instance.
+        Returns
+        -------
+        ZScoreNormalization
+            The fitted normalization instance.
         """
         self.scaler = StandardScaler()
-        self.scaler.fit(X.reshape(-1, 1))
+        self.scaler.fit(self._reshape_input(X))
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
         """
         Transform the input data using Z-Score scaling.
 
-        Args:
-            X (np.ndarray): Input data.
+        Parameters
+        ----------
+        X : np.ndarray
+            Input data.
 
-        Returns:
-            np.ndarray: Transformed data.
+        Returns
+        -------
+        np.ndarray
+            Transformed data.
         """
-        return self.scaler.transform(X.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(self.scaler.transform(self._reshape_input(X)))
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
         Inverse transform the data back to the original scale.
 
-        Args:
-            X (np.ndarray): Transformed data.
+        Parameters
+        ----------
+        X : np.ndarray
+            Transformed data.
 
-        Returns:
-            np.ndarray: Original data.
+        Returns
+        -------
+        np.ndarray
+            Original data.
         """
-        return self.scaler.inverse_transform(X.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(
+            self.scaler.inverse_transform(self._reshape_input(X))
+        )
 
 
 class LogNormalization(AbstractNormalization):
@@ -169,68 +259,93 @@ class LogNormalization(AbstractNormalization):
     Normalization using logarithmic scaling.
     """
 
-    def __init__(self, base: float = 10, eps: float = 1e-6) -> None:
+    PREFIX = "log"
+
+    def __init__(self, base: float = 10.0, eps: float = 1e-6, **kwargs: Any) -> None:
         """
         Initialize LogNormalization.
 
-        Args:
-            base (float, optional): Base of the logarithm. Defaults to 10.
-            eps (float, optional): Small constant to avoid log(0). Defaults to 1e-6.
+        Parameters
+        ----------
+        base : float, default=10.0
+            Base of the logarithm.
+        eps : float, default=1e-6
+            Small constant to avoid log(0).
         """
-        super().__init__()
-        self.base = base
-        self.eps = eps
+        super().__init__(**kwargs)
+        self.base = float(base)
+        self.eps = float(eps)
+        self.min_val: float = 0.0
 
     def fit(
-        self, X: np.ndarray, y: np.ndarray = None, sample_weight: np.ndarray = None
-    ) -> "LogNormalization":
+        self,
+        X: np.ndarray,
+        y: np.ndarray | None = None,
+        sample_weight: np.ndarray | None = None,
+    ) -> LogNormalization:
         """
         Fit the LogNormalization model to the data.
 
-        Args:
-            X (np.ndarray): Input data.
-            y (np.ndarray, optional): Target values. Defaults to None.
-            sample_weight (np.ndarray, optional): Sample weights. Defaults to None.
+        Parameters
+        ----------
+        X : np.ndarray
+            Input data.
+        y : np.ndarray or None, default=None
+            Target values.
+        sample_weight : np.ndarray or None, default=None
+            Sample weights.
 
-        Returns:
-            LogNormalization: The fitted normalization instance.
+        Returns
+        -------
+        LogNormalization
+            The fitted normalization instance.
         """
         x_min = np.min(np.asarray(X))
         if x_min <= 0:
             self.min_val = x_min
         else:
-            self.min_val = 0
-            self.eps = 0
+            self.min_val = 0.0
+            self.eps = 0.0
 
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
         """
-        Transform the input data using logarithmic scaling.
+                Transform the input data using logarithmic scaling.
 
-        Args:
-            X (np.ndarray): Input data.
+                Parameters
+                ----------
+                X : np.ndarray
+                    Input data.
 
-        Returns:
-            np.ndarray: Transformed data.
+                Returns
+        -------
+                np.ndarray
+                    Transformed data.
         """
-        X = X - self.min_val + self.eps
-        return np.log(X) / np.log(self.base)
+        X_shifted = np.asarray(X) - self.min_val + self.eps
+        # Clip to avoid non-positive values for log
+        X_shifted = np.clip(X_shifted, self.eps, None)
+        return np.log(X_shifted) / np.log(self.base)
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
-        Inverse transform the data back to the original scale.
+                Inverse transform the data back to the original scale.
 
-        Args:
-            X (np.ndarray): Transformed data.
+                Parameters
+                ----------
+                X : np.ndarray
+                    Transformed data.
 
-        Returns:
-            np.ndarray: Original data.
+                Returns
+        -------
+                np.ndarray
+                    Original data.
         """
-        X = np.power(self.base, X)
+        X_orig = np.power(self.base, X)
         if self.min_val != 0:
-            X = X + self.min_val - self.eps
-        return X
+            X_orig = X_orig + self.min_val - self.eps
+        return X_orig
 
 
 class SqrtNormalization(AbstractNormalization):
@@ -238,65 +353,87 @@ class SqrtNormalization(AbstractNormalization):
     Normalization using square root scaling.
     """
 
-    def __init__(self, eps: float = 1e-6) -> None:
+    PREFIX = "sqrt"
+
+    def __init__(self, eps: float = 1e-6, **kwargs: Any) -> None:
         """
         Initialize SqrtNormalization.
 
-        Args:
-            eps (float, optional): Small constant to avoid sqrt(0). Defaults to 1e-6.
+        Parameters
+        ----------
+        eps : float, default=1e-6
+            Small constant to avoid sqrt(0).
         """
-        super().__init__()
+        super().__init__(**kwargs)
         self.eps = eps
 
     def fit(
-        self, X: np.ndarray, y: np.ndarray = None, sample_weight: np.ndarray = None
-    ) -> "SqrtNormalization":
+        self,
+        X: np.ndarray,
+        y: np.ndarray | None = None,
+        sample_weight: np.ndarray | None = None,
+    ) -> SqrtNormalization:
         """
         Fit the SqrtNormalization model to the data.
 
-        Args:
-            X (np.ndarray): Input data.
-            y (np.ndarray, optional): Target values. Defaults to None.
-            sample_weight (np.ndarray, optional): Sample weights. Defaults to None.
+        Parameters
+        ----------
+        X : np.ndarray
+            Input data.
+        y : np.ndarray or None, default=None
+            Target values.
+        sample_weight : np.ndarray or None, default=None
+            Sample weights.
 
-        Returns:
-            SqrtNormalization: The fitted normalization instance.
+        Returns
+        -------
+        SqrtNormalization
+            The fitted normalization instance.
         """
         x_min = np.min(np.asarray(X))
         if x_min < 0:
             self.min_val = x_min
-            X = X + self.min_val + self.eps
         else:
-            self.min_val = 0
+            self.min_val = 0.0
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
         """
-        Transform the input data using square root scaling.
+                Transform the input data using square root scaling.
 
-        Args:
-            X (np.ndarray): Input data.
+                Parameters
+                ----------
+                X : np.ndarray
+                    Input data.
 
-        Returns:
-            np.ndarray: Transformed data.
+                Returns
+        -------
+                np.ndarray
+                    Transformed data.
         """
-        X = X + self.min_val + self.eps
-        return np.sqrt(X)
+        X_shifted = np.asarray(X) - self.min_val + self.eps
+        # Clip to avoid negative values for sqrt
+        X_shifted = np.clip(X_shifted, 0, None)
+        return np.sqrt(X_shifted)
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
-        Inverse transform the data back to the original scale.
+                Inverse transform the data back to the original scale.
 
-        Args:
-            X (np.ndarray): Transformed data.
+                Parameters
+                ----------
+                X : np.ndarray
+                    Transformed data.
 
-        Returns:
-            np.ndarray: Original data.
+                Returns
+        -------
+                np.ndarray
+                    Original data.
         """
-        X = np.power(X, 2)
+        X_orig = np.power(X, 2)
         if self.min_val != 0:
-            X = X - self.min_val - self.eps
-        return X
+            X_orig = X_orig + self.min_val - self.eps
+        return X_orig
 
 
 class InvSigmoidNormalization(AbstractNormalization):
@@ -304,52 +441,75 @@ class InvSigmoidNormalization(AbstractNormalization):
     Normalization using inverse sigmoid scaling.
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    PREFIX = "inv_sigmoid"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     def fit(
-        self, X: np.ndarray, y: np.ndarray = None, sample_weight: np.ndarray = None
-    ) -> "InvSigmoidNormalization":
+        self,
+        X: np.ndarray,
+        y: np.ndarray | None = None,
+        sample_weight: np.ndarray | None = None,
+    ) -> InvSigmoidNormalization:
         """
         Fit the InvSigmoidNormalization model to the data.
 
-        Args:
-            X (np.ndarray): Input data.
-            y (np.ndarray, optional): Target values. Defaults to None.
-            sample_weight (np.ndarray, optional): Sample weights. Defaults to None.
+        Parameters
+        ----------
+        X : np.ndarray
+            Input data.
+        y : np.ndarray or None, default=None
+            Target values.
+        sample_weight : np.ndarray or None, default=None
+            Sample weights.
 
-        Returns:
-            InvSigmoidNormalization: The fitted normalization instance.
+        Returns
+        -------
+        InvSigmoidNormalization
+            The fitted normalization instance.
         """
         self.min_max_scale = MinMaxScaler(feature_range=(1e-6, 1 - 1e-6))
-        self.min_max_scale.fit(np.asarray(X).reshape(-1, 1))
+        self.min_max_scale.fit(self._reshape_input(X))
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
         """
-        Transform the input data using inverse sigmoid scaling.
+                Transform the input data using inverse sigmoid scaling.
 
-        Args:
-            X (np.ndarray): Input data.
+                Parameters
+                ----------
+                X : np.ndarray
+                    Input data.
 
-        Returns:
-            np.ndarray: Transformed data.
+                Returns
+        -------
+                np.ndarray
+                    Transformed data.
         """
-        X = self.min_max_scale.transform(X.reshape(-1, 1)).reshape(-1)
-        return np.log(X / (1 - X))
+        X_scaled = self._reshape_output(
+            self.min_max_scale.transform(self._reshape_input(X))
+        )
+        return np.log(X_scaled / (1 - X_scaled))
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
-        Inverse transform the data back to the original scale.
+                Inverse transform the data back to the original scale.
 
-        Args:
-            X (np.ndarray): Transformed data.
+                Parameters
+                ----------
+                X : np.ndarray
+                    Transformed data.
 
-        Returns:
-            np.ndarray: Original data.
+                Returns
+        -------
+                np.ndarray
+                    Original data.
         """
-        X = scipy.special.expit(X)
-        return self.min_max_scale.inverse_transform(X.reshape(-1, 1)).reshape(-1)
+        X_logit = scipy.special.expit(X)
+        return self._reshape_output(
+            self.min_max_scale.inverse_transform(self._reshape_input(X_logit))
+        )
 
 
 class NegExpNormalization(AbstractNormalization):
@@ -357,46 +517,65 @@ class NegExpNormalization(AbstractNormalization):
     Normalization using negative exponential scaling.
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    PREFIX = "neg_exp"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     def fit(
-        self, X: np.ndarray, y: np.ndarray = None, sample_weight: np.ndarray = None
-    ) -> "NegExpNormalization":
+        self,
+        X: np.ndarray,
+        y: np.ndarray | None = None,
+        sample_weight: np.ndarray | None = None,
+    ) -> NegExpNormalization:
         """
         Fit the NegExpNormalization model to the data.
 
-        Args:
-            X (np.ndarray): Input data.
-            y (np.ndarray, optional): Target values. Defaults to None.
-            sample_weight (np.ndarray, optional): Sample weights. Defaults to None.
+        Parameters
+        ----------
+        X : np.ndarray
+            Input data.
+        y : np.ndarray or None, default=None
+            Target values.
+        sample_weight : np.ndarray or None, default=None
+            Sample weights.
 
-        Returns:
-            NegExpNormalization: The fitted normalization instance.
+        Returns
+        -------
+        NegExpNormalization
+            The fitted normalization instance.
         """
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
         """
-        Transform the input data using negative exponential scaling.
+                Transform the input data using negative exponential scaling.
 
-        Args:
-            X (np.ndarray): Input data.
+                Parameters
+                ----------
+                X : np.ndarray
+                    Input data.
 
-        Returns:
-            np.ndarray: Transformed data.
+                Returns
+        -------
+                np.ndarray
+                    Transformed data.
         """
         return np.exp(-X)
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
-        Inverse transform the data back to the original scale.
+                Inverse transform the data back to the original scale.
 
-        Args:
-            X (np.ndarray): Transformed data.
+                Parameters
+                ----------
+                X : np.ndarray
+                    Transformed data.
 
-        Returns:
-            np.ndarray: Original data.
+                Returns
+        -------
+                np.ndarray
+                    Original data.
         """
         return -np.log(X)
 
@@ -406,97 +585,137 @@ class DummyNormalization(AbstractNormalization):
     Normalization that does not change the data.
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    PREFIX = "dummy"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     def fit(
-        self, X: np.ndarray, y: np.ndarray = None, sample_weight: np.ndarray = None
-    ) -> "DummyNormalization":
+        self,
+        X: np.ndarray,
+        y: np.ndarray | None = None,
+        sample_weight: np.ndarray | None = None,
+    ) -> DummyNormalization:
         """
         Fit the DummyNormalization model to the data.
 
-        Args:
-            X (np.ndarray): Input data.
-            y (np.ndarray, optional): Target values. Defaults to None.
-            sample_weight (np.ndarray, optional): Sample weights. Defaults to None.
+        Parameters
+        ----------
+        X : np.ndarray
+            Input data.
+        y : np.ndarray or None, default=None
+            Target values.
+        sample_weight : np.ndarray or None, default=None
+            Sample weights.
 
-        Returns:
-            DummyNormalization: The fitted normalization instance.
+        Returns
+        -------
+        DummyNormalization
+            The fitted normalization instance.
         """
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
         """
-        Transform the input data (no change).
+                Transform the input data (no change).
 
-        Args:
-            X (np.ndarray): Input data.
+                Parameters
+                ----------
+                X : np.ndarray
+                    Input data.
 
-        Returns:
-            np.ndarray: Transformed data.
+                Returns
+        -------
+                np.ndarray
+                    Transformed data.
         """
         return X
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
-        Inverse transform the data (no change).
+                Inverse transform the data (no change).
 
-        Args:
-            X (np.ndarray): Transformed data.
+                Parameters
+                ----------
+                X : np.ndarray
+                    Transformed data.
 
-        Returns:
-            np.ndarray: Original data.
+                Returns
+        -------
+                np.ndarray
+                    Original data.
         """
         return X
 
 
 class BoxCoxNormalization(AbstractNormalization):
     """
-    Normalization using Box-Cox transformation.
+    Normalization using Box-Cox transformation (Yeo-Johnson variant).
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    PREFIX = "box_cox"
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     def fit(
-        self, X: np.ndarray, y: np.ndarray = None, sample_weight: np.ndarray = None
-    ) -> "BoxCoxNormalization":
+        self,
+        X: np.ndarray,
+        y: np.ndarray | None = None,
+        sample_weight: np.ndarray | None = None,
+    ) -> BoxCoxNormalization:
         """
         Fit the Box-Cox transformer to the data.
 
-        Args:
-            X (np.ndarray): Input data.
-            y (np.ndarray, optional): Target values. Defaults to None.
-            sample_weight (np.ndarray, optional): Sample weights. Defaults to None.
+        Parameters
+        ----------
+        X : np.ndarray
+            Input data.
+        y : np.ndarray or None, default=None
+            Target values.
+        sample_weight : np.ndarray or None, default=None
+            Sample weights.
 
-        Returns:
-            BoxCoxNormalization: The fitted normalization instance.
+        Returns
+        -------
+        BoxCoxNormalization
+            The fitted normalization instance.
         """
         self.box_cox = PowerTransformer(method="yeo-johnson")
-        self.box_cox.fit(X.reshape(-1, 1))
+        self.box_cox.fit(self._reshape_input(X))
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
         """
-        Transform the input data using Box-Cox transformation.
+                Transform the input data using Box-Cox transformation.
 
-        Args:
-            X (np.ndarray): Input data.
+                Parameters
+                ----------
+                X : np.ndarray
+                    Input data.
 
-        Returns:
-            np.ndarray: Transformed data.
+                Returns
+        -------
+                np.ndarray
+                    Transformed data.
         """
-        return self.box_cox.transform(X.reshape(-1, 1)).reshape(-1)
+        return self._reshape_output(self.box_cox.transform(self._reshape_input(X)))
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
-        Inverse transform the data back to the original scale.
+                Inverse transform the data back to the original scale.
 
-        Args:
-            X (np.ndarray): Transformed data.
+                Parameters
+                ----------
+                X : np.ndarray
+                    Transformed data.
 
-        Returns:
-            np.ndarray: Original data.
+                Returns
+        -------
+                np.ndarray
+                    Original data.
         """
-        X = self.box_cox.inverse_transform(X.reshape(-1, 1)).reshape(-1)
-        return X
+        X_orig = self._reshape_output(
+            self.box_cox.inverse_transform(self._reshape_input(X))
+        )
+        return X_orig

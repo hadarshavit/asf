@@ -49,11 +49,7 @@ def test_sqrt_negative():
     norm.fit(data)
     transformed = norm.transform(data)
     inverted = norm.inverse_transform(transformed)
-    # The implementation shifts by min_val which currently results in
-    # negative values under the sqrt for the negative entries producing NaNs.
-    # We expect the last element (positive) to round-trip, and the first two to be NaN.
-    assert np.isnan(inverted[0]) and np.isnan(inverted[1])
-    assert np.allclose(inverted[2], data[2], atol=1e-5)
+    assert np.allclose(data, inverted, atol=1e-5)
 
 
 def test_inv_sigmoid_and_negexp():

@@ -19,7 +19,7 @@ def test_mlp_configuration_space(wrapper_cls):
     assert isinstance(cs, ConfigurationSpace)
 
     prefix = wrapper_cls.PREFIX
-    cs_names = {hp.name for hp in cs.get_hyperparameters()}
+    cs_names = {hp.name for hp in list(cs.values())}
     assert {f"{prefix}:depth", f"{prefix}:width"}.issubset(cs_names)
 
 

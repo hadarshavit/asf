@@ -1,7 +1,10 @@
 import numpy as np
 import pandas as pd
+from typing import Any, cast
 
-from sklearn.ensemble import RandomForestClassifier
+from asf.predictors.random_forest import (
+    RandomForestClassifierWrapper as RandomForestClassifier,
+)
 from asf.selectors.meta_selector import MetaSelector
 from asf.selectors.snnap import SNNAP
 from asf.selectors.satzilla import SATzilla
@@ -17,8 +20,8 @@ def make_challenging_data(n_instances=200, n_algorithms=6, seed=42, budget=200.0
     rng = np.random.RandomState(seed)
     features = pd.DataFrame(
         rng.uniform(0, 10, size=(n_instances, 4)),
-        columns=[f"f{i}" for i in range(4)],
-        index=[f"inst_{i}" for i in range(n_instances)],
+        columns=[f"f{i}" for i in range(4)],  # type: ignore[arg-type]
+        index=[f"inst_{i}" for i in range(n_instances)],  # type: ignore[arg-type]
     )
 
     perf = pd.DataFrame(index=features.index)
@@ -33,7 +36,7 @@ def make_challenging_data(n_instances=200, n_algorithms=6, seed=42, budget=200.0
     return features, perf
 
 
-def evaluate_predictions(predictions: dict, true_perf: pd.DataFrame, budget: float):
+def evaluate_predictions(predictions: Any, true_perf: pd.DataFrame, budget: float):
     total = 0.0
     solved = 0
     n = len(true_perf)
@@ -117,7 +120,7 @@ def main():
     print(f"{'MetaSelector':<20} {meta_avg_rt:12.2f}s {meta_solve_rate:11.1%}")
     print("\nSample meta decisions (first 10 instances):")
     for inst in list(test_Y.index)[:10]:
-        sched = meta_preds.get(inst, [])
+        sched = cast(dict, meta_preds).get(inst, [])
         if not sched:
             print(f"{inst}: <no prediction>")
             continue

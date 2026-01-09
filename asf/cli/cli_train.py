@@ -1,33 +1,22 @@
 #!/usr/bin/env python3
-"""CLI entry point for training selectors.
+"""CLI entry point for training selectors."""
 
-This script provides a command-line interface for training model-based selectors.
-It allows users to specify the selector type, model, budget, and other parameters
-to train and save the selector model.
-"""
+from __future__ import annotations
 
 import argparse
-from pathlib import Path
 from functools import partial
-from typing import Dict, Callable, List, Optional, Union
+from pathlib import Path
+from typing import Any, Callable
 
 import pandas as pd
-
 from sklearn import preprocessing
-from asf import selectors
-from asf import presolving
-from asf.selectors import tune_selector
-from asf.selectors import AbstractModelBasedSelector, AbstractSelector
-from asf.predictors.random_forest import (
-    RandomForestClassifierWrapper,
-    RandomForestRegressorWrapper,
+
+from asf import predictors, presolving, selectors
+from asf.selectors import (
+    AbstractModelBasedSelector,
+    AbstractSelector,
+    tune_selector,
 )
-from asf.predictors.ridge import RidgeRegressorWrapper
-from asf.predictors.survival import RandomSurvivalForestWrapper
-from asf.predictors.svm import SVMClassifierWrapper, SVMRegressorWrapper
-from asf.predictors.xgboost import XGBoostClassifierWrapper, XGBoostRegressorWrapper
-from asf.predictors.linear_model import LinearClassifierWrapper, LinearRegressorWrapper
-from asf.predictors.mlp import MLPClassifierWrapper, MLPRegressorWrapper
 from asf.selectors.selector_pipeline import SelectorPipeline
 
 
@@ -42,23 +31,34 @@ pandas_read_map: dict[str, Callable] = {
     ".xml": pd.read_xml,
 }
 
-model_list: Dict = {
-    "RandomForestClassifier": RandomForestClassifierWrapper,
-    "RandomForestRegressor": RandomForestRegressorWrapper,
-    "Ridge": RidgeRegressorWrapper,
-    "RandomSurvivalForest": RandomSurvivalForestWrapper,
-    "SVMClassifier": SVMClassifierWrapper,
-    "SVMRegressor": SVMRegressorWrapper,
-    "XGBoostClassifier": XGBoostClassifierWrapper,
-    "XGBoostRegressor": XGBoostRegressorWrapper,
-    "LinearClassifier": LinearClassifierWrapper,
-    "LinearRegressor": LinearRegressorWrapper,
-    "MLPClassifier": MLPClassifierWrapper,
-    "MLPRegressor": MLPRegressorWrapper,
+# Dynamically discover models from asf.predictors
+model_list: dict[str, Any] = {
+    name.replace("Wrapper", ""): getattr(predictors, name)
+    for name in predictors.__all__
+    if not name.startswith("Abstract")
+    and name not in ["SklearnWrapper", "RankingMLP", "RegressionMLP", "EPMRandomForest"]
 }
 
 
 def _fraction_type(val: str) -> float:
+    """
+    Validate and convert string to float fraction.
+
+    Parameters
+    ----------
+    val : str
+        String to convert.
+
+    Returns
+    -------
+    float
+        Float between 0 and 1.
+
+    Raises
+    ------
+    argparse.ArgumentTypeError
+        If value is not a float between 0 and 1.
+    """
     try:
         f = float(val)
     except Exception:
@@ -69,10 +69,13 @@ def _fraction_type(val: str) -> float:
 
 
 def parser_function() -> argparse.ArgumentParser:
-    """Define command line arguments for the CLI.
+    """
+    Define command line arguments for the CLI.
 
-    Returns:
-        argparse.ArgumentParser: The argument parser with defined arguments.
+    Returns
+    -------
+    argparse.ArgumentParser
+        The argument parser with defined arguments.
     """
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -91,8 +94,8 @@ def parser_function() -> argparse.ArgumentParser:
     parser.add_argument(
         "--model",
         default="RandomForestClassifier",
-        help="Model to use for the selector. "
-        "Make sure to specify as an attribute of sklearn.ensemble.",
+        choices=list(model_list.keys()),
+        help="Model to use for the selector.",
     )
     parser.add_argument(
         "--budget",
@@ -130,13 +133,13 @@ def parser_function() -> argparse.ArgumentParser:
         "--preprocessors",
         nargs="*",
         default=None,
-        help=("Preprocessors to apply, choose from Sklearn preprocessors"),
+        help="Preprocessors to apply, choose from Sklearn preprocessors",
     )
     parser.add_argument(
         "--presolvers",
         nargs="*",
         default=None,
-        help=("Presolvers to apply"),
+        help="Presolvers to apply",
     )
     parser.add_argument(
         "--presolver-budget",
@@ -154,24 +157,56 @@ def parser_function() -> argparse.ArgumentParser:
 
 
 def build_cli_command(
-    selector: Union[
-        selectors.AbstractSelector,
-        AbstractModelBasedSelector,
-        List[Union[selectors.AbstractSelector, AbstractModelBasedSelector]],
-    ],
+    selector: AbstractSelector
+    | AbstractModelBasedSelector
+    | list[AbstractSelector | AbstractModelBasedSelector],
     feature_data: Path,
     performance_data: Path,
     destination: Path,
-    model: Optional[Callable] = None,
+    model: type | None = None,
     tuning: bool = False,
-    budget: Optional[int] = None,
-    maximize: Optional[bool] = None,
-    preprocessors: Optional[List[object]] = None,
-    presolvers: Optional[List[object]] = None,
-    presolver_budget: Optional[float] = None,
-    runcount_limit: Optional[int] = None,
-) -> List[str]:
-    """Build CLI command from selector objects."""
+    budget: int | None = None,
+    maximize: bool | None = None,
+    preprocessors: list[type | Any] | None = None,
+    presolvers: list[type | Any] | None = None,
+    presolver_budget: float | None = None,
+    runcount_limit: int | None = None,
+) -> list[str]:
+    """
+    Build CLI command from selector objects.
+
+    Parameters
+    ----------
+    selector : AbstractSelector or list
+        Selector object(s) to use.
+    feature_data : Path
+        Path to feature data.
+    performance_data : Path
+        Path to performance data.
+    destination : Path
+        Path to save the model.
+    model : type or None, default=None
+        Model class to use.
+    tuning : bool, default=False
+        Whether tuning is enabled.
+    budget : int or None, default=None
+        Budget for solvers.
+    maximize : bool or None, default=None
+        Whether to maximize the objective.
+    preprocessors : list or None, default=None
+        List of preprocessor classes or objects.
+    presolvers : list or None, default=None
+        List of presolver classes or objects.
+    presolver_budget : float or None, default=None
+        Budget fraction for presolving.
+    runcount_limit : int or None, default=None
+        Limit on SMAC runs.
+
+    Returns
+    -------
+    list[str]
+        List of command line arguments.
+    """
     if isinstance(selector, (list, tuple)):
         sel_list = list(selector)
     else:
@@ -192,7 +227,7 @@ def build_cli_command(
     for s in sel_list:
         sel_names.append(s.__name__ if isinstance(s, type) else type(s).__name__)
 
-    cmd: List[str] = [
+    cmd: list[str] = [
         "python",
         str(Path(__file__).absolute()),
         "--selectors",
@@ -200,20 +235,21 @@ def build_cli_command(
     if tuning:
         cmd.append("--tuning")
 
-    model_name: Optional[str] = None
+    model_name: str | None = None
     if model is not None:
-        model_name = model.__name__ if hasattr(model, "__name__") else str(model)
+        model_name = str(model.__name__) if hasattr(model, "__name__") else str(model)
     else:
         first = sel_list[0] if len(sel_list) > 0 else None
         if first is not None:
             try:
+                model_attr = getattr(first, "model_class", None)
                 mc = (
-                    first.model_class.args[0]
-                    if isinstance(getattr(first, "model_class", None), partial)
-                    else getattr(first, "model_class", None)
+                    model_attr.args[0]
+                    if isinstance(model_attr, partial)
+                    else model_attr
                 )
                 if mc is not None and hasattr(mc, "__name__"):
-                    model_name = mc.__name__
+                    model_name = str(mc.__name__)
             except Exception:
                 pass
     if model_name is not None:
@@ -252,13 +288,14 @@ def build_cli_command(
 
     if preprocessors and len(preprocessors) > 0:
         proc_names = [
-            p.__name__ if isinstance(p, type) else type(p).__name__
+            str(p.__name__ if isinstance(p, type) else type(p).__name__)
             for p in preprocessors
         ]
         cmd += ["--preprocessors"] + proc_names
     if presolvers and len(presolvers) > 0:
         pres_names = [
-            p.__name__ if isinstance(p, type) else type(p).__name__ for p in presolvers
+            str(p.__name__ if isinstance(p, type) else type(p).__name__)
+            for p in presolvers
         ]
         cmd += ["--presolvers"] + pres_names
     if presolver_budget is not None:
@@ -302,16 +339,22 @@ if __name__ == "__main__":
     model_class = model_list[args.model]
     print("Model class:", model_class)
 
-    presolver_classes = [
-        getattr(presolving, name)(budget=presolver_budget / len(presolver_names))
-        for name in presolver_names
-    ]
+    if args.tuning:
+        presolver_classes = [getattr(presolving, name) for name in presolver_names]
+        preprocessing_steps = [
+            getattr(preprocessing, name) for name in preprocessor_names
+        ]
+    else:
+        presolver_classes = [
+            getattr(presolving, name)(budget=presolver_budget / len(presolver_names))
+            for name in presolver_names
+        ]
+        preprocessing_steps = [
+            getattr(preprocessing, name)() for name in preprocessor_names
+        ]
+
     print("Presolver classes:", presolver_classes)
     print("Presolver budget fraction:", presolver_ratio)
-
-    preprocessing_steps = [
-        getattr(preprocessing, name)() for name in preprocessor_names
-    ]
     print("Preprocessing classes:", preprocessing_steps)
 
     # Parse training data into variables
@@ -352,10 +395,18 @@ if __name__ == "__main__":
         pipeline.save(args.model_path)
 
     else:
+        # Create dummy features_running_time if not available
+        dummy_rt = pd.DataFrame(
+            0.0,
+            index=features.index,
+            columns=["total_feature_time"],  # type: ignore[arg-type]
+        )
+
         selector = tune_selector(
             features,
             performance,
             selector_class=selector_classes,
+            features_running_time=dummy_rt,
             budget=budget,
             runcount_limit=args.runcount_limit,
             preprocessing_class=preprocessing_steps

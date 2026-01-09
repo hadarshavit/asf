@@ -90,7 +90,7 @@ def find_default_models(tree: ast.AST, file_path: Path) -> List[DefaultModel]:
     imports = collect_imports(tree, file_path)
     defaults: List[DefaultModel] = []
 
-    for node in tree.body:
+    for node in tree.body:  # type: ignore[attr-defined]
         if not isinstance(node, ast.ClassDef):
             continue
         for item in node.body:

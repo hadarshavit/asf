@@ -1,7 +1,15 @@
-from sklearn.base import ClassifierMixin
-from asf.predictors.abstract_predictor import AbstractPredictor
+"""
+A generic wrapper for scikit-learn models.
+"""
+
+from __future__ import annotations
+
 from typing import Any
+
+import joblib
 import numpy as np
+
+from asf.predictors.abstract_predictor import AbstractPredictor
 
 
 class SklearnWrapper(AbstractPredictor):
@@ -10,36 +18,38 @@ class SklearnWrapper(AbstractPredictor):
 
     This class allows scikit-learn models to be used with the ASF framework.
 
-    Methods
-    -------
-    fit(X, Y, sample_weight=None, **kwargs)
-        Fit the model to the data.
-    predict(X, **kwargs)
-        Predict using the model.
-    save(file_path)
-        Save the model to a file.
-    load(file_path)
-        Load the model from a file.
+    Parameters
+    ----------
+    model_class : type[BaseEstimator]
+        A scikit-learn model class.
+    init_params : dict[str, Any], optional
+        Initialization parameters for the scikit-learn model (default is {}).
     """
 
-    def __init__(self, model_class: ClassifierMixin, init_params: dict[str, Any] = {}):
-        """
-        Initialize the wrapper with a scikit-learn model.
+    def __init__(
+        self,
+        model_class: Any,
+        init_params: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ):
+        super().__init__()
+        params = init_params if isinstance(init_params, dict) else {}
+        params.update(kwargs)
 
-        Parameters
-        ----------
-        model_class : ClassifierMixin
-            A scikit-learn model class.
-        init_params : dict, optional
-            Initialization parameters for the scikit-learn model (default is an empty dictionary).
-        """
-        self.model_class = model_class(**init_params)
+        # Filter out parameters that are for the selector/pipeline and not the model
+        model_params = {
+            k: v
+            for k, v in params.items()
+            if k not in ["budget", "maximize", "n_algorithms"]
+        }
+
+        self.model_class: Any = model_class(**model_params)
 
     def fit(
         self,
         X: np.ndarray,
         Y: np.ndarray,
-        sample_weight: np.ndarray = None,
+        sample_weight: np.ndarray | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -51,8 +61,8 @@ class SklearnWrapper(AbstractPredictor):
             Training data of shape (n_samples, n_features).
         Y : np.ndarray
             Target values of shape (n_samples,).
-        sample_weight : np.ndarray, optional
-            Sample weights of shape (n_samples,) (default is None).
+        sample_weight : np.ndarray or None, default=None
+            Sample weights of shape (n_samples,).
         **kwargs : Any
             Additional keyword arguments for the scikit-learn model's `fit` method.
         """
@@ -85,11 +95,10 @@ class SklearnWrapper(AbstractPredictor):
         file_path : str
             Path to the file where the model will be saved.
         """
-        import joblib
-
         joblib.dump(self, file_path)
 
-    def load(self, file_path: str) -> "SklearnWrapper":
+    @classmethod
+    def load(cls, file_path: str) -> SklearnWrapper:
         """
         Load the model from a file.
 
@@ -103,6 +112,4 @@ class SklearnWrapper(AbstractPredictor):
         SklearnWrapper
             The loaded model.
         """
-        import joblib
-
         return joblib.load(file_path)

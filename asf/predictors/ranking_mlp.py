@@ -16,10 +16,24 @@ except Exception:
 
 from asf.predictors.abstract_predictor import AbstractPredictor
 
+from asf.utils.configurable import ConfigurableMixin
+
+try:
+    from ConfigSpace import (  # noqa: F401
+        ConfigurationSpace,
+        Integer,
+        Float,
+        Categorical,
+    )
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
+
 import logging
 
 
-class RankingMLP(AbstractPredictor):
+class RankingMLP(ConfigurableMixin, AbstractPredictor):
     """
     A ranking-based predictor using a Multi-Layer Percetron (MLP).
 
@@ -29,18 +43,37 @@ class RankingMLP(AbstractPredictor):
 
     def __init__(
         self,
+        init_params: dict[str, Any] | None = None,
         model: Any | None = None,
         input_size: int | None = None,
-        loss: Callable = None,
+        loss: Callable | None = None,
         optimizer: Callable[..., Any] | None = None,
         batch_size: int = 128,
         epochs: int = 500,
         seed: int = 42,
         device: str = "cpu",
         compile: bool = True,
+        learning_rate: float = 1e-3,
+        weight_decay: float = 0.0,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        params = init_params if isinstance(init_params, dict) else {}
+        params.update(kwargs)
+
+        # Extract parameters from params with defaults
+        model = params.pop("model", model)
+        input_size = params.pop("input_size", input_size)
+        loss = params.pop("loss", loss)
+        optimizer = params.pop("optimizer", optimizer)
+        batch_size = params.pop("batch_size", batch_size)
+        epochs = params.pop("epochs", epochs)
+        seed = params.pop("seed", seed)
+        device = params.pop("device", device)
+        params.pop("compile", compile)
+        learning_rate = params.pop("learning_rate", learning_rate)
+        weight_decay = params.pop("weight_decay", weight_decay)
+
+        super().__init__(**params)
         if not TORCH_AVAILABLE:
             raise RuntimeError(
                 "PyTorch is not installed. Install it with: pip install torch"
@@ -53,6 +86,7 @@ class RankingMLP(AbstractPredictor):
         torch.manual_seed(seed)
 
         if model is None:
+            assert input_size is not None
             self.model = get_mlp(input_size=input_size, output_size=1)
         else:
             self.model = model
@@ -64,6 +98,8 @@ class RankingMLP(AbstractPredictor):
         self.batch_size = batch_size
         self.optimizer = optimizer or torch.optim.Adam
         self.epochs = epochs
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
 
         if compile:
             self.model = torch.compile(self.model)
@@ -81,13 +117,24 @@ class RankingMLP(AbstractPredictor):
 
     def fit(
         self,
-        features: pd.DataFrame,
-        performance: pd.DataFrame,
-        algorithm_features: pd.DataFrame,
-    ) -> "RankingMLP":
-        dataloader = self._get_dataloader(features, performance, algorithm_features)
+        X: Any,
+        Y: Any,
+        **kwargs: Any,
+    ) -> None:
+        # Extract algorithm_features from kwargs
+        algorithm_features = kwargs.get("algorithm_features")
+        if algorithm_features is None:
+            raise ValueError(
+                "algorithm_features must be provided in kwargs for RankingMLP.fit"
+            )
 
-        optimizer = self.optimizer(self.model.parameters())
+        dataloader = self._get_dataloader(X, Y, algorithm_features)
+
+        optimizer = self.optimizer(
+            self.model.parameters(),
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay,
+        )
         self.model.train()
         for epoch in range(self.epochs):
             total_loss = 0
@@ -121,18 +168,35 @@ class RankingMLP(AbstractPredictor):
 
             logging.debug(f"Epoch {epoch}, Loss: {total_loss / len(dataloader)}")
 
-        return self
+        return None
 
-    def predict(self, features: pd.DataFrame) -> pd.DataFrame:
+    def predict(self, X: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
         self.model.eval()
 
-        features = torch.from_numpy(features.values).to(self.device).float()
-        predictions = self.model(features).detach().numpy()
+        features_tensor = torch.from_numpy(X.values).to(self.device).float()
+        predictions = self.model(features_tensor).detach().numpy()
 
         return predictions
 
     def save(self, file_path: str) -> None:
-        torch.save(self.model, file_path)
+        torch.save(self, file_path)
 
-    def load(self, file_path: str) -> None:
-        self.model = torch.load(file_path)
+    @classmethod
+    def load(cls, file_path: str) -> AbstractPredictor:
+        return torch.load(file_path)
+
+    PREFIX = "ranking_mlp"
+
+    @staticmethod
+    def _define_hyperparameters(**kwargs):
+        """Define hyperparameters for RankingMLP."""
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
+
+        hyperparameters = [
+            Integer("batch_size", (32, 256), log=True, default=128),
+            Integer("epochs", (50, 1000), log=True, default=500),
+            Float("learning_rate", (1e-4, 1e-1), log=True, default=1e-3),
+            Float("weight_decay", (1e-6, 1e-2), log=True, default=1e-5),
+        ]
+        return hyperparameters, [], []

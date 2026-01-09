@@ -1,0 +1,12 @@
+[submodule "paper/aslib_data"]
+	path = paper/aslib_data
+	url = https://github.com/coseal/aslib_data.git
+[submodule "paper/BaB_DynTerm"]
+	path = paper/BaB_DynTerm
+	url = https://github.com/ADA-research/BaB_DynTerm.git
+[submodule "paper/amlb-results"]
+	path = paper/amlb-results
+	url = https://github.com/PGijsbers/amlb-results.git
+[submodule "paper/zero-shot-automl-with-pretrained-models"]
+	path = paper/zero-shot-automl-with-pretrained-models
+	url = https://github.com/automl/zero-shot-automl-with-pretrained-models.git

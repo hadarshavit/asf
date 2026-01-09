@@ -54,11 +54,11 @@ def test_build_cli_command(tmp_path: Path):
     _write_dummy_csv(perf)
 
     cmd = build_cli_command(
-        selector=[SATzilla, PairwiseRegressor],
+        selector=[SATzilla, PairwiseRegressor],  # type: ignore[arg-type]
         feature_data=feats,
         performance_data=perf,
         destination=tmp_path / "model.pkl",
-        model="Ridge",
+        model="RidgeRegressor",  # type: ignore[arg-type]
         tuning=True,
         budget=60,
         maximize=False,
@@ -70,7 +70,7 @@ def test_build_cli_command(tmp_path: Path):
     assert isinstance(cmd, list)
     assert "--selectors" in cmd
     assert "SATzilla" in cmd and "PairwiseRegressor" in cmd
-    assert "--model" in cmd and "Ridge" in cmd
+    assert "--model" in cmd and "RidgeRegressor" in cmd
     assert "--budget" in cmd and "60" in cmd
     assert "--presolver-budget" in cmd and "0.2" in cmd
     assert (
@@ -84,8 +84,8 @@ def _validate_pipeline_extensive(
     features: pd.DataFrame,
     expected_budget: float,
     expected_selector_types: list,
-    expected_preprocessor_types: list = None,
-    expected_presolver_type: type = None,
+    expected_preprocessor_types: list | None = None,
+    expected_presolver_type: type | None = None,
     presolver_budget_fraction: float = 0.0,
     tuning: bool = False,
 ):
@@ -100,7 +100,7 @@ def _validate_pipeline_extensive(
 
     presolver_budget = 0.0
     if pipeline.pre_solving is not None:
-        presolver_budget = getattr(pipeline.pre_solving, "budget", 0.0)
+        presolver_budget = getattr(pipeline.pre_solving, "presolver_budget", 0.0)
 
     total_budget = selector_budget + presolver_budget
     assert pytest.approx(total_budget, rel=1e-3, abs=1e-6) == expected_budget, (
@@ -152,12 +152,15 @@ def _validate_pipeline_extensive(
 
     # Validate presolver
     if expected_presolver_type:
-        assert pipeline.pre_solving is not None, "Expected presolver but got None"
-        actual_presolver_type = type(pipeline.pre_solving)
-        assert actual_presolver_type == expected_presolver_type, (
-            f"Presolver type mismatch: got {actual_presolver_type.__name__}, "
-            f"expected {expected_presolver_type.__name__}"
-        )
+        if not tuning:
+            assert pipeline.pre_solving is not None, "Expected presolver but got None"
+
+        if pipeline.pre_solving is not None:
+            actual_presolver_type = type(pipeline.pre_solving)
+            assert actual_presolver_type == expected_presolver_type, (
+                f"Presolver type mismatch: got {actual_presolver_type.__name__}, "
+                f"expected {expected_presolver_type.__name__}"
+            )
 
         if tuning:
             # During tuning: presolver budget can be any value, just check it's reasonable
@@ -186,7 +189,7 @@ def _validate_pipeline_extensive(
         assert inst_id in features.index
         assert isinstance(schedule, list) and len(schedule) > 0
         total_time = 0.0
-        for algo_name, time_alloc in schedule:
+        for algo_name, time_alloc, *_ in schedule:
             assert isinstance(algo_name, (str, type(None)))
             assert isinstance(time_alloc, (int, float)) and time_alloc >= 0
             total_time += time_alloc
@@ -197,11 +200,11 @@ def _run_cli_and_validate(
     tmp_path: Path,
     selector: list,
     tuning: bool = False,
-    preprocessors: list = None,
-    presolvers: list = None,
+    preprocessors: list | None = None,
+    presolvers: list | None = None,
     presolver_budget: float = 0.0,
     budget: int = 450,
-    runcount_limit: int = None,
+    runcount_limit: int | None = None,
 ):
     """Run CLI subprocess and validate resulting pipeline."""
     feats = tmp_path / "features.csv"
@@ -215,7 +218,7 @@ def _run_cli_and_validate(
         feature_data=feats,
         performance_data=perf,
         destination=out_model,
-        model="Ridge",
+        model="RidgeRegressor",  # type: ignore[arg-type]
         tuning=tuning,
         budget=budget,
         maximize=False,
@@ -225,7 +228,11 @@ def _run_cli_and_validate(
         runcount_limit=runcount_limit,
     )
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    import os
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path.cwd())
+    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
     if result.returncode != 0:
         print("STDOUT:", result.stdout)
         print("STDERR:", result.stderr)

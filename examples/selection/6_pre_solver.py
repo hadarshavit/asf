@@ -76,11 +76,13 @@ def get_data():
         performance_data.append(times)
 
     features = pd.DataFrame(
-        feature_data, columns=["complexity", "size", "density", "structure", "noise"]
+        feature_data,
+        columns=pd.Index(["complexity", "size", "density", "structure", "noise"]),
     )
 
     performance = pd.DataFrame(
-        performance_data, columns=["algo1", "algo2", "algo3", "algo4", "algo5"]
+        performance_data,
+        columns=pd.Index(["algo1", "algo2", "algo3", "algo4", "algo5"]),
     )
 
     return features, performance
@@ -110,7 +112,7 @@ if __name__ == "__main__":
     print("Best algorithm distribution (train):", dict(best_algorithms))
 
     selector = SelectorPipeline(
-        selector=PairwiseClassifier(model_class=RandomForestClassifier),
+        selector=PairwiseClassifier(model_class=RandomForestClassifier),  # type: ignore[arg-type]
         preprocessor=get_default_preprocessor(),
         algorithm_pre_selector=MarginalContributionBasedPreSelector(
             metric=virtual_best_solver, n_algorithms=3
@@ -126,7 +128,7 @@ if __name__ == "__main__":
     predictions = selector.predict(test_features)
 
     print("\nASAPv2 learned schedule:")
-    asap_config = selector.pre_solving.get_preschedule_config()
+    asap_config = selector.pre_solving.get_preschedule_config()  # type: ignore[attr-defined]
 
     # Calculate coverage on test set
     solvable_by_alg = {}

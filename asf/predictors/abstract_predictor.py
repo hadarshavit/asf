@@ -2,19 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-try:
-    from ConfigSpace import ConfigurationSpace
-    from ConfigSpace.hyperparameters import Hyperparameter
-
-    CONFIGSPACE_AVAILABLE = True
-except ImportError:
-    CONFIGSPACE_AVAILABLE = False
 from abc import ABC, abstractmethod
 
 
 class AbstractPredictor(ABC):
     """
     Abstract base class for all predictors.
+
+    Provides a framework for fitting, predicting, and managing model persistence.
 
     Methods
     -------
@@ -26,13 +21,9 @@ class AbstractPredictor(ABC):
         Save the model to a file.
     load(file_path)
         Load the model from a file.
-    get_configuration_space(cs)
-        Get the configuration space for the predictor.
-    get_from_configuration(configuration)
-        Get a predictor instance from a configuration.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs: Any) -> None:
         """
         Initialize the predictor.
         """
@@ -85,8 +76,9 @@ class AbstractPredictor(ABC):
         """
         pass
 
+    @classmethod
     @abstractmethod
-    def load(self, file_path: str) -> None:
+    def load(cls, file_path: str) -> AbstractPredictor:
         """
         Load the model from a file.
 
@@ -94,72 +86,10 @@ class AbstractPredictor(ABC):
         ----------
         file_path : str
             Path to the file from which the model will be loaded.
-        """
-        pass
-
-    @staticmethod
-    def get_configuration_space(
-        cs: ConfigurationSpace | None = None,
-        pre_prefix: str = "",
-        parent_param: Hyperparameter | None = None,
-        parent_value: str | None = None,
-    ) -> Any:
-        """
-        Get the configuration space for the predictor.
-
-        Parameters
-        ----------
-        cs : Any | None, optional
-            The configuration space to add the parameters to. If None, a new configuration space will be created.
-
-        Returns
-        -------
-        Any
-            The configuration space for the predictor.
-
-        Raises
-        ------
-        RuntimeError
-            If ConfigSpace is not installed.
-        NotImplementedError
-            If the method is not implemented for the predictor.
-        """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-        raise NotImplementedError(
-            "get_configuration_space() is not implemented for this predictor"
-        )
-
-    @staticmethod
-    def get_from_configuration(
-        configuration: dict[str, Any], pre_prefix: str = "", **kwargs
-    ) -> "AbstractPredictor":
-        """
-        Get a predictor instance from a configuration.
-
-        Parameters
-        ----------
-        configuration : Any
-            The configuration to create the predictor from.
 
         Returns
         -------
         AbstractPredictor
-            The predictor instance.
-
-        Raises
-        ------
-        RuntimeError
-            If ConfigSpace is not installed.
-        NotImplementedError
-            If the method is not implemented for the predictor.
+            The loaded model.
         """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-        raise NotImplementedError(
-            "get_from_configuration() is not implemented for this predictor"
-        )
+        pass

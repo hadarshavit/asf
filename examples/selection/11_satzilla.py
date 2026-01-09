@@ -9,8 +9,8 @@ def generate_data(n_instances=80, seed=0):
     np.random.seed(seed)
     features = pd.DataFrame(
         np.random.uniform(0, 10, size=(n_instances, 2)),
-        columns=["size", "density"],
-        index=[f"inst_{i}" for i in range(n_instances)],
+        columns=["size", "density"],  # type: ignore[arg-type]
+        index=[f"inst_{i}" for i in range(n_instances)],  # type: ignore[arg-type]
     )
     # Each algorithm's performance is a different function of the features
     performance = pd.DataFrame(

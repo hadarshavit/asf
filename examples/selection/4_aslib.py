@@ -1,5 +1,7 @@
 from asf.selectors import PairwiseClassifier
-from sklearn.ensemble import RandomForestClassifier
+from asf.predictors.random_forest import (
+    RandomForestClassifierWrapper as RandomForestClassifier,
+)
 import asf.scenario.aslib_reader as aslib_reader
 
 
@@ -14,6 +16,7 @@ if __name__ == "__main__":
         feature_groups,
         maximize,
         budget,
+        algorithm_features,
     ) = aslib_reader.read_aslib_scenario(scenario_path)
 
     for i in range(10):

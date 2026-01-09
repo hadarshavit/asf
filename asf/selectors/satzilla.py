@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Dict, List, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -10,30 +10,35 @@ from asf.predictors.random_forest import RandomForestClassifierWrapper
 from asf.predictors.ridge import RidgeRegressorWrapper
 from asf.selectors.abstract_epm_based_selector import AbstractEPMBasedSelector
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
+from asf.utils.configurable import ClassChoice, ConfigurableMixin
 
-# Optional ConfigSpace import (consistent with other modules)
 try:
-    from ConfigSpace import (
-        ConfigurationSpace,
+    from ConfigSpace import (  # noqa: F401
         Categorical,
-        Integer,
+        ConfigurationSpace,
         Float,
-        EqualsCondition,
-        Configuration,
+        Integer,
     )
-    from ConfigSpace.hyperparameters import Hyperparameter
 
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
 
-class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
+class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSelector):
     """
-    SATzilla-like selector using Schmee & Hahn (1979) iterative imputation
-    for censored runtimes (log-scale) and per-algorithm ridge models on
-    expanded features (original + pairwise products).
-    -> Feature Selection is recommended.
+    SATzilla-like selector using iterative imputation for censored runtimes.
+
+    Uses per-algorithm ridge models on expanded features.
+
+    Attributes
+    ----------
+    epms : dict[str, dict[str, EPM]]
+        Mapping from algorithm name to another mapping of label to EPM.
+    label_classifier : AbstractPredictor or None
+        Model trained to predict instance labels (e.g., SAT/UNSAT).
+    labels : list[str]
+        Unique labels used for conditioning EPMs.
     """
 
     PREFIX = "satzilla"
@@ -41,96 +46,102 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
 
     def __init__(
         self,
-        model_class: Any = RandomForestClassifierWrapper,
-        **kwargs,
-    ):
+        model_class: type[Any] = RandomForestClassifierWrapper,
+        **kwargs: Any,
+    ) -> None:
         """
-        Initialize the SATzillaSelector.
-
-        Args:
-            model_class: Callable returning a fresh model instance.
-            **kwargs: Additional args passed to parent.
+        Initialize the SATzilla selector.
         """
         super().__init__(model_class=model_class, **kwargs)
-        self.epms: dict[str, EPM] = {}
+        self.epms: dict[str, dict[str, EPM]] = {}
+        self.label_classifier: Any = None
+        self.labels: list[str] = []
 
     def _fit(
         self,
         features: pd.DataFrame,
         performance: pd.DataFrame,
         labels: pd.DataFrame | pd.Series | list[str] | np.ndarray | None = None,
+        **kwargs: Any,
     ) -> None:
         """
         Fit per-algorithm models.
 
-        Args:
-            features: DataFrame of instance features (n_instances x n_features).
-            performance: DataFrame of runtimes (n_instances x n_algorithms).
-            labels: Array-like aligned with features.index containing
-                    SAT/UNSAT labels; if provided, train per-status models.
-                   If None, train a single EPM per algorithm without conditioning.
+        Parameters
+        ----------
+        features : pd.DataFrame
+            Training features (instances x features).
+        performance : pd.DataFrame
+            Training performance matrix (instances x algorithms).
+        labels : pd.DataFrame, pd.Series, list, or np.ndarray, optional
+            Optional labels for training conditioned EPMs.
         """
         if labels is None:
             labels_series = pd.Series(["default"] * len(features), index=features.index)
             self.label_classifier = None
             self.labels = ["default"]
         else:
-            # Normalize labels to a 1D pandas Series aligned with features/performance
             if isinstance(labels, pd.DataFrame):
-                if labels.shape[1] != 1:
-                    raise ValueError("labels DataFrame must have exactly one column")
                 labels_series = labels.squeeze(axis=1)
             elif isinstance(labels, pd.Series):
                 labels_series = labels
             else:
                 labels_series = pd.Series(labels, index=features.index)
 
-            # Ensure index alignment
             if not labels_series.index.equals(features.index):
                 labels_series = labels_series.reindex(features.index)
 
             self.label_classifier = self.model_class()
             self.label_classifier.fit(features.values, labels_series.values)
+
+            # Extract unique labels
             if hasattr(self.label_classifier, "model_class") and hasattr(
                 self.label_classifier.model_class, "classes_"
             ):
-                self.labels = self.label_classifier.model_class.classes_
+                self.labels = [
+                    str(c) for c in self.label_classifier.model_class.classes_
+                ]
             else:
-                self.labels = np.unique(labels_series.values)
+                self.labels = [str(c) for c in np.unique(labels_series.values)]
 
-        # Train per-algorithm EPMs conditioned on label
         for algo in self.algorithms:
-            self.epms[algo] = {}
+            self.epms[str(algo)] = {}
             for label in self.labels:
-                idx = labels_series == label
+                idx = labels_series.astype(str) == str(label)
                 if idx.sum() == 0:
                     continue
-                self.epms[algo][label] = EPM(**self.epm_kwargs)
+                self.epms[str(algo)][str(label)] = EPM(**self.epm_kwargs)
                 X_sub = features.loc[idx]
                 y_sub = performance.loc[idx, algo]
-                self.epms[algo][label].fit(X_sub, y_sub)
+                self.epms[str(algo)][str(label)].fit(X_sub, y_sub)
 
     def _predict(
         self,
-        features: pd.DataFrame | None = None,
-    ) -> dict[str, list[tuple[str | None, float]]]:
+        features: pd.DataFrame | None,
+        performance: pd.DataFrame | None = None,
+    ) -> dict[str, list[tuple[str, float]]]:
         """
-        Predict best algorithm per instance.
+        Predict the best algorithm for each instance.
 
-        Args:
-            features: DataFrame of instance features to predict for.
+        Parameters
+        ----------
+        features : pd.DataFrame or None
+            The input features.
+        performance : pd.DataFrame or None, default=None
+            Partial performance data.
 
-        Returns:
-            Mapping instance_name -> [(algorithm_name_or_None, budget)].
+        Returns
+        -------
+        dict
+            Mapping from instance name to algorithm schedules.
         """
-
+        if features is None:
+            raise ValueError("SATzilla requires features for prediction.")
         n_instances = features.shape[0]
         n_algorithms = len(self.algorithms)
         preds = np.zeros((n_instances, n_algorithms), dtype=float)
 
-        # Get label probabilities once; use underlying sklearn model
         if self.label_classifier is None:
-            # No label classifier: uniform probability for the single "default" label
             label_probs = np.ones((n_instances, 1), dtype=float)
         elif hasattr(self.label_classifier, "model_class") and hasattr(
             self.label_classifier.model_class, "predict_proba"
@@ -139,153 +150,90 @@ class SATzilla(AbstractEPMBasedSelector, AbstractModelBasedSelector):
                 features.values
             )
         else:
-            # Fallback: use hard predictions and one-hot encode
             hard_preds = np.asarray(self.label_classifier.predict(features.values))
             classes = np.asarray(self.labels)
             label_probs = (hard_preds[:, None] == classes[None, :]).astype(float)
 
         for j, algo in enumerate(self.algorithms):
             for k, label in enumerate(self.labels):
-                # Skip labels with no trained EPM for this algo
-                if algo not in self.epms or label not in self.epms[algo]:
+                if str(algo) not in self.epms or str(label) not in self.epms[str(algo)]:
                     continue
-                pred_time = np.asarray(self.epms[algo][label].predict(features))
+                pred_time = np.asarray(
+                    self.epms[str(algo)][str(label)].predict(features)
+                )
                 preds[:, j] += label_probs[:, k] * pred_time
 
         best_idx = np.argmin(preds, axis=1)
-        results = {}
+        results: dict[str, list[tuple[str, float]]] = {}
         for i, inst in enumerate(features.index):
             j = int(best_idx[i])
-            algo = self.algorithms[j]
-            results[inst] = [(algo, self.budget)]
+            algo = str(self.algorithms[j])
+            results[str(inst)] = [(algo, float(self.budget or 0))]
         return results
 
     @staticmethod
-    def get_configuration_space(
-        cs: Optional[ConfigurationSpace] = None,
-        cs_transform: Optional[Dict[str, Dict[str, type]]] = None,
-        model_class: List[type] = None,
-        pre_prefix: str = "",
-        parent_param: Optional[Hyperparameter] = None,
-        parent_value: Optional[str] = None,
-        **kwargs,
-    ) -> Tuple[ConfigurationSpace, Dict[str, Dict[str, type]]]:
+    def _define_hyperparameters(
+        model_class: list[type] | None = None, **kwargs: Any
+    ) -> tuple[list[Any], list[Any], list[Any]]:
         """
-        Build ConfigSpace for SATzilla, including:
-        - model_class choice (wrappers) with nested model hyperparams
-        - SATzilla-specific EM/log parameters
+                Define hyperparameters for SATzilla.
+
+                Parameters
+                ----------
+                model_class : list[type] or None, default=None
+                    List of model classes to choose from.
+                **kwargs : Any
+                    Additional keyword arguments.
+
+                Returns
+        -------
+                tuple
+                    Tuple of (hyperparameters, conditions, forbiddens).
         """
         if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-        if cs is None:
-            cs = ConfigurationSpace()
-        if cs_transform is None:
-            cs_transform = {}
+            return [], [], []
+
         if model_class is None:
             model_class = [RidgeRegressorWrapper]
 
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{SATzilla.PREFIX}"
-        else:
-            prefix = SATzilla.PREFIX
-
-        model_class_param = Categorical(
-            name=f"{prefix}:model_class",
-            items=[str(c.__name__) for c in model_class],
+        model_class_param = ClassChoice(
+            name="model_class",
+            choices=model_class,
+            default=model_class[0],
         )
-        cs_transform[f"{prefix}:model_class"] = {
-            str(c.__name__): c for c in model_class
-        }
 
-        use_log10 = Categorical(
-            f"{prefix}:use_log10",
-            [True, False],
+        use_log10_param = Categorical(
+            name="use_log10",
+            items=[True, False],
             default=True,
         )
-        em_max_iter = Integer(
-            f"{prefix}:em_max_iter",
-            (5, 50),
+
+        em_max_iter_param = Integer(
+            name="em_max_iter",
+            bounds=(5, 50),
             default=20,
         )
-        em_tol = Float(
-            f"{prefix}:em_tol",
-            (1e-6, 1e-2),
+
+        em_tol_param = Float(
+            name="em_tol",
+            bounds=(1e-6, 1e-2),
             log=True,
             default=1e-3,
         )
-        em_min_sigma = Float(
-            f"{prefix}:em_min_sigma",
-            (1e-8, 1e-1),
+
+        em_min_sigma_param = Float(
+            name="em_min_sigma",
+            bounds=(1e-8, 1e-1),
             log=True,
             default=1e-6,
         )
 
-        params = [model_class_param, use_log10, em_max_iter, em_tol, em_min_sigma]
-
-        # Activate these params only when the parent selector is SATzilla
-        if parent_param is not None:
-            conditions = [
-                EqualsCondition(
-                    child=param,
-                    parent=parent_param,
-                    value=parent_value,
-                )
-                for param in params
-            ]
-        else:
-            conditions = []
-
-        cs.add(params + conditions)
-
-        for mc in model_class:
-            mc.get_configuration_space(
-                cs=cs,
-                pre_prefix=f"{prefix}:model_class",
-                parent_param=model_class_param,
-                parent_value=str(mc.__name__),
-                **kwargs,
-            )
-
-        return cs, cs_transform
-
-    @staticmethod
-    def get_from_configuration(
-        configuration: Configuration,
-        cs_transform: Dict[str, Dict[str, type]],
-        pre_prefix: str = "",
-        **kwargs,
-    ):
-        """
-        Instantiate SATzilla from a ConfigSpace configuration.
-        """
-        if not CONFIGSPACE_AVAILABLE:
-            raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
-            )
-        if pre_prefix != "":
-            prefix = f"{pre_prefix}:{SATzilla.PREFIX}"
-        else:
-            prefix = SATzilla.PREFIX
-
-        model_cls = cs_transform[f"{prefix}:model_class"][
-            configuration[f"{prefix}:model_class"]
+        params = [
+            model_class_param,
+            use_log10_param,
+            em_max_iter_param,
+            em_tol_param,
+            em_min_sigma_param,
         ]
-        model_ctor = model_cls.get_from_configuration(
-            configuration, pre_prefix=f"{prefix}:model_class"
-        )
 
-        use_log10 = configuration[f"{prefix}:use_log10"]
-        em_max_iter = configuration[f"{prefix}:em_max_iter"]
-        em_tol = configuration[f"{prefix}:em_tol"]
-        em_min_sigma = configuration[f"{prefix}:em_min_sigma"]
-
-        return SATzilla(
-            model_class=model_ctor,
-            use_log10=use_log10,
-            em_max_iter=em_max_iter,
-            em_tol=em_tol,
-            em_min_sigma=em_min_sigma,
-            **kwargs,
-        )
+        return params, [], []

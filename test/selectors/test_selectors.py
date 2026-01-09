@@ -64,7 +64,7 @@ def dummy_performance():
             [580, 200, 10],
         ]
     )
-    return pd.DataFrame(data, columns=["algo1", "algo2", "algo3"])
+    return pd.DataFrame(data, columns=pd.Index(["algo1", "algo2", "algo3"]))
 
 
 @pytest.fixture
@@ -93,7 +93,7 @@ def dummy_features():
             [105, 52, 10.5],
         ]
     )
-    return pd.DataFrame(data, columns=["feature1", "feature2", "feature3"])
+    return pd.DataFrame(data, columns=pd.Index(["feature1", "feature2", "feature3"]))
 
 
 def validate_predictions(predictions):
@@ -119,10 +119,20 @@ def validate_predictions(predictions):
 
 
 def test_simple_ranking(dummy_performance, dummy_features):
-    selector = SimpleRanking(model_class=XGBRanker, budget=450.0)
+    selector = SimpleRanking(model_class=XGBRanker, budget=450.0)  # type: ignore[arg-type]
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
+
+
+def test_pairwise_classifier_numpy_output(dummy_performance, dummy_features):
+    selector = PairwiseClassifier(prediction_mode="numpy", budget=450.0)
+    selector.fit(dummy_features, dummy_performance)
+    predictions = selector.predict(dummy_features)
+    import numpy as _np
+
+    assert isinstance(predictions, _np.ndarray), "Expected numpy array output"
+    assert predictions.shape == (len(dummy_features), len(selector.algorithms))
 
 
 def test_joint_ranking(dummy_performance, dummy_features):
@@ -146,7 +156,7 @@ def test_survival_analysis_schedule(dummy_performance, dummy_features):
     predictions = selector.predict(dummy_features)
 
     assert len(predictions) == len(dummy_features)
-    for sched in predictions.values():
+    for sched in predictions.values():  # type: ignore[attr-defined]
         assert isinstance(sched, list)
         assert all(isinstance(x, tuple) and len(x) == 2 for x in sched)
         assert all(
@@ -163,7 +173,7 @@ def test_isa_selector(dummy_performance, dummy_features):
     predictions = selector.predict(dummy_features)
 
     assert len(predictions) == len(dummy_features)
-    for sched in predictions.values():
+    for sched in predictions.values():  # type: ignore[attr-defined]
         assert isinstance(sched, list)
         assert all(isinstance(x, tuple) and len(x) == 2 for x in sched)
         assert all(
@@ -201,16 +211,16 @@ def test_collaborative_filtering_selector(dummy_performance, dummy_features):
 def test_sunny_selector(dummy_performance, dummy_features):
     budget = 500
 
-    cs, cs_transform = SUNNY.get_configuration_space()
+    cs = SUNNY.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    SUNNY.get_from_configuration(cs.get_default_configuration(), cs_transform)
+    SUNNY.get_from_configuration(cs.get_default_configuration())
 
     selector = SUNNY(k=3, use_v2=True, use_tsunny=True, budget=budget)
 
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     assert len(predictions) == len(dummy_features)
-    for sched in predictions.values():
+    for sched in predictions.values():  # type: ignore[attr-defined]
         assert isinstance(sched, list)
         assert all(isinstance(x, tuple) and len(x) == 2 for x in sched)
         assert all(isinstance(x[0], str) and isinstance(x[1], float) for x in sched)
@@ -219,9 +229,9 @@ def test_sunny_selector(dummy_performance, dummy_features):
 
 
 def test_isac_selector(dummy_performance, dummy_features):
-    cs, cs_transform = ISAC.get_configuration_space()
+    cs = ISAC.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    ISAC.get_from_configuration(cs.get_default_configuration(), cs_transform)
+    ISAC.get_from_configuration(cs.get_default_configuration())
 
     selector = ISAC(budget=450.0)
     selector.fit(dummy_features, dummy_performance)
@@ -230,9 +240,9 @@ def test_isac_selector(dummy_performance, dummy_features):
 
 
 def test_snnap_selector(dummy_performance, dummy_features):
-    cs, cs_transform = SNNAP.get_configuration_space()
+    cs = SNNAP.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    SNNAP.get_from_configuration(cs.get_default_configuration(), cs_transform)
+    SNNAP.get_from_configuration(cs.get_default_configuration())
 
     selector = SNNAP(k=3, budget=450.0)
     selector.fit(dummy_features, dummy_performance)
@@ -241,9 +251,9 @@ def test_snnap_selector(dummy_performance, dummy_features):
 
 
 def test_satzilla_selector(dummy_performance, dummy_features):
-    cs, cs_transform = SATzilla.get_configuration_space()
+    cs = SATzilla.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    SATzilla.get_from_configuration(cs.get_default_configuration(), cs_transform)
+    SATzilla.get_from_configuration(cs.get_default_configuration())
 
     selector = SATzilla(budget=450)
     selector.fit(
@@ -267,7 +277,7 @@ def test_meta_selector(dummy_performance, dummy_features):
         SATzilla(budget=budget),
         ISAC(budget=budget),
     ]
-    meta_sel = SimpleRanking(model_class=XGBRanker, budget=budget)
+    meta_sel = SimpleRanking(model_class=XGBRanker, budget=budget)  # type: ignore[arg-type]
 
     meta = MetaSelector(
         base_selectors=base_selectors, meta_selector=meta_sel, budget=budget, n_folds=2
@@ -285,7 +295,7 @@ def test_meta_selector_rejects_schedule_base(dummy_performance, dummy_features):
     with pytest.raises(ValueError):
         MetaSelector(
             base_selectors=[SNNAP(k=3, budget=budget), ISA(budget=budget)],
-            meta_selector=SimpleRanking(model_class=XGBRanker, budget=budget),
+            meta_selector=SimpleRanking(model_class=XGBRanker, budget=budget),  # type: ignore[arg-type]
             budget=budget,
         )
 
@@ -329,9 +339,17 @@ def test_cshc_selector_no_backup(dummy_performance, dummy_features):
 
 def test_selector_tuner(dummy_performance, dummy_features):
     # Keep runcount_limit and cv low for fast testing
+    # Create dummy feature running time (same shape as features)
+    features_running_time = pd.DataFrame(
+        np.random.exponential(0.1, dummy_features.shape),
+        columns=dummy_features.columns,
+        index=dummy_features.index,
+    )
+
     tuned_pipeline = tune_selector(
         X=dummy_features,
         y=dummy_performance,
+        features_running_time=features_running_time,
         selector_class=[PairwiseClassifier, PairwiseRegressor],
         runcount_limit=2,
         cv=2,
@@ -357,11 +375,9 @@ def test_selector_tuner(dummy_performance, dummy_features):
     ],
 )
 def test_pairwise_classifier(dummy_performance, dummy_features, model_class):
-    cs, cs_transform = PairwiseClassifier.get_configuration_space()
+    cs = PairwiseClassifier.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    PairwiseClassifier.get_from_configuration(
-        cs.get_default_configuration(), cs_transform
-    )
+    PairwiseClassifier.get_from_configuration(cs.get_default_configuration())
 
     classifier = PairwiseClassifier(
         model_class=model_class, use_weights=True, budget=450.0
@@ -376,11 +392,9 @@ def test_pairwise_classifier(dummy_performance, dummy_features, model_class):
     [XGBoostClassifierWrapper],
 )
 def test_multi_class_classifier(dummy_performance, dummy_features, model_class):
-    cs, cs_transform = MultiClassClassifier.get_configuration_space()
+    cs = MultiClassClassifier.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    MultiClassClassifier.get_from_configuration(
-        cs.get_default_configuration(), cs_transform
-    )
+    MultiClassClassifier.get_from_configuration(cs.get_default_configuration())
 
     classifier = MultiClassClassifier(model_class=model_class, budget=450.0)
     classifier.fit(dummy_features, dummy_performance)
@@ -393,11 +407,9 @@ def test_multi_class_classifier(dummy_performance, dummy_features, model_class):
     [XGBoostRegressorWrapper, RegressionMLP],
 )
 def test_pairwise_regressor(dummy_performance, dummy_features, model_class):
-    cs, cs_transform = PairwiseRegressor.get_configuration_space()
+    cs = PairwiseRegressor.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    PairwiseRegressor.get_from_configuration(
-        cs.get_default_configuration(), cs_transform
-    )
+    PairwiseRegressor.get_from_configuration(cs.get_default_configuration())
 
     regressor = PairwiseRegressor(model_class=model_class, budget=450.0)
     regressor.fit(dummy_features, dummy_performance)
@@ -410,11 +422,9 @@ def test_pairwise_regressor(dummy_performance, dummy_features, model_class):
     [XGBoostRegressorWrapper, RegressionMLP],
 )
 def test_performance_model(dummy_performance, dummy_features, model_class):
-    cs, cs_transform = PerformanceModel.get_configuration_space()
+    cs = PerformanceModel.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
-    PerformanceModel.get_from_configuration(
-        cs.get_default_configuration(), cs_transform
-    )
+    PerformanceModel.get_from_configuration(cs.get_default_configuration())
 
     model = PerformanceModel(model_class=model_class, budget=450.0)
     model.fit(dummy_features, dummy_performance)
@@ -430,7 +440,7 @@ def test_osl_linear_selector(dummy_performance, dummy_features):
     predictions = selector.predict(dummy_features)
 
     assert len(predictions) == len(dummy_features)
-    for pred in predictions.values():
+    for pred in predictions.values():  # type: ignore[attr-defined]
         assert isinstance(pred, list) and len(pred) == 1
         algo, score = pred[0]
         assert algo in ["algo1", "algo2", "algo3"] or algo is None
@@ -438,7 +448,7 @@ def test_osl_linear_selector(dummy_performance, dummy_features):
         assert score >= 0
 
 
-def test_cosine_selector_default_ridge(dummy_performance, dummy_features):
+def test_cosine_selector_default(dummy_performance, dummy_features):
     # simple algorithm feature matrix matching performance columns
     alg_df = pd.DataFrame(
         [
@@ -446,32 +456,41 @@ def test_cosine_selector_default_ridge(dummy_performance, dummy_features):
             [0.0, 1.0],
             [0.5, 0.5],
         ],
-        index=["algo1", "algo2", "algo3"],
-        columns=["af1", "af2"],
+        index=["algo1", "algo2", "algo3"],  # type: ignore[arg-type]
+        columns=["af1", "af2"],  # type: ignore[arg-type]
     )
 
-    sel = CosineSelector(shared_latent_dim=2, normalize_features=True, budget=450.0)
+    sel = CosineSelector(
+        normalize_features=True,
+        num_epochs=5,  # Low for fast testing
+        embed_size=10,
+        num_hiddens=10,
+        budget=450.0,
+    )
     sel.fit(dummy_features, dummy_performance, alg_df)
     preds = sel.predict(dummy_features)
     validate_predictions(preds)
 
 
-def test_cosine_selector_random_forest(dummy_performance, dummy_features):
+def test_cosine_selector_custom_params(dummy_performance, dummy_features):
     alg_df = pd.DataFrame(
         [
             [1.0, 0.0],
             [0.0, 1.0],
             [0.5, 0.5],
         ],
-        index=["algo1", "algo2", "algo3"],
-        columns=["af1", "af2"],
+        index=["algo1", "algo2", "algo3"],  # type: ignore[arg-type]
+        columns=["af1", "af2"],  # type: ignore[arg-type]
     )
 
     sel = CosineSelector(
-        shared_latent_dim=2,
         normalize_features=True,
-        projection_model=RandomForestRegressorWrapper,
-        projection_model_kwargs={"n_estimators": 10, "random_state": 42},
+        embed_size=20,
+        num_hiddens=20,
+        num_layers=1,
+        alpha=0.8,
+        beta=0.2,
+        num_epochs=5,  # Low for fast testing
         budget=450.0,
     )
     sel.fit(dummy_features, dummy_performance, alg_df)

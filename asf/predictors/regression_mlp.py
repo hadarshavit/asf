@@ -1,4 +1,17 @@
+"""
+Regression MLP predictor using PyTorch.
+"""
+
 from __future__ import annotations
+
+from typing import Any
+
+import numpy as np
+import pandas as pd
+from sklearn.impute import SimpleImputer
+
+from asf.predictors.abstract_predictor import AbstractPredictor
+from asf.utils.configurable import ConfigurableMixin
 
 try:
     import torch
@@ -9,26 +22,56 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
-import pandas as pd
-from sklearn.impute import SimpleImputer
+try:
+    from ConfigSpace import (
+        Float,
+        Integer,
+    )
+    from ConfigSpace.hyperparameters import Hyperparameter
 
-from asf.predictors.abstract_predictor import AbstractPredictor
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
 
 
-class RegressionMLP(AbstractPredictor):
+class RegressionMLP(AbstractPredictor, ConfigurableMixin):
+    """
+    A regression-based predictor using a Multi-Layer Perceptron (MLP).
+    """
+
+    PREFIX: str = "regression_mlp"
+
     def __init__(
         self,
-        model: object | None = None,
-        loss: object | None = None,
-        optimizer: object | None = None,
+        init_params: dict[str, Any] | None = None,
+        model: torch.nn.Module | None = None,
+        loss: torch.nn.modules.loss._Loss | None = None,
+        optimizer: type[torch.optim.Optimizer] | None = None,
         batch_size: int = 128,
         epochs: int = 2000,
         seed: int = 42,
         device: str = "cpu",
-        compile: bool = True,
-        **kwargs,
+        compile_model: bool = True,
+        learning_rate: float = 1e-3,
+        weight_decay: float = 0.0,
+        **kwargs: Any,
     ):
-        super().__init__(**kwargs)
+        params = init_params if isinstance(init_params, dict) else {}
+        params.update(kwargs)
+
+        # Extract parameters from params with defaults
+        model = params.pop("model", model)
+        loss = params.pop("loss", loss)
+        optimizer = params.pop("optimizer", optimizer)
+        batch_size = params.pop("batch_size", batch_size)
+        epochs = params.pop("epochs", epochs)
+        seed = params.pop("seed", seed)
+        device = params.pop("device", device)
+        compile_model = params.pop("compile_model", compile_model)
+        learning_rate = params.pop("learning_rate", learning_rate)
+        weight_decay = params.pop("weight_decay", weight_decay)
+
+        super().__init__(**params)
         if not TORCH_AVAILABLE:
             raise RuntimeError(
                 "PyTorch is not installed. Install it with: pip install torch"
@@ -38,68 +81,146 @@ class RegressionMLP(AbstractPredictor):
 
         self.model = model
         self.device = device
-
         self.loss = loss or torch.nn.MSELoss()
         self.batch_size = batch_size
         self.optimizer = optimizer or torch.optim.Adam
         self.epochs = epochs
-        self.compile = compile
+        self.compile_model = compile_model
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
 
     def _get_dataloader(
-        self, features: pd.DataFrame, performance: pd.DataFrame
-    ) -> object:
+        self,
+        features: pd.DataFrame,
+        performance: pd.DataFrame,
+    ) -> torch.utils.data.DataLoader:
         dataset = RegressionDataset(features, performance)
         return torch.utils.data.DataLoader(
             dataset, batch_size=self.batch_size, shuffle=True
         )
 
     def fit(
-        self, features: pd.DataFrame, performance: pd.DataFrame, sample_weight=None
-    ) -> "RegressionMLP":
+        self,
+        X: Any,
+        Y: Any,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Fit the model to the data.
+
+        Parameters
+        ----------
+        X : pd.DataFrame
+            The features for each instance.
+        Y : pd.DataFrame
+            The performance of each algorithm on each instance.
+        sample_weight : np.ndarray or None, default=None
+            Sample weights. Currently not supported.
+        **kwargs : Any
+            Additional arguments.
+
+        Returns
+        -------
+        RegressionMLP
+            The fitted model.
+
+        Raises
+        ------
+        AssertionError
+            If sample_weight is provided.
+        """
+        sample_weight = kwargs.get("sample_weight")
         assert sample_weight is None, "Sample weights are not supported."
 
         if self.model is None:
-            self.model = get_mlp(input_size=features.shape[1], output_size=1)
+            input_size = X.shape[1] if hasattr(X, "shape") else len(X.columns)
+            self.model = get_mlp(input_size=input_size, output_size=1)
 
-        self.model.to(self.device)
+        self.model.to(self.device)  # type: ignore[attr-defined]
 
-        if self.compile:
+        if self.compile_model:
             self.model = torch.compile(self.model)
 
-        features = pd.DataFrame(
-            SimpleImputer().fit_transform(features.values),
-            index=features.index,
-            columns=features.columns,
+        features_imputed = pd.DataFrame(
+            SimpleImputer().fit_transform(X.values),
+            index=X.index,
+            columns=X.columns,
         )
-        dataloader = self._get_dataloader(features, performance)
+        dataloader = self._get_dataloader(features_imputed, Y)
 
-        optimizer = self.optimizer(self.model.parameters())
-        self.model.train()
+        optimizer = self.optimizer(
+            self.model.parameters(),  # type: ignore[attr-defined]
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay,
+        )
+        self.model.train()  # type: ignore[attr-defined]
         for epoch in range(self.epochs):
-            total_loss = 0
-            for i, (X, y) in enumerate(dataloader):
-                X, y = X.to(self.device), y.to(self.device)
-                X = X.float()
-                y = y.unsqueeze(-1)
+            total_loss = 0.0
+            for i, (X_batch, y_batch) in enumerate(dataloader):
+                X_batch, y_batch = X_batch.to(self.device), y_batch.to(self.device)
+                X_batch = X_batch.float()
+                y_batch = y_batch.unsqueeze(-1).float()
                 optimizer.zero_grad()
-                y_pred = self.model(X)
-                loss = self.loss(y_pred, y)
+                y_pred = self.model(X_batch)
+                loss = self.loss(y_pred, y_batch)
                 total_loss += loss.item()
                 loss.backward()
                 optimizer.step()
 
-        return self
+        return None
 
-    def predict(self, features: pd.DataFrame) -> pd.DataFrame:
-        self.model.eval()
+    def predict(self, X: pd.DataFrame, **kwargs: Any) -> np.ndarray:
+        """
+        Predict using the model.
 
-        features = torch.from_numpy(features.values).to(self.device).float()
-        predictions = self.model(features).detach().numpy().squeeze(1)
+        Parameters
+        ----------
+        X : pd.DataFrame
+            The features to predict on.
+        **kwargs : Any
+            Additional arguments.
+
+        Returns
+        -------
+        np.ndarray
+            The predicted values.
+        """
+        if self.model is None:
+            raise RuntimeError("Model not fitted")
+        self.model.eval()  # type: ignore[attr-defined]
+
+        features_tensor = torch.from_numpy(X.values).to(self.device).float()
+        predictions = self.model(features_tensor).detach().cpu().numpy().squeeze(1)
 
         return predictions
 
     def save(self, file_path: str) -> None:
-        torch.save(self.model, file_path)
+        """
+        Save the model to a file.
+        """
+        torch.save(self, file_path)
 
-    def load(self, file_path: str) -> None:
-        self.model = torch.load(file_path)
+    @classmethod
+    def load(cls, file_path: str) -> AbstractPredictor:
+        """
+        Load the model from a file.
+        """
+        return torch.load(file_path)
+
+    @staticmethod
+    def _define_hyperparameters(
+        **kwargs: Any,
+    ) -> tuple[list[Hyperparameter], list[Any], list[Any]]:
+        """
+        Define hyperparameters for RegressionMLP.
+        """
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
+
+        hyperparameters = [
+            Integer("batch_size", (32, 256), log=True, default=128),
+            Integer("epochs", (200, 2000), log=True, default=500),
+            Float("learning_rate", (1e-4, 1e-1), log=True, default=1e-3),
+            Float("weight_decay", (1e-6, 1e-2), log=True, default=1e-5),
+        ]
+        return hyperparameters, [], []

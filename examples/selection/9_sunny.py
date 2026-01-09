@@ -10,8 +10,8 @@ def generate_simple_data(n_instances=100, seed=0):
     # Create features with 3 dimensions
     features = pd.DataFrame(
         np.random.uniform(0, 10, size=(n_instances, 3)),
-        columns=["size", "density", "complexity"],
-        index=[f"inst_{i}" for i in range(n_instances)],
+        columns=pd.Index(["size", "density", "complexity"]),
+        index=pd.Index([f"inst_{i}" for i in range(n_instances)]),
     )
 
     # Create 6 algorithms with different characteristics

@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import cast
 
 from asf.presolving.static_3s import Static3S
 from asf.selectors.sunny import SUNNY
@@ -9,8 +10,8 @@ def generate_simple_data(n_instances=100, n_algorithms=6, seed=1, budget=500.0):
     rng = np.random.RandomState(seed)
     features = pd.DataFrame(
         rng.uniform(0, 10, size=(n_instances, 4)),
-        columns=[f"f{i}" for i in range(4)],
-        index=[f"inst_{i}" for i in range(n_instances)],
+        columns=[f"f{i}" for i in range(4)],  # type: ignore[arg-type]
+        index=[f"inst_{i}" for i in range(n_instances)],  # type: ignore[arg-type]
     )
 
     perf = pd.DataFrame(index=features.index)
@@ -63,7 +64,7 @@ def main():
     presolver_unsolved = []
 
     for inst in test_Y.index:
-        schedule_for_inst = preschedule_map.get(inst)
+        schedule_for_inst = cast(dict, preschedule_map).get(inst)
         solved = run_schedule(schedule_for_inst, test_Y.loc[inst], presolve_budget)
         if solved:
             presolver_solved.append(inst)
@@ -81,7 +82,7 @@ def main():
     sunny_solved = []
     sunny_unsolved = []
     for inst in presolver_unsolved:
-        sched = preds.get(inst, [])
+        sched = cast(dict, preds).get(inst, [])
         solved = run_schedule(sched, test_Y.loc[inst], budget)
         if solved:
             sunny_solved.append(inst)

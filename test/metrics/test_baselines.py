@@ -14,7 +14,7 @@ def test_single_best_solver_minimize_and_maximize():
             "A": [1, 3],  # sum = 4
             "B": [2, 5],  # sum = 7
         },
-        index=["i1", "i2"],
+        index=pd.Index(["i1", "i2"]),
     )
 
     # minimize (default)
@@ -30,7 +30,7 @@ def test_virtual_best_solver_minimize_and_maximize():
             "A": [1, 7],
             "B": [2, 5],
         },
-        index=["i1", "i2"],
+        index=pd.Index(["i1", "i2"]),
     )
 
     # minimize: pick per-instance minimums: i1=1, i2=5 -> 6
@@ -46,12 +46,12 @@ def test_running_time_selector_performance_solved_and_unsolved():
             "algA": [5],
             "algB": [100],
         },
-        index=["inst1"],
+        index=pd.Index(["inst1"]),
     )
 
     # solved path: allocate more than needed for algA -> solved, include feature time
     schedules = {"inst1": [("algA", 6.0)]}
-    feature_time = pd.DataFrame({"feature_time": [1.0]}, index=["inst1"])
+    feature_time = pd.DataFrame({"feature_time": [1.0]}, index=pd.Index(["inst1"]))
     total = m.running_time_selector_performance(
         schedules, perf, budget=10.0, par=2.0, feature_time=feature_time
     )
@@ -72,9 +72,11 @@ def test_running_time_closed_gap_basic():
             "algA": [5, 9],
             "algB": [8, 3],
         },
-        index=["i1", "i2"],
+        index=pd.Index(["i1", "i2"]),
     )
-    feature_time = pd.DataFrame({"feature_time": [0.0, 0.0]}, index=["i1", "i2"])
+    feature_time = pd.DataFrame(
+        {"feature_time": [0.0, 0.0]}, index=pd.Index(["i1", "i2"])
+    )
 
     # schedule solves with exact or more than required budget for each instance
     schedules = {
@@ -103,7 +105,7 @@ def test_precision_regret_behaviors():
             "A": [0.1, 0.9],
             "B": [0.7, 0.2],
         },
-        index=["x", "y"],
+        index=pd.Index(["x", "y"]),
     )
 
     # Use performance as precision if precision_data is None
@@ -119,7 +121,7 @@ def test_precision_regret_behaviors():
             "A": [0.5, 0.6],
             "B": [0.3, 0.4],
         },
-        index=["x", "y"],
+        index=pd.Index(["x", "y"]),
     )
     assert (
         m.precision_regret(schedules, perf, precision_data=precision)
@@ -160,7 +162,7 @@ class TestSchedulePrerequisiteValidation:
                 "algo1": [10.0, 20.0],
                 "algo2": [15.0, 10.0],
             },
-            index=["inst1", "inst2"],
+            index=pd.Index(["inst1", "inst2"]),
         )
 
     @pytest.fixture
@@ -172,7 +174,7 @@ class TestSchedulePrerequisiteValidation:
                 "Basic": [2.0, 2.0],
                 "CG": [3.0, 3.0],
             },
-            index=["inst1", "inst2"],
+            index=pd.Index(["inst1", "inst2"]),
         )
 
     def test_validate_schedule_valid_prereqs_first(self, feature_groups_with_prereqs):
@@ -263,7 +265,7 @@ class TestClosedGapPrerequisiteValidation:
                 "algo1": [10.0, 20.0],
                 "algo2": [15.0, 10.0],
             },
-            index=["inst1", "inst2"],
+            index=pd.Index(["inst1", "inst2"]),
         )
 
     @pytest.fixture
@@ -273,7 +275,7 @@ class TestClosedGapPrerequisiteValidation:
                 "Pre": [1.0, 1.0],
                 "Basic": [2.0, 2.0],
             },
-            index=["inst1", "inst2"],
+            index=pd.Index(["inst1", "inst2"]),
         )
 
     def test_closed_gap_valid_schedule(

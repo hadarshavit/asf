@@ -1,14 +1,14 @@
 import os
 import numpy as np
 import pandas as pd
-from asf.predictors.random_forest import RandomForestRegressorWrapper
+from typing import Any, cast
 
 from asf.selectors.cosine_selector import CosineSelector
 from asf.scenario.aslib_reader import read_aslib_scenario
 from asf.utils.aslib_algorithm_features import get_algorithm_features_from_aslib
 
 
-def evaluate_solve_rate(preds: dict, perf: pd.DataFrame, budget: float) -> float:
+def evaluate_solve_rate(preds: Any, perf: pd.DataFrame, budget: float) -> float:
     solved = 0
     total = 0
     for inst, rec in preds.items():
@@ -28,9 +28,16 @@ def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
             f"ASLib scenario directory not found: {aslib_scenario_dir}"
         )
 
-    features, performance, _, cv, feature_groups, maximize, budget = (
-        read_aslib_scenario(aslib_scenario_dir)
-    )
+    (
+        features,
+        performance,
+        _,
+        cv,
+        feature_groups,
+        maximize,
+        budget,
+        algorithm_features,
+    ) = read_aslib_scenario(aslib_scenario_dir)
     budget = budget / 2
 
     alg_df = get_algorithm_features_from_aslib(aslib_scenario_dir)
@@ -43,11 +50,17 @@ def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
     X_train, X_test = features.iloc[:n_train], features.iloc[n_train:]
     Y_train, Y_test = performance.iloc[:n_train], performance.iloc[n_train:]
 
+    # AS-LLM based CosineSelector
     sel = CosineSelector(
         normalize_features=True,
-        shared_latent_dim=4,
-        projection_model=RandomForestRegressorWrapper,
-        projection_model_kwargs={"n_estimators": 100, "random_state": 42},
+        embed_size=50,
+        num_hiddens=50,
+        num_layers=2,
+        alpha=0.9,
+        beta=0.1,
+        num_epochs=50,  # Reduced for demo
+        batch_size=128,
+        lr=0.001,
     )
     sel.fit(X_train, Y_train, algorithm_features=alg_df)
 
@@ -62,7 +75,7 @@ def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
     oracle_sr = float(oracle_hits.mean())
 
     print("=" * 60)
-    print("CosineSelector (real ASLib data)")
+    print("CosineSelector - AS-LLM Architecture (real ASLib data)")
     print("=" * 60)
     print(f"Scenario: {aslib_scenario_dir}")
     print(
@@ -76,7 +89,7 @@ def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
     print()
     print("Sample decisions (first 12):")
     for inst in list(X_test.index)[:12]:
-        algo, score = preds.get(inst, [(None, None)])[0]
+        algo, score = cast(dict, preds).get(inst, [(None, None)])[0]
         rt = Y_test.at[inst, algo] if algo is not None else float("nan")
         print(f"{inst}: chosen={algo} predicted_score={score:.4f} true_rt={rt:.2f}")
     print("=" * 60)
