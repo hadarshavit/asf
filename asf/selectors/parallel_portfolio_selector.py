@@ -166,7 +166,9 @@ class APPS(AbstractSelector):
 
         return p_cand_left + p_best_right
 
-    def _predict(self, features: pd.DataFrame) -> Dict[str, List[str]]:
+    def _predict(
+        self, features: pd.DataFrame, performance: pd.DataFrame | None = None
+    ) -> Dict[str, List[str]]:
         """
         Predict parallel portfolio for each instance.
 

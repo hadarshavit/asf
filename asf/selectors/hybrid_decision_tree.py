@@ -216,6 +216,9 @@ class HybridDecisionTree:
         Returns:
             Predicted performances (n_instances, n_algorithms)
         """
+        if self.regression_label is None:
+            raise ValueError("Tree has not been fitted. Call fit() before predict().")
+
         predictions = np.zeros((X.shape[0], len(self.regression_label)))
 
         for i in range(X.shape[0]):
@@ -365,7 +368,9 @@ class HARRIS(AbstractSelector):
             self.trees.append(tree)
             self.feature_indices_per_tree.append(feature_indices)
 
-    def _predict(self, features: pd.DataFrame) -> dict:
+    def _predict(
+        self, features: pd.DataFrame, performance: pd.DataFrame | None = None
+    ) -> dict:
         """
         Predict the best algorithm for each instance.
 

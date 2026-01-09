@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple, Type
+from typing import Any, List, Dict, Tuple, Type
 import inspect
 import numpy as np
 import pandas as pd
@@ -21,7 +21,7 @@ class RPCSelector(AbstractSelector):
         self,
         classifier_class: Type = RandomForestClassifierWrapper,
         n_estimators: int = 100,
-        classifier_kwargs: Dict = None,
+        classifier_kwargs: Dict | None = None,
         random_state: int = 42,
         top_n: int = 1,
         **kwargs,
@@ -64,7 +64,7 @@ class RPCSelector(AbstractSelector):
         # Set return type dynamically based on top_n
         self.RETURN_TYPE = "parallel" if self.top_n > 1 else "single"
 
-        self.classifiers: Dict[Tuple[str, str], object] = {}
+        self.classifiers: Dict[Tuple[str, str], Any] = {}
         self.algorithms: List[str] = []
         self.pairs: List[Tuple[str, str]] = []
 
@@ -144,7 +144,9 @@ class RPCSelector(AbstractSelector):
 
         return scores
 
-    def _predict(self, features: pd.DataFrame) -> Dict[str, List]:
+    def _predict(
+        self, features: pd.DataFrame, performance: pd.DataFrame | None = None
+    ) -> Dict[str, List]:
         """
         Predict algorithm(s) for each instance using Copeland scores.
 
