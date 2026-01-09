@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -167,16 +167,25 @@ class APPS(AbstractSelector):
         return p_cand_left + p_best_right
 
     def _predict(
-        self, features: pd.DataFrame, performance: pd.DataFrame | None = None
-    ) -> Dict[str, List[str]]:
+        self,
+        features: pd.DataFrame | None,
+        performance: pd.DataFrame | None = None,
+    ) -> dict[str, list[tuple[str, float]]]:
         """
         Predict parallel portfolio for each instance.
 
         Returns:
-            Dictionary mapping instance names to lists of algorithm names.
+            Dictionary mapping instance names to lists of (algorithm, budget) tuples.
         """
+        if features is None:
+            raise ValueError("features cannot be None for APPS prediction")
+
+        budget = getattr(self, "budget", None)
+        if budget is None:
+            budget = float("inf")
+
         means, stds = self._predict_with_uncertainty(features)
-        predictions = {}
+        predictions: dict[str, list[tuple[str, float]]] = {}
 
         for inst_idx, inst_name in enumerate(features.index):
             inst_means = means[inst_idx, :]
@@ -202,6 +211,6 @@ class APPS(AbstractSelector):
                 if overlap >= self.p_intersection:
                     portfolio.append(self.algorithms[algo_idx])
 
-            predictions[inst_name] = portfolio
+            predictions[inst_name] = [(algo, float(budget)) for algo in portfolio]
 
         return predictions
