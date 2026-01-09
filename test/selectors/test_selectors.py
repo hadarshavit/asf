@@ -517,10 +517,14 @@ def test_apps_selector(dummy_performance, dummy_features):
 
     for inst_name, portfolio in predictions.items():
         assert len(portfolio) > 0, f"Empty portfolio for {inst_name}"
-        assert all(isinstance(algo, str) for algo in portfolio), (
-            f"Portfolio for {inst_name} contains non-string elements"
+        assert all(isinstance(item, tuple) and len(item) == 2 for item in portfolio), (
+            f"Portfolio for {inst_name} should contain (algo, budget) tuples"
         )
-        assert all(algo in ["algo1", "algo2", "algo3"] for algo in portfolio), (
+        assert all(
+            isinstance(algo, str) and isinstance(budget, float)
+            for algo, budget in portfolio
+        ), f"Portfolio for {inst_name} tuples should be (str, float)"
+        assert all(algo in ["algo1", "algo2", "algo3"] for algo, _ in portfolio), (
             f"Portfolio for {inst_name} contains invalid algorithm names"
         )
 
