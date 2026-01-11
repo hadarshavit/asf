@@ -10,16 +10,10 @@ import numpy as np
 import pandas as pd
 
 from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
-
-try:
-    from ConfigSpace import Configuration, ConfigurationSpace
-
-    CONFIGSPACE_AVAILABLE = True
-except ImportError:
-    CONFIGSPACE_AVAILABLE = False
+from asf.utils.configurable import ConfigurableMixin
 
 
-class BeamSearchPreSelector(AbstractPreSelector):
+class BeamSearchPreSelector(ConfigurableMixin, AbstractPreSelector):
     """
     Beam search algorithm for algorithm pre-selection.
 
@@ -36,6 +30,8 @@ class BeamSearchPreSelector(AbstractPreSelector):
     **kwargs : Any
         Additional keyword arguments passed to the parent class.
     """
+
+    PREFIX = "beam_search"
 
     def __init__(
         self,
@@ -127,86 +123,3 @@ class BeamSearchPreSelector(AbstractPreSelector):
         else:
             selected_performance = selected_performance.reset_index(drop=True)
         return selected_performance
-
-    @staticmethod
-    def get_configuration_space(
-        cs: ConfigurationSpace | None = None,
-        cs_transform: dict[str, Any] | None = None,
-        parent_param: Any | None = None,
-        parent_value: Any | None = None,
-        n_algorithms_max: int | None = None,
-        **kwargs: Any,
-    ) -> tuple[ConfigurationSpace, dict[str, Any]]:
-        """
-        Get the configuration space.
-
-        Parameters
-        ----------
-        cs : ConfigurationSpace | None, default=None
-            The configuration space to extend.
-        cs_transform : dict[str, Any] | None, default=None
-            The configuration space transform to extend.
-        parent_param : Any | None, default=None
-            The parent parameter.
-        parent_value : Any | None, default=None
-            The parent value.
-        n_algorithms_max : int | None, default=None
-            The maximum number of algorithms to select.
-        **kwargs : Any
-            Additional keyword arguments.
-
-        Returns
-        -------
-        tuple[ConfigurationSpace, dict[str, Any]]
-            The configuration space and the configuration space transform.
-        """
-        return AbstractPreSelector.get_configuration_space(
-            cs=cs,
-            cs_transform=cs_transform,
-            parent_param=parent_param,
-            parent_value=parent_value,
-            n_algorithms_max=n_algorithms_max,
-            **kwargs,
-        )
-
-    @staticmethod
-    def get_from_configuration(
-        configuration: Configuration | dict[str, Any],
-        cs_transform: dict[str, Any],
-        maximize: bool = False,
-        pre_selector_name: str | None = None,
-        **kwargs: Any,
-    ) -> BeamSearchPreSelector:
-        """
-        Create a BeamSearchPreSelector instance from a configuration.
-
-        Parameters
-        ----------
-        configuration : Configuration | dict[str, Any]
-            The configuration to create the instance from.
-        cs_transform : dict[str, Any]
-            The configuration space transform.
-        maximize : bool, default=False
-            Whether to maximize the metric.
-        pre_selector_name : str | None, default=None
-            The name of the pre-selector.
-        **kwargs : Any
-            Additional keyword arguments.
-
-        Returns
-        -------
-        BeamSearchPreSelector
-            A BeamSearchPreSelector instance.
-        """
-        n_algorithms = AbstractPreSelector.get_from_configuration(
-            configuration=configuration,
-            cs_transform=cs_transform,
-            maximize=maximize,
-            pre_selector_name=pre_selector_name,
-            **kwargs,
-        )
-        return BeamSearchPreSelector(
-            n_algorithms=n_algorithms,
-            maximize=maximize,
-            **kwargs,
-        )

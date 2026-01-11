@@ -10,9 +10,10 @@ import numpy as np
 import pandas as pd
 
 from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
+from asf.utils.configurable import ConfigurableMixin
 
 
-class KneeOfCurvePreSelector(AbstractPreSelector):
+class KneeOfCurvePreSelector(ConfigurableMixin, AbstractPreSelector):
     """
     Knee-of-the-curve algorithm for algorithm pre-selection.
 
@@ -36,6 +37,8 @@ class KneeOfCurvePreSelector(AbstractPreSelector):
     **kwargs : Any
         Additional arguments passed to the parent class.
     """
+
+    PREFIX = "knee_of_curve"
 
     def __init__(
         self,

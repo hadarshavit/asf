@@ -11,16 +11,10 @@ import numpy as np
 import pandas as pd
 
 from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
-
-try:
-    from ConfigSpace import Configuration, ConfigurationSpace
-
-    CONFIGSPACE_AVAILABLE = True
-except ImportError:
-    CONFIGSPACE_AVAILABLE = False
+from asf.utils.configurable import ConfigurableMixin
 
 
-class BruteForcePreSelector(AbstractPreSelector):
+class BruteForcePreSelector(ConfigurableMixin, AbstractPreSelector):
     """
     Brute-force algorithm for algorithm pre-selection.
 
@@ -38,6 +32,8 @@ class BruteForcePreSelector(AbstractPreSelector):
     **kwargs : Any
         Additional keyword arguments passed to the parent class.
     """
+
+    PREFIX = "brute_force"
 
     def __init__(
         self,
@@ -105,48 +101,3 @@ class BruteForcePreSelector(AbstractPreSelector):
         else:
             selected_performance = selected_performance.reset_index(drop=True)
         return selected_performance
-
-    @staticmethod
-    def get_configuration_space(
-        cs: ConfigurationSpace | None = None,
-        cs_transform: dict[str, Any] | None = None,
-        parent_param: Any | None = None,
-        parent_value: Any | None = None,
-        n_algorithms_max: int | None = None,
-        **kwargs: Any,
-    ) -> tuple[ConfigurationSpace, dict[str, Any]]:
-        """
-        Get the configuration space.
-        """
-        return AbstractPreSelector.get_configuration_space(
-            cs=cs,
-            cs_transform=cs_transform,
-            parent_param=parent_param,
-            parent_value=parent_value,
-            n_algorithms_max=n_algorithms_max,
-            **kwargs,
-        )
-
-    @staticmethod
-    def get_from_configuration(
-        configuration: Configuration | dict[str, Any],
-        cs_transform: dict[str, Any],
-        maximize: bool = False,
-        pre_selector_name: str | None = None,
-        **kwargs: Any,
-    ) -> BruteForcePreSelector:
-        """
-        Create a BruteForcePreSelector instance from a configuration.
-        """
-        n_algorithms = AbstractPreSelector.get_from_configuration(
-            configuration=configuration,
-            cs_transform=cs_transform,
-            maximize=maximize,
-            pre_selector_name=pre_selector_name,
-            **kwargs,
-        )
-        return BruteForcePreSelector(
-            n_algorithms=n_algorithms,
-            maximize=maximize,
-            **kwargs,
-        )

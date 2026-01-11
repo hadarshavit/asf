@@ -10,16 +10,10 @@ import numpy as np
 import pandas as pd
 
 from asf.pre_selector.abstract_pre_selector import AbstractPreSelector
-
-try:
-    from ConfigSpace import Configuration, ConfigurationSpace
-
-    CONFIGSPACE_AVAILABLE = True
-except ImportError:
-    CONFIGSPACE_AVAILABLE = False
+from asf.utils.configurable import ConfigurableMixin
 
 
-class SBSPreSelector(AbstractPreSelector):
+class SBSPreSelector(ConfigurableMixin, AbstractPreSelector):
     """
     Sequential Backward Selection-based pre-selector.
 
@@ -36,6 +30,8 @@ class SBSPreSelector(AbstractPreSelector):
     **kwargs : Any
         Additional arguments passed to the parent class.
     """
+
+    PREFIX = "sbs"
 
     def __init__(
         self,
@@ -96,48 +92,3 @@ class SBSPreSelector(AbstractPreSelector):
             selected_performance = selected_performance.values
 
         return selected_performance
-
-    @staticmethod
-    def get_configuration_space(
-        cs: ConfigurationSpace | None = None,
-        cs_transform: dict[str, Any] | None = None,
-        parent_param: Any | None = None,
-        parent_value: Any | None = None,
-        n_algorithms_max: int | None = None,
-        **kwargs: Any,
-    ) -> tuple[ConfigurationSpace, dict[str, Any]]:
-        """
-        Get the configuration space.
-        """
-        return AbstractPreSelector.get_configuration_space(
-            cs=cs,
-            cs_transform=cs_transform,
-            parent_param=parent_param,
-            parent_value=parent_value,
-            n_algorithms_max=n_algorithms_max,
-            **kwargs,
-        )
-
-    @staticmethod
-    def get_from_configuration(
-        configuration: Configuration | dict[str, Any],
-        cs_transform: dict[str, Any],
-        maximize: bool = False,
-        pre_selector_name: str | None = None,
-        **kwargs: Any,
-    ) -> SBSPreSelector:
-        """
-        Create a SBSPreSelector instance from a configuration.
-        """
-        n_algorithms = AbstractPreSelector.get_from_configuration(
-            configuration=configuration,
-            cs_transform=cs_transform,
-            maximize=maximize,
-            pre_selector_name=pre_selector_name,
-            **kwargs,
-        )
-        return SBSPreSelector(
-            n_algorithms=n_algorithms,
-            maximize=maximize,
-            **kwargs,
-        )
