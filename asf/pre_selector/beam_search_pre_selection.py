@@ -4,6 +4,7 @@ Beam search algorithm for algorithm pre-selection.
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any, Callable
 
 import numpy as np
@@ -123,3 +124,21 @@ class BeamSearchPreSelector(ConfigurableMixin, AbstractPreSelector):
         else:
             selected_performance = selected_performance.reset_index(drop=True)
         return selected_performance
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs: Any,
+    ) -> partial:
+        """Create a partial function from a clean configuration."""
+        init_kwargs = {**clean_config}
+        if "metric" in kwargs:
+            init_kwargs["metric"] = kwargs["metric"]
+        if "n_algorithms" in kwargs:
+            init_kwargs["n_algorithms"] = kwargs["n_algorithms"]
+        if "maximize" in kwargs:
+            init_kwargs["maximize"] = kwargs["maximize"]
+        if "beam_width" in kwargs:
+            init_kwargs["beam_width"] = kwargs["beam_width"]
+        return partial(cls, **init_kwargs)

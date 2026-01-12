@@ -37,6 +37,7 @@ def _create_pipeline(
     selector_kwargs: dict[str, Any],
     feature_groups: dict[str, Any] | None,
     max_feature_time: float | None = None,
+    algorithm_pre_selector_kwargs: dict[str, Any] | None = None,
 ) -> SelectorPipeline:
     """
     Helper function to create a SelectorPipeline from a configuration.
@@ -47,6 +48,7 @@ def _create_pipeline(
         max_feature_time=max_feature_time,
         budget=budget,
         maximize=maximize,
+        algorithm_pre_selector_kwargs=algorithm_pre_selector_kwargs or {},
         **selector_kwargs,
     )
     return pipeline_partial()
@@ -155,12 +157,31 @@ def tune_selector(
     sel_kwargs = selector_kwargs or {}
     sc_kwargs = smac_scenario_kwargs or {}
 
+    # Extract algorithm_pre_selector class and kwargs from tuple if provided
+    aps_cls = None
+    aps_kwargs: dict[str, Any] = {}
+    if algorithm_pre_selector:
+        if isinstance(algorithm_pre_selector, tuple):
+            aps_cls = algorithm_pre_selector[0]
+            aps_kwargs = (
+                dict(algorithm_pre_selector[1])
+                if len(algorithm_pre_selector) > 1
+                else {}
+            )
+        else:
+            aps_cls = algorithm_pre_selector
+
+    # Add n_algorithms from max_algorithm_pre_selector if not already provided
+    if aps_cls and max_algorithm_pre_selector is not None:
+        if "n_algorithms" not in aps_kwargs:
+            aps_kwargs["n_algorithms"] = max_algorithm_pre_selector
+
     cs = SelectorPipeline.get_configuration_space(
         selector_class=sel_list,
         preprocessing_class=preprocessing_class,
         pre_solving_class=pre_solving_class,
         feature_groups=feature_groups,
-        algorithm_pre_selector=algorithm_pre_selector,
+        algorithm_pre_selector=aps_cls,
         max_feature_time=max_feature_time,
         budget=budget,
         max_algorithm_pre_selector=max_algorithm_pre_selector,
@@ -199,6 +220,7 @@ def tune_selector(
                 sel_kwargs,
                 feature_groups,
                 max_feature_time=max_feature_time,
+                algorithm_pre_selector_kwargs=aps_kwargs,
             )
 
             pipeline.fit(X_train, y_train, algorithm_features=algorithm_features)
@@ -226,4 +248,5 @@ def tune_selector(
         sel_kwargs,
         feature_groups,
         max_feature_time=max_feature_time,
+        algorithm_pre_selector_kwargs=aps_kwargs,
     )

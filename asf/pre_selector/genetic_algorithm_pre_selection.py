@@ -4,6 +4,7 @@ Genetic Algorithm-based pre-selector for algorithm pre-selection.
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any, Callable
 
 import numpy as np
@@ -282,3 +283,21 @@ class GeneticAlgorithmPreSelector(ConfigurableMixin, AbstractPreSelector):
             selected_performance = selected_performance.reset_index(drop=True)
 
         return selected_performance
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs: Any,
+    ) -> partial:
+        """Create a partial function from a clean configuration."""
+        init_kwargs = {**clean_config}
+        if "metric" in kwargs:
+            init_kwargs["metric"] = kwargs["metric"]
+        if "n_algorithms" in kwargs:
+            init_kwargs["n_algorithms"] = kwargs["n_algorithms"]
+        if "maximize" in kwargs:
+            init_kwargs["maximize"] = kwargs["maximize"]
+        if "seed" in kwargs:
+            init_kwargs["seed"] = kwargs["seed"]
+        return partial(cls, **init_kwargs)

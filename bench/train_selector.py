@@ -145,9 +145,16 @@ def run(selector, scenario, fold, base_path="/home/shavit/asf/paper/aslib_data")
 
 
 def run_baseline(
-    selector, scenario, fold, base_path="/home/shavit/asf/paper/aslib_data"
+    selector, scenario, fold, base_path="/home/shavit/asf/paper/aslib_data", seed=42
 ):
     """Run baseline selectors (SBS, VBS) without HPO."""
+    # Set random seeds for reproducibility
+    import random
+    import numpy as np
+
+    random.seed(seed)
+    np.random.seed(seed)
+
     selector_name = selector.__name__
 
     print(f"Evaluating baseline selector: {selector_name}")
@@ -195,8 +202,8 @@ if __name__ == "__main__":
         ISAC,
         ISA,
         CosineSelector,
-        SingleBestSolver,
-        VirtualBestSolver,
+        # SingleBestSolver,
+        # VirtualBestSolver,
     ]
 
     executor = submitit.AutoExecutor("logs", "slurm")

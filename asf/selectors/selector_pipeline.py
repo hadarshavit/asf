@@ -168,9 +168,9 @@ class SelectorPipeline(ConfigurableMixin):
 
         if self.algorithm_pre_selector:
             if hasattr(self.algorithm_pre_selector, "fit_transform"):
-                y = self.algorithm_pre_selector.fit_transform(X, y)  # type: ignore
+                y = self.algorithm_pre_selector.fit_transform(y)  # type: ignore
             else:
-                self.algorithm_pre_selector.fit(X, y)  # type: ignore
+                self.algorithm_pre_selector.fit(y)  # type: ignore
                 if hasattr(self.algorithm_pre_selector, "transform"):
                     y = self.algorithm_pre_selector.transform(y)  # type: ignore
 
@@ -244,13 +244,12 @@ class SelectorPipeline(ConfigurableMixin):
         predictions = self.selector.predict(X, performance=performance)
 
         feature_steps: list[Any] = []
-        if self.feature_groups is not None:
+        if self.max_feature_time is not None and self.feature_groups is not None:
             if isinstance(self.feature_groups, dict):
                 feature_steps = list(self.feature_groups.keys())
             elif isinstance(self.feature_groups, list):
                 feature_steps = self.feature_groups
-
-        if self.max_feature_time is not None and feature_steps:
+            # Convert to tuples with budget
             feature_steps = [
                 (str(fg), float(self.max_feature_time)) for fg in feature_steps
             ]
@@ -531,7 +530,13 @@ class SelectorPipeline(ConfigurableMixin):
 
         if "algorithm_pre_selector" in clean_config:
             val = clean_config["algorithm_pre_selector"]
-            init_kwargs["algorithm_pre_selector"] = val() if callable(val) else val
+            # Get pre-selector specific kwargs
+            aps_kwargs = kwargs.get("algorithm_pre_selector_kwargs", {})
+            if callable(val):
+                # If it's a partial, call it with any additional args it needs
+                init_kwargs["algorithm_pre_selector"] = val(**aps_kwargs)
+            else:
+                init_kwargs["algorithm_pre_selector"] = val
 
         init_kwargs["max_feature_time"] = clean_config.get(
             "max_feature_time", max_feature_time
@@ -579,6 +584,11 @@ class SelectorPipeline(ConfigurableMixin):
         clean_config: dict[str, Any] = {}
         cs = getattr(configuration, "config_space", None)
 
+        # Filter out algorithm_pre_selector_kwargs before passing to child components
+        filtered_kwargs = {
+            k: v for k, v in kwargs.items() if k != "algorithm_pre_selector_kwargs"
+        }
+
         def resolve(hp_name: str, val: Any) -> Any:
             if isinstance(val, (type, partial)) or callable(val):
                 return val
@@ -601,7 +611,7 @@ class SelectorPipeline(ConfigurableMixin):
                     configuration,
                     pre_prefix=f"{prefix}presolver",
                     total_budget=budget,
-                    **kwargs,
+                    **filtered_kwargs,
                 )
                 # Try to extract the budget from the configuration to subtract it from the selector budget
                 # The parameter name is f"{prefix}presolver:{ps_cls.PREFIX}:presolver_budget"
@@ -626,7 +636,7 @@ class SelectorPipeline(ConfigurableMixin):
                     configuration,
                     pre_prefix=f"{prefix}selector",
                     budget=selector_budget,
-                    **kwargs,
+                    **filtered_kwargs,
                 )
             else:
                 clean_config["selector"] = (
@@ -644,7 +654,7 @@ class SelectorPipeline(ConfigurableMixin):
                             key = hp.name[len(prefix) :]
                             clean_config[key] = (
                                 res.get_from_configuration(  # type: ignore
-                                    configuration, pre_prefix=hp.name, **kwargs
+                                    configuration, pre_prefix=hp.name, **filtered_kwargs
                                 )
                                 if hasattr(res, "get_from_configuration")
                                 else (res() if callable(res) else res)
@@ -656,14 +666,18 @@ class SelectorPipeline(ConfigurableMixin):
         aps_val = configuration.get(f"{prefix}algorithm_pre_selector")
         aps_cls = resolve(f"{prefix}algorithm_pre_selector", aps_val)
         if aps_cls:
+            # Extract pre-selector kwargs from algorithm_pre_selector tuple if provided
+            aps_kwargs = kwargs.get("algorithm_pre_selector_kwargs", {})
             if hasattr(aps_cls, "get_from_configuration"):
                 clean_config["algorithm_pre_selector"] = aps_cls.get_from_configuration(
                     configuration,
                     pre_prefix=f"{prefix}algorithm_pre_selector",
-                    **kwargs,
+                    **aps_kwargs,
                 )
             else:
-                clean_config["algorithm_pre_selector"] = aps_cls()
+                clean_config["algorithm_pre_selector"] = (
+                    aps_cls(**aps_kwargs) if aps_kwargs else aps_cls()
+                )
 
         # 5. Max feature time
         mft = configuration.get(f"{prefix}max_feature_time")

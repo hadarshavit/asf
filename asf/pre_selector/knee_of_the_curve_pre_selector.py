@@ -4,6 +4,7 @@ Knee-of-the-curve algorithm for algorithm pre-selection.
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any, Callable
 
 import numpy as np
@@ -167,3 +168,19 @@ class KneeOfCurvePreSelector(ConfigurableMixin, AbstractPreSelector):
             selected_performance = selected_performance.to_numpy()
 
         return selected_performance
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs: Any,
+    ) -> partial:
+        """Create a partial function from a clean configuration."""
+        init_kwargs = {**clean_config}
+        if "metric" in kwargs:
+            init_kwargs["metric"] = kwargs["metric"]
+        if "base_pre_selector" in kwargs:
+            init_kwargs["base_pre_selector"] = kwargs["base_pre_selector"]
+        if "maximize" in kwargs:
+            init_kwargs["maximize"] = kwargs["maximize"]
+        return partial(cls, **init_kwargs)

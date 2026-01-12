@@ -148,3 +148,19 @@ class OptimizePreSelection(ConfigurableMixin, AbstractPreSelector):
             selected_performance = selected_performance.values
 
         return selected_performance
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs: Any,
+    ) -> partial:
+        """Create a partial function from a clean configuration."""
+        init_kwargs = {**clean_config}
+        if "metric" in kwargs:
+            init_kwargs["metric"] = kwargs["metric"]
+        if "n_algorithms" in kwargs:
+            init_kwargs["n_algorithms"] = kwargs["n_algorithms"]
+        if "maximize" in kwargs:
+            init_kwargs["maximize"] = kwargs["maximize"]
+        return partial(cls, **init_kwargs)

@@ -256,6 +256,17 @@ def read_aslib_scenario(
 
     algorithm_features = _load_aslib_algorithm_features(path, algorithm_feature_groups)
 
+    # Only return feature_groups if there are actual feature costs in the scenario
+    # (i.e., feature_groups columns exist in features_running_time)
+    if feature_groups is not None:
+        fg_cols = (
+            set(feature_groups.keys()) if isinstance(feature_groups, dict) else set()
+        )
+        rt_cols = set(features_running_time.columns)
+        if not fg_cols.intersection(rt_cols):
+            # No matching feature group columns in features_running_time
+            feature_groups = None
+
     return (
         features,
         performance,

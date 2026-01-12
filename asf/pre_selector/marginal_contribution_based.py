@@ -4,6 +4,7 @@ Marginal contribution-based algorithm for algorithm pre-selection.
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any, Callable, Literal
 
 import numpy as np
@@ -149,3 +150,36 @@ class MarginalContributionBasedPreSelector(ConfigurableMixin, AbstractPreSelecto
             selected_performance = selected_performance.values
 
         return selected_performance
+
+    @classmethod
+    def _get_from_clean_configuration(
+        cls,
+        clean_config: dict[str, Any],
+        **kwargs: Any,
+    ) -> partial:
+        """
+        Create a partial function from a clean configuration.
+
+        Parameters
+        ----------
+        clean_config : dict[str, Any]
+            The clean configuration dict with prefixes stripped.
+        **kwargs : Any
+            Additional keyword arguments including metric, n_algorithms, maximize.
+
+        Returns
+        -------
+        partial
+            A partial function to instantiate the pre-selector.
+        """
+        init_kwargs = {**clean_config}
+        # Extract required parameters from kwargs
+        if "metric" in kwargs:
+            init_kwargs["metric"] = kwargs["metric"]
+        if "n_algorithms" in kwargs:
+            init_kwargs["n_algorithms"] = kwargs["n_algorithms"]
+        if "maximize" in kwargs:
+            init_kwargs["maximize"] = kwargs["maximize"]
+        if "mode" in kwargs:
+            init_kwargs["mode"] = kwargs["mode"]
+        return partial(cls, **init_kwargs)
