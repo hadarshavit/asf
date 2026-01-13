@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from sklearn.cluster import DBSCAN, AgglomerativeClustering, KMeans
+from sklearn.metrics import pairwise_distances_argmin_min
 
 from asf.utils.configurable import ConfigurableMixin
 from asf.utils.g_means import GMeans
@@ -111,9 +112,7 @@ class GMeansWrapper(AbstractClustering):
         cls, clean_config: dict[str, Any], **kwargs: Any
     ) -> partial:
         """Create a partial class wrapper."""
-        config = clean_config.copy()
-        config.update(kwargs)
-        return partial(GMeansWrapper, **config)
+        return partial(GMeansWrapper, **clean_config)
 
 
 class KMeansWrapper(AbstractClustering):
@@ -182,9 +181,7 @@ class KMeansWrapper(AbstractClustering):
         cls, clean_config: dict[str, Any], **kwargs: Any
     ) -> partial:
         """Create a partial class wrapper."""
-        config = clean_config.copy()
-        config.update(kwargs)
-        return partial(KMeansWrapper, **config)
+        return partial(KMeansWrapper, **clean_config)
 
 
 class AgglomerativeClusteringWrapper(AbstractClustering):
@@ -201,6 +198,7 @@ class AgglomerativeClusteringWrapper(AbstractClustering):
 
     def __init__(self, **kwargs: Any) -> None:
         self.model = AgglomerativeClustering(**kwargs)
+        self._X_fit: np.ndarray | None = None
 
     def fit(self, X: pd.DataFrame | np.ndarray) -> AgglomerativeClusteringWrapper:
         """
@@ -216,7 +214,8 @@ class AgglomerativeClusteringWrapper(AbstractClustering):
         AgglomerativeClusteringWrapper
             The fitted wrapper.
         """
-        self.model.fit(self._ensure_array(X))
+        self._X_fit = self._ensure_array(X)
+        self.model.fit(self._X_fit)
         return self
 
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
@@ -240,7 +239,12 @@ class AgglomerativeClusteringWrapper(AbstractClustering):
         """
         if hasattr(self.model, "predict"):
             return getattr(self.model, "predict")(X)
-        raise NotImplementedError("AgglomerativeClustering does not support predict()")
+
+        if self._X_fit is None:
+            raise ValueError("Model must be fitted before calling predict.")
+
+        X_idx, _ = pairwise_distances_argmin_min(self._ensure_array(X), self._X_fit)
+        return self.model.labels_[X_idx]
 
     @staticmethod
     def _define_hyperparameters(
@@ -263,9 +267,7 @@ class AgglomerativeClusteringWrapper(AbstractClustering):
         cls, clean_config: dict[str, Any], **kwargs: Any
     ) -> partial:
         """Create a partial class wrapper."""
-        config = clean_config.copy()
-        config.update(kwargs)
-        return partial(AgglomerativeClusteringWrapper, **config)
+        return partial(AgglomerativeClusteringWrapper, **clean_config)
 
 
 class DBSCANWrapper(AbstractClustering):
@@ -282,6 +284,7 @@ class DBSCANWrapper(AbstractClustering):
 
     def __init__(self, **kwargs: Any) -> None:
         self.model = DBSCAN(**kwargs)
+        self._X_fit: np.ndarray | None = None
 
     def fit(self, X: pd.DataFrame | np.ndarray) -> DBSCANWrapper:
         """
@@ -297,7 +300,8 @@ class DBSCANWrapper(AbstractClustering):
         DBSCANWrapper
             The fitted wrapper.
         """
-        self.model.fit(self._ensure_array(X))
+        self._X_fit = self._ensure_array(X)
+        self.model.fit(self._X_fit)
         return self
 
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
@@ -321,7 +325,12 @@ class DBSCANWrapper(AbstractClustering):
         """
         if hasattr(self.model, "predict"):
             return getattr(self.model, "predict")(X)
-        raise NotImplementedError("DBSCAN does not support predict()")
+
+        if self._X_fit is None:
+            raise ValueError("Model must be fitted before calling predict.")
+
+        X_idx, _ = pairwise_distances_argmin_min(self._ensure_array(X), self._X_fit)
+        return self.model.labels_[X_idx]
 
     @staticmethod
     def _define_hyperparameters(
@@ -342,6 +351,4 @@ class DBSCANWrapper(AbstractClustering):
         cls, clean_config: dict[str, Any], **kwargs: Any
     ) -> partial:
         """Create a partial class wrapper."""
-        config = clean_config.copy()
-        config.update(kwargs)
-        return partial(DBSCANWrapper, **config)
+        return partial(DBSCANWrapper, **clean_config)

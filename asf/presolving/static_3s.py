@@ -83,18 +83,9 @@ class Static3S(AbstractPresolver):
         """
         Define hyperparameters for Static3S.
         """
-        from ConfigSpace import Integer
 
         hps, conds, forbs = AbstractPresolver._define_hyperparameters(
             total_budget=total_budget, **kwargs
-        )
-
-        hps.append(
-            Integer(
-                "max_candidates_per_solver",
-                bounds=(5, 100),
-                default=20,
-            )
         )
 
         return hps, conds, forbs

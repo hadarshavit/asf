@@ -74,3 +74,19 @@ def test_performance_model(
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
+
+
+def test_performance_model_with_normalization():
+    from asf.preprocessing.performance_scaling import MinMaxNormalization
+
+    X, Y = small_df()
+    # Ensure multi-column
+    assert Y.shape[1] > 1
+
+    selector = PerformanceModel(
+        model_class=DummyRegressor, normalize=MinMaxNormalization()
+    )
+    # This should not raise ValueError
+    selector.fit(X, Y)
+    predictions = selector.predict(X)
+    assert set(predictions.keys()) == set(X.index)

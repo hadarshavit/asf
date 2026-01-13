@@ -48,12 +48,13 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         input_size: int | None = None,
         loss: Callable | None = None,
         optimizer: Callable[..., Any] | None = None,
-        batch_size: int = 128,
-        epochs: int = 500,
+        batch_size: int = 256,
+        epochs: int = 400,
         seed: int = 42,
         device: str = "cpu",
         compile: bool = True,
         learning_rate: float = 1e-3,
+        min_lr: float = 1e-6,
         weight_decay: float = 0.0,
         **kwargs,
     ):
@@ -71,6 +72,7 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         device = params.pop("device", device)
         params.pop("compile", compile)
         learning_rate = params.pop("learning_rate", learning_rate)
+        min_lr = params.pop("min_lr", min_lr)
         weight_decay = params.pop("weight_decay", weight_decay)
 
         super().__init__(**params)
@@ -96,9 +98,10 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
 
         self.loss = loss or bpr_loss
         self.batch_size = batch_size
-        self.optimizer = optimizer or torch.optim.Adam
+        self.optimizer = optimizer or torch.optim.AdamW
         self.epochs = epochs
         self.learning_rate = learning_rate
+        self.min_lr = min_lr
         self.weight_decay = weight_decay
 
         if compile:
@@ -135,6 +138,9 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
             lr=self.learning_rate,
             weight_decay=self.weight_decay,
         )
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=self.epochs, eta_min=self.min_lr
+        )
         self.model.train()
         for epoch in range(self.epochs):
             total_loss = 0
@@ -166,6 +172,7 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
                 loss.backward()
                 optimizer.step()
 
+            scheduler.step()
             logging.debug(f"Epoch {epoch}, Loss: {total_loss / len(dataloader)}")
 
         return None
@@ -194,9 +201,7 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
             return [], [], []
 
         hyperparameters = [
-            Integer("batch_size", (32, 256), log=True, default=128),
-            Integer("epochs", (50, 1000), log=True, default=500),
-            Float("learning_rate", (1e-4, 1e-1), log=True, default=1e-3),
-            Float("weight_decay", (1e-6, 1e-2), log=True, default=1e-5),
+            Float("learning_rate", (1e-6, 1e-2), log=True, default=1e-3),
+            Float("weight_decay", (1e-6, 1e-1), log=True, default=1e-5),
         ]
         return hyperparameters, [], []

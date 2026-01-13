@@ -544,8 +544,9 @@ class ConfigurableMixin:
         partial
             A partial function that will instantiate the class.
         """
-        # Default implementation: merge clean_config into kwargs
-        init_kwargs = {**clean_config, **kwargs}
+        # Default implementation: merge kwargs with clean_config
+        # clean_config values (from configuration) take precedence over kwargs
+        init_kwargs = {**kwargs, **clean_config}
         return partial(cls, **init_kwargs)
 
     @classmethod
@@ -687,12 +688,27 @@ class ConfigurableMixin:
         else:
             prefix = f"{cls.PREFIX}:"
 
-        # Get hyperparameter definitions, passing kwargs (e.g., model_class)
-        hyperparameters, _, _ = cls._define_hyperparameters(**kwargs)
-
-        # Extract values from configuration
+        # Identify ALL hyperparameters belonging to this prefix in the configuration
+        # This allows discovering parameters without explicitly defining them in
+        # _define_hyperparameters (e.g., if they are passed through SMAC)
         init_kwargs = {}
+        for key in configuration.keys():
+            if key.startswith(prefix):
+                param_name = key[len(prefix) :]
+                # Only take parameters at THIS level (no more colons)
+                if ":" not in param_name:
+                    init_kwargs[param_name] = configuration[key]
 
+        # Get hyperparameter definitions to handle recursion to children
+        hyperparameters, _, _ = cls._define_hyperparameters(**kwargs)
+        hp_names = {hp.name for hp in hyperparameters}
+
+        # Filter kwargs: remove any that match hyperparameter names
+        # Those parameters are for defining the config space, not for the constructor
+        # Must be done before recursive calls so child classes don't receive them
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k not in hp_names}
+
+        # Recursively resolve ClassChoice parameters
         for hp in hyperparameters:
             prefixed_name = f"{prefix}{hp.name}"
 
@@ -709,15 +725,16 @@ class ConfigurableMixin:
 
                 if hasattr(chosen_cls, "get_from_configuration"):
                     # Get a partial for the chosen class
+                    # Use filtered_kwargs to avoid passing hp-definition params to children
                     value = chosen_cls.get_from_configuration(  # type: ignore[operator]
                         configuration=configuration,
                         pre_prefix=child_pre_prefix,
-                        **kwargs,
+                        **filtered_kwargs,
                     )
                 else:
                     value = chosen_cls
 
-            init_kwargs[hp.name] = value
+                init_kwargs[hp.name] = value
 
-        # Call the hook method with clean configuration
-        return cls._get_from_clean_configuration(init_kwargs, **kwargs)
+        # Call the hook method with identified configuration and filtered kwargs
+        return cls._get_from_clean_configuration(init_kwargs, **filtered_kwargs)

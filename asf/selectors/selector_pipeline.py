@@ -455,14 +455,18 @@ class SelectorPipeline(ConfigurableMixin):
                 ClassChoice("algorithm_pre_selector", choices=[aps_cls])
             )
 
-        if max_feature_time is None:
+        # Only add max_feature_time hyperparameter if:
+        # 1. max_feature_time is None (not explicitly set)
+        # 2. AND feature_groups are provided (scenario has feature times)
+        if max_feature_time is None and feature_groups:
             upper = float(budget or 3600.0)
             hyperparameters.append(
                 UniformFloatHyperparameter(
                     "max_feature_time",
-                    lower=0.0,
+                    lower=1.0,
                     upper=upper,
                     default_value=min(60.0, upper),
+                    log=True,
                 )
             )
 

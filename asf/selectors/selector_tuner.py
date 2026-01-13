@@ -153,8 +153,22 @@ def tune_selector(
     if pre_solving_class is not None and budget is None:
         raise ValueError("Budget must be provided if using pre-solving.")
 
-    sel_list = selector_class if isinstance(selector_class, list) else [selector_class]
-    sel_kwargs = selector_kwargs or {}
+    # Normalize selector_class to a list and extract kwargs from tuples
+    raw_list = selector_class if isinstance(selector_class, list) else [selector_class]
+    sel_list: list[type[AbstractSelector]] = []
+    sel_kwargs = dict(selector_kwargs) if selector_kwargs else {}
+
+    for item in raw_list:
+        if isinstance(item, tuple):
+            # Extract class and kwargs from tuple (SelectorClass, {"kwarg": value})
+            sel_cls = item[0]
+            item_kwargs = dict(item[1]) if len(item) > 1 else {}
+            # Merge item kwargs into sel_kwargs (item kwargs take precedence)
+            for k, v in item_kwargs.items():
+                sel_kwargs[k] = v
+            sel_list.append(sel_cls)
+        else:
+            sel_list.append(item)
     sc_kwargs = smac_scenario_kwargs or {}
 
     # Extract algorithm_pre_selector class and kwargs from tuple if provided

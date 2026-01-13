@@ -42,6 +42,15 @@ if TORCH_AVAILABLE:
             return self.features[index], self.performance[index]
 
     class RankingDataset(torch.utils.data.Dataset):
+        """
+        Dataset for ranking-based training.
+
+        Samples at the (dataset, algorithm) level to match ZAP HPO.
+        Each sample consists of a triplet: (main, smaller, larger) where
+        smaller and larger are algorithms with lower/higher performance
+        on the same dataset.
+        """
+
         def __init__(
             self,
             features: pd.DataFrame,
@@ -63,46 +72,56 @@ if TORCH_AVAILABLE:
             self.algorithm_features_cols = algorithm_features.columns.to_list()
             self._dtype = dtype
 
+            # Build index mapping for efficient access
+            # Each entry is (instance_id, row_position_within_instance)
+            self._index_map = []
+            self._instance_data = {}
+            for iid in self.all.index.unique():
+                instance_data = self.all.loc[iid]
+                if isinstance(instance_data, pd.Series):
+                    # Single row case - convert to DataFrame
+                    instance_data = instance_data.to_frame().T
+                self._instance_data[iid] = instance_data
+                for row_idx in range(len(instance_data)):
+                    self._index_map.append((iid, row_idx))
+
         def __len__(self):
-            return len(self.all.index.unique())
+            # Return total number of (dataset, algorithm) pairs
+            return len(self._index_map)
 
         def __getitem__(self, index):
-            iid = self.all.index.unique()[index]
-            data = self.all.loc[iid]
+            iid, row_idx = self._index_map[index]
+            data = self._instance_data[iid]
 
-            main = np.random.randint(0, len(data))
+            # The main point is the specific (dataset, algorithm) pair
+            main_point = data.iloc[row_idx]
+            main_perf = main_point["performance"]
 
-            main_point = data.iloc[main]
-            smaller = data[data["performance"] < main_point["performance"]]
-            if len(smaller) == 0:
+            # Find algorithms with smaller performance on the same dataset
+            smaller_mask = data["performance"] < main_perf
+            if smaller_mask.any():
+                smaller = data[smaller_mask].sample(1).iloc[0]
+            else:
                 smaller = main_point
+
+            # Find algorithms with larger performance on the same dataset
+            larger_mask = data["performance"] > main_perf
+            if larger_mask.any():
+                larger = data[larger_mask].sample(1).iloc[0]
             else:
-                smaller = smaller.sample(1).iloc[0]
-            larger = data[data["performance"] > main_point["performance"]]
-            if len(larger) == 0:
                 larger = main_point
-            else:
-                larger = larger.sample(1).iloc[0]
 
-            main_feats = (
-                main_point[self.algorithm_features_cols + self.features_cols]
-                .to_numpy()
-                .astype(np.float32)
+            # Extract features
+            cols = self.algorithm_features_cols + self.features_cols
+            main_feats = torch.tensor(
+                main_point[cols].to_numpy().astype(np.float32)
+            ).to(self._dtype)
+            smaller_feats = torch.tensor(
+                smaller[cols].to_numpy().astype(np.float32)
+            ).to(self._dtype)
+            larger_feats = torch.tensor(larger[cols].to_numpy().astype(np.float32)).to(
+                self._dtype
             )
-            smaller_feats = (
-                smaller[self.algorithm_features_cols + self.features_cols]
-                .to_numpy()
-                .astype(np.float32)
-            )
-            larger_feats = (
-                larger[self.algorithm_features_cols + self.features_cols]
-                .to_numpy()
-                .astype(np.float32)
-            )
-
-            main_feats = torch.tensor(main_feats).to(self._dtype)
-            smaller_feats = torch.tensor(smaller_feats).to(self._dtype)
-            larger_feats = torch.tensor(larger_feats).to(self._dtype)
 
             return (main_feats, smaller_feats, larger_feats), (
                 main_point["performance"],

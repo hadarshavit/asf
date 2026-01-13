@@ -93,9 +93,15 @@ class ISAC(ConfigurableMixin, AbstractSelector):
             Performance matrix (instances x algorithms).
         """
         if isinstance(self.clusterer, type) or isinstance(self.clusterer, partial):
-            self.clusterer_instance = self.clusterer(
-                random_state=self.random_state, **self.clusterer_kwargs
-            )
+            import inspect
+
+            # Check if clusterer accepts random_state
+            sig = inspect.signature(self.clusterer)
+            inst_kwargs = self.clusterer_kwargs.copy()
+            if "random_state" in sig.parameters:
+                inst_kwargs["random_state"] = self.random_state
+
+            self.clusterer_instance = self.clusterer(**inst_kwargs)
         elif hasattr(self.clusterer, "fit") and hasattr(self.clusterer, "predict"):
             self.clusterer_instance = self.clusterer
         else:
@@ -104,10 +110,13 @@ class ISAC(ConfigurableMixin, AbstractSelector):
             )
 
         self.clusterer_instance.fit(features.values)  # type: ignore[attr-defined]
-        cluster_labels = self.clusterer_instance.predict(features.values)  # type: ignore[attr-defined]
+        if hasattr(self.clusterer_instance, "labels_"):
+            cluster_labels = self.clusterer_instance.labels_
+        else:
+            cluster_labels = self.clusterer_instance.predict(features.values)  # type: ignore[attr-defined]
 
-        n_clusters = len(np.unique(cluster_labels))
-        for cluster_id in range(n_clusters):
+        unique_labels = np.unique(cluster_labels)
+        for cluster_id in unique_labels:
             idxs = np.where(cluster_labels == cluster_id)[0]
             if len(idxs) == 0:
                 continue

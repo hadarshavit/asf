@@ -92,8 +92,12 @@ class AbstractNormalization(
         """Reshape input for sklearn scalers (n_samples, 1)."""
         return np.asarray(X).reshape(-1, 1)
 
-    def _reshape_output(self, X: np.ndarray) -> np.ndarray:
-        """Reshape output from sklearn scalers back to 1D."""
+    def _reshape_output(
+        self, X: np.ndarray, shape: tuple[int, ...] | None = None
+    ) -> np.ndarray:
+        """Reshape output from sklearn scalers back to target shape."""
+        if shape is not None:
+            return np.asarray(X).reshape(shape)
         return np.asarray(X).reshape(-1)
 
 
@@ -159,8 +163,9 @@ class MinMaxNormalization(AbstractNormalization):
         np.ndarray
             Transformed data.
         """
+        X_arr = np.asarray(X)
         return self._reshape_output(
-            self.min_max_scale.transform(self._reshape_input(X))
+            self.min_max_scale.transform(self._reshape_input(X_arr)), shape=X_arr.shape
         )
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
@@ -177,8 +182,10 @@ class MinMaxNormalization(AbstractNormalization):
         np.ndarray
             Original data.
         """
+        X_arr = np.asarray(X)
         return self._reshape_output(
-            self.min_max_scale.inverse_transform(self._reshape_input(X))
+            self.min_max_scale.inverse_transform(self._reshape_input(X_arr)),
+            shape=X_arr.shape,
         )
 
 
@@ -233,7 +240,10 @@ class ZScoreNormalization(AbstractNormalization):
         np.ndarray
             Transformed data.
         """
-        return self._reshape_output(self.scaler.transform(self._reshape_input(X)))
+        X_arr = np.asarray(X)
+        return self._reshape_output(
+            self.scaler.transform(self._reshape_input(X_arr)), shape=X_arr.shape
+        )
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
@@ -249,8 +259,9 @@ class ZScoreNormalization(AbstractNormalization):
         np.ndarray
             Original data.
         """
+        X_arr = np.asarray(X)
         return self._reshape_output(
-            self.scaler.inverse_transform(self._reshape_input(X))
+            self.scaler.inverse_transform(self._reshape_input(X_arr)), shape=X_arr.shape
         )
 
 
@@ -487,8 +498,9 @@ class InvSigmoidNormalization(AbstractNormalization):
                 np.ndarray
                     Transformed data.
         """
+        X_arr = np.asarray(X)
         X_scaled = self._reshape_output(
-            self.min_max_scale.transform(self._reshape_input(X))
+            self.min_max_scale.transform(self._reshape_input(X_arr)), shape=X_arr.shape
         )
         return np.log(X_scaled / (1 - X_scaled))
 
@@ -506,9 +518,11 @@ class InvSigmoidNormalization(AbstractNormalization):
                 np.ndarray
                     Original data.
         """
-        X_logit = scipy.special.expit(X)
+        X_arr = np.asarray(X)
+        X_logit = scipy.special.expit(X_arr)
         return self._reshape_output(
-            self.min_max_scale.inverse_transform(self._reshape_input(X_logit))
+            self.min_max_scale.inverse_transform(self._reshape_input(X_logit)),
+            shape=X_arr.shape,
         )
 
 
@@ -699,7 +713,10 @@ class BoxCoxNormalization(AbstractNormalization):
                 np.ndarray
                     Transformed data.
         """
-        return self._reshape_output(self.box_cox.transform(self._reshape_input(X)))
+        X_arr = np.asarray(X)
+        return self._reshape_output(
+            self.box_cox.transform(self._reshape_input(X_arr)), shape=X_arr.shape
+        )
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
         """
@@ -715,7 +732,9 @@ class BoxCoxNormalization(AbstractNormalization):
                 np.ndarray
                     Original data.
         """
+        X_arr = np.asarray(X)
         X_orig = self._reshape_output(
-            self.box_cox.inverse_transform(self._reshape_input(X))
+            self.box_cox.inverse_transform(self._reshape_input(X_arr)),
+            shape=X_arr.shape,
         )
         return X_orig
