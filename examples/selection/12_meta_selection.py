@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import Any, cast
+from typing import cast
 
 from asf.predictors.random_forest import (
     RandomForestClassifierWrapper as RandomForestClassifier,
@@ -8,12 +8,14 @@ from asf.predictors.random_forest import (
 from asf.selectors.meta_selector import MetaSelector
 from asf.selectors.snnap import SNNAP
 from asf.selectors.satzilla import SATzilla
-from asf.selectors.isac import ISAC
 from asf.selectors.multi_class import MultiClassClassifier
 from asf.selectors.survival_analysis import SurvivalAnalysis
-
-BASE_CLASSES = [SNNAP, SATzilla, ISAC]
-META_CLASS = SATzilla
+from asf.metrics import (
+    compute_solve_rate,
+    single_best_solver,
+    virtual_best_solver,
+    running_time_selector_performance,
+)
 
 
 def make_challenging_data(n_instances=200, n_algorithms=6, seed=42, budget=200.0):
@@ -30,29 +32,10 @@ def make_challenging_data(n_instances=200, n_algorithms=6, seed=42, budget=200.0
         noise = rng.normal(0, 30, size=n_instances)
         runtimes = np.maximum(5.0, bias + features["f0"] * rng.uniform(-5, 5) + noise)
         timeout_mask = rng.rand(n_instances) < (0.10 + 0.05 * (a % 3))
-        runtimes[timeout_mask] = budget
+        runtimes[timeout_mask] = budget * 10
         perf[f"algo{a + 1}"] = runtimes
 
     return features, perf
-
-
-def evaluate_predictions(predictions: Any, true_perf: pd.DataFrame, budget: float):
-    total = 0.0
-    solved = 0
-    n = len(true_perf)
-    for inst in true_perf.index:
-        sched = predictions.get(inst, [])
-        if not sched:
-            total += budget
-            continue
-        algo, _ = sched[0]
-        rt = true_perf.loc[inst, algo]
-        if pd.isna(rt) or rt >= budget:
-            total += budget
-        else:
-            total += float(rt)
-            solved += 1
-    return total / n, solved / n
 
 
 def run_base_selectors(base_selectors, train_X, train_Y, test_X, test_Y, budget):
@@ -62,10 +45,26 @@ def run_base_selectors(base_selectors, train_X, train_Y, test_X, test_Y, budget)
         try:
             sel.fit(train_X, train_Y)
             preds = sel.predict(test_X)
-            avg_rt, solve_rate = evaluate_predictions(preds, test_Y, budget)
-            results.append((name, avg_rt, solve_rate))
-        except Exception as _:
-            results.append((name, float("inf"), 0.0))
+            if preds is None or (isinstance(preds, dict) and len(preds) == 0):
+                results.append((name, 0.0, float("inf")))
+                continue
+
+            budgeted_preds = {
+                inst: [(algo, budget) for algo, _ in sched]
+                for inst, sched in preds.items()
+            }
+
+            solve_rate = compute_solve_rate(budgeted_preds, test_Y, budget)
+            par10 = running_time_selector_performance(
+                budgeted_preds,
+                test_Y,
+                budget=budget,
+                par=10.0,
+                return_per_instance=False,
+            )
+            results.append((name, solve_rate, par10))
+        except Exception:
+            results.append((name, 0.0, float("inf")))
     return results
 
 
@@ -80,6 +79,10 @@ def main():
     train_Y = performance.iloc[:n_train]
     test_X = features.iloc[n_train:]
     test_Y = performance.iloc[n_train:]
+
+    # Use ASF metrics for baselines
+    sbs_score = single_best_solver(test_Y, maximize=False, budget=budget, par=10.0)
+    vbs_score = virtual_best_solver(test_Y, maximize=False, budget=budget, par=10.0)
 
     # instantiate fresh base selectors
     base_selectors = [
@@ -101,23 +104,33 @@ def main():
         MultiClassClassifier(model_class=RandomForestClassifier),
     ]
     meta = MetaSelector(
-        base_selectors=meta_base_selectors, meta_selector=ISAC(), budget=budget
+        base_selectors=meta_base_selectors, meta_selector=SATzilla(), budget=budget
     )
 
     meta.fit(train_X, train_Y)
     meta_preds = meta.predict(test_X)
-    meta_avg_rt, meta_solve_rate = evaluate_predictions(meta_preds, test_Y, budget)
+    budgeted_meta_preds = {
+        inst: [(algo, budget) for algo, _ in sched]
+        for inst, sched in meta_preds.items()
+    }
+    meta_sr = compute_solve_rate(budgeted_meta_preds, test_Y, budget)
+    meta_par10 = running_time_selector_performance(
+        budgeted_meta_preds, test_Y, budget=budget, par=10.0, return_per_instance=False
+    )
 
     # print comparison
     print("=" * 60)
     print("MetaSelector vs Base Selectors")
     print("=" * 60)
-    print(f"{'Selector':<20} {'Avg Runtime':>12} {'Solve Rate':>12}")
+    print(f"Single Best Solver PAR10 Score: {sbs_score:.2f}")
+    print(f"Virtual Best Solver (Oracle) PAR10 Score: {vbs_score:.2f}")
+    print()
+    print(f"{'Selector':<20} {'Solve Rate':>12} {'PAR10':>12}")
     print("-" * 46)
-    for name, avg_rt, solve_rate in base_results:
-        print(f"{name:<20} {avg_rt:12.2f}s {solve_rate:11.1%}")
+    for name, solve_rate, par10 in base_results:
+        print(f"{name:<20} {solve_rate:11.1%} {par10:12.2f}")
     print("-" * 46)
-    print(f"{'MetaSelector':<20} {meta_avg_rt:12.2f}s {meta_solve_rate:11.1%}")
+    print(f"{'MetaSelector':<20} {meta_sr:11.1%} {meta_par10:12.2f}")
     print("\nSample meta decisions (first 10 instances):")
     for inst in list(test_Y.index)[:10]:
         sched = cast(dict, meta_preds).get(inst, [])

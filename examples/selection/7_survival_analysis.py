@@ -1,6 +1,12 @@
 import pandas as pd
 import numpy as np
 from asf.selectors.survival_analysis import SurvivalAnalysis
+from asf.metrics import (
+    compute_solve_rate,
+    single_best_solver,
+    virtual_best_solver,
+    running_time_selector_performance,
+)
 
 
 def generate_complex_data(n_instances=100, n_algorithms=6, budget=150.0, seed=42):
@@ -88,6 +94,7 @@ if __name__ == "__main__":
     train_features = features.loc[train_idx]
     train_performance = performance.loc[train_idx]
     test_features = features.loc[test_idx]
+    test_performance = performance.loc[test_idx]
     test_types = types[n_train:]
 
     # --- 1. Single Best Algorithm Prediction ---
@@ -101,6 +108,37 @@ if __name__ == "__main__":
         algo, _ = predictions[instance][0]
         true_type = test_types[i]
         print(f"{instance}: {algo} (true type: {true_type})")
+
+    # Wrap predictions with budget for metrics
+    budgeted_preds = {
+        inst: [(algo, BUDGET) for algo, _ in sched]
+        for inst, sched in predictions.items()
+    }
+
+    # Baselines
+    sbs_score = single_best_solver(
+        test_performance, maximize=False, budget=BUDGET, par=10.0
+    )
+    vbs_score = virtual_best_solver(
+        test_performance, maximize=False, budget=BUDGET, par=10.0
+    )
+
+    # Selector metrics
+    sr = compute_solve_rate(budgeted_preds, test_performance, BUDGET)
+    par10 = running_time_selector_performance(
+        budgeted_preds,
+        test_performance,
+        budget=BUDGET,
+        par=10.0,
+        return_per_instance=False,
+    )
+
+    print("\n--- Single Best Metrics ---")
+    print(f"Budget: {BUDGET}s | Train/Test: {len(train_features)}/{len(test_features)}")
+    print(f"Single Best Solver (SBS) PAR10: {sbs_score:.2f}")
+    print(f"Virtual Best Solver (VBS) PAR10: {vbs_score:.2f}")
+    print(f"Selector solve-rate: {sr:.2%}")
+    print(f"Selector PAR10: {par10:.2f}")
 
     print("\n" + "=" * 60 + "\n")
 
@@ -131,3 +169,19 @@ if __name__ == "__main__":
 
         print(f"{instance} (true type: {true_type}):")
         print(f"  Schedule: {schedule_str}")
+
+    # Schedule selector metrics (schedules already contain time allocations)
+    sr_schedule = compute_solve_rate(schedule_predictions, test_performance, BUDGET)
+    par10_schedule = running_time_selector_performance(
+        schedule_predictions,
+        test_performance,
+        budget=BUDGET,
+        par=10.0,
+        return_per_instance=False,
+    )
+
+    print("\n--- Schedule Metrics ---")
+    print(f"Single Best Solver (SBS) PAR10: {sbs_score:.2f}")
+    print(f"Virtual Best Solver (VBS) PAR10: {vbs_score:.2f}")
+    print(f"Schedule Selector solve-rate: {sr_schedule:.2%}")
+    print(f"Schedule Selector PAR10: {par10_schedule:.2f}")

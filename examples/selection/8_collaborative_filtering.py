@@ -1,7 +1,14 @@
 import pandas as pd
 import numpy as np
+
 from asf.selectors.collaborative_filtering_selector import (
     CollaborativeFilteringSelector,
+)
+from asf.metrics import (
+    compute_solve_rate,
+    single_best_solver,
+    virtual_best_solver,
+    running_time_selector_performance,
 )
 
 
@@ -46,29 +53,6 @@ def generate_correlated_data(n_instances=100, n_algorithms=6, seed=42):
     return features, performance
 
 
-def evaluate_predictions(predictions, true_performance):
-    correct = 0
-    total = 0
-    score_diffs = []
-    for instance, pred in predictions.items():
-        pred_algo, pred_score = pred[0]
-        if instance not in true_performance.index:
-            continue
-        # Find the true best algorithm and its score (ignoring NaNs)
-        row = true_performance.loc[instance]
-        if row.isnull().all():
-            continue
-        true_algo = row.idxmin()
-        true_score = row.min()
-        total += 1
-        if pred_algo == true_algo:
-            correct += 1
-        score_diffs.append(pred_score - true_score)
-    accuracy = correct / total if total > 0 else 0
-    avg_score_diff = np.mean(score_diffs) if score_diffs else float("nan")
-    return accuracy, avg_score_diff
-
-
 def print_sample_predictions(predictions, true_performance, label, n=10):
     print(f"\nSample predictions for test set ({label}):")
     for instance in list(true_performance.index)[:n]:
@@ -93,6 +77,9 @@ if __name__ == "__main__":
     print("Full performance matrix (no NaNs):")
     print(performance_full.head(10))
 
+    # Use budget as 95th percentile of runtimes for metrics evaluation
+    budget = float(performance_full.values.flatten().max()) * 1.1
+
     # Split into train/test
     n_train = int(0.7 * len(features))
     train_idx = features.index[:n_train]
@@ -102,6 +89,18 @@ if __name__ == "__main__":
     train_performance_full = performance_full.loc[train_idx]
     test_features = features.loc[test_idx]
     test_performance_full = performance_full.loc[test_idx]
+
+    # Compute baselines on the full test set
+    sbs_score = single_best_solver(
+        test_performance_full, maximize=False, budget=budget, par=10.0
+    )
+    vbs_score = virtual_best_solver(
+        test_performance_full, maximize=False, budget=budget, par=10.0
+    )
+
+    print(f"\nBudget (for metrics): {budget:.2f}")
+    print(f"Single Best Solver PAR10: {sbs_score:.2f}")
+    print(f"Virtual Best Solver (Oracle) PAR10: {vbs_score:.2f}")
 
     # Insert NaNs for training and test sets
     missing_rate = 0.3
@@ -122,23 +121,40 @@ if __name__ == "__main__":
 
     # 1. Predict on training set (no NaNs)
     predictions_train = selector.predict(None, None)
-    acc_train, diff_train = evaluate_predictions(
-        predictions_train, train_performance_full
+    # Wrap predictions with budget allocation for metrics
+    budgeted_train = {
+        inst: [(algo, budget) for algo, _ in sched]
+        for inst, sched in predictions_train.items()
+    }
+    sr_train = compute_solve_rate(budgeted_train, train_performance_full, budget)
+    par10_train = running_time_selector_performance(
+        budgeted_train,
+        train_performance_full,
+        budget=budget,
+        par=10.0,
+        return_per_instance=False,
     )
-    print(
-        f"\n[TRAIN] Accuracy: {acc_train:.2%}, Avg. predicted-best minus true-best actual: {diff_train:.2f}"
-    )
+    print(f"\n[TRAIN] Solve-rate: {sr_train:.2%}, PAR10: {par10_train:.2f}")
     print_sample_predictions(
         predictions_train, train_performance_full, label="train (full)", n=10
     )
 
     # 2. Predict on test set (with sparse performance matrix)
     predictions_test_perf = selector.predict(None, test_performance)
-    acc_test_perf, diff_test_perf = evaluate_predictions(
-        predictions_test_perf, test_performance_full
+    budgeted_test_perf = {
+        inst: [(algo, budget) for algo, _ in sched]
+        for inst, sched in predictions_test_perf.items()
+    }
+    sr_test_perf = compute_solve_rate(budgeted_test_perf, test_performance_full, budget)
+    par10_test_perf = running_time_selector_performance(
+        budgeted_test_perf,
+        test_performance_full,
+        budget=budget,
+        par=10.0,
+        return_per_instance=False,
     )
     print(
-        f"[TEST - Sparse Perf] Accuracy: {acc_test_perf:.2%}, Avg. predicted-best minus true-best actual: {diff_test_perf:.2f}"
+        f"[TEST - Sparse Perf] Solve-rate: {sr_test_perf:.2%}, PAR10: {par10_test_perf:.2f}"
     )
     print_sample_predictions(
         predictions_test_perf, test_performance_full, label="test (sparse perf)", n=10
@@ -146,11 +162,20 @@ if __name__ == "__main__":
 
     # 3. Predict on test set (cold start, using features only)
     predictions_test_feat = selector.predict(test_features, None)
-    acc_test_feat, diff_test_feat = evaluate_predictions(
-        predictions_test_feat, test_performance_full
+    budgeted_test_feat = {
+        inst: [(algo, budget) for algo, _ in sched]
+        for inst, sched in predictions_test_feat.items()
+    }
+    sr_test_feat = compute_solve_rate(budgeted_test_feat, test_performance_full, budget)
+    par10_test_feat = running_time_selector_performance(
+        budgeted_test_feat,
+        test_performance_full,
+        budget=budget,
+        par=10.0,
+        return_per_instance=False,
     )
     print(
-        f"[TEST - Cold Start] Accuracy: {acc_test_feat:.2%}, Avg. predicted-best minus true-best actual: {diff_test_feat:.2f}"
+        f"[TEST - Cold Start] Solve-rate: {sr_test_feat:.2%}, PAR10: {par10_test_feat:.2f}"
     )
     print_sample_predictions(
         predictions_test_feat, test_performance_full, label="test (cold start)", n=10

@@ -3,6 +3,12 @@ import pandas as pd
 
 from asf.selectors.parallel_portfolio_selector import APPS
 from asf.predictors.random_forest import RandomForestRegressorWrapper
+from asf.metrics import (
+    single_best_solver,
+    virtual_best_solver,
+    compute_solve_rate,
+    running_time_selector_performance,
+)
 
 
 def make_data(n_instances=200, n_algorithms=5, seed=1, budget=200.0):
@@ -26,45 +32,6 @@ def make_data(n_instances=200, n_algorithms=5, seed=1, budget=200.0):
     return features, perf
 
 
-def evaluate_parallel_portfolio(preds, true_perf, budget):
-    """
-    Evaluate parallel portfolio performance.
-
-    For each instance, check if ANY algorithm in the portfolio solves it.
-    This simulates running all algorithms in parallel.
-    """
-    solved = 0
-    total = len(preds)
-
-    for inst, algo_list in preds.items():
-        if inst not in true_perf.index:
-            continue
-
-        # Check if any algorithm in the portfolio solves the instance
-        instance_solved = False
-        for algo in algo_list:
-            rt = true_perf.loc[inst, algo]
-            if not np.isnan(rt) and float(rt) <= budget:
-                instance_solved = True
-                break
-
-        if instance_solved:
-            solved += 1
-
-    return solved / total if total > 0 else 0.0
-
-
-def compute_portfolio_stats(preds):
-    """Compute statistics about portfolio sizes."""
-    sizes = [len(portfolio) for portfolio in preds.values()]
-    return {
-        "mean": np.mean(sizes),
-        "median": np.median(sizes),
-        "min": np.min(sizes),
-        "max": np.max(sizes),
-    }
-
-
 def main():
     budget = 200.0
     X, Y = make_data(n_instances=300, n_algorithms=6, seed=2, budget=budget)
@@ -85,16 +52,11 @@ def main():
     print(f"Algorithms: {list(Y.columns)}")
     print()
 
-    # Baseline: best single algorithm
-    solve_rates = ((Y_train <= budget).mean(axis=0)).to_dict()
-    best_algo = max(solve_rates, key=solve_rates.get)
-    baseline_acc = float((Y_test[best_algo] <= budget).mean())
+    sbs_score = single_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
+    vbs_score = virtual_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
 
-    # Oracle: at least one algorithm solves it
-    oracle = float((Y_test.min(axis=1) <= budget).mean())
-
-    print(f"Best-single baseline ({best_algo}) solve-rate: {baseline_acc:.2%}")
-    print(f"Oracle solve-rate: {oracle:.2%}")
+    print(f"Single Best Solver PAR10 Score: {sbs_score:.2f}")
+    print(f"Virtual Best Solver (Oracle) PAR10 Score: {vbs_score:.2f}")
     print()
     print("-" * 70)
 
@@ -108,22 +70,22 @@ def main():
         sel.fit(X_train, Y_train)
         preds = sel.predict(X_test)
 
-        # Validate structure
-        assert isinstance(preds, dict)
-        for v in preds.values():
-            assert isinstance(v, list)
-            for algo in v:
-                assert algo in list(Y.columns)
+        # Use ASF metrics for evaluation (handles parallel portfolios correctly)
+        solve_rate = compute_solve_rate(preds, Y_test, budget)
+        par10_score = running_time_selector_performance(
+            preds, Y_test, budget=budget, par=10.0, return_per_instance=False
+        )
 
-        acc = evaluate_parallel_portfolio(preds, Y_test, budget)
-        stats = compute_portfolio_stats(preds)
+        # Portfolio size statistics
+        sizes = [len(preds[inst]) for inst in Y_test.index if inst in preds]
 
         print(f"p_intersection = {p_int:.2f}")
-        print(f"  Solve-rate: {acc:.2%}")
+        print(f"  Solve-rate: {solve_rate:.2%}")
+        print(f"  PAR10 Score: {par10_score:.2f}")
         print(
-            f"  Portfolio size - mean: {stats['mean']:.2f}, "
-            f"median: {stats['median']:.0f}, "
-            f"range: [{stats['min']:.0f}, {stats['max']:.0f}]"
+            f"  Portfolio size - mean: {np.mean(sizes):.2f}, "
+            f"median: {np.median(sizes):.0f}, "
+            f"range: [{np.min(sizes):.0f}, {np.max(sizes):.0f}]"
         )
         print()
 
@@ -142,16 +104,20 @@ def main():
     preds = sel.predict(X_test)
 
     for inst in list(X_test.index)[:10]:
-        portfolio = preds.get(inst, [])
-        # Check which algorithms actually solve it
-        solvers = []
-        for algo in portfolio:
-            rt = Y_test.loc[inst, algo]
-            if not np.isnan(rt) and float(rt) <= budget:
-                solvers.append(f"{algo}({rt:.1f}s)")
+        portfolio_schedule = preds.get(inst, [])
+        # Extract algorithm names from schedule
+        portfolio_algos = [algo for algo, _ in portfolio_schedule]
+        # Get min runtime across portfolio (parallel execution)
+        portfolio_times = Y_test.loc[inst, portfolio_algos]
+        min_time = portfolio_times.min()
+        solvers = [
+            f"{algo}({Y_test.loc[inst, algo]:.1f}s)"
+            for algo in portfolio_algos
+            if Y_test.loc[inst, algo] <= budget
+        ]
 
-        solved_str = " ✓" if solvers else " ✗"
-        print(f"{inst}: {portfolio}{solved_str}")
+        solved_str = " ✓" if min_time <= budget else " ✗"
+        print(f"{inst}: {portfolio_algos}{solved_str} (min: {min_time:.1f}s)")
         if solvers:
             print(f"  └─ Solved by: {', '.join(solvers)}")
 

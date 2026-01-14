@@ -174,8 +174,9 @@ if __name__ == "__main__":
             if isinstance(prediction, list) and len(prediction) > 0
             else str(prediction)
         )
-        best_actual = test_performance.loc[instance_id].idxmin()
-        best_time = test_performance.loc[instance_id].min()
+        idx = int(instance_id)
+        best_actual = test_performance.loc[idx].idxmin()
+        best_time = test_performance.loc[idx].min()
 
         print(
             f"  {instance_id}: [{preschedule_str}] → {main_alg} (best: {best_actual}:{best_time:.0f}s)"

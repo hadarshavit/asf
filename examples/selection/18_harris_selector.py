@@ -2,6 +2,12 @@ import numpy as np
 import pandas as pd
 
 from asf.selectors.hybrid_decision_tree import HARRIS
+from asf.metrics import (
+    single_best_solver,
+    virtual_best_solver,
+    running_time_selector_performance,
+    compute_solve_rate,
+)
 
 
 def make_data(n_instances=300, n_algorithms=6, seed=2, budget=200.0):
@@ -33,23 +39,6 @@ def make_data(n_instances=300, n_algorithms=6, seed=2, budget=200.0):
     return features, perf
 
 
-def evaluate_solve_rate(preds: dict, perf: pd.DataFrame, budget: float) -> float:
-    """Compute fraction of instances solved within budget by chosen algorithm."""
-    solved = 0
-    total = 0
-    for inst, rec in preds.items():
-        if not rec:
-            continue
-        algo, _ = rec[0]
-        if algo is None:
-            continue
-        total += 1
-        rt = perf.at[inst, algo]
-        if not np.isnan(rt) and float(rt) <= budget:
-            solved += 1
-    return solved / total if total > 0 else 0.0
-
-
 def main():
     budget = 200.0
     X, Y = make_data(n_instances=300, n_algorithms=6, seed=2, budget=budget)
@@ -68,13 +57,14 @@ def main():
     print(f"Algorithms: {list(Y.columns)}")
     print()
 
-    # Baselines
-    best_algo = ((Y_train <= budget).mean(axis=0)).idxmax()
-    baseline_sr = float((Y_test[best_algo] <= budget).mean())
-    oracle_sr = float((Y_test.min(axis=1) <= budget).mean())
+    # Use ASF metrics for baselines
+    sbs_score = single_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
+    vbs_score = virtual_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
+    vbs_solve_rate = float((Y_test.min(axis=1) <= budget).mean())
 
-    print(f"Best-single baseline ({best_algo}) solve-rate: {baseline_sr:.2%}")
-    print(f"Oracle solve-rate: {oracle_sr:.2%}")
+    print(f"Single Best Solver PAR10 Score: {sbs_score:.2f}")
+    print(f"Virtual Best Solver (Oracle) PAR10 Score: {vbs_score:.2f}")
+    print(f"Virtual Best Solver (Oracle) solve-rate: {vbs_solve_rate:.2%}")
     print("-" * 70)
 
     # Try a couple of lambda balances (ranking vs regression)
@@ -91,8 +81,11 @@ def main():
         )
         selector.fit(X_train, Y_train)
         preds = selector.predict(X_test)
-        sr = evaluate_solve_rate(preds, Y_test, budget)
-        print(f"lambda={lam:.2f} -> solve-rate: {sr:.2%}")
+        sr = compute_solve_rate(preds, Y_test, budget)
+        par10 = running_time_selector_performance(
+            preds, Y_test, budget=budget, par=10.0, return_per_instance=False
+        )
+        print(f"lambda={lam:.2f} -> solve-rate: {sr:.2%}, PAR10: {par10:.2f}")
 
     print("-" * 70)
     print("Detailed predictions (lambda=0.5, first 10 instances):")
@@ -108,13 +101,21 @@ def main():
     )
     selector.fit(X_train, Y_train)
     preds = selector.predict(X_test)
-    sr = evaluate_solve_rate(preds, Y_test, budget)
-    print(f"lambda=0.5 -> solve-rate: {sr:.2%}")
+    sr = compute_solve_rate(preds, Y_test, budget)
+    par10 = running_time_selector_performance(
+        preds, Y_test, budget=budget, par=10.0, return_per_instance=False
+    )
+    print(f"lambda=0.5 -> solve-rate: {sr:.2%}, PAR10: {par10:.2f}")
+    print()
 
     for inst in list(X_test.index)[:10]:
         algo, _ = preds.get(inst, [(None, None)])[0]
-        rt = Y_test.at[inst, algo] if algo is not None else float("nan")
-        print(f"{inst}: chosen={algo}, true_rt={rt:.1f}s")
+        if algo is not None and algo in Y_test.columns:
+            rt = Y_test.at[inst, algo]
+            solved_str = " ✓" if rt <= budget else " ✗"
+            print(f"{inst}: chosen={algo}, true_rt={rt:.1f}s{solved_str}")
+        else:
+            print(f"{inst}: chosen={algo} (invalid)")
 
     print("=" * 70)
 

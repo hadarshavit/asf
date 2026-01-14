@@ -168,9 +168,9 @@ class SelectorPipeline(ConfigurableMixin):
 
         if self.algorithm_pre_selector:
             if hasattr(self.algorithm_pre_selector, "fit_transform"):
-                y = self.algorithm_pre_selector.fit_transform(X, y)  # type: ignore
+                y = self.algorithm_pre_selector.fit_transform(y)  # type: ignore
             else:
-                self.algorithm_pre_selector.fit(X, y)  # type: ignore
+                self.algorithm_pre_selector.fit(y)  # type: ignore
                 if hasattr(self.algorithm_pre_selector, "transform"):
                     y = self.algorithm_pre_selector.transform(y)  # type: ignore
 
