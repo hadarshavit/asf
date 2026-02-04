@@ -243,6 +243,7 @@ if __name__ == "__main__":
             p_intersection=0.63,
             n_estimators_for_std=5,
             use_jackknife=True,
+            n_jackknife_folds=10,
         ),
     ]
 
