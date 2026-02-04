@@ -1,7 +1,6 @@
 from typing import List, Optional, Tuple
 import numpy as np
 import pandas as pd
-from scipy.stats import spearmanr
 
 from asf.selectors.abstract_selector import AbstractSelector
 
@@ -49,48 +48,72 @@ class HybridDecisionTree:
         """Compute regression label as mean performance."""
         return np.mean(y, axis=0)
 
+    def _vectorized_rank_correlation(self, y_ranks: np.ndarray, y_pred: np.ndarray) -> float:
+        """Compute average Spearman correlation using vectorized operations.
+        
+        Args:
+            y_ranks: Pre-computed ranks of performance values (n_instances, n_algorithms)
+            y_pred: Predicted performance values (n_algorithms,)
+        
+        Returns:
+            Average correlation across instances
+        """
+        n_instances = y_ranks.shape[0]
+        if n_instances == 0:
+            return 0.0
+        
+        # Rank y_pred once
+        y_pred_ranks = np.argsort(np.argsort(y_pred)).astype(float)
+        
+        # Compute Pearson correlation on ranks (Spearman)
+        y_ranks_centered = y_ranks - np.mean(y_ranks, axis=1, keepdims=True)
+        y_pred_centered = y_pred_ranks - np.mean(y_pred_ranks)
+        
+        numerator = np.sum(y_ranks_centered * y_pred_centered, axis=1)
+        denominator = np.sqrt(
+            np.sum(y_ranks_centered**2, axis=1) * np.sum(y_pred_centered**2)
+        )
+        
+        # Avoid division by zero
+        correlations = np.where(denominator > 1e-10, numerator / denominator, 0.0)
+        
+        return np.mean(correlations)
+
     def _regression_loss(self, y: np.ndarray, y_pred: np.ndarray) -> float:
         """Mean squared error."""
         return np.mean((y - y_pred) ** 2)
 
-    def _ranking_loss(self, y: np.ndarray, y_pred: np.ndarray) -> float:
+    def _ranking_loss(self, y_ranks: np.ndarray, y_pred: np.ndarray) -> float:
         """
-        Spearman correlation loss between true and predicted algorithm ordering.
+        Vectorized Spearman correlation loss using pre-computed ranks.
 
         Args:
-            y: True performance values (n_instances, n_algorithms)
+            y_ranks: Pre-computed ranks of performance values (n_instances, n_algorithms)
             y_pred: Predicted performance values (regression label)
 
         Returns:
             Loss value in [0, 1]: (1 - avg_correlation) / 2
         """
-        n_instances = y.shape[0]
-
-        if n_instances == 0:
+        if y_ranks.shape[0] == 0:
             return 1.0
 
-        correlations = []
-        for i in range(n_instances):
-            # Spearman correlation between true and predicted algorithm ordering
-            corr, _ = spearmanr(y[i, :], y_pred)
-            correlations.append(corr)
-
-        avg_corr = np.mean(correlations)
+        avg_corr = self._vectorized_rank_correlation(y_ranks, y_pred)
         # Convert to loss: (1 - correlation) / 2 to scale to [0, 1]
         return (1.0 - avg_corr) / 2.0
 
-    def _hybrid_loss(self, y: np.ndarray, regression_label: np.ndarray) -> float:
+    def _hybrid_loss(self, y: np.ndarray, y_ranks: np.ndarray, regression_label: np.ndarray) -> float:
         """
         Combined regression and ranking loss.
         Args:
             y: True performance values (n_instances, n_algorithms)
+            y_ranks: Pre-computed ranks (n_instances, n_algorithms)
             regression_label: Predicted performances (mean of y for this node)
 
         Returns:
             Weighted combination of regression and ranking losses
         """
         reg_loss = self._regression_loss(y, regression_label)
-        rank_loss = self._ranking_loss(y, regression_label)
+        rank_loss = self._ranking_loss(y_ranks, regression_label)
 
         return self.lambda_param * reg_loss + (1 - self.lambda_param) * rank_loss
 
@@ -112,6 +135,9 @@ class HybridDecisionTree:
 
         if n_instances < self.min_samples_split:
             return None, None
+
+        # Pre-compute ranks ONCE for all instances (only done once per node)
+        y_ranks = np.argsort(np.argsort(y, axis=1), axis=1).astype(float)
 
         best_loss = float("inf")
         best_feature = None
@@ -136,6 +162,10 @@ class HybridDecisionTree:
 
                 y_left = y[left_mask]
                 y_right = y[right_mask]
+                
+                # Slice pre-computed ranks (no recalculation)
+                y_ranks_left = y_ranks[left_mask]
+                y_ranks_right = y_ranks[right_mask]
 
                 left_reg_label = self._compute_regression_label(y_left)
                 right_reg_label = self._compute_regression_label(y_right)
@@ -144,8 +174,8 @@ class HybridDecisionTree:
                 n_left = len(y_left)
                 n_right = len(y_right)
 
-                left_loss = self._hybrid_loss(y_left, left_reg_label)
-                right_loss = self._hybrid_loss(y_right, right_reg_label)
+                left_loss = self._hybrid_loss(y_left, y_ranks_left, left_reg_label)
+                right_loss = self._hybrid_loss(y_right, y_ranks_right, right_reg_label)
 
                 weighted_loss = (n_left / n_instances) * left_loss + (
                     n_right / n_instances
@@ -401,8 +431,11 @@ class HARRIS(AbstractSelector):
             # Average predictions across trees
             avg_prediction = np.mean(tree_predictions, axis=0)
 
-            # Select best algorithm (lowest predicted performance)
-            best_algo_idx = np.argmin(avg_prediction)
+            # Select best algorithm based on maximize parameter
+            if self.maximize:
+                best_algo_idx = np.argmax(avg_prediction)
+            else:
+                best_algo_idx = np.argmin(avg_prediction)
             best_algo = self.algorithms[best_algo_idx]
 
             predictions[inst_name] = [(best_algo, budget)]

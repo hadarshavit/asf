@@ -3,12 +3,12 @@ import os
 import pandas as pd
 import numpy as np
 
-from asf.metrics.baselines import virtual_best_solver, running_time_closed_gap
-from asf.pre_selector import MarginalContributionBasedPreSelector
-from asf.predictors import RandomForestRegressorWrapper
+from asf.metrics.baselines import running_time_closed_gap
 from asf.scenario.aslib_reader import evaluate_selector
 from asf.selectors.baselines import SingleBestSolver, VirtualBestSolver
-from asf.selectors.parallel_portfolio_selector import APPS
+from asf.selectors.hybrid_decision_tree import HARRIS
+from asf.selectors.isac import ISAC
+from asf.clustering.wrappers import KMeansWrapper
 from asf.presolving import Static3S
 from asf.selectors.selector_tuner import tune_selector
 from functools import partial
@@ -224,26 +224,27 @@ def report_results(scenario, results_dir=None):
 if __name__ == "__main__":
     # Configuration
     base_path = os.path.join(os.path.dirname(__file__), "..", "..", "aslib_data")
-    scenarios = ["SAT11-INDU"]
+    scenarios = ["MIP-2016"]
     n_folds = 3
-
-    apps_model_class = partial(
-        RandomForestRegressorWrapper,
-        n_estimators=30,
-        n_jobs=-1,
-        random_state=42,
-    )
 
     selectors = [
         SingleBestSolver,
         VirtualBestSolver,
         partial(
-            APPS,
-            model_class=apps_model_class,
-            p_intersection=0.63,
-            n_estimators_for_std=5,
-            use_jackknife=True,
-            n_jackknife_folds=10,
+            HARRIS,
+            n_estimators=100,
+            max_depth=4,
+            min_samples_split=2,
+            lambda_param=0.8,
+            max_features="sqrt",
+            max_thresholds=32,
+            random_state=42,
+        ),
+        partial(
+            ISAC,
+            clusterer=KMeansWrapper,
+            clusterer_kwargs={"n_clusters": 5},
+            random_state=42,
         ),
     ]
 
