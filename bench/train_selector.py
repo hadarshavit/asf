@@ -90,9 +90,7 @@ def run(selector, scenario, fold, base_path, use_HPO=False):
         pd.DataFrame(results).to_csv(path, header=True, index=False)
 
 
-def run_baseline(
-    selector, scenario, fold, base_path
-):
+def run_baseline(selector, scenario, fold, base_path):
     """Run baseline selectors (SBS, VBS) without HPO."""
     selector_name = selector.__name__
 
@@ -135,7 +133,7 @@ def run_baseline(
 
 def report_results(scenario, results_dir=None):
     """Read and report results with gap analysis.
-    
+
     Parameters
     ----------
     scenario : str
@@ -145,79 +143,101 @@ def report_results(scenario, results_dir=None):
     """
     if results_dir is None:
         results_dir = os.path.join(os.path.dirname(__file__), "results")
-    
+
     csv_path = os.path.join(results_dir, f"results_{scenario}_per_instance.csv")
     if not os.path.exists(csv_path):
         print(f"No results found at {csv_path}")
         return
-    
+
     df = pd.read_csv(csv_path)
-    
+
     # test_score now contains PAR10 scores per instance
     # Sum by selector and fold to get total PAR10
     par10_summary = df.groupby(["selector", "fold"])["test_score"].sum().reset_index()
     par10_summary = par10_summary.rename(columns={"test_score": "par10_total"})
-    
+
     # Compute PAR10 baselines
     from asf.scenario.aslib_reader import read_aslib_scenario
     from asf.metrics.baselines import single_best_solver, virtual_best_solver
-    
+
     base_path = os.path.join(os.path.dirname(__file__), "..", "..", "aslib_data")
     scenario_path = os.path.join(base_path, scenario)
-    
+
     # Load scenario
-    (features, performance, features_running_time, cv, 
-     feature_groups, maximize, budget, algorithm_features) = read_aslib_scenario(scenario_path)
-    
+    (
+        features,
+        performance,
+        features_running_time,
+        cv,
+        feature_groups,
+        maximize,
+        budget,
+        algorithm_features,
+    ) = read_aslib_scenario(scenario_path)
+
     # Compute PAR10 baselines per fold
     par10_per_fold = {}
     for fold in range(1, df["fold"].max() + 1):
         test_instance_ids = cv.index[cv["fold"] == fold].unique()
         y_test = performance.loc[test_instance_ids]
-        
+
         sbs_par10 = single_best_solver(y_test, maximize=False, budget=budget, par=10.0)
         vbs_par10 = virtual_best_solver(y_test, maximize=False, budget=budget, par=10.0)
-        
+
         par10_per_fold[fold] = {"SBS": sbs_par10, "VBS": vbs_par10}
-    
+
     print(f"\n{'=' * 80}")
     print(f"RESULTS SUMMARY: {scenario}")
     print(f"{'=' * 80}")
-    print(f"{'Selector':<25} | {'Mean PAR10':<15} | {'Gap Closed':<15} | {'Std Dev':<15}")
+    print(
+        f"{'Selector':<25} | {'Mean PAR10':<15} | {'Gap Closed':<15} | {'Std Dev':<15}"
+    )
     print(f"{'-' * 80}")
-    
+
     # Baselines
-    sbs_par10_values = [par10_per_fold[fold]["SBS"] for fold in sorted(par10_per_fold.keys())]
-    vbs_par10_values = [par10_per_fold[fold]["VBS"] for fold in sorted(par10_per_fold.keys())]
-    
+    sbs_par10_values = [
+        par10_per_fold[fold]["SBS"] for fold in sorted(par10_per_fold.keys())
+    ]
+    vbs_par10_values = [
+        par10_per_fold[fold]["VBS"] for fold in sorted(par10_per_fold.keys())
+    ]
+
     sbs_mean = np.mean(sbs_par10_values)
     vbs_mean = np.mean(vbs_par10_values)
     gap_denominator = sbs_mean - vbs_mean
-    
-    print(f"{'SingleBestSolver':<25} | {sbs_mean:<15.2f} | {'0.00%':<15} | {np.std(sbs_par10_values):<15.2f}")
-    print(f"{'VirtualBestSolver':<25} | {vbs_mean:<15.2f} | {'100.00%':<15} | {np.std(vbs_par10_values):<15.2f}")
+
+    print(
+        f"{'SingleBestSolver':<25} | {sbs_mean:<15.2f} | {'0.00%':<15} | {np.std(sbs_par10_values):<15.2f}"
+    )
+    print(
+        f"{'VirtualBestSolver':<25} | {vbs_mean:<15.2f} | {'100.00%':<15} | {np.std(vbs_par10_values):<15.2f}"
+    )
     print(f"{'-' * 80}")
-    
+
     # Print other selectors
     for selector in sorted(df["selector"].unique()):
         if selector in ["SingleBestSolver", "VirtualBestSolver"]:
             continue
-        
-        selector_par10 = par10_summary[par10_summary["selector"] == selector]["par10_total"].values
+
+        selector_par10 = par10_summary[par10_summary["selector"] == selector][
+            "par10_total"
+        ].values
         if len(selector_par10) == 0:
             continue
-        
+
         sel_mean_par10 = np.mean(selector_par10)
         sel_std_par10 = np.std(selector_par10)
-        
+
         # Compute gap closed
         if abs(gap_denominator) > 1e-9:
             gap_closed = (sbs_mean - sel_mean_par10) / gap_denominator * 100
         else:
             gap_closed = 0.0
-        
-        print(f"{selector:<25} | {sel_mean_par10:<15.2f} | {gap_closed:<14.2f}% | {sel_std_par10:<15.2f}")
-    
+
+        print(
+            f"{selector:<25} | {sel_mean_par10:<15.2f} | {gap_closed:<14.2f}% | {sel_std_par10:<15.2f}"
+        )
+
     print(f"{'=' * 80}\n")
 
 
@@ -261,7 +281,7 @@ if __name__ == "__main__":
         results_file = os.path.join(results_dir, f"results_{scenario}_per_instance.csv")
         if os.path.exists(results_file):
             os.remove(results_file)
-        
+
         for selector in selectors:
             for fold in range(1, n_folds + 1):
                 try:
@@ -271,9 +291,11 @@ if __name__ == "__main__":
                     import traceback
 
                     traceback.print_exc()
-        
+
             if selector == SingleBestSolver or selector == VirtualBestSolver:
-                print(f"Completed baseline selector: {selector.__name__} for scenario: {scenario}\n")
+                print(
+                    f"Completed baseline selector: {selector.__name__} for scenario: {scenario}\n"
+                )
 
         # Report results after all selectors are evaluated for this scenario
         report_results(scenario)

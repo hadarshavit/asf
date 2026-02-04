@@ -77,14 +77,16 @@ class APPS(AbstractSelector):
         n_instances = len(features)
 
         if self.use_jackknife:
-            # Jackknife method: K-fold or leave-one-out            
+            # Jackknife method: K-fold or leave-one-out
             if self.n_jackknife_folds is None:
                 n_splits = n_instances
             else:
                 n_splits = self.n_jackknife_folds
-            
-            kfold = KFold(n_splits=n_splits, shuffle=True, random_state=self.random_state)
-            
+
+            kfold = KFold(
+                n_splits=n_splits, shuffle=True, random_state=self.random_state
+            )
+
             for algo_idx, _ in enumerate(self.algorithms):
                 algo_models = []
                 algo_performance = performance.iloc[:, algo_idx]
@@ -106,7 +108,9 @@ class APPS(AbstractSelector):
                 algo_performance = performance.iloc[:, algo_idx]
 
                 for _ in range(self.n_estimators_for_std):
-                    sample_indices = rng.choice(n_instances, size=n_instances, replace=True)
+                    sample_indices = rng.choice(
+                        n_instances, size=n_instances, replace=True
+                    )
                     X_boot = features.iloc[sample_indices]
                     y_boot = algo_performance.iloc[sample_indices]
 
@@ -142,11 +146,11 @@ class APPS(AbstractSelector):
             for algo_idx in range(n_algorithms):
                 # For each test instance, collect predictions from all models
                 all_predictions = []
-                
+
                 for model, test_idx in self.predictors[algo_idx]:
                     pred = model.predict(features)
                     all_predictions.append(pred)
-                
+
                 all_predictions = np.array(all_predictions)  # (n_folds, n_test)
                 means[:, algo_idx] = np.mean(all_predictions, axis=0)
                 stds[:, algo_idx] = np.std(all_predictions, axis=0)
@@ -170,81 +174,92 @@ class APPS(AbstractSelector):
             return means, stds
 
     def _solve_intersection_vectorized(
-        self, mu_best: np.ndarray, sigma_best: np.ndarray, 
-        mu_candidates: np.ndarray, sigma_candidates: np.ndarray
+        self,
+        mu_best: np.ndarray,
+        sigma_best: np.ndarray,
+        mu_candidates: np.ndarray,
+        sigma_candidates: np.ndarray,
     ) -> np.ndarray:
         """
         Vectorized computation of PDF intersection points for multiple candidates.
-        
+
         Args:
             mu_best: Scalar or array of best algorithm means
             sigma_best: Scalar or array of best algorithm stds
             mu_candidates: Array of candidate means (n_candidates,)
             sigma_candidates: Array of candidate stds (n_candidates,)
-        
+
         Returns:
             Array of intersection points c for each candidate
         """
         # Handle equal variance case
         equal_var = np.abs(sigma_best - sigma_candidates) < 1e-9
         c = np.where(equal_var, (mu_best + mu_candidates) / 2.0, 0.0)
-        
+
         # Compute for unequal variance cases
         unequal_mask = ~equal_var
         if np.any(unequal_mask):
-            sigma_best_ue = sigma_best if np.isscalar(sigma_best) else sigma_best[unequal_mask]
+            sigma_best_ue = (
+                sigma_best if np.isscalar(sigma_best) else sigma_best[unequal_mask]
+            )
             mu_best_ue = mu_best if np.isscalar(mu_best) else mu_best[unequal_mask]
-            
+
             var1 = sigma_best_ue**2
-            var2 = sigma_candidates[unequal_mask]**2
-            
+            var2 = sigma_candidates[unequal_mask] ** 2
+
             a = 0.5 / var1 - 0.5 / var2
             b = mu_candidates[unequal_mask] / var2 - mu_best_ue / var1
-            c_coeff = (mu_best_ue**2) / (2 * var1) - (mu_candidates[unequal_mask]**2) / (2 * var2) - np.log(sigma_candidates[unequal_mask] / sigma_best_ue)
-            
+            c_coeff = (
+                (mu_best_ue**2) / (2 * var1)
+                - (mu_candidates[unequal_mask] ** 2) / (2 * var2)
+                - np.log(sigma_candidates[unequal_mask] / sigma_best_ue)
+            )
+
             delta = b**2 - 4 * a * c_coeff
             delta = np.maximum(delta, 0)  # Clamp negative deltas
-            
+
             sqrt_delta = np.sqrt(delta)
             x1 = (-b - sqrt_delta) / (2 * a)
             x2 = (-b + sqrt_delta) / (2 * a)
-            
+
             midpoint = (mu_best_ue + mu_candidates[unequal_mask]) / 2.0
-            
+
             # Choose x closest to midpoint
-            c_unequal = np.where(
-                np.abs(x1 - midpoint) < np.abs(x2 - midpoint),
-                x1, x2
-            )
-            
+            c_unequal = np.where(np.abs(x1 - midpoint) < np.abs(x2 - midpoint), x1, x2)
+
             if np.isscalar(c):
                 c = np.array([c] * len(mu_candidates))
             c[unequal_mask] = c_unequal
-        
+
         return c
 
     def _compute_overlap_vectorized(
-        self, mu_best: float, sigma_best: float,
-        mu_candidates: np.ndarray, sigma_candidates: np.ndarray
+        self,
+        mu_best: float,
+        sigma_best: float,
+        mu_candidates: np.ndarray,
+        sigma_candidates: np.ndarray,
     ) -> np.ndarray:
         """
         Vectorized computation of distribution overlaps.
-        
+
         Args:
             mu_best: Best algorithm mean
             sigma_best: Best algorithm std
             mu_candidates: Array of candidate means
             sigma_candidates: Array of candidate stds
-        
+
         Returns:
             Array of overlap values for each candidate
         """
-        c = self._solve_intersection_vectorized(mu_best, sigma_best, mu_candidates, sigma_candidates)
-        
+        c = self._solve_intersection_vectorized(
+            mu_best, sigma_best, mu_candidates, sigma_candidates
+        )
+
         # Vectorized CDF computation
         p_cand_left = stats.norm.cdf(c, loc=mu_candidates, scale=sigma_candidates)
         p_best_right = 1.0 - stats.norm.cdf(c, loc=mu_best, scale=sigma_best)
-        
+
         return p_cand_left + p_best_right
 
     def _solve_intersection(
@@ -327,28 +342,30 @@ class APPS(AbstractSelector):
         # Vectorized ranking across all instances
         ranks = np.argsort(means, axis=1)  # (n_instances, n_algorithms)
         best_algo_indices = ranks[:, 0]
-        
+
         mu_best_all = means[np.arange(len(means)), best_algo_indices]
         sigma_best_all = stds[np.arange(len(stds)), best_algo_indices]
-        
+
         for inst_idx, inst_name in enumerate(features.index):
             mu_best = mu_best_all[inst_idx]
             sigma_best = sigma_best_all[inst_idx]
             best_algo_idx = best_algo_indices[inst_idx]
-            
+
             portfolio = [self.algorithms[best_algo_idx]]
-            
+
             # Vectorized overlap computation for all candidates
             mu_candidates = means[inst_idx, :]
             sigma_candidates = stds[inst_idx, :]
-            overlaps = self._compute_overlap_vectorized(mu_best, sigma_best, mu_candidates, sigma_candidates)
-            
+            overlaps = self._compute_overlap_vectorized(
+                mu_best, sigma_best, mu_candidates, sigma_candidates
+            )
+
             # Find algorithms that meet threshold (excluding the best one)
             for rank_idx in range(1, len(self.algorithms)):
                 algo_idx = ranks[inst_idx, rank_idx]
                 if overlaps[algo_idx] >= self.p_intersection:
                     portfolio.append(self.algorithms[algo_idx])
-            
+
             predictions[inst_name] = [(algo, float(budget)) for algo in portfolio]
 
         return predictions

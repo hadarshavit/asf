@@ -48,35 +48,37 @@ class HybridDecisionTree:
         """Compute regression label as mean performance."""
         return np.mean(y, axis=0)
 
-    def _vectorized_rank_correlation(self, y_ranks: np.ndarray, y_pred: np.ndarray) -> float:
+    def _vectorized_rank_correlation(
+        self, y_ranks: np.ndarray, y_pred: np.ndarray
+    ) -> float:
         """Compute average Spearman correlation using vectorized operations.
-        
+
         Args:
             y_ranks: Pre-computed ranks of performance values (n_instances, n_algorithms)
             y_pred: Predicted performance values (n_algorithms,)
-        
+
         Returns:
             Average correlation across instances
         """
         n_instances = y_ranks.shape[0]
         if n_instances == 0:
             return 0.0
-        
+
         # Rank y_pred once
         y_pred_ranks = np.argsort(np.argsort(y_pred)).astype(float)
-        
+
         # Compute Pearson correlation on ranks (Spearman)
         y_ranks_centered = y_ranks - np.mean(y_ranks, axis=1, keepdims=True)
         y_pred_centered = y_pred_ranks - np.mean(y_pred_ranks)
-        
+
         numerator = np.sum(y_ranks_centered * y_pred_centered, axis=1)
         denominator = np.sqrt(
             np.sum(y_ranks_centered**2, axis=1) * np.sum(y_pred_centered**2)
         )
-        
+
         # Avoid division by zero
         correlations = np.where(denominator > 1e-10, numerator / denominator, 0.0)
-        
+
         return np.mean(correlations)
 
     def _regression_loss(self, y: np.ndarray, y_pred: np.ndarray) -> float:
@@ -101,7 +103,9 @@ class HybridDecisionTree:
         # Convert to loss: (1 - correlation) / 2 to scale to [0, 1]
         return (1.0 - avg_corr) / 2.0
 
-    def _hybrid_loss(self, y: np.ndarray, y_ranks: np.ndarray, regression_label: np.ndarray) -> float:
+    def _hybrid_loss(
+        self, y: np.ndarray, y_ranks: np.ndarray, regression_label: np.ndarray
+    ) -> float:
         """
         Combined regression and ranking loss.
         Args:
@@ -162,7 +166,7 @@ class HybridDecisionTree:
 
                 y_left = y[left_mask]
                 y_right = y[right_mask]
-                
+
                 # Slice pre-computed ranks (no recalculation)
                 y_ranks_left = y_ranks[left_mask]
                 y_ranks_right = y_ranks[right_mask]
