@@ -8,7 +8,7 @@ which is essential for algorithm selection to properly penalize timeouts.
 from __future__ import annotations
 
 import warnings
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
 import pandas as pd
@@ -164,7 +164,7 @@ def virtual_best_solver(
 
 
 def running_time_selector_performance(
-    schedules: dict[str, list[tuple[str, float] | str]],
+    schedules: dict[str, Sequence[tuple[str, float] | str]],
     performance: pd.DataFrame,
     budget: float = 5000.0,
     feature_time: pd.DataFrame | None = None,
@@ -180,7 +180,7 @@ def running_time_selector_performance(
 
     Parameters
     ----------
-    schedules : dict[str, list[tuple[str, float] | str]]
+    schedules : dict[str, Sequence[tuple[str, float] | str]]
         The schedules to evaluate, where each key is an instance and the value is a list of items.
         Each item can be:
         - A string: the name of a feature group to compute (uses full actual time)
@@ -318,7 +318,7 @@ def running_time_selector_performance(
 
 
 def _validate_schedule_prerequisites(
-    schedules: dict[str, list[tuple[str, float] | str]],
+    schedules: dict[str, Sequence[tuple[str, float] | str]],
     feature_groups: dict[str, Any],
 ) -> None:
     """
@@ -326,7 +326,7 @@ def _validate_schedule_prerequisites(
 
     Parameters
     ----------
-    schedules : dict[str, list[tuple[str, float] | str]]
+    schedules : dict[str, Sequence[tuple[str, float] | str]]
         The schedules to validate.
     feature_groups : dict[str, Any]
         Feature group definitions with 'requires' information.
@@ -365,7 +365,7 @@ def _validate_schedule_prerequisites(
 
 
 def running_time_closed_gap(
-    schedules: dict[str, list[tuple[str, float] | str]],
+    schedules: dict[str, Sequence[tuple[str, float] | str]],
     performance: pd.DataFrame,
     budget: float,
     feature_time: pd.DataFrame,
@@ -377,7 +377,7 @@ def running_time_closed_gap(
 
     Parameters
     ----------
-    schedules : dict[str, list[tuple[str, float] | str]]
+    schedules : dict[str, Sequence[tuple[str, float] | str]]
         The schedules to evaluate.
     performance : pd.DataFrame
         The performance data for the algorithms.
@@ -416,7 +416,7 @@ def running_time_closed_gap(
 
 
 def precision_regret(
-    schedules: dict[str, list[tuple[str, float] | str]],
+    schedules: dict[str, Sequence[tuple[str, float] | str]],
     performance: pd.DataFrame,
     precision_data: pd.DataFrame | None = None,
     **kwargs: Any,
@@ -426,7 +426,7 @@ def precision_regret(
 
     Parameters
     ----------
-    schedules : dict[str, list[tuple[str, float] | str]]
+    schedules : dict[str, Sequence[tuple[str, float] | str]]
         Selector predictions mapping instance_id to schedule.
     performance : pd.DataFrame
         Ground-truth precision table.
@@ -469,7 +469,7 @@ def precision_regret(
 
 
 def compute_solve_rate(
-    schedules: dict[str, list[tuple[str, float] | str]],
+    schedules: dict[str, Sequence[tuple[str, float] | str]],
     performance: pd.DataFrame,
     budget: float,
 ) -> float:
@@ -482,7 +482,7 @@ def compute_solve_rate(
 
     Parameters
     ----------
-    schedules : dict[str, list[tuple[str, float] | str]]
+    schedules : dict[str, Sequence[tuple[str, float] | str]]
         Selector predictions mapping instance_id to schedule/selections.
     performance : pd.DataFrame
         Performance data for the algorithms.
