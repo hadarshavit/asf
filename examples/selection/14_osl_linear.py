@@ -15,8 +15,8 @@ def make_data(n_instances=200, n_algorithms=5, seed=1, budget=200.0):
     rng = np.random.RandomState(seed)
     features = pd.DataFrame(
         rng.normal(size=(n_instances, 6)),
-        columns=[f"f{i}" for i in range(6)],  # type: ignore[arg-type]
-        index=[f"inst_{i}" for i in range(n_instances)],  # type: ignore[arg-type]
+        columns=[f"f{i}" for i in range(6)],
+        index=[f"inst_{i}" for i in range(n_instances)]
     )
 
     perf = pd.DataFrame(index=features.index)

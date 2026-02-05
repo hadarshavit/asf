@@ -112,7 +112,7 @@ if __name__ == "__main__":
     print("Best algorithm distribution (train):", dict(best_algorithms))
 
     selector = SelectorPipeline(
-        selector=PairwiseClassifier(model_class=RandomForestClassifier),  # type: ignore[arg-type]
+        selector=PairwiseClassifier(model_class=RandomForestClassifier),
         preprocessor=get_default_preprocessor(),
         algorithm_pre_selector=MarginalContributionBasedPreSelector(
             metric=virtual_best_solver, n_algorithms=3

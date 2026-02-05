@@ -168,11 +168,11 @@ class SelectorPipeline(ConfigurableMixin):
 
         if self.algorithm_pre_selector:
             if hasattr(self.algorithm_pre_selector, "fit_transform"):
-                y = self.algorithm_pre_selector.fit_transform(y)  # type: ignore
+                y = self.algorithm_pre_selector.fit_transform(y)
             else:
-                self.algorithm_pre_selector.fit(y)  # type: ignore
+                self.algorithm_pre_selector.fit(y)
                 if hasattr(self.algorithm_pre_selector, "transform"):
-                    y = self.algorithm_pre_selector.transform(y)  # type: ignore
+                    y = self.algorithm_pre_selector.transform(y)
 
         self._logger.debug(
             f"Algorithm pre-selection completed in {time.time() - start:.2f} seconds"
@@ -189,10 +189,10 @@ class SelectorPipeline(ConfigurableMixin):
 
         if self.feature_selector:
             if hasattr(self.feature_selector, "fit_transform"):
-                X, y = self.feature_selector.fit_transform(X, y)  # type: ignore
+                X, y = self.feature_selector.fit_transform(X, y)
             else:
-                self.feature_selector.fit(X, y)  # type: ignore
-                X = self.feature_selector.transform(X)  # type: ignore
+                self.feature_selector.fit(X, y)
+                X = self.feature_selector.transform(X)
 
         self._logger.debug(
             f"Feature selection completed in {time.time() - start:.2f} seconds"
@@ -237,7 +237,7 @@ class SelectorPipeline(ConfigurableMixin):
             scheds = list(self.pre_solving.predict())
 
         if self.feature_selector:
-            X = self.feature_selector.transform(X)  # type: ignore
+            X = self.feature_selector.transform(X)
 
         X = self._filter_features(X)
 
@@ -257,7 +257,7 @@ class SelectorPipeline(ConfigurableMixin):
 
         final_preds: dict[str, list[tuple[str, float] | tuple[str, float, float]]] = {}
         for instance_id in X.index:
-            prediction = predictions.get(str(instance_id), [])  # type: ignore
+            prediction = predictions.get(str(instance_id), [])
             final_preds[str(instance_id)] = scheds + feature_steps + list(prediction)
 
         return final_preds
@@ -389,7 +389,7 @@ class SelectorPipeline(ConfigurableMixin):
                     for c in (
                         selector_class if isinstance(selector_class, list) else []
                     )
-                ]  # type: ignore
+                ]
             else:
                 selector_choices = (
                     selector_class
@@ -410,7 +410,7 @@ class SelectorPipeline(ConfigurableMixin):
             hyperparameters.append(use_presolver)
             presolver_choice = ClassChoice("presolver", choices=ps_choices)
             hyperparameters.append(presolver_choice)
-            conditions.append(EqualsCondition(presolver_choice, use_presolver, True))  # type: ignore
+            conditions.append(EqualsCondition(presolver_choice, use_presolver, True))
 
         if preprocessing_class:
             for preproc_cls in preprocessing_class:
@@ -643,7 +643,7 @@ class SelectorPipeline(ConfigurableMixin):
                         if res:
                             key = hp.name[len(prefix) :]
                             clean_config[key] = (
-                                res.get_from_configuration(  # type: ignore
+                                res.get_from_configuration(
                                     configuration, pre_prefix=hp.name, **kwargs
                                 )
                                 if hasattr(res, "get_from_configuration")

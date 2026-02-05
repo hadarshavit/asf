@@ -16,8 +16,8 @@ def generate_simple_data(n_instances=100, n_algorithms=6, seed=1, budget=500.0):
     rng = np.random.RandomState(seed)
     features = pd.DataFrame(
         rng.uniform(0, 10, size=(n_instances, 4)),
-        columns=[f"f{i}" for i in range(4)],  # type: ignore[arg-type]
-        index=[f"inst_{i}" for i in range(n_instances)],  # type: ignore[arg-type]
+        columns=[f"f{i}" for i in range(4)],
+        index=[f"inst_{i}" for i in range(n_instances)]
     )
 
     perf = pd.DataFrame(index=features.index)
