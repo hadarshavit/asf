@@ -10,6 +10,8 @@ class HybridDecisionTree:
     A decision tree that uses a hybrid loss combining regression and ranking.
     """
 
+    RETURN_TYPE = "single"
+
     def __init__(
         self,
         max_depth: int = 10,
@@ -71,10 +73,13 @@ class HybridDecisionTree:
         y_ranks_centered = y_ranks - np.mean(y_ranks, axis=1, keepdims=True)
         y_pred_centered = y_pred_ranks - np.mean(y_pred_ranks)
 
+        # Check if y_pred has zero variance (constant values)
+        y_pred_var = np.sum(y_pred_centered**2)
+        if y_pred_var < 1e-10:
+            return 0.0
+
         numerator = np.sum(y_ranks_centered * y_pred_centered, axis=1)
-        denominator = np.sqrt(
-            np.sum(y_ranks_centered**2, axis=1) * np.sum(y_pred_centered**2)
-        )
+        denominator = np.sqrt(np.sum(y_ranks_centered**2, axis=1) * y_pred_var)
 
         # Avoid division by zero
         correlations = np.where(denominator > 1e-10, numerator / denominator, 0.0)

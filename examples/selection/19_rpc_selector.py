@@ -35,7 +35,7 @@ def make_data(n_instances=300, n_algorithms=6, seed=2, budget=200.0):
         noise = rng.normal(0, 10, size=n_instances)
         runtimes = np.clip(features.values @ coeff + bias + noise, 1.0, None)
         timeout_mask = rng.rand(n_instances) < (0.10 + 0.03 * (a % 3))
-        runtimes[timeout_mask] = budget * 2
+        runtimes[timeout_mask] = budget * 10
         perf[f"algo{a + 1}"] = runtimes
 
     return features, perf
@@ -121,10 +121,14 @@ def main():
     selector_rf_top3.fit(X_train, Y_train)
     portfolios = selector_rf_top3.predict(X_test)
     # Convert shortlist to schedules with equal time slices summing to budget
-    budgeted_portfolios: dict[str, list[tuple[str, float] | str]] = {
-        inst: [(algo, budget / len(portfolio)) for algo in portfolio]
-        for inst, portfolio in portfolios.items()
-    }
+    budgeted_portfolios: dict[str, list[tuple[str, float] | str]] = {}
+    for inst, portfolio in portfolios.items():
+        algos = [a for a in portfolio if isinstance(a, str)]
+        if algos:
+            time_slice = budget / len(algos)
+            budgeted_portfolios[inst] = [(a, time_slice) for a in algos]
+        else:
+            budgeted_portfolios[inst] = []
 
     sr_top3 = compute_solve_rate(budgeted_portfolios, Y_test, budget)
     par10_top3 = running_time_selector_performance(

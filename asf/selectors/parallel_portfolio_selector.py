@@ -238,8 +238,6 @@ class APPS(AbstractSelector):
             # Choose x closest to midpoint
             c_unequal = np.where(np.abs(x1 - midpoint) < np.abs(x2 - midpoint), x1, x2)
 
-            if np.isscalar(c):
-                c = np.array([c] * len(mu_candidates))
             c[unequal_mask] = c_unequal
 
         return c

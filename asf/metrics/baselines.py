@@ -260,7 +260,7 @@ def running_time_selector_performance(
                     )
 
         # Calculate total algorithm time used
-        total_algorithm_time = sum(budget for _, budget in algorithm_items)
+        total_algorithm_time = sum(alloc_budget for _, alloc_budget in algorithm_items)
 
         # Validate: at least some algorithm time was allocated
         if total_algorithm_time < budget:
@@ -270,8 +270,10 @@ def running_time_selector_performance(
 
         # Check if this is a parallel portfolio (all algorithms get the same budget)
         # or sequential (budgets may vary)
-        budgets = [budget for _, budget in algorithm_items]
-        is_parallel = len(set(budgets)) == 1 and len(algorithm_items) > 1
+        budgets = [alloc_budget for _, alloc_budget in algorithm_items]
+        is_parallel = (
+            len(set(budgets)) == 1 and len(algorithm_items) > 1 and budgets[0] >= budget
+        )
 
         if is_parallel:
             # Parallel portfolio: each algorithm runs for its budget concurrently

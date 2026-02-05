@@ -674,7 +674,7 @@ class StackingSelector(ConfigurableMixin, AbstractSelector):
         self,
         features: pd.DataFrame | None,
         performance: pd.DataFrame | None = None,
-    ) -> dict[str, list[tuple[str, float]]]:
+    ) -> dict[str, list[tuple[str, float] | str]]:
         """Predict using the stacking ensemble.
 
         Parameters

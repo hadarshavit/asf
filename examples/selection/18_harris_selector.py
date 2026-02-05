@@ -33,7 +33,7 @@ def make_data(n_instances=300, n_algorithms=6, seed=2, budget=200.0):
         noise = rng.normal(0, 10, size=n_instances)
         runtimes = np.clip(features.values @ coeff + bias + noise, 1.0, None)
         timeout_mask = rng.rand(n_instances) < (0.10 + 0.03 * (a % 3))
-        runtimes[timeout_mask] = budget * 2
+        runtimes[timeout_mask] = budget * 10
         perf[f"algo{a + 1}"] = runtimes
 
     return features, perf
