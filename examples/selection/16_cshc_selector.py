@@ -19,7 +19,7 @@ def make_data(n_instances=300, n_algorithms=5, n_inst_feats=10, seed=42, budget=
     features = pd.DataFrame(
         rng.normal(size=(n_instances, n_inst_feats)),
         columns=[f"f{i}" for i in range(n_inst_feats)],
-        index=[f"inst_{i}" for i in range(n_instances)]
+        index=[f"inst_{i}" for i in range(n_instances)],
     )
 
     alg_names = [f"algo{i + 1}" for i in range(n_algorithms)]

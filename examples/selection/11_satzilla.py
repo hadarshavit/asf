@@ -16,7 +16,7 @@ def generate_data(n_instances=80, seed=0):
     features = pd.DataFrame(
         np.random.uniform(0, 10, size=(n_instances, 2)),
         columns=["size", "density"],
-        index=[f"inst_{i}" for i in range(n_instances)]
+        index=[f"inst_{i}" for i in range(n_instances)],
     )
     # Each algorithm's performance is a different function of the features
     performance = pd.DataFrame(
