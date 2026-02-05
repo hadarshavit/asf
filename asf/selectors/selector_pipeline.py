@@ -643,7 +643,7 @@ class SelectorPipeline(ConfigurableMixin):
                         if res:
                             key = hp.name[len(prefix) :]
                             if hasattr(res, "get_from_configuration"):
-                                clean_config[key] = res.get_from_configuration(
+                                clean_config[key] = res.get_from_configuration(  # type: ignore[misc]
                                     configuration, pre_prefix=hp.name, **kwargs
                                 )
                             else:
