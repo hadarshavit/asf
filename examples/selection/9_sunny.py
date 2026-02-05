@@ -183,7 +183,8 @@ if __name__ == "__main__":
     selector_tsunny = SUNNY(k=5, use_tsunny=True, budget=budget)
     selector_tsunny.fit(train_features, train_performance)
     predictions_tsunny = cast(
-        dict[str, Sequence[tuple[str, float] | str]], selector_tsunny.predict(test_features)
+        dict[str, Sequence[tuple[str, float] | str]],
+        selector_tsunny.predict(test_features),
     )
     sr_tsunny = compute_solve_rate(predictions_tsunny, test_performance, budget)
     par10_tsunny = running_time_selector_performance(
@@ -205,7 +206,8 @@ if __name__ == "__main__":
     selector_hardcoded = SUNNY(k=5, algorithm_limit=2, budget=budget)
     selector_hardcoded.fit(train_features, train_performance)
     predictions_hardcoded = cast(
-        dict[str, Sequence[tuple[str, float] | str]], selector_hardcoded.predict(test_features)
+        dict[str, Sequence[tuple[str, float] | str]],
+        selector_hardcoded.predict(test_features),
     )
     sr_hardcoded = compute_solve_rate(predictions_hardcoded, test_performance, budget)
     par10_hardcoded = running_time_selector_performance(
@@ -229,7 +231,8 @@ if __name__ == "__main__":
     )
     selector_combined.fit(train_features, train_performance)
     predictions_combined = cast(
-        dict[str, Sequence[tuple[str, float] | str]], selector_combined.predict(test_features)
+        dict[str, Sequence[tuple[str, float] | str]],
+        selector_combined.predict(test_features),
     )
     sr_combined = compute_solve_rate(predictions_combined, test_performance, budget)
     par10_combined = running_time_selector_performance(
