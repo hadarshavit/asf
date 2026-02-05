@@ -129,7 +129,11 @@ def main():
 
     sr_top3 = compute_solve_rate(budgeted_portfolios_seq, Y_test, budget)
     par10_top3 = running_time_selector_performance(
-        budgeted_portfolios_seq, Y_test, budget=budget, par=10.0, return_per_instance=False
+        budgeted_portfolios_seq,
+        Y_test,
+        budget=budget,
+        par=10.0,
+        return_per_instance=False,
     )
     print(f"  Parallel shortlist solve-rate: {sr_top3:.2%} | PAR10: {par10_top3:.2f}")
 

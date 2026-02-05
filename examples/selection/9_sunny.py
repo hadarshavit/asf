@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Sequence, cast
+from typing import cast
 
 from asf.selectors.sunny import SUNNY
 from asf.metrics import (

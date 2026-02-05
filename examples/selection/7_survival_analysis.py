@@ -156,7 +156,8 @@ if __name__ == "__main__":
     )
     schedule_selector.fit(train_features, train_performance)
     schedule_predictions = cast(
-        dict[str, Sequence[tuple[str, float] | str]], schedule_selector.predict(test_features)
+        dict[str, Sequence[tuple[str, float] | str]],
+        schedule_selector.predict(test_features),
     )
 
     print("Predicted algorithm schedules for each test instance:")
