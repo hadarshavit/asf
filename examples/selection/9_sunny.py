@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import cast
+from typing import Sequence, cast
 
 from asf.selectors.sunny import SUNNY
 from asf.metrics import (
@@ -139,7 +139,7 @@ if __name__ == "__main__":
     selector = SUNNY(k=5, use_v2=False, budget=budget)
     selector.fit(train_features, train_performance)
     predictions = cast(
-        dict[str, list[tuple[str, float]]], selector.predict(test_features)
+        dict[str, Sequence[tuple[str, float] | str]], selector.predict(test_features)
     )
     sr = compute_solve_rate(predictions, test_performance, budget)
     par10 = running_time_selector_performance(
@@ -161,7 +161,7 @@ if __name__ == "__main__":
     selector_v2 = SUNNY(k=5, use_v2=True, budget=budget, k_candidates=[3, 5, 7, 10, 15])
     selector_v2.fit(train_features, train_performance)
     predictions_v2 = cast(
-        dict[str, list[tuple[str, float]]], selector_v2.predict(test_features)
+        dict[str, Sequence[tuple[str, float] | str]], selector_v2.predict(test_features)
     )
     sr_v2 = compute_solve_rate(predictions_v2, test_performance, budget)
     par10_v2 = running_time_selector_performance(
@@ -183,7 +183,7 @@ if __name__ == "__main__":
     selector_tsunny = SUNNY(k=5, use_tsunny=True, budget=budget)
     selector_tsunny.fit(train_features, train_performance)
     predictions_tsunny = cast(
-        dict[str, list[tuple[str, float]]], selector_tsunny.predict(test_features)
+        dict[str, Sequence[tuple[str, float] | str]], selector_tsunny.predict(test_features)
     )
     sr_tsunny = compute_solve_rate(predictions_tsunny, test_performance, budget)
     par10_tsunny = running_time_selector_performance(
@@ -205,7 +205,7 @@ if __name__ == "__main__":
     selector_hardcoded = SUNNY(k=5, algorithm_limit=2, budget=budget)
     selector_hardcoded.fit(train_features, train_performance)
     predictions_hardcoded = cast(
-        dict[str, list[tuple[str, float]]], selector_hardcoded.predict(test_features)
+        dict[str, Sequence[tuple[str, float] | str]], selector_hardcoded.predict(test_features)
     )
     sr_hardcoded = compute_solve_rate(predictions_hardcoded, test_performance, budget)
     par10_hardcoded = running_time_selector_performance(
@@ -229,7 +229,7 @@ if __name__ == "__main__":
     )
     selector_combined.fit(train_features, train_performance)
     predictions_combined = cast(
-        dict[str, list[tuple[str, float]]], selector_combined.predict(test_features)
+        dict[str, Sequence[tuple[str, float] | str]], selector_combined.predict(test_features)
     )
     sr_combined = compute_solve_rate(predictions_combined, test_performance, budget)
     par10_combined = running_time_selector_performance(

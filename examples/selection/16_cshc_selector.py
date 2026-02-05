@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import cast
+from typing import Sequence, cast
 
 from asf.selectors.cshc import CSHCSelector
 from asf.selectors.osl_linear import OSLLinearSelector
@@ -73,7 +73,7 @@ def main():
 
     sel.fit(X_train, Y_train)
 
-    preds = cast(dict[str, list[tuple[str, float]]], sel.predict(X_test))
+    preds = cast(dict[str, Sequence[tuple[str, float] | str]], sel.predict(X_test))
     sr = compute_solve_rate(preds, Y_test, budget)
 
     # Use ASF metrics for baselines

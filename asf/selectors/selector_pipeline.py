@@ -649,7 +649,7 @@ class SelectorPipeline(ConfigurableMixin):
                             else:
                                 res_any: Any = res
                                 clean_config[key] = (
-                                    res_any() if callable(res_any) else res_any
+                                    res_any() if callable(res_any) else res_any  # type: ignore[misc]
                                 )
                     else:
                         clean_config[hp.name[len(prefix) :]] = False

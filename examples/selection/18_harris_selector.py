@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import cast
+from typing import Sequence, cast
 
 from asf.selectors.hybrid_decision_tree import HARRIS
 from asf.metrics import (
@@ -81,7 +81,7 @@ def main():
             budget=budget,
         )
         selector.fit(X_train, Y_train)
-        preds = cast(dict[str, list[tuple[str, float]]], selector.predict(X_test))
+        preds = cast(dict[str, Sequence[tuple[str, float] | str]], selector.predict(X_test))
         sr = compute_solve_rate(preds, Y_test, budget)
         par10 = running_time_selector_performance(
             preds, Y_test, budget=budget, par=10.0, return_per_instance=False
@@ -101,7 +101,7 @@ def main():
         budget=budget,
     )
     selector.fit(X_train, Y_train)
-    preds = cast(dict[str, list[tuple[str, float]]], selector.predict(X_test))
+    preds = cast(dict[str, Sequence[tuple[str, float] | str]], selector.predict(X_test))
     sr = compute_solve_rate(preds, Y_test, budget)
     par10 = running_time_selector_performance(
         preds, Y_test, budget=budget, par=10.0, return_per_instance=False
