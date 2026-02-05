@@ -642,13 +642,15 @@ class SelectorPipeline(ConfigurableMixin):
                         res = cls._resolve_class_from_hp(hp, str(val))
                         if res:
                             key = hp.name[len(prefix) :]
-                            clean_config[key] = (
-                                res.get_from_configuration(
+                            if hasattr(res, "get_from_configuration"):
+                                clean_config[key] = res.get_from_configuration(
                                     configuration, pre_prefix=hp.name, **kwargs
                                 )
-                                if hasattr(res, "get_from_configuration")
-                                else (res() if callable(res) else res)  # type: ignore[operator]
-                            )
+                            else:
+                                res_any: Any = res
+                                clean_config[key] = (
+                                    res_any() if callable(res_any) else res_any
+                                )
                     else:
                         clean_config[hp.name[len(prefix) :]] = False
 

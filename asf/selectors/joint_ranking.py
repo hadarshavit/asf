@@ -84,8 +84,8 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
             encoder = OneHotEncoder(sparse_output=False)
             self.algorithm_features = pd.DataFrame(
                 encoder.fit_transform(np.array(self.algorithms).reshape(-1, 1)),
-                index=list(self.algorithms),  # type: ignore[arg-type]
-                columns=[f"algo_{i}" for i in range(len(self.algorithms))],  # type: ignore[arg-type]
+                index=list(self.algorithms),
+                columns=[f"algo_{i}" for i in range(len(self.algorithms))],
             )
 
         if self.model is None:
@@ -167,10 +167,10 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
             data = selected_features.assign(**self.algorithm_features.loc[algorithm])
             # Ensure column order matches training
             data = data[self.algorithm_features.columns.to_list() + self.features]
-            prediction = self.model.predict(data)  # type: ignore[attr-defined]
+            prediction = self.model.predict(data)
             predictions[:, i] = prediction.flatten()
 
-        return pd.DataFrame(predictions, columns=list(self.algorithms))  # type: ignore[arg-type]
+        return pd.DataFrame(predictions, columns=list(self.algorithms))
 
     @staticmethod
     def _define_hyperparameters(

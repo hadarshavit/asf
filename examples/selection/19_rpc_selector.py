@@ -121,14 +121,7 @@ def main():
     selector_rf_top3.fit(X_train, Y_train)
     portfolios = selector_rf_top3.predict(X_test)
     # Convert shortlist to schedules with equal time slices summing to budget
-    budgeted_portfolios: dict[str, list[tuple[str, float] | str]] = {}
-    for inst, portfolio in portfolios.items():
-        algos = [a for a in portfolio if isinstance(a, str)]
-        if algos:
-            time_slice = budget / len(algos)
-            budgeted_portfolios[inst] = [(a, time_slice) for a in algos]
-        else:
-            budgeted_portfolios[inst] = []
+    budgeted_portfolios = portfolios
 
     sr_top3 = compute_solve_rate(budgeted_portfolios, Y_test, budget)
     par10_top3 = running_time_selector_performance(

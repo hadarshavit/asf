@@ -151,11 +151,11 @@ class PairwiseClassifier(
                 if self.features
                 else [f"f_{i}" for i in range(base_features.shape[1])]
             )
-            features_df = pd.DataFrame(base_features, columns=list(cols))  # type: ignore[arg-type]
+            features_df = pd.DataFrame(base_features, columns=list(cols))
         else:
             features_df = base_features
 
-        votes = pd.DataFrame(0, index=features_df.index, columns=list(self.algorithms))  # type: ignore[arg-type]
+        votes = pd.DataFrame(0, index=features_df.index, columns=list(self.algorithms))
         cnt = 0
         for i, algo1 in enumerate(self.algorithms):
             for _j, algo2 in enumerate(self.algorithms[i + 1 :]):

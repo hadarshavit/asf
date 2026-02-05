@@ -279,8 +279,10 @@ class HybridDecisionTree:
             return self.regression_label
 
         if x[self.feature_idx] <= self.threshold:
+            assert self.left is not None
             return self.left._predict_single(x)
         else:
+            assert self.right is not None
             return self.right._predict_single(x)
 
 

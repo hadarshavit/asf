@@ -263,9 +263,9 @@ def running_time_selector_performance(
         total_algorithm_time = sum(alloc_budget for _, alloc_budget in algorithm_items)
 
         # Validate: at least some algorithm time was allocated
-        if total_algorithm_time < budget:
+        if total_algorithm_time <= 0.0:
             raise ValueError(
-                f"Instance {instance}: Allocated time is less than budget in schedule {schedule}. "
+                f"Instance {instance}: No algorithm time allocated in schedule {schedule}. "
             )
 
         # Check if this is a parallel portfolio (all algorithms get the same budget)

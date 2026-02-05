@@ -146,7 +146,7 @@ class RPCSelector(AbstractSelector):
 
     def _predict(
         self, features: pd.DataFrame, performance: pd.DataFrame | None = None
-    ) -> dict[str, list[tuple[str, float] | str]]:
+    ) -> dict[str, list[tuple[str, float]]]:
         """
         Predict algorithm(s) for each instance using Copeland scores.
 
@@ -155,7 +155,7 @@ class RPCSelector(AbstractSelector):
 
         Returns:
             If top_n == 1: dict[str, list[tuple[str, float]]] with single (algo, budget).
-            If top_n > 1: dict[str, list[str]] with top-N algorithm names (parallel portfolio).
+            If top_n > 1: dict[str, list[tuple[str, float]]] with equal time slices.
         """
         if not self.classifiers:
             raise RuntimeError("The selector has not been fitted yet.")
@@ -174,8 +174,9 @@ class RPCSelector(AbstractSelector):
             top_algos = [self.algorithms[i] for i in top_indices]
 
             if self.top_n == 1:
-                predictions[inst_name] = [(top_algos[0], budget)]
+                predictions[inst_name] = [(top_algos[0], float(budget))]
             else:
-                predictions[inst_name] = top_algos
+                time_slice = float(budget) / len(top_algos)
+                predictions[inst_name] = [(algo, time_slice) for algo in top_algos]
 
         return predictions

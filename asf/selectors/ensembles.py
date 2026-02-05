@@ -674,7 +674,7 @@ class StackingSelector(ConfigurableMixin, AbstractSelector):
         self,
         features: pd.DataFrame | None,
         performance: pd.DataFrame | None = None,
-    ) -> dict[str, list[tuple[str, float] | str]]:
+    ) -> dict[str, list[tuple[str, float]]]:
         """Predict using the stacking ensemble.
 
         Parameters
@@ -702,10 +702,10 @@ class StackingSelector(ConfigurableMixin, AbstractSelector):
         preds = self.meta_selector_.predict(meta_features)
 
         if isinstance(preds, dict):
-            return {str(k): v for k, v in preds.items()}  # type: ignore[return-value]
+            return {str(k): v for k, v in preds.items()}
 
         # Handle other return types
-        result: dict[str, list[tuple[str, float] | str]] = {}
+        result: dict[str, list[tuple[str, float]]] = {}
         for idx in features.index:
             result[str(idx)] = []
         return result
