@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Any
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -55,7 +55,9 @@ class APPS(AbstractSelector):
         self.use_jackknife = bool(use_jackknife)
         self.n_jackknife_folds = n_jackknife_folds
 
-        self.predictors: List[List[tuple[AbstractPredictor, Any]]] | List[List[AbstractPredictor]] = []
+        self.predictors: (
+            List[List[tuple[AbstractPredictor, Any]]] | List[List[AbstractPredictor]]
+        ) = []
         self.algorithms: List[str] = []
         self.features_train: pd.DataFrame | None = None
         self.performance_train: pd.DataFrame | None = None
