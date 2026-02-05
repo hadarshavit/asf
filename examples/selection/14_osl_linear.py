@@ -44,14 +44,15 @@ def main():
     )
     sel.fit(X_train, Y_train)
 
-    preds = sel.predict(X_test)
+    preds = cast(dict[str, list[tuple[str, float]]], sel.predict(X_test))
 
     # simple validation of structure
     assert isinstance(preds, dict)
-    for v in cast(dict, preds).values():
+    for v in preds.values():
         assert isinstance(v, list) and len(v) == 1
         algo, score = v[0]
-        assert algo in list(Y.columns) or algo is None
+        assert isinstance(algo, str) and algo in list(Y.columns)
+        assert isinstance(score, (int, float))
 
     acc = compute_solve_rate(preds, Y_test, budget)
 
@@ -78,8 +79,11 @@ def main():
     print()
     print("Sample decisions (first 12):")
     for inst in list(X_test.index)[:12]:
-        rec = preds.get(inst, [(None, None)])
-        print(f"{inst}: chosen = {rec[0][0]} (pred_score={rec[0][1]})")  # type: ignore[index]
+        rec = preds.get(inst)
+        if not rec:
+            print(f"{inst}: no prediction")
+            continue
+        print(f"{inst}: chosen = {rec[0][0]} (pred_score={rec[0][1]})")
     print("=" * 60)
 
 

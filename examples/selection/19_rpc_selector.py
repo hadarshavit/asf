@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import cast
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 
@@ -119,7 +120,7 @@ def main():
         top_n=3,
     )
     selector_rf_top3.fit(X_train, Y_train)
-    portfolios = selector_rf_top3.predict(X_test)
+    portfolios = cast(dict[str, list[tuple[str, float]]], selector_rf_top3.predict(X_test))
     # Convert shortlist to schedules with equal time slices summing to budget
     budgeted_portfolios = portfolios
 
@@ -134,7 +135,7 @@ def main():
     for inst in list(X_test.index)[:10]:
         portfolio = portfolios.get(inst, [])
         solvers = []
-        for algo in portfolio:
+        for algo, _allocated in portfolio:
             rt = Y_test.at[inst, algo]
             if not np.isnan(rt) and float(rt) <= budget:
                 solvers.append(f"{algo}({rt:.1f}s)")

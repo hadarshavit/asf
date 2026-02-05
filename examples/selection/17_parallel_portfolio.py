@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import cast
 
 from asf.selectors.parallel_portfolio_selector import APPS
 from asf.predictors.random_forest import RandomForestRegressorWrapper
@@ -68,7 +69,7 @@ def main():
             random_state=42,
         )
         sel.fit(X_train, Y_train)
-        preds = sel.predict(X_test)
+        preds = cast(dict[str, list[tuple[str, float]]], sel.predict(X_test))
 
         # Use ASF metrics for evaluation (handles parallel portfolios correctly)
         solve_rate = compute_solve_rate(preds, Y_test, budget)

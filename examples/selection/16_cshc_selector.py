@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import cast
 
 from asf.selectors.cshc import CSHCSelector
 from asf.selectors.osl_linear import OSLLinearSelector
@@ -72,7 +73,7 @@ def main():
 
     sel.fit(X_train, Y_train)
 
-    preds = sel.predict(X_test)
+    preds = cast(dict[str, list[tuple[str, float]]], sel.predict(X_test))
     sr = compute_solve_rate(preds, Y_test, budget)
 
     # Use ASF metrics for baselines
@@ -94,7 +95,7 @@ def main():
         inst_feature_df = X_test.loc[[inst_name]]
 
         # 1. Get primary selector's choice
-        primary_pred = sel.primary_selector.predict(inst_feature_df).get(inst_name)  # type: ignore[attr-defined]
+        primary_pred = sel.primary_selector.predict(inst_feature_df).get(inst_name)
         if not primary_pred:
             continue
 
@@ -117,7 +118,7 @@ def main():
                 primary_success += 1
         elif sel.backup_selector:
             backup_used += 1
-            backup_pred_list = sel.backup_selector.predict(inst_feature_df).get(  # type: ignore[attr-defined]
+            backup_pred_list = sel.backup_selector.predict(inst_feature_df).get(
                 inst_name
             )
             if backup_pred_list:

@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from typing import cast
 from asf.selectors.survival_analysis import SurvivalAnalysis
 from asf.metrics import (
     compute_solve_rate,
@@ -101,7 +102,9 @@ if __name__ == "__main__":
     print("--- Single Best Algorithm Predictions ---")
     selector = SurvivalAnalysis(budget=BUDGET)
     selector.fit(train_features, train_performance)
-    predictions = selector.predict(test_features)
+    predictions = cast(
+        dict[str, list[tuple[str, float]]], selector.predict(test_features)
+    )
 
     print("Predicted best algorithm for each test instance:")
     for i, instance in enumerate(test_features.index):
@@ -152,7 +155,9 @@ if __name__ == "__main__":
         maxiter=100,
     )
     schedule_selector.fit(train_features, train_performance)
-    schedule_predictions = schedule_selector.predict(test_features)
+    schedule_predictions = cast(
+        dict[str, list[tuple[str, float]]], schedule_selector.predict(test_features)
+    )
 
     print("Predicted algorithm schedules for each test instance:")
     for i, instance in enumerate(test_features.index):

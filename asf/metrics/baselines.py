@@ -220,12 +220,14 @@ def running_time_selector_performance(
     for instance, schedule in schedules.items():
         instance_feature_time = 0.0
         algorithm_items = []  # List of (algorithm, budget) tuples
+        saw_feature_group = False
 
         # Process schedule items
         for item in schedule:
             if isinstance(item, str):
                 # Feature group without budget: add its full computation time if available
                 if item in feature_time.columns:
+                    saw_feature_group = True
                     ft_val = feature_time.loc[instance, item]
                     if hasattr(ft_val, "item"):
                         ft_val = ft_val.item()
@@ -240,6 +242,7 @@ def running_time_selector_performance(
             elif isinstance(item, tuple) and len(item) == 2:
                 item_name, item_budget = item
                 if item_name in feature_time.columns:
+                    saw_feature_group = True
                     # Feature group with budget: use min(actual_time, budget)
                     ft_val = feature_time.loc[instance, item_name]
                     if hasattr(ft_val, "item"):
@@ -258,6 +261,16 @@ def running_time_selector_performance(
                     algorithm_items.append(
                         (item_name, item_budget if item_budget is not None else 0.0)
                     )
+
+        if not saw_feature_group and "feature_time" in feature_time.columns:
+            ft_val = feature_time.loc[instance, "feature_time"]
+            if hasattr(ft_val, "item"):
+                ft_val = ft_val.item()
+            instance_feature_time += (
+                0.0
+                if ft_val is None or (isinstance(ft_val, float) and np.isnan(ft_val))
+                else float(ft_val)
+            )
 
         # Calculate total algorithm time used
         total_algorithm_time = sum(alloc_budget for _, alloc_budget in algorithm_items)
