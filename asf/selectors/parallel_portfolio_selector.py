@@ -159,7 +159,7 @@ class APPS(AbstractSelector):
                         model, test_idx = model_tuple
                     else:
                         model = model_tuple
-                    pred = model.predict(features)
+                    pred = model.predict(features)  # type: ignore[union-attr]
                     all_predictions.append(pred)
 
                 all_predictions = np.array(all_predictions)  # (n_folds, n_test)

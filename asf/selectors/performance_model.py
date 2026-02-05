@@ -232,8 +232,9 @@ class PerformanceModel(
                 if not isinstance(self.regressors, list):
                     raise RuntimeError("Individual regressors missing.")
                 for i, _ in enumerate(self.algorithms):
+                    regressor: Any = self.regressors[i]
                     predictions[:, i] = np.asarray(
-                        self.regressors[i].predict(base_features)
+                        regressor.predict(base_features)  # type: ignore[union-attr]
                     ).flatten()
             else:
                 if not isinstance(self.regressors, AbstractPredictor):

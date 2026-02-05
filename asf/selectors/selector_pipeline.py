@@ -647,7 +647,7 @@ class SelectorPipeline(ConfigurableMixin):
                                     configuration, pre_prefix=hp.name, **kwargs
                                 )
                                 if hasattr(res, "get_from_configuration")
-                                else (res() if callable(res) else res)
+                                else (res() if callable(res) else res)  # type: ignore[operator]
                             )
                     else:
                         clean_config[hp.name[len(prefix) :]] = False
