@@ -120,7 +120,9 @@ def main():
         top_n=3,
     )
     selector_rf_top3.fit(X_train, Y_train)
-    portfolios = cast(dict[str, list[tuple[str, float]]], selector_rf_top3.predict(X_test))
+    portfolios = cast(
+        dict[str, list[tuple[str, float]]], selector_rf_top3.predict(X_test)
+    )
     # Convert shortlist to schedules with equal time slices summing to budget
     budgeted_portfolios = portfolios
 

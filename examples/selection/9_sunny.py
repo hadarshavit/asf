@@ -138,7 +138,9 @@ if __name__ == "__main__":
     print("=" * 70)
     selector = SUNNY(k=5, use_v2=False, budget=budget)
     selector.fit(train_features, train_performance)
-    predictions = cast(dict[str, list[tuple[str, float]]], selector.predict(test_features))
+    predictions = cast(
+        dict[str, list[tuple[str, float]]], selector.predict(test_features)
+    )
     sr = compute_solve_rate(predictions, test_performance, budget)
     par10 = running_time_selector_performance(
         predictions,
@@ -158,7 +160,9 @@ if __name__ == "__main__":
     print("=" * 70)
     selector_v2 = SUNNY(k=5, use_v2=True, budget=budget, k_candidates=[3, 5, 7, 10, 15])
     selector_v2.fit(train_features, train_performance)
-    predictions_v2 = cast(dict[str, list[tuple[str, float]]], selector_v2.predict(test_features))
+    predictions_v2 = cast(
+        dict[str, list[tuple[str, float]]], selector_v2.predict(test_features)
+    )
     sr_v2 = compute_solve_rate(predictions_v2, test_performance, budget)
     par10_v2 = running_time_selector_performance(
         predictions_v2,

@@ -262,15 +262,8 @@ def running_time_selector_performance(
                         (item_name, item_budget if item_budget is not None else 0.0)
                     )
 
-        if not saw_feature_group and "feature_time" in feature_time.columns:
-            ft_val = feature_time.loc[instance, "feature_time"]
-            if hasattr(ft_val, "item"):
-                ft_val = ft_val.item()
-            instance_feature_time += (
-                0.0
-                if ft_val is None or (isinstance(ft_val, float) and np.isnan(ft_val))
-                else float(ft_val)
-            )
+        if not saw_feature_group:
+            instance_feature_time = float(feature_time.loc[instance].sum())
 
         # Calculate total algorithm time used
         total_algorithm_time = sum(alloc_budget for _, alloc_budget in algorithm_items)
