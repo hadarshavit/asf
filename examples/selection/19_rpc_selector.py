@@ -121,8 +121,8 @@ def main():
     selector_rf_top3.fit(X_train, Y_train)
     portfolios = selector_rf_top3.predict(X_test)
     # Convert shortlist to schedules with equal time slices summing to budget
-    budgeted_portfolios = {
-        inst: [(algo, budget / len(portfolio)) for algo in portfolio]
+    budgeted_portfolios: dict[str, list[tuple[str, float] | str]] = {
+        inst: [(algo, budget / len(portfolio)) for algo in portfolio]  # type: ignore[misc]
         for inst, portfolio in portfolios.items()
     }
 

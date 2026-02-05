@@ -149,7 +149,16 @@ class APPS(AbstractSelector):
                 # For each test instance, collect predictions from all models
                 all_predictions = []
 
-                for model, test_idx in self.predictors[algo_idx]:
+                # Type narrowing: ensure we have the right structure
+                algo_models = self.predictors[algo_idx]
+                if not isinstance(algo_models, list):
+                    raise RuntimeError("Expected list of models")
+
+                for model_tuple in algo_models:
+                    if isinstance(model_tuple, tuple):
+                        model, test_idx = model_tuple
+                    else:
+                        model = model_tuple
                     pred = model.predict(features)
                     all_predictions.append(pred)
 

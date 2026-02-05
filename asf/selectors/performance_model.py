@@ -238,7 +238,7 @@ class PerformanceModel(
             else:
                 if not isinstance(self.regressors, AbstractPredictor):
                     raise RuntimeError("Joint regressor missing.")
-                regressor = self.regressors  # Type narrowing for checker
+                regressor: AbstractPredictor = self.regressors
                 for i, algorithm in enumerate(self.algorithms):
                     data = pd.merge(
                         base_features,

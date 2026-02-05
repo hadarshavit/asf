@@ -702,10 +702,10 @@ class StackingSelector(ConfigurableMixin, AbstractSelector):
         preds = self.meta_selector_.predict(meta_features)
 
         if isinstance(preds, dict):
-            return {str(k): v for k, v in preds.items()}
+            return {str(k): v for k, v in preds.items()}  # type: ignore[return-value]
 
         # Handle other return types
-        result: dict[str, list[tuple[str, float]]] = {}
+        result: dict[str, list[tuple[str, float] | str]] = {}
         for idx in features.index:
             result[str(idx)] = []
         return result
