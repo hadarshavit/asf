@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import cast
+from typing import Sequence, cast
 
 from asf.selectors.parallel_portfolio_selector import APPS
 from asf.predictors.random_forest import RandomForestRegressorWrapper
@@ -69,12 +69,15 @@ def main():
             random_state=42,
         )
         sel.fit(X_train, Y_train)
-        preds = cast(dict[str, list[tuple[str, float]]], sel.predict(X_test))
+        preds = sel.predict(X_test)
+        preds_seq: dict[str, Sequence[tuple[str, float] | str]] = cast(
+            dict[str, Sequence[tuple[str, float] | str]], preds
+        )
 
         # Use ASF metrics for evaluation (handles parallel portfolios correctly)
-        solve_rate = compute_solve_rate(preds, Y_test, budget)
+        solve_rate = compute_solve_rate(preds_seq, Y_test, budget)
         par10_score = running_time_selector_performance(
-            preds, Y_test, budget=budget, par=10.0, return_per_instance=False
+            preds_seq, Y_test, budget=budget, par=10.0, return_per_instance=False
         )
 
         # Portfolio size statistics

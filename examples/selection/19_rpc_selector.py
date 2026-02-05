@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import cast
+from typing import Sequence, cast
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 
@@ -120,15 +120,16 @@ def main():
         top_n=3,
     )
     selector_rf_top3.fit(X_train, Y_train)
-    portfolios = cast(
-        dict[str, list[tuple[str, float]]], selector_rf_top3.predict(X_test)
-    )
+    portfolios = selector_rf_top3.predict(X_test)
     # Convert shortlist to schedules with equal time slices summing to budget
     budgeted_portfolios = portfolios
+    budgeted_portfolios_seq: dict[str, Sequence[tuple[str, float] | str]] = cast(
+        dict[str, Sequence[tuple[str, float] | str]], budgeted_portfolios
+    )
 
-    sr_top3 = compute_solve_rate(budgeted_portfolios, Y_test, budget)
+    sr_top3 = compute_solve_rate(budgeted_portfolios_seq, Y_test, budget)
     par10_top3 = running_time_selector_performance(
-        budgeted_portfolios, Y_test, budget=budget, par=10.0, return_per_instance=False
+        budgeted_portfolios_seq, Y_test, budget=budget, par=10.0, return_per_instance=False
     )
     print(f"  Parallel shortlist solve-rate: {sr_top3:.2%} | PAR10: {par10_top3:.2f}")
 
