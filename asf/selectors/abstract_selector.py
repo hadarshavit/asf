@@ -136,7 +136,7 @@ class AbstractSelector(ABC):
         self,
         features: pd.DataFrame | np.ndarray | None,
         performance: pd.DataFrame | None = None,
-    ) -> dict[str, list[tuple[str, float]]] | pd.Series | np.ndarray:
+    ) -> dict[str, list[tuple[str, float] | str]] | pd.Series | np.ndarray:
         """
         Predict algorithm selections/rankings.
 
@@ -151,6 +151,9 @@ class AbstractSelector(ABC):
         -------
         dict or pd.Series or np.ndarray
             Predicted selections in the specified prediction_mode.
+            For dict return type, each list item can be either:
+            - A tuple (algorithm_name, budget): algorithm selection with time budget
+            - A string: feature group name (for feature computation)
         """
         if features is None:
             df_features: pd.DataFrame | None = None

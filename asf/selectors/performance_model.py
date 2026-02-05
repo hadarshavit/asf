@@ -238,6 +238,7 @@ class PerformanceModel(
             else:
                 if not isinstance(self.regressors, AbstractPredictor):
                     raise RuntimeError("Joint regressor missing.")
+                regressor = self.regressors  # Type narrowing for checker
                 for i, algorithm in enumerate(self.algorithms):
                     data = pd.merge(
                         base_features,
@@ -247,7 +248,7 @@ class PerformanceModel(
                         left_index=True,
                         right_index=True,
                     )
-                    predictions[:, i] = self.regressors.predict(data)
+                    predictions[:, i] = regressor.predict(data)
 
         return pd.DataFrame(
             predictions,
