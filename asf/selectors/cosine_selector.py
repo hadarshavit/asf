@@ -66,10 +66,10 @@ if TORCH_AVAILABLE:
             beta: float = 0.1,
         ):
             super().__init__()
-            self.num_algorithms = num_algorithms  # type: ignore[attr-defined]
-            self.num_user_features = num_user_features  # type: ignore[attr-defined]
-            self.alpha = alpha  # type: ignore[attr-defined]
-            self.beta = beta  # type: ignore[attr-defined]
+            self.num_algorithms = num_algorithms
+            self.num_user_features = num_user_features
+            self.alpha = alpha
+            self.beta = beta
 
             # User (instance) feature MLP: input → 50 → output_dim
             self.user_mlp = nn.Sequential(
@@ -179,7 +179,7 @@ if TORCH_AVAILABLE:
             return output
 else:
 
-    class _ASLLMRecommendationModel:  # type: ignore
+    class _ASLLMRecommendationModel:
         def __init__(self, *args, **kwargs):
             pass
 

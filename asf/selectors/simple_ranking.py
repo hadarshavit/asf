@@ -72,8 +72,8 @@ class SimpleRanking(ConfigurableMixin, AbstractModelBasedSelector):
             encoder = OneHotEncoder(sparse_output=False)
             self.algorithm_features = pd.DataFrame(
                 encoder.fit_transform(np.array(self.algorithms).reshape(-1, 1)),
-                index=list(self.algorithms),  # type: ignore[arg-type]
-                columns=[f"algo_{i}" for i in range(len(self.algorithms))],  # type: ignore[arg-type]
+                index=list(self.algorithms),
+                columns=[f"algo_{i}" for i in range(len(self.algorithms))],
             )
 
         performance = performance[self.algorithms]

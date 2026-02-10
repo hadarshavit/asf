@@ -3,14 +3,20 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from asf.selectors.satzilla import SATzilla
+from asf.metrics import (
+    compute_solve_rate,
+    single_best_solver,
+    virtual_best_solver,
+    running_time_selector_performance,
+)
 
 
 def generate_data(n_instances=80, seed=0):
     np.random.seed(seed)
     features = pd.DataFrame(
         np.random.uniform(0, 10, size=(n_instances, 2)),
-        columns=["size", "density"],  # type: ignore[arg-type]
-        index=[f"inst_{i}" for i in range(n_instances)],  # type: ignore[arg-type]
+        columns=["size", "density"],
+        index=[f"inst_{i}" for i in range(n_instances)],
     )
     # Each algorithm's performance is a different function of the features
     performance = pd.DataFrame(
@@ -36,24 +42,6 @@ def generate_data(n_instances=80, seed=0):
     )
     performance[performance < 5] = 5
     return features, performance
-
-
-def evaluate(preds, true_perf, budget=None):
-    total = 0
-    correct = 0
-    for inst, rec in preds.items():
-        algo = rec[0][0]
-        if algo is None or inst not in true_perf.index:
-            continue
-        total += 1
-        runtime = true_perf.loc[inst, algo]
-        if budget is not None:
-            if runtime <= budget:
-                correct += 1
-        else:
-            if runtime <= true_perf.loc[inst].min():
-                correct += 1
-    return (correct / total) if total > 0 else 0.0
 
 
 def print_sample(preds, true_perf, n=10):
@@ -84,7 +72,27 @@ if __name__ == "__main__":
 
     preds = selector.predict(test_X)
 
-    acc = evaluate(preds, test_perf, budget=budget)
-    print(f"\nSATzilla example accuracy (<= {budget}s): {acc:.2%}")
+    # Metrics expect (algo, allocated_time); SATzilla schedules contain scores, so wrap with budget
+    budgeted_preds = {
+        inst: [(algo, budget) for algo, _ in sched] for inst, sched in preds.items()
+    }
+
+    # Baselines
+    sbs_score = single_best_solver(test_perf, maximize=False, budget=budget, par=10.0)
+    vbs_score = virtual_best_solver(test_perf, maximize=False, budget=budget, par=10.0)
+
+    # Selector metrics
+    sr = compute_solve_rate(budgeted_preds, test_perf, budget)
+    par10 = running_time_selector_performance(
+        budgeted_preds, test_perf, budget=budget, par=10.0, return_per_instance=False
+    )
+
+    print("\nSATzilla example")
+    print("=" * 50)
+    print(f"Budget: {budget}s | Train/Test: {len(train_X)}/{len(test_X)}")
+    print(f"Single Best Solver (SBS) PAR10: {sbs_score:.2f}")
+    print(f"Virtual Best Solver (VBS) PAR10: {vbs_score:.2f}")
+    print(f"SATzilla solve-rate: {sr:.2%}")
+    print(f"SATzilla PAR10: {par10:.2f}")
 
     print_sample(preds, test_perf, n=12)

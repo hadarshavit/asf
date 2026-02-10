@@ -140,7 +140,7 @@ class PairwiseRegressor(
                 if self.features
                 else [f"f_{i}" for i in range(base_features.shape[1])]
             )
-            features_df = pd.DataFrame(base_features, columns=list(cols))  # type: ignore[arg-type]
+            features_df = pd.DataFrame(base_features, columns=list(cols))
         else:
             features_df = base_features
 

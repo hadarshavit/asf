@@ -1,25 +1,15 @@
 import os
-import numpy as np
-import pandas as pd
-from typing import Any, cast
+from typing import Sequence, cast
 
 from asf.selectors.cosine_selector import CosineSelector
 from asf.scenario.aslib_reader import read_aslib_scenario
 from asf.utils.aslib_algorithm_features import get_algorithm_features_from_aslib
-
-
-def evaluate_solve_rate(preds: Any, perf: pd.DataFrame, budget: float) -> float:
-    solved = 0
-    total = 0
-    for inst, rec in preds.items():
-        algo, _ = rec[0]
-        if algo is None:
-            continue
-        total += 1
-        rt = perf.at[inst, algo]
-        if not np.isnan(rt) and float(rt) <= budget:
-            solved += 1
-    return solved / total if total > 0 else 0.0
+from asf.metrics import (
+    compute_solve_rate,
+    single_best_solver,
+    virtual_best_solver,
+    running_time_selector_performance,
+)
 
 
 def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
@@ -64,15 +54,21 @@ def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
     )
     sel.fit(X_train, Y_train, algorithm_features=alg_df)
 
-    preds = sel.predict(X_test)
-    sr = evaluate_solve_rate(preds, Y_test, budget)
+    preds_seq: dict[str, Sequence[tuple[str, float] | str]] = cast(
+        dict[str, Sequence[tuple[str, float] | str]], sel.predict(X_test)
+    )
+    sr = compute_solve_rate(preds_seq, Y_test, budget)
+    par10 = running_time_selector_performance(
+        preds_seq, Y_test, budget=budget, par=10.0, return_per_instance=False
+    )
 
     best = ((Y_train <= budget).mean(axis=0)).idxmax()
     baseline_preds = {idx: [(best, budget)] for idx in X_test.index}
-    base_sr = evaluate_solve_rate(baseline_preds, Y_test, budget)
+    base_sr = compute_solve_rate(baseline_preds, Y_test, budget)
 
-    oracle_hits = Y_test.min(axis=1) <= budget
-    oracle_sr = float(oracle_hits.mean())
+    sbs_score = single_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
+    vbs_score = virtual_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
+    oracle_sr = float((Y_test.min(axis=1) <= budget).mean())
 
     print("=" * 60)
     print("CosineSelector - AS-LLM Architecture (real ASLib data)")
@@ -83,18 +79,22 @@ def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
     )
     print(f"Train / Test: {len(X_train)} / {len(X_test)}  Budget: {budget}")
     print()
+    print(f"Single Best Solver PAR10 Score: {sbs_score:.2f}")
+    print(f"Virtual Best Solver (Oracle) PAR10 Score: {vbs_score:.2f}")
+    print(f"Virtual Best Solver (Oracle) solve-rate: {oracle_sr:.2%}")
+    print()
     print(f"Cosine selector solve-rate: {sr:.2%}")
+    print(f"Cosine selector PAR10 Score: {par10:.2f}")
     print(f"Best-single ({best}) solve-rate: {base_sr:.2%}")
-    print(f"Oracle solve-rate: {oracle_sr:.2%}")
     print()
     print("Sample decisions (first 12):")
     for inst in list(X_test.index)[:12]:
-        algo, score = cast(dict, preds).get(inst, [(None, None)])[0]
+        algo, score = cast(dict, preds_seq).get(inst, [(None, None)])[0]
         rt = Y_test.at[inst, algo] if algo is not None else float("nan")
         print(f"{inst}: chosen={algo} predicted_score={score:.4f} true_rt={rt:.2f}")
     print("=" * 60)
 
-    return sel, X_test, Y_test, preds
+    return sel, X_test, Y_test, preds_seq
 
 
 if __name__ == "__main__":

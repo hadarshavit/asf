@@ -1,10 +1,16 @@
 import numpy as np
 import pandas as pd
-from typing import Any
+from typing import Sequence, cast
 
 from asf.selectors.cshc import CSHCSelector
 from asf.selectors.osl_linear import OSLLinearSelector
 from asf.selectors.survival_analysis import SurvivalAnalysis
+from asf.metrics import (
+    compute_solve_rate,
+    single_best_solver,
+    virtual_best_solver,
+    running_time_selector_performance,
+)
 
 
 def make_data(n_instances=300, n_algorithms=5, n_inst_feats=10, seed=42, budget=500.0):
@@ -13,8 +19,8 @@ def make_data(n_instances=300, n_algorithms=5, n_inst_feats=10, seed=42, budget=
 
     features = pd.DataFrame(
         rng.normal(size=(n_instances, n_inst_feats)),
-        columns=[f"f{i}" for i in range(n_inst_feats)],  # type: ignore[arg-type]
-        index=[f"inst_{i}" for i in range(n_instances)],  # type: ignore[arg-type]
+        columns=[f"f{i}" for i in range(n_inst_feats)],
+        index=[f"inst_{i}" for i in range(n_instances)],
     )
 
     alg_names = [f"algo{i + 1}" for i in range(n_algorithms)]
@@ -35,23 +41,6 @@ def make_data(n_instances=300, n_algorithms=5, n_inst_feats=10, seed=42, budget=
         perf[algo_name] = runtimes
 
     return features, perf
-
-
-def evaluate_solve_rate(preds: Any, perf: pd.DataFrame, budget: float) -> float:
-    """Helper function to evaluate the solve rate of predictions."""
-    solved = 0
-    total = 0
-    for inst, rec in preds.items():
-        if not rec:
-            continue
-        algo, _ = rec[0]
-        if algo is None:
-            continue
-        total += 1
-        rt = perf.at[inst, algo]
-        if not np.isnan(rt) and float(rt) <= budget:
-            solved += 1
-    return solved / total if total > 0 else 0.0
 
 
 def main():
@@ -84,8 +73,15 @@ def main():
 
     sel.fit(X_train, Y_train)
 
-    preds = sel.predict(X_test)
-    sr = evaluate_solve_rate(preds, Y_test, budget)
+    preds = cast(dict[str, Sequence[tuple[str, float] | str]], sel.predict(X_test))
+    sr = compute_solve_rate(preds, Y_test, budget)
+
+    # Use ASF metrics for baselines
+    sbs_score = single_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
+    vbs_score = virtual_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
+    par10 = running_time_selector_performance(
+        preds, Y_test, budget=budget, par=10.0, return_per_instance=False
+    )
 
     # --- Detailed Evaluation of CSHC Decisions ---
     primary_used = 0
@@ -99,7 +95,7 @@ def main():
         inst_feature_df = X_test.loc[[inst_name]]
 
         # 1. Get primary selector's choice
-        primary_pred = sel.primary_selector.predict(inst_feature_df).get(inst_name)  # type: ignore[attr-defined]
+        primary_pred = sel.primary_selector.predict(inst_feature_df).get(inst_name)
         if not primary_pred:
             continue
 
@@ -122,7 +118,7 @@ def main():
                 primary_success += 1
         elif sel.backup_selector:
             backup_used += 1
-            backup_pred_list = sel.backup_selector.predict(inst_feature_df).get(  # type: ignore[attr-defined]
+            backup_pred_list = sel.backup_selector.predict(inst_feature_df).get(
                 inst_name
             )
             if backup_pred_list:
@@ -146,11 +142,10 @@ def main():
     # Single best solver on the training set
     best_single_solver = ((Y_train <= budget).mean(axis=0)).idxmax()
     baseline_preds = {idx: [(best_single_solver, budget)] for idx in X_test.index}
-    base_sr = evaluate_solve_rate(baseline_preds, Y_test, budget)
+    base_sr = compute_solve_rate(baseline_preds, Y_test, budget)
 
     # Oracle (perfect selector)
-    oracle_hits = Y_test.min(axis=1) <= budget
-    oracle_sr = float(oracle_hits.mean())
+    oracle_sr = float((Y_test.min(axis=1) <= budget).mean())
 
     # --- Print Results ---
     print("=" * 60)
@@ -163,9 +158,13 @@ def main():
     )
     print(f"Learned Confidence Threshold: {sel.threshold:.4f}")
     print()
+    print(f"Single Best Solver PAR10 Score: {sbs_score:.2f}")
+    print(f"Virtual Best Solver (Oracle) PAR10 Score: {vbs_score:.2f}")
+    print(f"Virtual Best Solver (Oracle) solve-rate: {oracle_sr:.2%}")
+    print()
     print(f"CSHC selector solve-rate: {sr:.2%}")
+    print(f"CSHC selector PAR10 Score: {par10:.2f}")
     print(f"Best-single ({best_single_solver}) solve-rate: {base_sr:.2%}")
-    print(f"Oracle solve-rate: {oracle_sr:.2%}")
     print()
     print("--- CSHC Decision Breakdown ---")
     if primary_used > 0:
@@ -183,7 +182,7 @@ def main():
     print()
     print("Sample decisions (first 12):")
     for inst in list(X_test.index)[:12]:
-        algo, _ = preds.get(inst, [(None, None)])[0]  # type: ignore[attr-defined]
+        algo, _ = preds.get(inst, [(None, None)])[0]
         rt = Y_test.at[inst, algo] if algo is not None else float("nan")
         print(f"{inst}: chosen={algo}, true_rt={rt:.2f}")
     print("=" * 60)

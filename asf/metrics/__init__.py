@@ -3,6 +3,7 @@ from asf.metrics.baselines import (
     virtual_best_solver,
     running_time_selector_performance,
     running_time_closed_gap,
+    compute_solve_rate,
 )
 from asf.metrics.par10 import apply_par, apply_par10
 
@@ -12,6 +13,7 @@ __all__ = [
     "virtual_best_solver",
     "running_time_selector_performance",
     "running_time_closed_gap",
+    "compute_solve_rate",
     "apply_par",
     "apply_par10",
 ]

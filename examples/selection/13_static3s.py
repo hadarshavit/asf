@@ -4,14 +4,20 @@ from typing import cast
 
 from asf.presolving.static_3s import Static3S
 from asf.selectors.sunny import SUNNY
+from asf.metrics import (
+    compute_solve_rate,
+    single_best_solver,
+    virtual_best_solver,
+    running_time_selector_performance,
+)
 
 
 def generate_simple_data(n_instances=100, n_algorithms=6, seed=1, budget=500.0):
     rng = np.random.RandomState(seed)
     features = pd.DataFrame(
         rng.uniform(0, 10, size=(n_instances, 4)),
-        columns=[f"f{i}" for i in range(4)],  # type: ignore[arg-type]
-        index=[f"inst_{i}" for i in range(n_instances)],  # type: ignore[arg-type]
+        columns=[f"f{i}" for i in range(4)],
+        index=[f"inst_{i}" for i in range(n_instances)],
     )
 
     perf = pd.DataFrame(index=features.index)
@@ -24,20 +30,6 @@ def generate_simple_data(n_instances=100, n_algorithms=6, seed=1, budget=500.0):
         perf[f"algo{a + 1}"] = runtimes
 
     return features, perf
-
-
-def run_schedule(schedule, perf_row, budget):
-    """
-    schedule: list[tuple[algo, time]] or empty list
-    perf_row: Series of runtimes for that instance
-    """
-    for algo, t in schedule:
-        rt = perf_row.get(algo)
-        if pd.isna(rt):
-            continue
-        if float(rt) <= float(t):
-            return True
-    return False
 
 
 def main():
@@ -54,20 +46,44 @@ def main():
     test_X = features.iloc[n_train:]
     test_Y = performance.iloc[n_train:]
 
+    # Use ASF metrics for baselines
+    sbs_score = single_best_solver(test_Y, maximize=False, budget=budget, par=10.0)
+    vbs_score = virtual_best_solver(test_Y, maximize=False, budget=budget, par=10.0)
+
     # 1) compute static preschedule
     presolver = Static3S(budget=presolve_budget, max_candidates_per_solver=10)
     presolver.fit(train_X, train_Y)
 
     preschedule_map = presolver.predict(test_X)
 
+    presolver_sr = compute_solve_rate(
+        cast(dict, preschedule_map), test_Y, presolve_budget
+    )
+    presolver_par10 = running_time_selector_performance(
+        cast(dict, preschedule_map),
+        test_Y,
+        budget=presolve_budget,
+        par=10.0,
+        return_per_instance=False,
+    )
+
     presolver_solved = []
     presolver_unsolved = []
 
     for inst in test_Y.index:
         schedule_for_inst = cast(dict, preschedule_map).get(inst)
-        solved = run_schedule(schedule_for_inst, test_Y.loc[inst], presolve_budget)
-        if solved:
-            presolver_solved.append(inst)
+        if schedule_for_inst and inst in test_Y.index:
+            # Check if any algorithm in schedule solves within its allocated time
+            algo_solved = False
+            for algo, t in schedule_for_inst:
+                rt = test_Y.loc[inst, algo]
+                if not pd.isna(rt) and float(rt) <= float(t):
+                    algo_solved = True
+                    break
+            if algo_solved:
+                presolver_solved.append(inst)
+            else:
+                presolver_unsolved.append(inst)
         else:
             presolver_unsolved.append(inst)
 
@@ -79,13 +95,38 @@ def main():
     else:
         preds = {}
 
+    sunny_sr = (
+        compute_solve_rate(cast(dict, preds), test_Y.loc[presolver_unsolved], budget)
+        if presolver_unsolved
+        else 0.0
+    )
+    sunny_par10 = (
+        running_time_selector_performance(
+            cast(dict, preds),
+            test_Y.loc[presolver_unsolved],
+            budget=budget,
+            par=10.0,
+            return_per_instance=False,
+        )
+        if presolver_unsolved
+        else 0.0
+    )
+
     sunny_solved = []
     sunny_unsolved = []
     for inst in presolver_unsolved:
         sched = cast(dict, preds).get(inst, [])
-        solved = run_schedule(sched, test_Y.loc[inst], budget)
-        if solved:
-            sunny_solved.append(inst)
+        if sched and inst in test_Y.index:
+            algo_solved = False
+            for algo, t in sched:
+                rt = test_Y.loc[inst, algo]
+                if not pd.isna(rt) and float(rt) <= float(t):
+                    algo_solved = True
+                    break
+            if algo_solved:
+                sunny_solved.append(inst)
+            else:
+                sunny_unsolved.append(inst)
         else:
             sunny_unsolved.append(inst)
 
@@ -97,30 +138,16 @@ def main():
     print(f"Budget: {budget}s")
     print(f"Train instances: {len(train_X)}  Test instances: {len(test_X)}")
     print()
+    print(f"Single Best Solver (SBS) PAR10 Score: {sbs_score:.2f}")
+    print(f"Virtual Best Solver (VBS) PAR10 Score: {vbs_score:.2f}")
+    print()
     print("Presolver schedule (solver, time):")
     print(presolver.schedule)
+    print(f"Presolver solve rate: {presolver_sr:.2%}")
+    print(f"Presolver PAR10 score: {presolver_par10:.2f}")
     print()
-    print(f"Instances solved by presolver: {len(presolver_solved)}")
-    print(
-        ", ".join(presolver_solved[:20])
-        + ("" if len(presolver_solved) <= 20 else ", ...")
-    )
-    print()
-    print(
-        f"Instances handled by SUNNY (unsolved by presolver): {len(presolver_unsolved)}"
-    )
-    print(f" - solved by SUNNY: {len(sunny_solved)}")
-    print(
-        "   "
-        + ", ".join(sunny_solved[:20])
-        + ("" if len(sunny_solved) <= 20 else ", ...")
-    )
-    print(f" - still unsolved: {len(sunny_unsolved)}")
-    print(
-        "   "
-        + ", ".join(sunny_unsolved[:20])
-        + ("" if len(sunny_unsolved) <= 20 else ", ...")
-    )
+    print(f"SUNNY solve rate (on presolver-unsolved): {sunny_sr:.2%}")
+    print(f"SUNNY PAR10 score (on presolver-unsolved): {sunny_par10:.2f}")
     print("=" * 60)
 
 

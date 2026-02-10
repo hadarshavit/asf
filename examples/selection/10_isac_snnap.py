@@ -1,8 +1,15 @@
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
+
 from asf.selectors.isac import ISAC
 from asf.selectors.snnap import SNNAP
+from asf.metrics import (
+    compute_solve_rate,
+    single_best_solver,
+    virtual_best_solver,
+    running_time_selector_performance,
+)
 
 
 def generate_data(n_instances=120, n_algorithms=5, seed=0):
@@ -25,8 +32,8 @@ def generate_data(n_instances=120, n_algorithms=5, seed=0):
 
     features = pd.DataFrame(
         centers[cluster_ids] + rng.normal(scale=0.8, size=(n_instances, 2)),
-        columns=["f1", "f2"],  # type: ignore[arg-type]
-        index=[f"inst_{i}" for i in range(n_instances)],  # type: ignore[arg-type]
+        columns=["f1", "f2"],
+        index=[f"inst_{i}" for i in range(n_instances)],
     )
 
     # Create cluster-specific base performance for each algorithm
@@ -54,46 +61,6 @@ def generate_data(n_instances=120, n_algorithms=5, seed=0):
     return features, perf
 
 
-def evaluate_predictions(predictions, true_perf, budget=None):
-    """
-    Evaluate predictions.
-
-    Returns:
-        achieved_acc (float): Fraction of instances where the recommended algorithm
-            achieves runtime <= budget (if budget provided) or is the fastest (otherwise).
-        max_acc (float): Maximum achievable accuracy under the same evaluation criterion
-            (i.e., fraction of instances for which some algorithm achieves runtime <= budget).
-    """
-    correct = 0
-    total = 0
-    for inst, rec in predictions.items():
-        if inst not in true_perf.index:
-            continue
-        algo = rec[0][0]
-        if algo is None:
-            continue
-        total += 1
-        runtime = true_perf.loc[inst, algo]
-        if budget is not None:
-            if runtime <= budget:
-                correct += 1
-        else:
-            # compare to true best
-            if runtime <= true_perf.loc[inst].min():
-                correct += 1
-    achieved_acc = correct / total if total > 0 else 0.0
-
-    # Compute maximum achievable accuracy under the same budget criterion
-    if budget is not None:
-        best_runtimes = true_perf.min(axis=1)
-        max_acc = float((best_runtimes <= budget).mean())
-    else:
-        # If no budget provided, the maximum achievable accuracy (choosing best algorithm per instance) is 1.0
-        max_acc = 1.0
-
-    return achieved_acc, max_acc
-
-
 def print_sample(predictions, true_perf, n=8):
     print("\nSample predictions:")
     for inst in list(true_perf.index)[:n]:
@@ -117,32 +84,69 @@ if __name__ == "__main__":
     print("\nTest performance (head):")
     print(test_perf.head(10))
 
-    # Default ISAC (GMeans)
-    selector = ISAC()
-    selector.fit(train_features, train_perf)
-    preds = selector.predict(test_features)
-    acc, max_acc = evaluate_predictions(preds, test_perf, budget=60)
-    print(
-        f"\nISAC (GMeans) accuracy (<=60s): {acc:.2%} (max achievable: {max_acc:.2%})"
-    )
-    print_sample(preds, test_perf, n=10)
+    budget = 60
+
+    # Baselines
+    sbs_score = single_best_solver(test_perf, maximize=False, budget=budget, par=10.0)
+    vbs_score = virtual_best_solver(test_perf, maximize=False, budget=budget, par=10.0)
+
+    print(f"\nSingle Best Solver PAR10: {sbs_score:.2f}")
+    print(f"Virtual Best Solver (Oracle) PAR10: {vbs_score:.2f}")
+    print()
+
+    # Default ISAC (GMeans) - may fail on small synthetic data
+    print("ISAC (GMeans):")
+    try:
+        selector = ISAC()
+        selector.fit(train_features, train_perf)
+        preds = selector.predict(test_features)
+        budgeted_preds = {
+            inst: [(algo, budget) for algo, _ in sched] for inst, sched in preds.items()
+        }
+        sr = compute_solve_rate(budgeted_preds, test_perf, budget)
+        par10 = running_time_selector_performance(
+            budgeted_preds,
+            test_perf,
+            budget=budget,
+            par=10.0,
+            return_per_instance=False,
+        )
+        print(f"  Solve-rate: {sr:.2%}, PAR10: {par10:.2f}")
+        print_sample(preds, test_perf, n=8)
+    except ValueError as e:
+        print(f"  Skipped (clustering failed): {str(e)[:80]}")
 
     # ISAC with KMeans (example: 6 clusters)
+    print("\nISAC (KMeans, n_clusters=6):")
     selector_km = ISAC(clusterer=KMeans, clusterer_kwargs={"n_clusters": 6})
     selector_km.fit(train_features, train_perf)
     preds_km = selector_km.predict(test_features)
-    acc_km, max_acc_km = evaluate_predictions(preds_km, test_perf, budget=60)
-    print(
-        f"\nISAC (KMeans, n_clusters=6) accuracy (<=60s): {acc_km:.2%} (max achievable: {max_acc_km:.2%})"
+    budgeted_preds_km = {
+        inst: [(algo, budget) for algo, _ in sched] for inst, sched in preds_km.items()
+    }
+    sr_km = compute_solve_rate(budgeted_preds_km, test_perf, budget)
+    par10_km = running_time_selector_performance(
+        budgeted_preds_km, test_perf, budget=budget, par=10.0, return_per_instance=False
     )
-    print_sample(preds_km, test_perf, n=10)
+    print(f"  Solve-rate: {sr_km:.2%}, PAR10: {par10_km:.2f}")
+    print_sample(preds_km, test_perf, n=8)
 
     # SNNAP (k-NN majority-vote)
+    print("\nSNNAP (k=5):")
     selector_snnap = SNNAP(k=5)
     selector_snnap.fit(train_features, train_perf)
     preds_snnap = selector_snnap.predict(test_features)
-    acc_snnap, max_acc_snnap = evaluate_predictions(preds_snnap, test_perf, budget=60)
-    print(
-        f"\nSNNAP (k=5) accuracy (<=60s): {acc_snnap:.2%} (max achievable: {max_acc_snnap:.2%})"
+    budgeted_preds_snnap = {
+        inst: [(algo, budget) for algo, _ in sched]
+        for inst, sched in preds_snnap.items()
+    }
+    sr_snnap = compute_solve_rate(budgeted_preds_snnap, test_perf, budget)
+    par10_snnap = running_time_selector_performance(
+        budgeted_preds_snnap,
+        test_perf,
+        budget=budget,
+        par=10.0,
+        return_per_instance=False,
     )
-    print_sample(preds_snnap, test_perf, n=10)
+    print(f"  Solve-rate: {sr_snnap:.2%}, PAR10: {par10_snnap:.2f}")
+    print_sample(preds_snnap, test_perf, n=8)

@@ -1,6 +1,14 @@
 import pandas as pd
 import numpy as np
+from typing import Sequence, cast
+
 from asf.selectors.sunny import SUNNY
+from asf.metrics import (
+    compute_solve_rate,
+    single_best_solver,
+    virtual_best_solver,
+    running_time_selector_performance,
+)
 
 
 def generate_simple_data(n_instances=100, seed=0):
@@ -94,40 +102,6 @@ def print_sunny_schedules(predictions, true_performance, budget, n=10):
         )
 
 
-def evaluate_selector(
-    selector, train_features, train_performance, test_features, test_performance, budget
-):
-    """Fit and evaluate a selector, returning average runtime and solve rate."""
-    selector.fit(train_features, train_performance)
-    predictions = selector.predict(test_features)
-
-    total_runtime = 0.0
-    solved_count = 0
-
-    for instance in test_performance.index:
-        schedule = predictions[instance]
-        row = test_performance.loc[instance]
-        time_used = 0
-        solved = False
-
-        for algo, t in schedule:
-            runtime = row[algo]
-            time_used += t
-            if runtime <= budget and runtime <= time_used:
-                total_runtime += runtime
-                solved = True
-                solved_count += 1
-                break
-
-        if not solved:
-            total_runtime += budget
-
-    avg_runtime = total_runtime / len(test_performance)
-    solve_rate = solved_count / len(test_performance)
-
-    return predictions, avg_runtime, solve_rate
-
-
 if __name__ == "__main__":
     features, performance = generate_simple_data(n_instances=100, seed=42)
     budget = 200
@@ -147,23 +121,37 @@ if __name__ == "__main__":
     print(f"Budget: {budget}s")
     print(f"Algorithms: {list(performance.columns)}")
 
+    # Baselines
+    sbs_score = single_best_solver(
+        test_performance, maximize=False, budget=budget, par=10.0
+    )
+    vbs_score = virtual_best_solver(
+        test_performance, maximize=False, budget=budget, par=10.0
+    )
+
+    print(f"\nSingle Best Solver PAR10: {sbs_score:.2f}")
+    print(f"Virtual Best Solver (Oracle) PAR10: {vbs_score:.2f}")
+
     # 1. Basic SUNNY (no tuning)
     print("\n" + "=" * 70)
     print("1. Basic SUNNY (fixed k=5, no tuning)")
     print("=" * 70)
     selector = SUNNY(k=5, use_v2=False, budget=budget)
-    predictions, avg_rt, solve_rate = evaluate_selector(
-        selector,
-        train_features,
-        train_performance,
-        test_features,
+    selector.fit(train_features, train_performance)
+    predictions = cast(
+        dict[str, Sequence[tuple[str, float] | str]], selector.predict(test_features)
+    )
+    sr = compute_solve_rate(predictions, test_performance, budget)
+    par10 = running_time_selector_performance(
+        predictions,
         test_performance,
-        budget,
+        budget=budget,
+        par=10.0,
+        return_per_instance=False,
     )
     print(f"k = {selector.k}")
     print("Algorithm limit: None")
-    print(f"Average runtime: {avg_rt:.2f}s")
-    print(f"Solve rate: {solve_rate:.1%}")
+    print(f"Solve rate: {sr:.1%}  PAR10: {par10:.2f}")
     print_sunny_schedules(predictions, test_performance, budget, n=8)
 
     # 2. SUNNY-AS2 (k-tuning)
@@ -171,18 +159,21 @@ if __name__ == "__main__":
     print("2. SUNNY-AS2 (k-tuning enabled)")
     print("=" * 70)
     selector_v2 = SUNNY(k=5, use_v2=True, budget=budget, k_candidates=[3, 5, 7, 10, 15])
-    predictions_v2, avg_rt_v2, solve_rate_v2 = evaluate_selector(
-        selector_v2,
-        train_features,
-        train_performance,
-        test_features,
+    selector_v2.fit(train_features, train_performance)
+    predictions_v2 = cast(
+        dict[str, Sequence[tuple[str, float] | str]], selector_v2.predict(test_features)
+    )
+    sr_v2 = compute_solve_rate(predictions_v2, test_performance, budget)
+    par10_v2 = running_time_selector_performance(
+        predictions_v2,
         test_performance,
-        budget,
+        budget=budget,
+        par=10.0,
+        return_per_instance=False,
     )
     print(f"Tuned k = {selector_v2.k}")
     print("Algorithm limit: None")
-    print(f"Average runtime: {avg_rt_v2:.2f}s")
-    print(f"Solve rate: {solve_rate_v2:.1%}")
+    print(f"Solve rate: {sr_v2:.1%}  PAR10: {par10_v2:.2f}")
     print_sunny_schedules(predictions_v2, test_performance, budget, n=8)
 
     # 3. TSunny (algorithm limit tuning)
@@ -190,18 +181,22 @@ if __name__ == "__main__":
     print("3. TSunny (algorithm limit tuning enabled)")
     print("=" * 70)
     selector_tsunny = SUNNY(k=5, use_tsunny=True, budget=budget)
-    predictions_tsunny, avg_rt_tsunny, solve_rate_tsunny = evaluate_selector(
-        selector_tsunny,
-        train_features,
-        train_performance,
-        test_features,
+    selector_tsunny.fit(train_features, train_performance)
+    predictions_tsunny = cast(
+        dict[str, Sequence[tuple[str, float] | str]],
+        selector_tsunny.predict(test_features),
+    )
+    sr_tsunny = compute_solve_rate(predictions_tsunny, test_performance, budget)
+    par10_tsunny = running_time_selector_performance(
+        predictions_tsunny,
         test_performance,
-        budget,
+        budget=budget,
+        par=10.0,
+        return_per_instance=False,
     )
     print(f"k = {selector_tsunny.k}")
     print(f"Tuned algorithm limit = {selector_tsunny.tuned_algorithm_limit}")
-    print(f"Average runtime: {avg_rt_tsunny:.2f}s")
-    print(f"Solve rate: {solve_rate_tsunny:.1%}")
+    print(f"Solve rate: {sr_tsunny:.1%}  PAR10: {par10_tsunny:.2f}")
     print_sunny_schedules(predictions_tsunny, test_performance, budget, n=8)
 
     # 4. Hardcoded algorithm limit
@@ -209,18 +204,22 @@ if __name__ == "__main__":
     print("4. SUNNY with hardcoded algorithm_limit=2")
     print("=" * 70)
     selector_hardcoded = SUNNY(k=5, algorithm_limit=2, budget=budget)
-    predictions_hardcoded, avg_rt_hardcoded, solve_rate_hardcoded = evaluate_selector(
-        selector_hardcoded,
-        train_features,
-        train_performance,
-        test_features,
+    selector_hardcoded.fit(train_features, train_performance)
+    predictions_hardcoded = cast(
+        dict[str, Sequence[tuple[str, float] | str]],
+        selector_hardcoded.predict(test_features),
+    )
+    sr_hardcoded = compute_solve_rate(predictions_hardcoded, test_performance, budget)
+    par10_hardcoded = running_time_selector_performance(
+        predictions_hardcoded,
         test_performance,
-        budget,
+        budget=budget,
+        par=10.0,
+        return_per_instance=False,
     )
     print(f"k = {selector_hardcoded.k}")
     print(f"Hardcoded algorithm limit = {selector_hardcoded.algorithm_limit}")
-    print(f"Average runtime: {avg_rt_hardcoded:.2f}s")
-    print(f"Solve rate: {solve_rate_hardcoded:.1%}")
+    print(f"Solve rate: {sr_hardcoded:.1%}  PAR10: {par10_hardcoded:.2f}")
     print_sunny_schedules(predictions_hardcoded, test_performance, budget, n=8)
 
     # 5. Combined: k-tuning + algorithm limit tuning
@@ -230,18 +229,22 @@ if __name__ == "__main__":
     selector_combined = SUNNY(
         use_v2=True, use_tsunny=True, budget=budget, k_candidates=[3, 5, 7, 10, 15]
     )
-    predictions_combined, avg_rt_combined, solve_rate_combined = evaluate_selector(
-        selector_combined,
-        train_features,
-        train_performance,
-        test_features,
+    selector_combined.fit(train_features, train_performance)
+    predictions_combined = cast(
+        dict[str, Sequence[tuple[str, float] | str]],
+        selector_combined.predict(test_features),
+    )
+    sr_combined = compute_solve_rate(predictions_combined, test_performance, budget)
+    par10_combined = running_time_selector_performance(
+        predictions_combined,
         test_performance,
-        budget,
+        budget=budget,
+        par=10.0,
+        return_per_instance=False,
     )
     print(f"Tuned k = {selector_combined.k}")
     print(f"Tuned algorithm limit = {selector_combined.tuned_algorithm_limit}")
-    print(f"Average runtime: {avg_rt_combined:.2f}s")
-    print(f"Solve rate: {solve_rate_combined:.1%}")
+    print(f"Solve rate: {sr_combined:.1%}  PAR10: {par10_combined:.2f}")
     print_sunny_schedules(predictions_combined, test_performance, budget, n=8)
 
     # Summary comparison
@@ -249,21 +252,21 @@ if __name__ == "__main__":
     print("Summary Comparison")
     print("=" * 70)
     print(
-        f"{'Method':<30} {'Avg Runtime':>12} {'Solve Rate':>12} {'k':>5} {'Algo Limit':>12}"
+        f"{'Method':<30} {'Solve Rate':>12} {'PAR10':>12} {'k':>5} {'Algo Limit':>12}"
     )
     print("-" * 70)
     print(
-        f"{'Basic SUNNY':<30} {avg_rt:>12.2f}s {solve_rate:>11.1%} {selector.k:>5} {'None':>12}"
+        f"{'Basic SUNNY':<30} {sr:>11.1%} {par10:>12.2f} {selector.k:>5} {'None':>12}"
     )
     print(
-        f"{'SUNNY-AS2':<30} {avg_rt_v2:>12.2f}s {solve_rate_v2:>11.1%} {selector_v2.k:>5} {'None':>12}"
+        f"{'SUNNY-AS2':<30} {sr_v2:>11.1%} {par10_v2:>12.2f} {selector_v2.k:>5} {'None':>12}"
     )
     print(
-        f"{'TSunny':<30} {avg_rt_tsunny:>12.2f}s {solve_rate_tsunny:>11.1%} {selector_tsunny.k:>5} {selector_tsunny.tuned_algorithm_limit:>12}"
+        f"{'TSunny':<30} {sr_tsunny:>11.1%} {par10_tsunny:>12.2f} {selector_tsunny.k:>5} {selector_tsunny.tuned_algorithm_limit:>12}"
     )
     print(
-        f"{'Hardcoded limit=2':<30} {avg_rt_hardcoded:>12.2f}s {solve_rate_hardcoded:>11.1%} {selector_hardcoded.k:>5} {selector_hardcoded.algorithm_limit:>12}"
+        f"{'Hardcoded limit=2':<30} {sr_hardcoded:>11.1%} {par10_hardcoded:>12.2f} {selector_hardcoded.k:>5} {selector_hardcoded.algorithm_limit:>12}"
     )
     print(
-        f"{'Combined tuning':<30} {avg_rt_combined:>12.2f}s {solve_rate_combined:>11.1%} {selector_combined.k:>5} {selector_combined.tuned_algorithm_limit:>12}"
+        f"{'Combined tuning':<30} {sr_combined:>11.1%} {par10_combined:>12.2f} {selector_combined.k:>5} {selector_combined.tuned_algorithm_limit:>12}"
     )

@@ -352,7 +352,7 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
         ]
 
         conditions = [
-            EqualsCondition(backup_selector_param, use_backup, True),  # type: ignore[arg-type]
+            EqualsCondition(backup_selector_param, use_backup, True),
         ]
 
         return params, conditions, []

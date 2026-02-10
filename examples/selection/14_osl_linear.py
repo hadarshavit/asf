@@ -1,16 +1,22 @@
 import numpy as np
 import pandas as pd
-from typing import cast
+from typing import cast, Sequence
 
 from asf.selectors.osl_linear import OSLLinearSelector
+from asf.metrics import (
+    compute_solve_rate,
+    single_best_solver,
+    virtual_best_solver,
+    running_time_selector_performance,
+)
 
 
 def make_data(n_instances=200, n_algorithms=5, seed=1, budget=200.0):
     rng = np.random.RandomState(seed)
     features = pd.DataFrame(
         rng.normal(size=(n_instances, 6)),
-        columns=[f"f{i}" for i in range(6)],  # type: ignore[arg-type]
-        index=[f"inst_{i}" for i in range(n_instances)],  # type: ignore[arg-type]
+        columns=[f"f{i}" for i in range(6)],
+        index=[f"inst_{i}" for i in range(n_instances)],
     )
 
     perf = pd.DataFrame(index=features.index)
@@ -23,22 +29,6 @@ def make_data(n_instances=200, n_algorithms=5, seed=1, budget=200.0):
         runtimes[timeout_mask] = budget * 2
         perf[f"algo{a + 1}"] = runtimes
     return features, perf
-
-
-def evaluate(preds, true_perf, budget):
-    solved = 0
-    total = 0
-    for inst, rec in preds.items():
-        if inst not in true_perf.index:
-            continue
-        algo = rec[0][0]
-        if algo is None:
-            continue
-        total += 1
-        rt = true_perf.loc[inst, algo]
-        if not np.isnan(rt) and float(rt) <= budget:
-            solved += 1
-    return solved / total if total > 0 else 0.0
 
 
 def main():
@@ -54,23 +44,27 @@ def main():
     )
     sel.fit(X_train, Y_train)
 
-    preds = sel.predict(X_test)
+    preds = cast(dict[str, list[tuple[str, float]]], sel.predict(X_test))
 
     # simple validation of structure
     assert isinstance(preds, dict)
-    for v in cast(dict, preds).values():
+    for v in preds.values():
         assert isinstance(v, list) and len(v) == 1
         algo, score = v[0]
-        assert algo in list(Y.columns) or algo is None
+        assert isinstance(algo, str) and algo in list(Y.columns)
+        assert isinstance(score, (int, float))
 
-    acc = evaluate(preds, Y_test, budget)
-    # baseline: best single algorithm on training (by solve-rate on train)
-    solve_rates = ((Y_train <= budget).mean(axis=0)).to_dict()
-    best_algo = max(solve_rates, key=solve_rates.get)
-    baseline_preds = {idx: [(best_algo, 0.0)] for idx in X_test.index}
-    baseline_acc = evaluate(baseline_preds, Y_test, budget)
+    preds_seq: dict[str, Sequence[tuple[str, float] | str]] = cast(
+        dict[str, Sequence[tuple[str, float] | str]], preds
+    )
+    acc = compute_solve_rate(preds_seq, Y_test, budget)
 
-    # oracle (upper bound)
+    # Use ASF metrics for baselines
+    sbs_score = single_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
+    vbs_score = virtual_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
+    par10 = running_time_selector_performance(
+        preds_seq, Y_test, budget=budget, par=10.0, return_per_instance=False
+    )
     oracle = float((Y_test.min(axis=1) <= budget).mean())
 
     print("=" * 60)
@@ -79,14 +73,20 @@ def main():
     print(f"Budget: {budget}s")
     print(f"Test instances: {len(X_test)}")
     print()
-    print(f"OSL selector solve-rate (<=budget): {acc:.2%}")
-    print(f"Best-single baseline ({best_algo}) solve-rate: {baseline_acc:.2%}")
+    print(f"Single Best Solver PAR10 Score: {sbs_score:.2f}")
+    print(f"Virtual Best Solver (Oracle) PAR10 Score: {vbs_score:.2f}")
+    print()
+    print(f"OSL selector solve-rate: {acc:.2%}")
+    print(f"OSL selector PAR10 Score: {par10:.2f}")
     print(f"Oracle solve-rate: {oracle:.2%}")
     print()
     print("Sample decisions (first 12):")
     for inst in list(X_test.index)[:12]:
-        rec = preds.get(inst, [(None, None)])
-        print(f"{inst}: chosen = {rec[0][0]} (pred_score={rec[0][1]})")  # type: ignore[index]
+        rec = preds.get(inst)
+        if not rec:
+            print(f"{inst}: no prediction")
+            continue
+        print(f"{inst}: chosen = {rec[0][0]} (pred_score={rec[0][1]})")
     print("=" * 60)
 
 

@@ -232,12 +232,14 @@ class PerformanceModel(
                 if not isinstance(self.regressors, list):
                     raise RuntimeError("Individual regressors missing.")
                 for i, _ in enumerate(self.algorithms):
+                    regressor: Any = self.regressors[i]
                     predictions[:, i] = np.asarray(
-                        self.regressors[i].predict(base_features)
+                        regressor.predict(base_features)  # type: ignore[union-attr]
                     ).flatten()
             else:
                 if not isinstance(self.regressors, AbstractPredictor):
                     raise RuntimeError("Joint regressor missing.")
+                regressor: AbstractPredictor = self.regressors
                 for i, algorithm in enumerate(self.algorithms):
                     data = pd.merge(
                         base_features,
@@ -247,7 +249,7 @@ class PerformanceModel(
                         left_index=True,
                         right_index=True,
                     )
-                    predictions[:, i] = self.regressors.predict(data)
+                    predictions[:, i] = regressor.predict(data)
 
         return pd.DataFrame(
             predictions,

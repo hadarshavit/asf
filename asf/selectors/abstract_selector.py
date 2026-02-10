@@ -151,6 +151,8 @@ class AbstractSelector(ABC):
         -------
         dict or pd.Series or np.ndarray
             Predicted selections in the specified prediction_mode.
+            For dict return type, each list item is a tuple:
+            - (algorithm_name, budget): algorithm selection with time budget
         """
         if features is None:
             df_features: pd.DataFrame | None = None

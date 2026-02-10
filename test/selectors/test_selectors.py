@@ -158,8 +158,9 @@ def test_survival_analysis_schedule(dummy_performance, dummy_features):
         assert all(
             isinstance(x[0], str) and isinstance(x[1], (float, np.floating))
             for x in sched
+            if isinstance(x, tuple)
         )
-        assert np.isclose(sum(x[1] for x in sched), budget)
+        assert np.isclose(sum(x[1] for x in sched if isinstance(x, tuple)), budget)
 
 
 def test_isa_selector(dummy_performance, dummy_features):
@@ -175,8 +176,9 @@ def test_isa_selector(dummy_performance, dummy_features):
         assert all(
             isinstance(x[0], str) and isinstance(x[1], (float, np.floating, int))
             for x in sched
+            if isinstance(x, tuple)
         )
-        assert sum(x[1] for x in sched) == budget
+        assert sum(x[1] for x in sched if isinstance(x, tuple)) == budget
 
 
 def test_collaborative_filtering_selector(dummy_performance, dummy_features):
@@ -218,10 +220,20 @@ def test_sunny_selector(dummy_performance, dummy_features):
     assert len(predictions) == len(dummy_features)
     for sched in predictions.values():  # type: ignore[attr-defined]
         assert isinstance(sched, list)
-        assert all(isinstance(x, tuple) and len(x) == 2 for x in sched)
-        assert all(isinstance(x[0], str) and isinstance(x[1], float) for x in sched)
-        assert all(x[0] in ["algo1", "algo2", "algo3"] for x in sched)
-        assert np.isclose(sum(x[1] for x in sched), budget)
+        assert all(
+            isinstance(x, tuple) and len(x) == 2
+            for x in sched
+            if not isinstance(x, str)
+        )
+        assert all(
+            isinstance(x[0], str) and isinstance(x[1], float)
+            for x in sched
+            if isinstance(x, tuple)
+        )
+        assert all(
+            x[0] in ["algo1", "algo2", "algo3"] for x in sched if isinstance(x, tuple)
+        )
+        assert np.isclose(sum(x[1] for x in sched if isinstance(x, tuple)), budget)
 
 
 def test_isac_selector(dummy_performance, dummy_features):

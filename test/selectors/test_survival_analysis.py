@@ -16,7 +16,7 @@ def test_survival_analysis_schedule(dummy_performance, dummy_features):
 
     for inst_id, schedule in predictions.items():
         assert len(schedule) >= 1
-        total_budget = sum(time for algo, time in schedule)
+        total_budget = sum(item[1] for item in schedule if isinstance(item, tuple))
         # Should be roughly <= budget if it's a schedule
         # But SurvivalAnalysis might behave differently depending on implementation
         assert total_budget > 0

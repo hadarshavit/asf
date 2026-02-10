@@ -8,7 +8,7 @@ which is essential for algorithm selection to properly penalize timeouts.
 from __future__ import annotations
 
 import warnings
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
 import pandas as pd
@@ -164,7 +164,7 @@ def virtual_best_solver(
 
 
 def running_time_selector_performance(
-    schedules: dict[str, list[tuple[str, float] | str]],
+    schedules: dict[str, Sequence[tuple[str, float] | str]],
     performance: pd.DataFrame,
     budget: float = 5000.0,
     feature_time: pd.DataFrame | None = None,
@@ -180,7 +180,7 @@ def running_time_selector_performance(
 
     Parameters
     ----------
-    schedules : dict[str, list[tuple[str, float] | str]]
+    schedules : dict[str, Sequence[tuple[str, float] | str]]
         The schedules to evaluate, where each key is an instance and the value is a list of items.
         Each item can be:
         - A string: the name of a feature group to compute (uses full actual time)
@@ -203,6 +203,11 @@ def running_time_selector_performance(
     dict[str, float] or float
         If return_per_instance is True, returns a dictionary mapping each instance
         to its total running time. Otherwise, returns the sum of all running times.
+
+    Raises
+    ------
+    ValueError
+        If the schedule is invalid (e.g., total allocated time to algorithms is zero).
     """
     if feature_time is None:
         feature_time = pd.DataFrame(
@@ -213,29 +218,16 @@ def running_time_selector_performance(
 
     total_time: dict[str, float] = {}
     for instance, schedule in schedules.items():
-        allocated_times = {algorithm: 0.0 for algorithm in performance.columns}
         instance_feature_time = 0.0
-        # Check if schedule contains feature groups (strings or tuples where name is in feature_time.columns)
-        has_feature_groups_in_schedule = any(
-            isinstance(item, str)
-            or (
-                isinstance(item, tuple)
-                and len(item) >= 2
-                and item[0] in feature_time.columns
-            )
-            for item in schedule
-        )
+        algorithm_items = []  # List of (algorithm, budget) tuples
+        saw_feature_group = False
 
-        # For backward compatibility: if no feature groups in schedule, add all feature time upfront
-        if not has_feature_groups_in_schedule:
-            instance_feature_time = float(feature_time.loc[instance].sum())
-
-        solved = False
+        # Process schedule items
         for item in schedule:
-            # Check if item is a feature group (string or tuple) or algorithm selection (tuple)
             if isinstance(item, str):
                 # Feature group without budget: add its full computation time if available
                 if item in feature_time.columns:
+                    saw_feature_group = True
                     ft_val = feature_time.loc[instance, item]
                     if hasattr(ft_val, "item"):
                         ft_val = ft_val.item()
@@ -247,50 +239,83 @@ def running_time_selector_performance(
                         )
                         else float(ft_val)
                     )
-                continue
-
-            # It's a tuple: could be (feature_group, budget) or (algorithm, budget)
-            item_name, item_budget = item
-            if item_name in feature_time.columns:
-                # Feature group with budget: use min(actual_time, budget)
-                ft_val = feature_time.loc[instance, item_name]
-                if hasattr(ft_val, "item"):
-                    ft_val = ft_val.item()
-                actual_ft = (
-                    0.0
-                    if (
-                        ft_val is None
-                        or (isinstance(ft_val, float) and np.isnan(ft_val))
+            elif isinstance(item, tuple) and len(item) == 2:
+                item_name, item_budget = item
+                if item_name in feature_time.columns:
+                    saw_feature_group = True
+                    # Feature group with budget: use min(actual_time, budget)
+                    ft_val = feature_time.loc[instance, item_name]
+                    if hasattr(ft_val, "item"):
+                        ft_val = ft_val.item()
+                    actual_ft = (
+                        0.0
+                        if (
+                            ft_val is None
+                            or (isinstance(ft_val, float) and np.isnan(ft_val))
+                        )
+                        else float(ft_val)
                     )
-                    else float(ft_val)
-                )
-                instance_feature_time += min(actual_ft, item_budget or 0.0)
-                continue
+                    instance_feature_time += min(actual_ft, item_budget or 0.0)
+                else:
+                    # Algorithm selection
+                    algorithm_items.append(
+                        (item_name, item_budget if item_budget is not None else 0.0)
+                    )
 
-            # Algorithm selection: (algorithm, algo_budget)
-            algorithm, algo_budget = item_name, item_budget
-            if algo_budget is None:
-                algo_budget = 0.0
-            remaining_budget = (
-                budget - sum(allocated_times.values()) - instance_feature_time
+        if not saw_feature_group:
+            instance_feature_time = float(feature_time.loc[instance].sum())
+
+        # Calculate total algorithm time used
+        total_algorithm_time = sum(alloc_budget for _, alloc_budget in algorithm_items)
+
+        # Validate: at least some algorithm time was allocated
+        if total_algorithm_time <= 0.0:
+            raise ValueError(
+                f"Instance {instance}: No algorithm time allocated in schedule {schedule}. "
             )
-            remaining_time_to_solve = performance.loc[instance, algorithm] - (
-                algo_budget + allocated_times[algorithm]
-            )
-            if remaining_time_to_solve <= 0:
-                allocated_times[algorithm] = performance.loc[instance, algorithm]
-                solved = True
-                break
-            elif remaining_time_to_solve <= remaining_budget:
-                allocated_times[algorithm] += remaining_time_to_solve
+
+        # Check if this is a parallel portfolio (all algorithms get the same budget)
+        # or sequential (budgets may vary)
+        budgets = [alloc_budget for _, alloc_budget in algorithm_items]
+        is_parallel = (
+            len(set(budgets)) == 1 and len(algorithm_items) > 1 and budgets[0] >= budget
+        )
+
+        if is_parallel:
+            # Parallel portfolio: each algorithm runs for its budget concurrently
+            # Overall time is the minimum time needed to solve
+            times = []
+            solved = False
+            for algorithm, allocated_budget in algorithm_items:
+                if algorithm in performance.columns:
+                    algo_perf = performance.loc[instance, algorithm]
+                    if algo_perf <= allocated_budget:
+                        times.append(algo_perf)
+                        solved = True
+
+            if solved:
+                total_time[instance] = min(times) + instance_feature_time
             else:
-                allocated_times[algorithm] += remaining_budget
-                break
-
-        if solved:
-            total_time[instance] = sum(allocated_times.values()) + instance_feature_time
+                total_time[instance] = budget * par
         else:
-            total_time[instance] = budget * par
+            # Sequential: algorithms run one after another until one solves
+            cumulative_time = instance_feature_time
+            solved = False
+            for algorithm, allocated_budget in algorithm_items:
+                if solved:
+                    break
+                if algorithm in performance.columns:
+                    algo_perf = performance.loc[instance, algorithm]
+                    if algo_perf <= allocated_budget:
+                        cumulative_time += algo_perf
+                        solved = True
+                    else:
+                        cumulative_time += allocated_budget
+
+            if solved:
+                total_time[instance] = cumulative_time
+            else:
+                total_time[instance] = budget * par
 
     if return_per_instance:
         return total_time
@@ -299,7 +324,7 @@ def running_time_selector_performance(
 
 
 def _validate_schedule_prerequisites(
-    schedules: dict[str, list[tuple[str, float] | str]],
+    schedules: dict[str, Sequence[tuple[str, float] | str]],
     feature_groups: dict[str, Any],
 ) -> None:
     """
@@ -307,7 +332,7 @@ def _validate_schedule_prerequisites(
 
     Parameters
     ----------
-    schedules : dict[str, list[tuple[str, float] | str]]
+    schedules : dict[str, Sequence[tuple[str, float] | str]]
         The schedules to validate.
     feature_groups : dict[str, Any]
         Feature group definitions with 'requires' information.
@@ -346,7 +371,7 @@ def _validate_schedule_prerequisites(
 
 
 def running_time_closed_gap(
-    schedules: dict[str, list[tuple[str, float] | str]],
+    schedules: dict[str, Sequence[tuple[str, float] | str]],
     performance: pd.DataFrame,
     budget: float,
     feature_time: pd.DataFrame,
@@ -358,7 +383,7 @@ def running_time_closed_gap(
 
     Parameters
     ----------
-    schedules : dict[str, list[tuple[str, float] | str]]
+    schedules : dict[str, Sequence[tuple[str, float] | str]]
         The schedules to evaluate.
     performance : pd.DataFrame
         The performance data for the algorithms.
@@ -397,7 +422,7 @@ def running_time_closed_gap(
 
 
 def precision_regret(
-    schedules: dict[str, list[tuple[str, float] | str]],
+    schedules: dict[str, Sequence[tuple[str, float] | str]],
     performance: pd.DataFrame,
     precision_data: pd.DataFrame | None = None,
     **kwargs: Any,
@@ -407,7 +432,7 @@ def precision_regret(
 
     Parameters
     ----------
-    schedules : dict[str, list[tuple[str, float] | str]]
+    schedules : dict[str, Sequence[tuple[str, float] | str]]
         Selector predictions mapping instance_id to schedule.
     performance : pd.DataFrame
         Ground-truth precision table.
@@ -447,3 +472,44 @@ def precision_regret(
         warnings.warn("No valid schedules found for regret calculation.")
         return float("inf")
     return float(np.sum(regrets))
+
+
+def compute_solve_rate(
+    schedules: dict[str, Sequence[tuple[str, float] | str]],
+    performance: pd.DataFrame,
+    budget: float,
+) -> float:
+    """
+    Compute the solve rate for selector predictions.
+
+    For each instance in the schedules, determines if it was solved within budget.
+    An instance is solved if at least one algorithm in the schedule completes within
+    its allocated time.
+
+    Parameters
+    ----------
+    schedules : dict[str, Sequence[tuple[str, float] | str]]
+        Selector predictions mapping instance_id to schedule/selections.
+    performance : pd.DataFrame
+        Performance data for the algorithms.
+    budget : float
+        The time budget for solving.
+
+    Returns
+    -------
+    float
+        Solve rate (fraction of instances solved within budget, 0-1).
+    """
+    # Get per-instance times using the performance metrics
+    times_dict: dict[str, float] | float = running_time_selector_performance(
+        schedules, performance, budget=budget, par=10.0, return_per_instance=True
+    )
+
+    if not isinstance(times_dict, dict):
+        return 0.0
+
+    # Count instances solved within budget (where time is not penalized)
+    solved_count = sum(1 for time in times_dict.values() if time <= budget)
+    total_count = len(times_dict)
+
+    return float(solved_count / total_count) if total_count > 0 else 0.0
