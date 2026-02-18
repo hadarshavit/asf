@@ -9,7 +9,7 @@ from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
 from asf.predictors.abstract_predictor import AbstractPredictor
 from asf.predictors.xgboost import XGBoostRankerWrapper
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
-from asf.utils.configurable import ConfigurableMixin
+from asf.utils.configurable import ConfigurableMixin, ClassChoice
 
 try:
     from ConfigSpace import ConfigurationSpace  # noqa: F401
@@ -324,3 +324,37 @@ class DyadRanking(ConfigurableMixin, AbstractModelBasedSelector):
         )
 
         return X, y, qid
+
+    @staticmethod
+    def _define_hyperparameters(
+        model_class: list[type[AbstractPredictor]] | None = None,
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """
+        Define hyperparameters for SimpleRanking.
+
+        Parameters
+        ----------
+        model_class : list[type[AbstractPredictor]] or None, default=None
+            List of model classes to choose from.
+        **kwargs : Any
+            Additional keyword arguments.
+
+        Returns
+        -------
+        tuple
+            Tuple of (hyperparameters, conditions, forbiddens).
+        """
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
+
+        if model_class is None:
+            model_class = [XGBoostRankerWrapper]
+
+        model_class_param = ClassChoice(
+            name="model_class",
+            choices=model_class,
+            default=model_class[0],
+        )
+
+        return [model_class_param], [], []
