@@ -26,7 +26,7 @@ class DummyRegressor(AbstractPredictor):
         ):
             return np.full(n, self._y)
         else:
-            return np.tile(self._y, (n, 1))
+            return np.tile(self._y, (n, 1))  # type: ignore[call-overload]
 
     def save(self, file_path: str) -> None:
         pass
@@ -49,6 +49,7 @@ def test_performance_model_single_target_branch():
     pm = PerformanceModel(model_class=DummyRegressor, budget=5.0, normalize=None)
     pm.fit(X, Y)
     preds = pm.predict(X)
+    assert isinstance(preds, dict)
     assert set(preds.keys()) == set(X.index)
     for lst in preds.values():
         algo, bud = lst[0]
@@ -63,6 +64,7 @@ def test_performance_model_multi_target_only():
     )
     pm_mt.fit(X, Y)
     preds_mt = pm_mt.predict(X)
+    assert isinstance(preds_mt, dict)
     assert set(preds_mt.keys()) == set(X.index)
 
 

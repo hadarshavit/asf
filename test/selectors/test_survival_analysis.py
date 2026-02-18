@@ -13,6 +13,7 @@ def test_survival_analysis_schedule(dummy_performance, dummy_features):
     selector = SurvivalAnalysis(budget=2.0)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
+    assert isinstance(predictions, dict)
 
     for inst_id, schedule in predictions.items():
         assert len(schedule) >= 1

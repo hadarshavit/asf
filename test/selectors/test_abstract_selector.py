@@ -151,8 +151,9 @@ class TestAbstractSelectorFeatureGroups:
         )
         selector.fit(features=features, performance=performance)
         predictions = selector.predict(features=features)
+        assert isinstance(predictions, dict)
 
         # Predictions should have feature groups prepended
-        for inst_id, schedule in predictions.items():
+        for _, schedule in predictions.items():
             assert schedule[0] == "group1"
             assert schedule[1] == "group2"

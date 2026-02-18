@@ -64,6 +64,7 @@ def _load_aslib_performance(
 
     if training_par_factor is not None:
         performance = apply_par(performance, budget, training_par_factor)
+    assert isinstance(performance, pd.DataFrame)
     return performance.sort_index()
 
 
@@ -79,7 +80,7 @@ def _load_aslib_features(
         features_data: dict[str, Any] = load(f)
     features = pd.DataFrame(
         features_data["data"],
-        columns=[a[0] for a in features_data["attributes"]],  # type: ignore[arg-type]
+        columns=[a[0] for a in features_data["attributes"]],
     )
 
     if os.path.exists(features_runstatus_path):
@@ -87,7 +88,7 @@ def _load_aslib_features(
             feature_runstatus_data: dict[str, Any] = load(f)
         feature_runstatus = pd.DataFrame(
             feature_runstatus_data["data"],
-            columns=[a[0] for a in feature_runstatus_data["attributes"]],  # type: ignore[arg-type]
+            columns=[a[0] for a in feature_runstatus_data["attributes"]],
         )
         for step_name, step_info in feature_groups.items():
             if step_name in feature_runstatus.columns:
@@ -112,14 +113,14 @@ def _load_aslib_features(
     features_running_time = pd.DataFrame(
         0.0,
         index=performance_indices,
-        columns=["feature_time"],  # type: ignore[arg-type]
+        columns=["feature_time"],
     )
     if add_running_time_features and os.path.exists(features_running_time_path):
         with open(features_running_time_path, "r") as f:
             ft_data: dict[str, Any] = load(f)
         features_running_time = pd.DataFrame(
             ft_data["data"],
-            columns=[a[0] for a in ft_data["attributes"]],  # type: ignore[arg-type]
+            columns=[a[0] for a in ft_data["attributes"]],
         )
         features_running_time = (
             features_running_time.groupby("instance_id")
@@ -135,7 +136,7 @@ def _load_aslib_cv(path: str) -> pd.DataFrame:
     cv_path = os.path.join(path, "cv.arff")
     with open(cv_path, "r") as f:
         cv_data: dict[str, Any] = load(f)
-    cv = pd.DataFrame(cv_data["data"], columns=[a[0] for a in cv_data["attributes"]])  # type: ignore[arg-type]
+    cv = pd.DataFrame(cv_data["data"], columns=[a[0] for a in cv_data["attributes"]])
     cv = cv.set_index("instance_id").drop(columns=["repetition"], errors="ignore")
     return cv.sort_index()
 
@@ -156,7 +157,7 @@ def _load_aslib_algorithm_features(
         af_data: dict[str, Any] = load(f)
     algorithm_features = pd.DataFrame(
         af_data["data"],
-        columns=[a[0] for a in af_data["attributes"]],  # type: ignore[arg-type]
+        columns=[a[0] for a in af_data["attributes"]],
     )
 
     if os.path.exists(algorithm_features_runstatus_path):
@@ -164,7 +165,7 @@ def _load_aslib_algorithm_features(
             af_rs_data: dict[str, Any] = load(f)
         af_runstatus = pd.DataFrame(
             af_rs_data["data"],
-            columns=[a[0] for a in af_rs_data["attributes"]],  # type: ignore[arg-type]
+            columns=[a[0] for a in af_rs_data["attributes"]],
         )
         for step_name, step_info in algorithm_feature_groups.items():
             if step_name in af_runstatus.columns:

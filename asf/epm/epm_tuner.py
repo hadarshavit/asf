@@ -109,7 +109,7 @@ def tune_epm(
         X_df = pd.DataFrame(
             X,
             index=range(len(X)),
-            columns=[f"f_{i}" for i in range(X.shape[1])],  # type: ignore[arg-type]
+            columns=[f"f_{i}" for i in range(X.shape[1])],
         )
         y_ser = pd.Series(
             y,
@@ -169,7 +169,7 @@ def tune_epm(
         predictor_class=model_class,
         normalization_class=normalization_class,
         transform_back=True,
-        predictor_config=dict(best_config),
+        predictor_config=cast(dict[str, Any], dict(best_config)),
         features_preprocessing=features_preprocessing,
         categorical_features=categorical_features,
         numerical_features=numerical_features,

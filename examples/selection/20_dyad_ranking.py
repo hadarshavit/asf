@@ -125,7 +125,7 @@ def generate_synthetic_data(
     return instance_features, performance, algo_features
 
 
-def main(scenario: str = "synthetic"):
+def main():
     """
     Demonstrate DyadRanking on synthetic data where performance is a function
     of instance and algorithm features.
@@ -196,8 +196,9 @@ def main(scenario: str = "synthetic"):
     )
     selector_default.fit(X_train, Y_train)
     preds_default = selector_default.predict(X_test)
+    assert isinstance(preds_default, dict)
 
-    budgeted_preds_default = {
+    budgeted_preds_default: dict[str, list[tuple[str, float]]] = {
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in preds_default.items()
     }
@@ -223,8 +224,9 @@ def main(scenario: str = "synthetic"):
     )
     selector_more.fit(X_train, Y_train)
     preds_more = selector_more.predict(X_test)
+    assert isinstance(preds_more, dict)
 
-    budgeted_preds_more = {
+    budgeted_preds_more: dict[str, list[tuple[str, float]]] = {
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in preds_more.items()
     }
@@ -246,8 +248,9 @@ def main(scenario: str = "synthetic"):
     )
     selector_onehot.fit(X_train, Y_train)
     preds_onehot = selector_onehot.predict(X_test)
+    assert isinstance(preds_onehot, dict)
 
-    budgeted_preds_onehot = {
+    budgeted_preds_onehot: dict[str, list[tuple[str, float]]] = {
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in preds_onehot.items()
     }
@@ -270,8 +273,9 @@ def main(scenario: str = "synthetic"):
     )
     selector_simple.fit(X_train, Y_train)
     preds_simple = selector_simple.predict(X_test)
+    assert isinstance(preds_simple, dict)
 
-    budgeted_preds_simple = {
+    budgeted_preds_simple: dict[str, list[tuple[str, float]]] = {
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in preds_simple.items()
     }
@@ -290,6 +294,7 @@ def main(scenario: str = "synthetic"):
     print("\n" + "-" * 70)
     print("Detailed predictions (first 10 instances):")
     print()
+    assert isinstance(preds_default, dict)
 
     for inst in list(X_test.index)[:10]:
         sched = preds_default.get(inst, [(None, 0.0)])
@@ -321,9 +326,9 @@ def main(scenario: str = "synthetic"):
         f"  SimpleRanking:       PAR10={par10_simple:.2f}, solve-rate={sr_simple:.2%}"
     )
     print()
-    print(f"  Gap to VBS:          {par10_default - vbs_score:.2f}")
+    print(f"  Gap to VBS:          {float(par10_default) - float(vbs_score):.2f}")
     print(
-        f"  Improvement over SBS: {((sbs_score - par10_default) / sbs_score * 100):.1f}%"
+        f"  Improvement over SBS: {((float(sbs_score) - float(par10_default)) / float(sbs_score) * 100):.1f}%"
     )
     print("=" * 70)
 

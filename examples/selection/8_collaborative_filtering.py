@@ -121,8 +121,9 @@ if __name__ == "__main__":
 
     # 1. Predict on training set (no NaNs)
     predictions_train = selector.predict(None, None)
+    assert isinstance(predictions_train, dict)
     # Wrap predictions with budget allocation for metrics
-    budgeted_train = {
+    budgeted_train: dict[str, list[tuple[str, float]]] = {
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in predictions_train.items()
     }
@@ -141,7 +142,8 @@ if __name__ == "__main__":
 
     # 2. Predict on test set (with sparse performance matrix)
     predictions_test_perf = selector.predict(None, test_performance)
-    budgeted_test_perf = {
+    assert isinstance(predictions_test_perf, dict)
+    budgeted_test_perf: dict[str, list[tuple[str, float]]] = {
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in predictions_test_perf.items()
     }
@@ -162,7 +164,8 @@ if __name__ == "__main__":
 
     # 3. Predict on test set (cold start, using features only)
     predictions_test_feat = selector.predict(test_features, None)
-    budgeted_test_feat = {
+    assert isinstance(predictions_test_feat, dict)
+    budgeted_test_feat: dict[str, list[tuple[str, float]]] = {
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in predictions_test_feat.items()
     }

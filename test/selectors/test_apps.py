@@ -14,6 +14,7 @@ def test_apps_selector(dummy_performance, dummy_features):
 
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
+    assert isinstance(predictions, dict)
 
     assert len(predictions) == len(dummy_features), "Predictions length mismatch"
     assert all(isinstance(v, list) for v in predictions.values()), (
@@ -47,6 +48,7 @@ def test_apps_selector_different_thresholds(dummy_performance, dummy_features):
         )
         selector.fit(dummy_features, dummy_performance)
         predictions = selector.predict(dummy_features)
+        assert isinstance(predictions, dict)
 
         avg_size = np.mean([len(portfolio) for portfolio in predictions.values()])
         portfolios_by_p[p_val] = avg_size

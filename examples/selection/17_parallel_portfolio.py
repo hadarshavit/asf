@@ -106,6 +106,7 @@ def main():
     )
     sel.fit(X_train, Y_train)
     preds = sel.predict(X_test)
+    assert isinstance(preds, dict)
 
     for inst in list(X_test.index)[:10]:
         portfolio_schedule = preds.get(inst, [])

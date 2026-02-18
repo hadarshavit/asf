@@ -95,7 +95,9 @@ def main():
         inst_feature_df = X_test.loc[[inst_name]]
 
         # 1. Get primary selector's choice
-        primary_pred = sel.primary_selector.predict(inst_feature_df).get(inst_name)
+        primary_pred_dict = sel.primary_selector.predict(inst_feature_df)
+        assert isinstance(primary_pred_dict, dict)
+        primary_pred = primary_pred_dict.get(inst_name)
         if not primary_pred:
             continue
 
@@ -118,9 +120,9 @@ def main():
                 primary_success += 1
         elif sel.backup_selector:
             backup_used += 1
-            backup_pred_list = sel.backup_selector.predict(inst_feature_df).get(
-                inst_name
-            )
+            backup_pred_dict = sel.backup_selector.predict(inst_feature_df)
+            assert isinstance(backup_pred_dict, dict)
+            backup_pred_list = backup_pred_dict.get(inst_name)
             if backup_pred_list:
                 final_algo = backup_pred_list[0][0]
                 if Y_test.at[inst_name, final_algo] <= budget:

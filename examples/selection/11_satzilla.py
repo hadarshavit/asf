@@ -71,9 +71,10 @@ if __name__ == "__main__":
     print(test_perf.head(10))
 
     preds = selector.predict(test_X)
+    assert isinstance(preds, dict)
 
     # Metrics expect (algo, allocated_time); SATzilla schedules contain scores, so wrap with budget
-    budgeted_preds = {
+    budgeted_preds: dict[str, list[tuple[str, float]]] = {
         inst: [(algo, budget) for algo, _ in sched] for inst, sched in preds.items()
     }
 

@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from typing import Sequence, cast
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 
@@ -79,7 +78,8 @@ def main():
     )
     selector_rf.fit(X_train, Y_train)
     preds_rf = selector_rf.predict(X_test)
-    budgeted_preds_rf = {
+    assert isinstance(preds_rf, dict)
+    budgeted_preds_rf: dict[str, list[tuple[str, float]]] = {
         inst: [(algo, budget) for algo, _ in sched] for inst, sched in preds_rf.items()
     }
     sr_rf = compute_solve_rate(budgeted_preds_rf, Y_test, budget)
@@ -99,7 +99,8 @@ def main():
     )
     selector_dt.fit(X_train, Y_train)
     preds_dt = selector_dt.predict(X_test)
-    budgeted_preds_dt = {
+    assert isinstance(preds_dt, dict)
+    budgeted_preds_dt: dict[str, list[tuple[str, float]]] = {
         inst: [(algo, budget) for algo, _ in sched] for inst, sched in preds_dt.items()
     }
     sr_dt = compute_solve_rate(budgeted_preds_dt, Y_test, budget)
@@ -121,15 +122,13 @@ def main():
     )
     selector_rf_top3.fit(X_train, Y_train)
     portfolios = selector_rf_top3.predict(X_test)
+    assert isinstance(portfolios, dict)
     # Convert shortlist to schedules with equal time slices summing to budget
-    budgeted_portfolios = portfolios
-    budgeted_portfolios_seq: dict[str, Sequence[tuple[str, float] | str]] = cast(
-        dict[str, Sequence[tuple[str, float] | str]], budgeted_portfolios
-    )
+    budgeted_portfolios: dict[str, list[tuple[str, float]]] = portfolios
 
-    sr_top3 = compute_solve_rate(budgeted_portfolios_seq, Y_test, budget)
+    sr_top3 = compute_solve_rate(budgeted_portfolios, Y_test, budget)
     par10_top3 = running_time_selector_performance(
-        budgeted_portfolios_seq,
+        budgeted_portfolios,
         Y_test,
         budget=budget,
         par=10.0,

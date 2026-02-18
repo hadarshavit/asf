@@ -143,7 +143,7 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
                     chosen_algo = pred_list[0][0]
                     if Y_val.index.dtype != object:
                         # Convert back to original index type if necessary
-                        orig_inst_name = Y_val.index.dtype.type(inst_name)
+                        orig_inst_name = cast(Any, Y_val.index.dtype.type)(inst_name)
                     else:
                         orig_inst_name = inst_name
 
@@ -315,7 +315,7 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
 
         primary_selector_param = ClassChoice(
             name="primary_selector",
-            choices=candidate_selectors,
+            choices=cast(list[type | bool], candidate_selectors),
             default=candidate_selectors[0],
         )
 

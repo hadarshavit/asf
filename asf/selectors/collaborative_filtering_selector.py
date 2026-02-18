@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import numpy as np
 import pandas as pd
@@ -325,7 +325,7 @@ class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelect
 
         model_class_param = ClassChoice(
             name="model_class",
-            choices=model_class,
+            choices=cast(list[type | bool], model_class),
             default=model_class[0],
         )
 

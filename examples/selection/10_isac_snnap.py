@@ -121,7 +121,8 @@ if __name__ == "__main__":
     selector_km = ISAC(clusterer=KMeans, clusterer_kwargs={"n_clusters": 6})
     selector_km.fit(train_features, train_perf)
     preds_km = selector_km.predict(test_features)
-    budgeted_preds_km = {
+    assert isinstance(preds_km, dict)
+    budgeted_preds_km: dict[str, list[tuple[str, float]]] = {
         inst: [(algo, budget) for algo, _ in sched] for inst, sched in preds_km.items()
     }
     sr_km = compute_solve_rate(budgeted_preds_km, test_perf, budget)
@@ -136,7 +137,8 @@ if __name__ == "__main__":
     selector_snnap = SNNAP(k=5)
     selector_snnap.fit(train_features, train_perf)
     preds_snnap = selector_snnap.predict(test_features)
-    budgeted_preds_snnap = {
+    assert isinstance(preds_snnap, dict)
+    budgeted_preds_snnap: dict[str, list[tuple[str, float]]] = {
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in preds_snnap.items()
     }
