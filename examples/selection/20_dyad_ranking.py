@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
-from typing import Sequence, cast
 
 from asf.selectors.dyad_ranking import DyadRanking
+from asf.selectors.simple_ranking import SimpleRanking
 from asf.metrics import (
     compute_solve_rate,
     single_best_solver,
@@ -11,69 +11,128 @@ from asf.metrics import (
 )
 
 
-def make_data(n_instances=300, n_algorithms=6, seed=2, budget=200.0):
-    """Generate synthetic features and per-algorithm runtime matrix.
+def generate_synthetic_data(
+    n_instances=400,
+    n_algorithms=8,
+    n_inst_features=10,
+    n_algo_features=6,
+    seed=42,
+    budget=300.0,
+):
+    """
+    Generate synthetic algorithm selection data where performance depends on
+    the interaction between instance features and algorithm features.
 
-    Runtimes are positive with some timeouts (> budget).
+    Each algorithm has different "strengths" (algorithm features) and each instance
+    has different "characteristics" (instance features). The runtime is computed
+    based on how well the algorithm's strengths match the instance's characteristics.
+
+    Parameters
+    ----------
+    n_instances : int
+        Number of problem instances
+    n_algorithms : int
+        Number of algorithms
+    n_inst_features : int
+        Number of instance features
+    n_algo_features : int
+        Number of algorithm features
+    seed : int
+        Random seed
+    budget : float
+        Time budget (timeouts will be set to budget * 10)
+
+    Returns
+    -------
+    features : pd.DataFrame
+        Instance features
+    performance : pd.DataFrame
+        Algorithm runtimes per instance
+    algo_features : pd.DataFrame
+        Algorithm features
     """
     rng = np.random.RandomState(seed)
 
-    # Instance features
-    n_feats = 6
-    features = pd.DataFrame(
-        rng.normal(size=(n_instances, n_feats)),
-        columns=[f"f{i}" for i in range(n_feats)],
-        index=[f"inst_{i}" for i in range(n_instances)],
+    # Generate instance features (problem characteristics)
+    # Features represent: complexity, structure, size, etc.
+    instance_features = pd.DataFrame(
+        rng.uniform(0, 1, size=(n_instances, n_inst_features)),
+        columns=[f"inst_feat_{i}" for i in range(n_inst_features)],
+        index=[f"instance_{i}" for i in range(n_instances)],
     )
 
-    # Algorithm runtimes derived from linear relation + noise + occasional timeouts
-    perf = pd.DataFrame(index=features.index)
-    for a in range(n_algorithms):
-        bias = rng.uniform(20, 120) * (1 + 0.25 * (a % 2))
-        coeff = rng.uniform(-3, 3, size=n_feats)
-        noise = rng.normal(0, 10, size=n_instances)
-        runtimes = np.clip(features.values @ coeff + bias + noise, 1.0, None)
-        timeout_mask = rng.rand(n_instances) < (0.10 + 0.03 * (a % 3))
-        runtimes[timeout_mask] = budget * 10
-        perf[f"algo{a + 1}"] = runtimes
+    # Generate algorithm features (solver characteristics)
+    # Features represent: heuristic type, parameter values, search strategy, etc.
+    algo_features_data = {}
+    for i in range(n_algo_features):
+        if i < 3:
+            # Continuous parameters (e.g., learning rate, temperature)
+            algo_features_data[f"param_{i}"] = rng.uniform(0, 1, n_algorithms)
+        elif i < 5:
+            # Discrete strategy choices (normalized to 0-1)
+            algo_features_data[f"strategy_{i - 3}"] = rng.choice(
+                [0.0, 0.5, 1.0], n_algorithms
+            )
+        else:
+            # Binary flags (e.g., uses preprocessing, uses caching)
+            algo_features_data[f"flag_{i - 5}"] = rng.choice([0.0, 1.0], n_algorithms)
 
-    return features, perf
-
-
-def create_algorithm_features(algorithm_names, seed=42):
-    """Create synthetic algorithm features.
-    
-    In practice, these could be:
-    - Algorithm hyperparameters
-    - Heuristic characteristics
-    - Historical performance statistics
-    """
-    rng = np.random.RandomState(seed)
-    n_algos = len(algorithm_names)
-    
-    # Create diverse algorithm characteristics
-    algo_feat_data = {
-        "complexity": rng.uniform(1, 10, n_algos),
-        "memory_usage": rng.uniform(0.1, 5.0, n_algos),
-        "randomized": rng.choice([0, 1], n_algos),
-        "heuristic_type": rng.uniform(0, 1, n_algos),
-    }
-    
     algo_features = pd.DataFrame(
-        algo_feat_data,
-        index=algorithm_names,
+        algo_features_data,
+        index=[f"algo_{i}" for i in range(n_algorithms)],
     )
-    return algo_features
+
+    # Generate performance based on instance-algorithm interaction
+    # Key idea: Each algorithm has affinity for different instance types
+    performance = pd.DataFrame(
+        index=instance_features.index,
+        columns=algo_features.index,
+    )
+
+    # Create interaction weights: which instance features matter for which algorithm features
+    # This simulates that different algorithms excel at different problem types
+    interaction_matrix = rng.randn(n_inst_features, n_algo_features)
+
+    for inst_idx in instance_features.index:
+        inst_vec = instance_features.loc[inst_idx].values
+
+        for algo_idx in algo_features.index:
+            algo_vec = algo_features.loc[algo_idx].values
+
+            # Compute base runtime as interaction between instance and algorithm
+            # Lower dot product = better match = faster runtime
+            interaction = np.dot(inst_vec, interaction_matrix @ algo_vec)
+
+            # Add algorithm-specific bias (some algorithms are generally faster/slower)
+            algo_bias = 50 + algo_vec.mean() * 100
+
+            # Add instance-specific complexity
+            inst_complexity = 20 * inst_vec.mean()
+
+            # Add noise
+            noise = rng.normal(0, 10)
+
+            # Compute runtime (ensure positive)
+            runtime = max(5.0, algo_bias + inst_complexity + interaction * 50 + noise)
+
+            # Randomly timeout some hard combinations (5-15% depending on algorithm)
+            timeout_prob = 0.05 + algo_vec[-1] * 0.1  # Flag_0 controls timeout rate
+            if rng.rand() < timeout_prob:
+                runtime = budget * 10
+
+            performance.at[inst_idx, algo_idx] = runtime
+
+    return instance_features, performance, algo_features
 
 
-def main():
-    budget = 200.0
-    X, Y = make_data(n_instances=300, n_algorithms=8, seed=2, budget=budget)
+def main(scenario: str = "synthetic"):
+    """
+    Demonstrate DyadRanking on synthetic data where performance is a function
+    of instance and algorithm features.
 
-    # Train/test split
-    n_train = int(0.7 * len(X))
-    X_train, X_test = X.iloc[:n_train], X.iloc[n_train:]
-    Y_train, Y_test = Y.iloc[:n_train], Y.iloc[n_train:]
+    This allows the dyad ranking model to learn meaningful relationships between
+    problem characteristics and solver parameters.
+    """
 
     print("=" * 70)
     print("Dyad Ranking for Algorithm Selection")
@@ -82,107 +141,190 @@ def main():
     print("'Algorithm Selection as Recommendation: From Collaborative")
     print(" Filtering to Dyad Ranking'")
     print("=" * 70)
+    print()
+    print("Using synthetic data where performance depends on the interaction")
+    print("between instance features and algorithm features.")
+    print()
+
+    # Generate synthetic data
+    budget = 300.0
+    features, performance, algo_features = generate_synthetic_data(
+        n_instances=400,
+        n_algorithms=8,
+        n_inst_features=10,
+        n_algo_features=6,
+        seed=42,
+        budget=budget,
+    )
+
+    print(
+        f"Dataset size: {len(features)} instances, {len(performance.columns)} algorithms"
+    )
+    print(f"Instance features: {features.shape[1]} dimensions")
+    print(f"Algorithm features: {algo_features.shape[1]} dimensions")
     print(f"Budget: {budget}s")
+    print()
+    print("Sample algorithm features:")
+    print(algo_features.head(3))
+    print()
+
+    # Train/test split
+    n_train = int(0.7 * len(features))
+    X_train, X_test = features.iloc[:n_train], features.iloc[n_train:]
+    Y_train, Y_test = performance.iloc[:n_train], performance.iloc[n_train:]
+
     print(f"Training instances: {len(X_train)}")
     print(f"Test instances: {len(X_test)}")
-    print(f"Algorithms: {list(Y.columns)}")
     print()
 
     # Baselines
     sbs_score = single_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
     vbs_score = virtual_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
+    oracle_sr = float((Y_test.min(axis=1) <= budget).mean())
 
     print(f"Single Best Solver (SBS) PAR10: {sbs_score:.2f}")
     print(f"Virtual Best Solver (VBS) PAR10: {vbs_score:.2f}")
+    print(f"Virtual Best Solver solve-rate: {oracle_sr:.2%}")
     print("-" * 70)
 
-    # Test 1: Default one-hot algorithm features
-    print("\n1. DyadRanking with default one-hot algorithm features:")
+    # Test 1: Pairwise sampling with default (10 pairs/instance)
+    print("\n1. DyadRanking with pairwise sampling (10 pairs):")
+    selector_default = DyadRanking(
+        algorithm_features=algo_features,
+        budget=budget,
+        maximize=False,
+    )
+    selector_default.fit(X_train, Y_train)
+    preds_default = selector_default.predict(X_test)
+
+    budgeted_preds_default = {
+        inst: [(algo, budget) for algo, _ in sched]
+        for inst, sched in preds_default.items()
+    }
+
+    sr_default = compute_solve_rate(budgeted_preds_default, Y_test, budget)
+    par10_default = running_time_selector_performance(
+        budgeted_preds_default,
+        Y_test,
+        budget=budget,
+        par=10.0,
+        return_per_instance=False,
+    )
+    print(f"  Solve-rate: {sr_default:.2%} | PAR10: {par10_default:.2f}")
+
+    # Test 2: More pairs for comparison
+    print("\n2. DyadRanking with more pairs (25 pairs):")
+    selector_more = DyadRanking(
+        algorithm_features=algo_features,
+        n_pairs_per_instance=25,
+        random_state=42,
+        budget=budget,
+        maximize=False,
+    )
+    selector_more.fit(X_train, Y_train)
+    preds_more = selector_more.predict(X_test)
+
+    budgeted_preds_more = {
+        inst: [(algo, budget) for algo, _ in sched]
+        for inst, sched in preds_more.items()
+    }
+
+    sr_more = compute_solve_rate(budgeted_preds_more, Y_test, budget)
+    par10_more = running_time_selector_performance(
+        budgeted_preds_more, Y_test, budget=budget, par=10.0, return_per_instance=False
+    )
+    print(f"  Solve-rate: {sr_more:.2%} | PAR10: {par10_more:.2f}")
+
+    # Test 3: One-hot fallback (not recommended, but for comparison)
+    print("\n3. DyadRanking with one-hot fallback (not recommended per paper):")
     selector_onehot = DyadRanking(
+        algorithm_features=None,  # Triggers warning
+        n_pairs_per_instance=10,
+        random_state=42,
         budget=budget,
         maximize=False,
     )
     selector_onehot.fit(X_train, Y_train)
     preds_onehot = selector_onehot.predict(X_test)
-    
-    # Convert to budgeted predictions
+
     budgeted_preds_onehot = {
-        inst: [(algo, budget) for algo, _ in sched] 
+        inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in preds_onehot.items()
     }
-    
+
     sr_onehot = compute_solve_rate(budgeted_preds_onehot, Y_test, budget)
     par10_onehot = running_time_selector_performance(
-        budgeted_preds_onehot, Y_test, budget=budget, par=10.0, return_per_instance=False
+        budgeted_preds_onehot,
+        Y_test,
+        budget=budget,
+        par=10.0,
+        return_per_instance=False,
     )
     print(f"  Solve-rate: {sr_onehot:.2%} | PAR10: {par10_onehot:.2f}")
 
-    # Test 2: Custom algorithm features
-    print("\n2. DyadRanking with custom algorithm features:")
-    algo_features = create_algorithm_features(Y_train.columns, seed=42)
-    print(f"\nAlgorithm features shape: {algo_features.shape}")
-    print("Algorithm feature preview:")
-    print(algo_features.head())
-    print()
-    
-    selector_custom = DyadRanking(
-        algorithm_features=algo_features,
+    # Test 4: SimpleRanking (baseline for comparison)
+    print("\n4. SimpleRanking (full rankings with one-hot encoding):")
+    selector_simple = SimpleRanking(
         budget=budget,
         maximize=False,
     )
-    selector_custom.fit(X_train, Y_train)
-    preds_custom = selector_custom.predict(X_test)
-    
-    budgeted_preds_custom = {
-        inst: [(algo, budget) for algo, _ in sched] 
-        for inst, sched in preds_custom.items()
+    selector_simple.fit(X_train, Y_train)
+    preds_simple = selector_simple.predict(X_test)
+
+    budgeted_preds_simple = {
+        inst: [(algo, budget) for algo, _ in sched]
+        for inst, sched in preds_simple.items()
     }
-    
-    sr_custom = compute_solve_rate(budgeted_preds_custom, Y_test, budget)
-    par10_custom = running_time_selector_performance(
-        budgeted_preds_custom, Y_test, budget=budget, par=10.0, return_per_instance=False
+
+    sr_simple = compute_solve_rate(budgeted_preds_simple, Y_test, budget)
+    par10_simple = running_time_selector_performance(
+        budgeted_preds_simple,
+        Y_test,
+        budget=budget,
+        par=10.0,
+        return_per_instance=False,
     )
-    print(f"  Solve-rate: {sr_custom:.2%} | PAR10: {par10_custom:.2f}")
+    print(f"  Solve-rate: {sr_simple:.2%} | PAR10: {par10_simple:.2f}")
 
     # Show detailed predictions
     print("\n" + "-" * 70)
-    print("Detailed predictions (first 10 instances, custom features):")
+    print("Detailed predictions (first 10 instances):")
     print()
-    
+
     for inst in list(X_test.index)[:10]:
-        sched = preds_custom.get(inst, [(None, 0.0)])
+        sched = preds_default.get(inst, [(None, 0.0)])
         algo, _ = sched[0]
-        
+
         if algo is not None and algo in Y_test.columns:
             rt = Y_test.at[inst, algo]
             best_algo = Y_test.loc[inst].idxmin()
-            best_rt = Y_test.loc[inst].min()
-            
+
             solved_str = " ✓" if rt <= budget else " ✗"
             optimal_str = " (optimal)" if algo == best_algo else f" (best: {best_algo})"
-            
-            print(f"{inst}: selected={algo}, runtime={rt:.1f}s{solved_str}{optimal_str}")
-            print(f"  └─ Best possible: {best_algo} at {best_rt:.1f}s")
+
+            print(
+                f"{inst}: selected={algo}, runtime={rt:.1f}s{solved_str}{optimal_str}"
+            )
         else:
             print(f"{inst}: selected={algo} (invalid)")
-    
+
     print("\n" + "=" * 70)
     print("Summary:")
-    print(f"  One-hot features:  PAR10={par10_onehot:.2f}, solve-rate={sr_onehot:.2%}")
-    print(f"  Custom features:   PAR10={par10_custom:.2f}, solve-rate={sr_custom:.2%}")
-    print(f"  Gap to VBS:        {par10_custom - vbs_score:.2f}")
-    print("=" * 70)
-    
-    # Explain dyad concept
-    print("\nHow Dyad Ranking works:")
-    print("  1. Creates 'dyads' = (instance, algorithm) pairs")
-    print(f"     → {len(X_train)} instances × {len(Y_train.columns)} algorithms")
-    print(f"     = {len(X_train) * len(Y_train.columns)} training dyads")
-    print("  2. Each dyad combines:")
-    print("     - Instance features (problem characteristics)")
-    print("     - Algorithm features (solver characteristics)")
-    print("  3. Trains ranking model to predict best algorithms per instance")
-    print("  4. At test time: ranks all algorithms for each new instance")
+    print(
+        f"  10 pairs (default):  PAR10={par10_default:.2f}, solve-rate={sr_default:.2%}"
+    )
+    print(f"  25 pairs:            PAR10={par10_more:.2f}, solve-rate={sr_more:.2%}")
+    print(
+        f"  One-hot (fallback):  PAR10={par10_onehot:.2f}, solve-rate={sr_onehot:.2%}"
+    )
+    print(
+        f"  SimpleRanking:       PAR10={par10_simple:.2f}, solve-rate={sr_simple:.2%}"
+    )
+    print()
+    print(f"  Gap to VBS:          {par10_default - vbs_score:.2f}")
+    print(
+        f"  Improvement over SBS: {((sbs_score - par10_default) / sbs_score * 100):.1f}%"
+    )
     print("=" * 70)
 
 
