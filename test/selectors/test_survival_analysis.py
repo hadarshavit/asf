@@ -16,6 +16,7 @@ def test_survival_analysis_schedule(dummy_performance, dummy_features):
     assert isinstance(predictions, dict)
 
     for inst_id, schedule in predictions.items():
+        assert isinstance(schedule, list)
         assert len(schedule) >= 1
         total_budget = sum(item[1] for item in schedule if isinstance(item, tuple))
         # Should be roughly <= budget if it's a schedule

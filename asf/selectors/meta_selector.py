@@ -252,7 +252,7 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
 
         meta_selector_param = ClassChoice(
             name="meta_selector",
-            choices=candidate_selectors,
+            choices=cast(list[type | bool], candidate_selectors),
             default=candidate_selectors[0],
         )
 

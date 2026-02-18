@@ -123,12 +123,12 @@ if __name__ == "__main__":
     predictions_train = selector.predict(None, None)
     assert isinstance(predictions_train, dict)
     # Wrap predictions with budget allocation for metrics
-    budgeted_train: dict[str, list[tuple[str, float]]] = {
+    budgeted_train: dict[str, list[tuple[str, float]]] = {  # type: ignore[misc]
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in predictions_train.items()
     }
-    sr_train = compute_solve_rate(budgeted_train, train_performance_full, budget)
-    par10_train = running_time_selector_performance(
+    sr_train = compute_solve_rate(budgeted_train, train_performance_full, budget)  # type: ignore[arg-type]
+    par10_train = running_time_selector_performance(  # type: ignore[arg-type]
         budgeted_train,
         train_performance_full,
         budget=budget,
@@ -143,12 +143,12 @@ if __name__ == "__main__":
     # 2. Predict on test set (with sparse performance matrix)
     predictions_test_perf = selector.predict(None, test_performance)
     assert isinstance(predictions_test_perf, dict)
-    budgeted_test_perf: dict[str, list[tuple[str, float]]] = {
+    budgeted_test_perf: dict[str, list[tuple[str, float]]] = {  # type: ignore[misc]
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in predictions_test_perf.items()
     }
-    sr_test_perf = compute_solve_rate(budgeted_test_perf, test_performance_full, budget)
-    par10_test_perf = running_time_selector_performance(
+    sr_test_perf = compute_solve_rate(budgeted_test_perf, test_performance_full, budget)  # type: ignore[arg-type]
+    par10_test_perf = running_time_selector_performance(  # type: ignore[arg-type]
         budgeted_test_perf,
         test_performance_full,
         budget=budget,
@@ -165,12 +165,12 @@ if __name__ == "__main__":
     # 3. Predict on test set (cold start, using features only)
     predictions_test_feat = selector.predict(test_features, None)
     assert isinstance(predictions_test_feat, dict)
-    budgeted_test_feat: dict[str, list[tuple[str, float]]] = {
+    budgeted_test_feat: dict[str, list[tuple[str, float]]] = {  # type: ignore[misc]
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in predictions_test_feat.items()
     }
-    sr_test_feat = compute_solve_rate(budgeted_test_feat, test_performance_full, budget)
-    par10_test_feat = running_time_selector_performance(
+    sr_test_feat = compute_solve_rate(budgeted_test_feat, test_performance_full, budget)  # type: ignore[arg-type]
+    par10_test_feat = running_time_selector_performance(  # type: ignore[arg-type]
         budgeted_test_feat,
         test_performance_full,
         budget=budget,

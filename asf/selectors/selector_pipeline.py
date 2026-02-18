@@ -4,7 +4,7 @@ import logging
 import time
 from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 from sklearn.impute import SimpleImputer
@@ -256,6 +256,7 @@ class SelectorPipeline(ConfigurableMixin):
             ]
 
         final_preds: dict[str, list[tuple[str, float] | tuple[str, float, float]]] = {}
+        assert isinstance(predictions, dict)
         for instance_id in X.index:
             prediction = predictions.get(str(instance_id), [])
             final_preds[str(instance_id)] = scheds + feature_steps + list(prediction)
@@ -396,7 +397,11 @@ class SelectorPipeline(ConfigurableMixin):
                     if isinstance(selector_class, list)
                     else [selector_class]
                 )
-            hyperparameters.append(ClassChoice("selector", choices=selector_choices))
+            hyperparameters.append(
+                ClassChoice(
+                    "selector", choices=cast(list[type | bool], selector_choices)
+                )
+            )
 
         if pre_solving_class:
             ps_choices = (
@@ -408,7 +413,9 @@ class SelectorPipeline(ConfigurableMixin):
                 "use_presolver", items=[True, False], default=False
             )
             hyperparameters.append(use_presolver)
-            presolver_choice = ClassChoice("presolver", choices=ps_choices)
+            presolver_choice = ClassChoice(
+                "presolver", choices=cast(list[type | bool], ps_choices)
+            )
             hyperparameters.append(presolver_choice)
             conditions.append(EqualsCondition(presolver_choice, use_presolver, True))
 
@@ -649,7 +656,7 @@ class SelectorPipeline(ConfigurableMixin):
                             else:
                                 res_any: Any = res
                                 clean_config[key] = (
-                                    res_any() if callable(res_any) else res_any  # type: ignore[misc]
+                                    res_any() if callable(res_any) else res_any
                                 )
                     else:
                         clean_config[hp.name[len(prefix) :]] = False

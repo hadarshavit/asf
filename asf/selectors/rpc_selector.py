@@ -145,7 +145,7 @@ class RPCSelector(AbstractSelector):
         return scores
 
     def _predict(
-        self, features: pd.DataFrame, performance: pd.DataFrame | None = None
+        self, features: pd.DataFrame | None, performance: pd.DataFrame | None = None
     ) -> dict[str, list[tuple[str, float]]]:
         """
         Predict algorithm(s) for each instance using Copeland scores.

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -200,6 +200,7 @@ class DyadRanking(ConfigurableMixin, AbstractModelBasedSelector):
         inst_col_name = features.index.name or "index"
         features_reset = features_reset.rename(columns={inst_col_name: "INSTANCE_ID"})
 
+        assert self.algorithm_features is not None
         algo_features = self.algorithm_features.copy()
         algo_features.index.name = "ALGORITHM"
         algo_features_reset = algo_features.reset_index()
@@ -272,6 +273,7 @@ class DyadRanking(ConfigurableMixin, AbstractModelBasedSelector):
             # Create dyads for sampled pairs
             for better_algo, worse_algo in sampled_pairs:
                 # Create two dyads: one ranked 1 (better), one ranked 2 (worse)
+                assert self.algorithm_features is not None
                 for algo, rank in [(better_algo, 1), (worse_algo, 2)]:
                     dyad_features = dict(instance_feats)
                     dyad_features.update(self.algorithm_features.loc[algo].to_dict())
@@ -311,6 +313,7 @@ class DyadRanking(ConfigurableMixin, AbstractModelBasedSelector):
         # Sort by pair_id to ensure qid is in non-decreasing order (required by XGBoost)
         dyads_df = dyads_df.sort_values("pair_id").reset_index(drop=True)
 
+        assert self.algorithm_features is not None
         feature_cols = list(self.features) + list(self.algorithm_features.columns)
         X = dyads_df[feature_cols]
         y = dyads_df["rank"]
@@ -353,7 +356,7 @@ class DyadRanking(ConfigurableMixin, AbstractModelBasedSelector):
 
         model_class_param = ClassChoice(
             name="model_class",
-            choices=model_class,
+            choices=cast(list[type | bool], model_class),
             default=model_class[0],
         )
 

@@ -75,7 +75,8 @@ if __name__ == "__main__":
 
     # Metrics expect (algo, allocated_time); SATzilla schedules contain scores, so wrap with budget
     budgeted_preds: dict[str, list[tuple[str, float]]] = {
-        inst: [(algo, budget) for algo, _ in sched] for inst, sched in preds.items()
+        inst: [(algo, budget) for algo, _ in sched]  # type: ignore[misc]
+        for inst, sched in preds.items()
     }
 
     # Baselines
@@ -83,8 +84,8 @@ if __name__ == "__main__":
     vbs_score = virtual_best_solver(test_perf, maximize=False, budget=budget, par=10.0)
 
     # Selector metrics
-    sr = compute_solve_rate(budgeted_preds, test_perf, budget)
-    par10 = running_time_selector_performance(
+    sr = compute_solve_rate(budgeted_preds, test_perf, budget)  # type: ignore[arg-type]
+    par10 = running_time_selector_performance(  # type: ignore[arg-type]
         budgeted_preds, test_perf, budget=budget, par=10.0, return_per_instance=False
     )
 

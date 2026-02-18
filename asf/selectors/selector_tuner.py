@@ -22,6 +22,12 @@ try:
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
+    class Configuration:  # type: ignore
+        """Dummy Configuration class when ConfigSpace is not installed."""
+
+        pass
+
+
 try:
     from smac import HyperparameterOptimizationFacade, Scenario
 
@@ -219,6 +225,7 @@ def tune_selector(
 
     if isinstance(best_config, list):
         best_config = best_config[0]
+    assert isinstance(best_config, (dict, Configuration))
     return _create_pipeline(
         best_config,
         budget,

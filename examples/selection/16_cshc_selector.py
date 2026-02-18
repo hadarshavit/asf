@@ -101,6 +101,7 @@ def main():
         if not primary_pred:
             continue
 
+        assert isinstance(primary_pred, list)
         chosen_algo_primary = primary_pred[0][0]
 
         # 2. Get guardian's confidence in the primary choice
@@ -123,6 +124,7 @@ def main():
             backup_pred_dict = sel.backup_selector.predict(inst_feature_df)
             assert isinstance(backup_pred_dict, dict)
             backup_pred_list = backup_pred_dict.get(inst_name)
+            assert isinstance(backup_pred_list, list)
             if backup_pred_list:
                 final_algo = backup_pred_list[0][0]
                 if Y_test.at[inst_name, final_algo] <= budget:

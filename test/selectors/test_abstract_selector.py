@@ -155,5 +155,6 @@ class TestAbstractSelectorFeatureGroups:
 
         # Predictions should have feature groups prepended
         for _, schedule in predictions.items():
+            assert isinstance(schedule, list)
             assert schedule[0] == "group1"
             assert schedule[1] == "group2"

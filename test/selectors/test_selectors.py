@@ -115,7 +115,7 @@ def validate_predictions(predictions):
 
 
 def test_simple_ranking(dummy_performance, dummy_features):
-    selector = SimpleRanking(model_class=XGBRanker, budget=450.0)  # type: ignore[arg-type]
+    selector = SimpleRanking(model_class=XGBRanker, budget=450.0)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
@@ -152,7 +152,7 @@ def test_survival_analysis_schedule(dummy_performance, dummy_features):
     predictions = selector.predict(dummy_features)
 
     assert len(predictions) == len(dummy_features)
-    for sched in predictions.values():  # type: ignore[attr-defined]
+    for sched in predictions.values():
         assert isinstance(sched, list)
         assert all(isinstance(x, tuple) and len(x) == 2 for x in sched)
         assert all(
@@ -218,7 +218,7 @@ def test_sunny_selector(dummy_performance, dummy_features):
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     assert len(predictions) == len(dummy_features)
-    for sched in predictions.values():  # type: ignore[attr-defined]
+    for sched in predictions.values():
         assert isinstance(sched, list)
         assert all(
             isinstance(x, tuple) and len(x) == 2

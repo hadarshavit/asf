@@ -9,7 +9,7 @@ This module provides ensemble methods for combining multiple algorithm selectors
 from __future__ import annotations
 
 import copy
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import numpy as np
 import pandas as pd
@@ -201,9 +201,8 @@ class BaggingSelector(ConfigurableMixin, AbstractSelector):
                 for instance, schedule in preds.items():
                     if schedule:
                         algo = str(schedule[0][0])
-                        all_votes[str(instance)][algo] = (
-                            all_votes[str(instance)].get(algo, 0) + 1
-                        )
+                        votes_for_instance = all_votes[str(instance)]
+                        votes_for_instance[algo] = votes_for_instance.get(algo, 0) + 1
 
         # Aggregate votes
         result: dict[str, list[tuple[str, float]]] = {}
@@ -248,7 +247,10 @@ class BaggingSelector(ConfigurableMixin, AbstractSelector):
 
         if base_selector_class:
             hyperparameters.append(
-                ClassChoice("base_selector", choices=base_selector_class)
+                ClassChoice(
+                    "base_selector",
+                    choices=cast(list[type | bool], base_selector_class),
+                )
             )
 
         return hyperparameters, [], []
@@ -531,7 +533,7 @@ class StackingSelector(ConfigurableMixin, AbstractSelector):
         if isinstance(preds, dict):
             labels = []
             for idx in features.index:
-                schedule = preds.get(str(idx), [])
+                schedule = preds.get(str(idx))
                 if schedule:
                     labels.append(str(schedule[0][0]))
                 else:
@@ -743,7 +745,10 @@ class StackingSelector(ConfigurableMixin, AbstractSelector):
 
         if meta_selector_classes:
             hyperparameters.append(
-                ClassChoice("meta_selector", choices=meta_selector_classes)
+                ClassChoice(
+                    "meta_selector",
+                    choices=cast(list[type | bool], meta_selector_classes),
+                )
             )
 
         return hyperparameters, [], []

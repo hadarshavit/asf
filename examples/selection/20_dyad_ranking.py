@@ -198,13 +198,13 @@ def main():
     preds_default = selector_default.predict(X_test)
     assert isinstance(preds_default, dict)
 
-    budgeted_preds_default: dict[str, list[tuple[str, float]]] = {
+    budgeted_preds_default: dict[str, list[tuple[str, float]]] = {  # type: ignore[misc]
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in preds_default.items()
     }
 
-    sr_default = compute_solve_rate(budgeted_preds_default, Y_test, budget)
-    par10_default = running_time_selector_performance(
+    sr_default = compute_solve_rate(budgeted_preds_default, Y_test, budget)  # type: ignore[arg-type]
+    par10_default = running_time_selector_performance(  # type: ignore[arg-type]
         budgeted_preds_default,
         Y_test,
         budget=budget,
@@ -226,13 +226,13 @@ def main():
     preds_more = selector_more.predict(X_test)
     assert isinstance(preds_more, dict)
 
-    budgeted_preds_more: dict[str, list[tuple[str, float]]] = {
+    budgeted_preds_more: dict[str, list[tuple[str, float]]] = {  # type: ignore[misc]
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in preds_more.items()
     }
 
-    sr_more = compute_solve_rate(budgeted_preds_more, Y_test, budget)
-    par10_more = running_time_selector_performance(
+    sr_more = compute_solve_rate(budgeted_preds_more, Y_test, budget)  # type: ignore[arg-type]
+    par10_more = running_time_selector_performance(  # type: ignore[arg-type]
         budgeted_preds_more, Y_test, budget=budget, par=10.0, return_per_instance=False
     )
     print(f"  Solve-rate: {sr_more:.2%} | PAR10: {par10_more:.2f}")
@@ -250,13 +250,13 @@ def main():
     preds_onehot = selector_onehot.predict(X_test)
     assert isinstance(preds_onehot, dict)
 
-    budgeted_preds_onehot: dict[str, list[tuple[str, float]]] = {
+    budgeted_preds_onehot: dict[str, list[tuple[str, float]]] = {  # type: ignore[misc]
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in preds_onehot.items()
     }
 
-    sr_onehot = compute_solve_rate(budgeted_preds_onehot, Y_test, budget)
-    par10_onehot = running_time_selector_performance(
+    sr_onehot = compute_solve_rate(budgeted_preds_onehot, Y_test, budget)  # type: ignore[arg-type]
+    par10_onehot = running_time_selector_performance(  # type: ignore[arg-type]
         budgeted_preds_onehot,
         Y_test,
         budget=budget,
@@ -275,13 +275,13 @@ def main():
     preds_simple = selector_simple.predict(X_test)
     assert isinstance(preds_simple, dict)
 
-    budgeted_preds_simple: dict[str, list[tuple[str, float]]] = {
+    budgeted_preds_simple: dict[str, list[tuple[str, float]]] = {  # type: ignore[misc]
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in preds_simple.items()
     }
 
-    sr_simple = compute_solve_rate(budgeted_preds_simple, Y_test, budget)
-    par10_simple = running_time_selector_performance(
+    sr_simple = compute_solve_rate(budgeted_preds_simple, Y_test, budget)  # type: ignore[arg-type]
+    par10_simple = running_time_selector_performance(  # type: ignore[arg-type]
         budgeted_preds_simple,
         Y_test,
         budget=budget,
@@ -298,6 +298,7 @@ def main():
 
     for inst in list(X_test.index)[:10]:
         sched = preds_default.get(inst, [(None, 0.0)])
+        assert isinstance(sched, list)
         algo, _ = sched[0]
 
         if algo is not None and algo in Y_test.columns:

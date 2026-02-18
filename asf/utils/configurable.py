@@ -182,7 +182,7 @@ except ImportError:
     Hyperparameter = Any  # type: ignore
 
     # Provide a dummy ClassChoice for type hints when ConfigSpace is not installed
-    class ClassChoice:  # type: ignore
+    class ClassChoice:
         """Dummy ClassChoice when ConfigSpace is not installed."""
 
         name: str
@@ -243,11 +243,10 @@ def convert_class_choices_to_categorical(cs: ConfigurationSpace) -> Configuratio
     # Second pass: re-add conditions with updated references
     for condition in cs.conditions:
         # Create new condition with updated hyperparameter references
-        child = hp_map[condition.child.name]
-        parent = hp_map[condition.parent.name]  # type: ignore[attr-defined]
-        new_condition = type(condition)(
-            child=child, parent=parent, value=getattr(condition, "value", None)
-        )
+        child_hp = hp_map[condition.child.name]
+        parent_hp = hp_map[condition.parent.name]  # type: ignore[attr-defined]
+        value_obj = getattr(condition, "value", None)
+        new_condition = type(condition)(child_hp, parent_hp, value_obj)
         new_cs.add(new_condition)
 
     # Third pass: re-add forbidden clauses

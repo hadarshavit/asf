@@ -52,6 +52,7 @@ def test_performance_model_single_target_branch():
     assert isinstance(preds, dict)
     assert set(preds.keys()) == set(X.index)
     for lst in preds.values():
+        assert isinstance(lst, list)
         algo, bud = lst[0]
         assert algo in ("a", "b")
         assert bud == 5.0

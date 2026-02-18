@@ -60,6 +60,7 @@ def test_dyad_ranking_multiple_algorithms():
     assert list(selector.algorithm_features.index) == ["algo1", "algo2", "algo3"]
 
     predictions = selector.predict(features)
+    assert isinstance(predictions, dict)
     assert len(predictions) == len(features)
     for inst_pred in predictions.values():
         assert len(inst_pred) == 1

@@ -34,13 +34,13 @@ def test_tune_epm_with_mock_smac_returns_configured_epm(monkeypatch):
 
     class DummyPredictor(AbstractPredictor):
         @staticmethod
-        def get_configuration_space(  # type: ignore[override]
+        def get_configuration_space(
             cs=None, pre_prefix="", parent_param=None, parent_value=None
         ):
             return {"any": "space"}
 
         @staticmethod
-        def get_from_configuration(configuration, pre_prefix="", **kwargs):  # type: ignore[override]
+        def get_from_configuration(configuration, pre_prefix="", **kwargs):
             class Model(AbstractPredictor):
                 def fit(self, X, Y, **kwargs):
                     # simple constant regressor on normalized target

@@ -215,15 +215,17 @@ class APPS(AbstractSelector):
             )
             mu_best_ue = mu_best if np.isscalar(mu_best) else mu_best[unequal_mask]
 
+            sigma_best_ue = np.asarray(sigma_best_ue)
+            sigma_cand_ue = np.asarray(sigma_candidates[unequal_mask])
             var1 = sigma_best_ue**2
-            var2 = sigma_candidates[unequal_mask] ** 2
+            var2 = sigma_cand_ue**2
 
             a = 0.5 / var1 - 0.5 / var2
             b = mu_candidates[unequal_mask] / var2 - mu_best_ue / var1
             c_coeff = (
                 (mu_best_ue**2) / (2 * var1)
                 - (mu_candidates[unequal_mask] ** 2) / (2 * var2)
-                - np.log(sigma_candidates[unequal_mask] / sigma_best_ue)
+                - np.log(sigma_cand_ue / sigma_best_ue)
             )
 
             delta = b**2 - 4 * a * c_coeff
@@ -261,8 +263,10 @@ class APPS(AbstractSelector):
         Returns:
             Array of overlap values for each candidate
         """
+        mu_best_arr = np.atleast_1d(mu_best)
+        sigma_best_arr = np.atleast_1d(sigma_best)
         c = self._solve_intersection_vectorized(
-            mu_best, sigma_best, mu_candidates, sigma_candidates
+            mu_best_arr, sigma_best_arr, mu_candidates, sigma_candidates
         )
 
         # Vectorized CDF computation

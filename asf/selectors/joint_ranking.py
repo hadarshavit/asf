@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import numpy as np
 import pandas as pd
@@ -167,6 +167,7 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
             data = selected_features.assign(**self.algorithm_features.loc[algorithm])
             # Ensure column order matches training
             data = data[self.algorithm_features.columns.to_list() + self.features]
+            assert not isinstance(self.model, type)
             prediction = self.model.predict(data)
             predictions[:, i] = prediction.flatten()
 
@@ -199,7 +200,7 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
 
         model_param = ClassChoice(
             name="model",
-            choices=model,
+            choices=cast(list[type | bool], model),  # type: ignore[arg-type]
             default=model[0],
         )
 

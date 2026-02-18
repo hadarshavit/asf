@@ -22,6 +22,7 @@ def test_apps_selector(dummy_performance, dummy_features):
     )
 
     for inst_name, portfolio in predictions.items():
+        assert isinstance(portfolio, list)
         assert len(portfolio) > 0, f"Empty portfolio for {inst_name}"
         assert all(isinstance(item, tuple) and len(item) == 2 for item in portfolio), (
             f"Portfolio for {inst_name} should contain (algo, budget) tuples"

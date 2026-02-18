@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import cast
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 
@@ -79,11 +80,11 @@ def main():
     selector_rf.fit(X_train, Y_train)
     preds_rf = selector_rf.predict(X_test)
     assert isinstance(preds_rf, dict)
-    budgeted_preds_rf: dict[str, list[tuple[str, float]]] = {
+    budgeted_preds_rf: dict[str, list[tuple[str, float]]] = {  # type: ignore[misc]
         inst: [(algo, budget) for algo, _ in sched] for inst, sched in preds_rf.items()
     }
-    sr_rf = compute_solve_rate(budgeted_preds_rf, Y_test, budget)
-    par10_rf = running_time_selector_performance(
+    sr_rf = compute_solve_rate(budgeted_preds_rf, Y_test, budget)  # type: ignore[arg-type]
+    par10_rf = running_time_selector_performance(  # type: ignore[arg-type]
         budgeted_preds_rf, Y_test, budget=budget, par=10.0, return_per_instance=False
     )
     print(f"  Solve-rate: {sr_rf:.2%} | PAR10: {par10_rf:.2f}")
@@ -100,11 +101,11 @@ def main():
     selector_dt.fit(X_train, Y_train)
     preds_dt = selector_dt.predict(X_test)
     assert isinstance(preds_dt, dict)
-    budgeted_preds_dt: dict[str, list[tuple[str, float]]] = {
+    budgeted_preds_dt: dict[str, list[tuple[str, float]]] = {  # type: ignore[misc]
         inst: [(algo, budget) for algo, _ in sched] for inst, sched in preds_dt.items()
     }
-    sr_dt = compute_solve_rate(budgeted_preds_dt, Y_test, budget)
-    par10_dt = running_time_selector_performance(
+    sr_dt = compute_solve_rate(budgeted_preds_dt, Y_test, budget)  # type: ignore[arg-type]
+    par10_dt = running_time_selector_performance(  # type: ignore[arg-type]
         budgeted_preds_dt, Y_test, budget=budget, par=10.0, return_per_instance=False
     )
     print(f"  Solve-rate: {sr_dt:.2%} | PAR10: {par10_dt:.2f}")
@@ -124,10 +125,12 @@ def main():
     portfolios = selector_rf_top3.predict(X_test)
     assert isinstance(portfolios, dict)
     # Convert shortlist to schedules with equal time slices summing to budget
-    budgeted_portfolios: dict[str, list[tuple[str, float]]] = portfolios
+    budgeted_portfolios: dict[str, list[tuple[str, float]]] = cast(
+        dict[str, list[tuple[str, float]]], portfolios
+    )  # type: ignore[arg-type]
 
-    sr_top3 = compute_solve_rate(budgeted_portfolios, Y_test, budget)
-    par10_top3 = running_time_selector_performance(
+    sr_top3 = compute_solve_rate(budgeted_portfolios, Y_test, budget)  # type: ignore[arg-type]
+    par10_top3 = running_time_selector_performance(  # type: ignore[arg-type]
         budgeted_portfolios,
         Y_test,
         budget=budget,
@@ -140,6 +143,7 @@ def main():
     print("\nDetailed portfolios (first 10 instances):")
     for inst in list(X_test.index)[:10]:
         portfolio = portfolios.get(inst, [])
+        assert isinstance(portfolio, list)
         solvers = []
         for algo, _allocated in portfolio:
             rt = Y_test.at[inst, algo]

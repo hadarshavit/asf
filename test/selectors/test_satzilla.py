@@ -10,4 +10,5 @@ def test_satzilla_selector(dummy_performance, dummy_features, validate_predictio
     # Check that it has epms
     assert len(selector.epms) >= 2
     for inst_id, schedule in predictions.items():
+        assert isinstance(schedule, list)
         assert len(schedule) > 0

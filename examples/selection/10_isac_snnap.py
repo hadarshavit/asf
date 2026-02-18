@@ -100,11 +100,12 @@ if __name__ == "__main__":
         selector = ISAC()
         selector.fit(train_features, train_perf)
         preds = selector.predict(test_features)
-        budgeted_preds = {
+        assert isinstance(preds, dict)
+        budgeted_preds = {  # type: ignore[misc]
             inst: [(algo, budget) for algo, _ in sched] for inst, sched in preds.items()
         }
-        sr = compute_solve_rate(budgeted_preds, test_perf, budget)
-        par10 = running_time_selector_performance(
+        sr = compute_solve_rate(budgeted_preds, test_perf, budget)  # type: ignore[arg-type]
+        par10 = running_time_selector_performance(  # type: ignore[arg-type]
             budgeted_preds,
             test_perf,
             budget=budget,
@@ -122,11 +123,11 @@ if __name__ == "__main__":
     selector_km.fit(train_features, train_perf)
     preds_km = selector_km.predict(test_features)
     assert isinstance(preds_km, dict)
-    budgeted_preds_km: dict[str, list[tuple[str, float]]] = {
+    budgeted_preds_km: dict[str, list[tuple[str, float]]] = {  # type: ignore[misc]
         inst: [(algo, budget) for algo, _ in sched] for inst, sched in preds_km.items()
     }
-    sr_km = compute_solve_rate(budgeted_preds_km, test_perf, budget)
-    par10_km = running_time_selector_performance(
+    sr_km = compute_solve_rate(budgeted_preds_km, test_perf, budget)  # type: ignore[arg-type]
+    par10_km = running_time_selector_performance(  # type: ignore[arg-type]
         budgeted_preds_km, test_perf, budget=budget, par=10.0, return_per_instance=False
     )
     print(f"  Solve-rate: {sr_km:.2%}, PAR10: {par10_km:.2f}")
@@ -138,12 +139,12 @@ if __name__ == "__main__":
     selector_snnap.fit(train_features, train_perf)
     preds_snnap = selector_snnap.predict(test_features)
     assert isinstance(preds_snnap, dict)
-    budgeted_preds_snnap: dict[str, list[tuple[str, float]]] = {
+    budgeted_preds_snnap: dict[str, list[tuple[str, float]]] = {  # type: ignore[misc]
         inst: [(algo, budget) for algo, _ in sched]
         for inst, sched in preds_snnap.items()
     }
-    sr_snnap = compute_solve_rate(budgeted_preds_snnap, test_perf, budget)
-    par10_snnap = running_time_selector_performance(
+    sr_snnap = compute_solve_rate(budgeted_preds_snnap, test_perf, budget)  # type: ignore[arg-type]
+    par10_snnap = running_time_selector_performance(  # type: ignore[arg-type]
         budgeted_preds_snnap,
         test_perf,
         budget=budget,

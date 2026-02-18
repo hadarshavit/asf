@@ -110,6 +110,7 @@ def main():
 
     for inst in list(X_test.index)[:10]:
         portfolio_schedule = preds.get(inst, [])
+        assert isinstance(portfolio_schedule, list)
         # Extract algorithm names from schedule
         portfolio_algos = [algo for algo, _ in portfolio_schedule]
         # Get min runtime across portfolio (parallel execution)
