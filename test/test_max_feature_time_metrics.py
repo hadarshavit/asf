@@ -91,9 +91,6 @@ def test_running_time_closed_gap_with_budgeted_feature_groups():
         schedules_budgeted, performance, budget, feature_time, par=10
     )
 
-    gap_unbounded = cast(float, gap_unbounded)
-    gap_budgeted = cast(float, gap_budgeted)
-
     # Gap with budgets should be better (higher closed gap) since feature time penalty is lower
     assert gap_budgeted > gap_unbounded
 
