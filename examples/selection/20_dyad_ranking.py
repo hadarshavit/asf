@@ -183,8 +183,8 @@ def main():
     vbs_score = virtual_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
     oracle_sr = float((Y_test.min(axis=1) <= budget).mean())
 
-    sbs_float = float(sbs_score)
-    vbs_float = float(vbs_score)
+    sbs_float = cast(float, sbs_score)
+    vbs_float = cast(float, vbs_score)
 
     print(f"Single Best Solver (SBS) PAR10: {sbs_float:.2f}")
     print(f"Virtual Best Solver (VBS) PAR10: {vbs_float:.2f}")

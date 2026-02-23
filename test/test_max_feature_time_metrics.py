@@ -1,4 +1,5 @@
 import pandas as pd
+from typing import cast
 from asf.metrics.baselines import (
     running_time_selector_performance,
     running_time_closed_gap,
@@ -42,10 +43,13 @@ def test_running_time_selector_performance_with_budgeted_feature_groups():
         schedules_budgeted, performance, budget, feature_time, par=10
     )
 
+    score_unbounded = cast(float, score_unbounded)
+    score_budgeted = cast(float, score_budgeted)
+
     # Score with budgets should be lower (less feature time)
-    assert float(score_budgeted) < float(score_unbounded)
+    assert score_budgeted < score_unbounded
     # Expected: algo times (10 + 20 = 30) + budgeted feature times (110 + 120 = 230) = 260
-    assert abs(float(score_budgeted) - 260.0) < 1.0
+    assert abs(score_budgeted - 260.0) < 1.0
 
 
 def test_running_time_closed_gap_with_budgeted_feature_groups():
@@ -87,8 +91,11 @@ def test_running_time_closed_gap_with_budgeted_feature_groups():
         schedules_budgeted, performance, budget, feature_time, par=10
     )
 
+    gap_unbounded = cast(float, gap_unbounded)
+    gap_budgeted = cast(float, gap_budgeted)
+
     # Gap with budgets should be better (higher closed gap) since feature time penalty is lower
-    assert float(gap_budgeted) > float(gap_unbounded)
+    assert gap_budgeted > gap_unbounded
 
 
 def test_pipeline_outputs_budgeted_feature_groups():

@@ -1,4 +1,4 @@
-from typing import List, Any
+from typing import List, Any, cast
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -210,14 +210,18 @@ class APPS(AbstractSelector):
         # Compute for unequal variance cases
         unequal_mask = ~equal_var
         if np.any(unequal_mask):
-            if np.isscalar(sigma_best):
-                sigma_best_ue = float(sigma_best)
+            sigma_best_arr = np.asarray(sigma_best)
+            mu_best_arr = np.asarray(mu_best)
+
+            if sigma_best_arr.ndim == 0:
+                sigma_best_ue = cast(float, sigma_best_arr.item())
             else:
-                sigma_best_ue = sigma_best[unequal_mask]
-            if np.isscalar(mu_best):
-                mu_best_ue = float(mu_best)
+                sigma_best_ue = sigma_best_arr[unequal_mask]
+
+            if mu_best_arr.ndim == 0:
+                mu_best_ue = cast(float, mu_best_arr.item())
             else:
-                mu_best_ue = mu_best[unequal_mask]
+                mu_best_ue = mu_best_arr[unequal_mask]
 
             var1 = np.asarray(sigma_best_ue) ** 2
             var2 = np.asarray(sigma_candidates[unequal_mask]) ** 2
