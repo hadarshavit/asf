@@ -116,7 +116,7 @@ class EPM:
         if self.features_preprocessing is not None and not isinstance(
             self.features_preprocessing, str
         ):
-            X_df = self.features_preprocessing.fit_transform(X_df)  # type: ignore
+            X_df = self.features_preprocessing.fit_transform(X_df)
 
         self.normalization = self.normalization_class()
         self.normalization.fit(np.asarray(y_ser))

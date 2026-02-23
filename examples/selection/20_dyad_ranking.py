@@ -183,8 +183,11 @@ def main():
     vbs_score = virtual_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
     oracle_sr = float((Y_test.min(axis=1) <= budget).mean())
 
-    print(f"Single Best Solver (SBS) PAR10: {sbs_score:.2f}")
-    print(f"Virtual Best Solver (VBS) PAR10: {vbs_score:.2f}")
+    sbs_float = float(sbs_score)
+    vbs_float = float(vbs_score)
+
+    print(f"Single Best Solver (SBS) PAR10: {sbs_float:.2f}")
+    print(f"Virtual Best Solver (VBS) PAR10: {vbs_float:.2f}")
     print(f"Virtual Best Solver solve-rate: {oracle_sr:.2%}")
     print("-" * 70)
 
@@ -315,16 +318,6 @@ def main():
         f"  SimpleRanking:       PAR10={par10_simple:.2f}, solve-rate={sr_simple:.2%}"
     )
     print()
-    vbs_float = (
-        float(vbs_score)
-        if isinstance(vbs_score, (int, float, np.integer, np.floating))
-        else 0.0
-    )
-    sbs_float = (
-        float(sbs_score)
-        if isinstance(sbs_score, (int, float, np.integer, np.floating))
-        else 0.0
-    )
     print(f"  Gap to VBS:          {float(par10_default) - vbs_float:.2f}")
     print(
         f"  Improvement over SBS: {((sbs_float - float(par10_default)) / sbs_float * 100):.1f}%"

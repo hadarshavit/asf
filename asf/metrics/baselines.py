@@ -213,7 +213,7 @@ def running_time_selector_performance(
         feature_time = pd.DataFrame(
             0.0,
             index=performance.index,
-            columns=["feature_time"],  # type: ignore[arg-type]
+            columns=["feature_time"],
         )
 
     total_time: dict[str, float] = {}

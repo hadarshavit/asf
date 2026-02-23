@@ -1,4 +1,4 @@
-from typing import List, Any, cast
+from typing import List, Any
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -210,18 +210,23 @@ class APPS(AbstractSelector):
         # Compute for unequal variance cases
         unequal_mask = ~equal_var
         if np.any(unequal_mask):
-            sigma_best_ue = (
-                sigma_best if np.isscalar(sigma_best) else sigma_best[unequal_mask]
-            )
-            mu_best_ue = mu_best if np.isscalar(mu_best) else mu_best[unequal_mask]
+            if np.isscalar(sigma_best):
+                sigma_best_ue = float(sigma_best)
+            else:
+                sigma_best_ue = sigma_best[unequal_mask]
+            if np.isscalar(mu_best):
+                mu_best_ue = float(mu_best)
+            else:
+                mu_best_ue = mu_best[unequal_mask]
 
             var1 = np.asarray(sigma_best_ue) ** 2
             var2 = np.asarray(sigma_candidates[unequal_mask]) ** 2
 
             a = 0.5 / var1 - 0.5 / var2
-            b = mu_candidates[unequal_mask] / var2 - cast(float, mu_best_ue) / var1
+            mu_best_arr = np.asarray(mu_best_ue)
+            b = mu_candidates[unequal_mask] / var2 - mu_best_arr / var1
             c_coeff = (
-                (cast(float, mu_best_ue) ** 2) / (2 * var1)
+                (mu_best_arr**2) / (2 * var1)
                 - (mu_candidates[unequal_mask] ** 2) / (2 * var2)
                 - np.log(
                     np.asarray(sigma_candidates[unequal_mask])

@@ -291,7 +291,7 @@ def test_meta_selector(dummy_performance, dummy_features):
         SATzilla(budget=budget),
         ISAC(budget=budget),
     ]
-    meta_sel = SimpleRanking(model_class=XGBRanker, budget=budget)  # type: ignore[arg-type]
+    meta_sel = SimpleRanking(model_class=XGBRanker, budget=budget)
 
     meta = MetaSelector(
         base_selectors=base_selectors, meta_selector=meta_sel, budget=budget, n_folds=2
@@ -309,7 +309,7 @@ def test_meta_selector_rejects_schedule_base(dummy_performance, dummy_features):
     with pytest.raises(ValueError):
         MetaSelector(
             base_selectors=[SNNAP(k=3, budget=budget), ISA(budget=budget)],
-            meta_selector=SimpleRanking(model_class=XGBRanker, budget=budget),  # type: ignore[arg-type]
+            meta_selector=SimpleRanking(model_class=XGBRanker, budget=budget),
             budget=budget,
         )
 
@@ -470,8 +470,8 @@ def test_cosine_selector_default(dummy_performance, dummy_features):
             [0.0, 1.0],
             [0.5, 0.5],
         ],
-        index=["algo1", "algo2", "algo3"],  # type: ignore[arg-type]
-        columns=["af1", "af2"],  # type: ignore[arg-type]
+        index=["algo1", "algo2", "algo3"],
+        columns=["af1", "af2"],
     )
 
     sel = CosineSelector(
@@ -493,8 +493,8 @@ def test_cosine_selector_custom_params(dummy_performance, dummy_features):
             [0.0, 1.0],
             [0.5, 0.5],
         ],
-        index=["algo1", "algo2", "algo3"],  # type: ignore[arg-type]
-        columns=["af1", "af2"],  # type: ignore[arg-type]
+        index=["algo1", "algo2", "algo3"],
+        columns=["af1", "af2"],
     )
 
     sel = CosineSelector(

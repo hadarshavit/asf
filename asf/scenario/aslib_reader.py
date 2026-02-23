@@ -50,7 +50,7 @@ def _load_aslib_performance(
         performance_data: dict[str, Any] = load(f)
     performance = pd.DataFrame(
         performance_data["data"],
-        columns=[a[0] for a in performance_data["attributes"]],  # type: ignore[arg-type]
+        columns=[a[0] for a in performance_data["attributes"]],
     )
 
     if "runstatus" in performance.columns:

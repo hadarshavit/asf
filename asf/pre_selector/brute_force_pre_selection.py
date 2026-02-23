@@ -71,7 +71,7 @@ class BruteForcePreSelector(AbstractPreSelector):
         if isinstance(performance, np.ndarray):
             performance_frame = pd.DataFrame(
                 performance,
-                columns=[f"Algorithm_{i}" for i in range(performance.shape[1])],  # type: ignore[arg-type]
+                columns=[f"Algorithm_{i}" for i in range(performance.shape[1])],
             )
             is_numpy = True
         else:
