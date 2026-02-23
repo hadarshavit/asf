@@ -101,7 +101,10 @@ if __name__ == "__main__":
     print("--- Single Best Algorithm Predictions ---")
     selector = SurvivalAnalysis(budget=BUDGET)
     selector.fit(train_features, train_performance)
-    predictions = selector.predict(test_features)
+    predictions: dict[str, list[tuple[str, float] | str]] = selector.predict(
+        test_features
+    )
+    assert isinstance(predictions, dict)
 
     print("Predicted best algorithm for each test instance:")
     for i, instance in enumerate(test_features.index):
@@ -111,7 +114,7 @@ if __name__ == "__main__":
 
     # Wrap predictions with budget for metrics
     budgeted_preds: dict[str, list[tuple[str, float] | str]] = {
-        inst: [(algo, BUDGET) for algo, _ in sched]
+        str(inst): [(algo, BUDGET) for algo, _ in sched]
         for inst, sched in predictions.items()
     }
 
@@ -152,7 +155,10 @@ if __name__ == "__main__":
         maxiter=100,
     )
     schedule_selector.fit(train_features, train_performance)
-    schedule_predictions = schedule_selector.predict(test_features)
+    schedule_predictions: dict[str, list[tuple[str, float] | str]] = (
+        schedule_selector.predict(test_features)
+    )
+    assert isinstance(schedule_predictions, dict)
 
     print("Predicted algorithm schedules for each test instance:")
     for i, instance in enumerate(test_features.index):

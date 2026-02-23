@@ -72,6 +72,7 @@ if __name__ == "__main__":
 
     preds = selector.predict(test_X)
     assert isinstance(preds, dict)
+    preds: dict[str, list[tuple[str, float] | str]] = preds
 
     # Baselines
     sbs_score = single_best_solver(test_perf, maximize=False, budget=budget, par=10.0)

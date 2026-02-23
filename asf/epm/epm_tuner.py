@@ -165,6 +165,9 @@ def tune_epm(
     if isinstance(best_config, list):
         best_config = best_config[0]
 
+    # Cast to Any since SMAC's Configuration type is not always available
+    best_config = cast(Any, best_config)
+
     # Convert Configuration to dict
     config_dict = (
         dict(best_config.items())

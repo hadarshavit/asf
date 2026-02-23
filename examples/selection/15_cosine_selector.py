@@ -54,7 +54,7 @@ def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
     )
     sel.fit(X_train, Y_train, algorithm_features=alg_df)
 
-    preds = sel.predict(X_test)
+    preds: dict[str, list[tuple[str, float] | str]] = sel.predict(X_test)
     sr = compute_solve_rate(preds, Y_test, budget)
     par10 = running_time_selector_performance(
         preds, Y_test, budget=budget, par=10.0, return_per_instance=False

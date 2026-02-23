@@ -88,7 +88,8 @@ class KneeOfCurvePreSelector(AbstractPreSelector):
 
         def process(i: int) -> tuple[int, float, pd.DataFrame]:
             # Cast to Any to allow passing metric/maximize parameters that subclasses accept
-            base_selector = self.base_pre_selector(  # type: ignore[call-arg]
+            base_selector_cls: Any = self.base_pre_selector
+            base_selector = base_selector_cls(
                 metric=self.metric,
                 n_algorithms=i + 1,
                 maximize=self.maximize,

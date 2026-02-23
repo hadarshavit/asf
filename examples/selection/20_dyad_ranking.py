@@ -195,21 +195,14 @@ def main():
         maximize=False,
     )
     selector_default.fit(X_train, Y_train)
-    preds_default = selector_default.predict(X_test)
+    preds_default: dict[str, list[tuple[str, float] | str]] = selector_default.predict(
+        X_test
+    )
     assert isinstance(preds_default, dict)
 
-    budgeted_preds_default: dict[str, list[tuple[str, float]]] = {}
-    for inst, sched in preds_default.items():
-        if isinstance(sched, list) and len(sched) > 0:
-            budgeted_preds_default[str(inst)] = [
-                (str(algo), budget) for algo, _ in sched
-            ]
-        else:
-            budgeted_preds_default[str(inst)] = []
-
-    sr_default = compute_solve_rate(budgeted_preds_default, Y_test, budget)
+    sr_default = compute_solve_rate(preds_default, Y_test, budget)
     par10_default = running_time_selector_performance(
-        budgeted_preds_default,
+        preds_default,
         Y_test,
         budget=budget,
         par=10.0,
@@ -227,19 +220,12 @@ def main():
         maximize=False,
     )
     selector_more.fit(X_train, Y_train)
-    preds_more = selector_more.predict(X_test)
+    preds_more: dict[str, list[tuple[str, float] | str]] = selector_more.predict(X_test)
     assert isinstance(preds_more, dict)
 
-    budgeted_preds_more: dict[str, list[tuple[str, float]]] = {}
-    for inst, sched in preds_more.items():
-        if isinstance(sched, list) and len(sched) > 0:
-            budgeted_preds_more[str(inst)] = [(str(algo), budget) for algo, _ in sched]
-        else:
-            budgeted_preds_more[str(inst)] = []
-
-    sr_more = compute_solve_rate(budgeted_preds_more, Y_test, budget)
+    sr_more = compute_solve_rate(preds_more, Y_test, budget)
     par10_more = running_time_selector_performance(
-        budgeted_preds_more, Y_test, budget=budget, par=10.0, return_per_instance=False
+        preds_more, Y_test, budget=budget, par=10.0, return_per_instance=False
     )
     print(f"  Solve-rate: {sr_more:.2%} | PAR10: {par10_more:.2f}")
 
@@ -253,21 +239,14 @@ def main():
         maximize=False,
     )
     selector_onehot.fit(X_train, Y_train)
-    preds_onehot = selector_onehot.predict(X_test)
+    preds_onehot: dict[str, list[tuple[str, float] | str]] = selector_onehot.predict(
+        X_test
+    )
     assert isinstance(preds_onehot, dict)
 
-    budgeted_preds_onehot: dict[str, list[tuple[str, float]]] = {}
-    for inst, sched in preds_onehot.items():
-        if isinstance(sched, list) and len(sched) > 0:
-            budgeted_preds_onehot[str(inst)] = [
-                (str(algo), budget) for algo, _ in sched
-            ]
-        else:
-            budgeted_preds_onehot[str(inst)] = []
-
-    sr_onehot = compute_solve_rate(budgeted_preds_onehot, Y_test, budget)
+    sr_onehot = compute_solve_rate(preds_onehot, Y_test, budget)
     par10_onehot = running_time_selector_performance(
-        budgeted_preds_onehot,
+        preds_onehot,
         Y_test,
         budget=budget,
         par=10.0,
@@ -282,21 +261,14 @@ def main():
         maximize=False,
     )
     selector_simple.fit(X_train, Y_train)
-    preds_simple = selector_simple.predict(X_test)
+    preds_simple: dict[str, list[tuple[str, float] | str]] = selector_simple.predict(
+        X_test
+    )
     assert isinstance(preds_simple, dict)
 
-    budgeted_preds_simple: dict[str, list[tuple[str, float]]] = {}
-    for inst, sched in preds_simple.items():
-        if isinstance(sched, list) and len(sched) > 0:
-            budgeted_preds_simple[str(inst)] = [
-                (str(algo), budget) for algo, _ in sched
-            ]
-        else:
-            budgeted_preds_simple[str(inst)] = []
-
-    sr_simple = compute_solve_rate(budgeted_preds_simple, Y_test, budget)
+    sr_simple = compute_solve_rate(preds_simple, Y_test, budget)
     par10_simple = running_time_selector_performance(
-        budgeted_preds_simple,
+        preds_simple,
         Y_test,
         budget=budget,
         par=10.0,
@@ -311,7 +283,7 @@ def main():
     assert isinstance(preds_default, dict)
 
     for inst in list(X_test.index)[:10]:
-        sched = preds_default.get(inst, [(None, 0.0)])
+        sched = preds_default.get(str(inst), [(None, 0.0)])
         assert isinstance(sched, list)
         if len(sched) > 0:
             algo, _ = sched[0]
@@ -344,11 +316,11 @@ def main():
         f"  SimpleRanking:       PAR10={par10_simple:.2f}, solve-rate={sr_simple:.2%}"
     )
     print()
+    vbs_float = float(vbs_score) if isinstance(vbs_score, (int, float)) else 0.0
+    sbs_float = float(sbs_score) if isinstance(sbs_score, (int, float)) else 0.0
+    print(f"  Gap to VBS:          {float(par10_default) - vbs_float:.2f}")
     print(
-        f"  Gap to VBS:          {float(par10_default) - float(vbs_score if isinstance(vbs_score, (int, float)) else 0):.2f}"
-    )
-    print(
-        f"  Improvement over SBS: {((float(sbs_score if isinstance(sbs_score, (int, float)) else 0) - float(par10_default)) / float(sbs_score if isinstance(sbs_score, (int, float)) else 1) * 100):.1f}%"
+        f"  Improvement over SBS: {((sbs_float - float(par10_default)) / sbs_float * 100):.1f}%"
     )
     print("=" * 70)
 

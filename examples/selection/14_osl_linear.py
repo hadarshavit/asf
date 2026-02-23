@@ -47,6 +47,7 @@ def main():
 
     # simple validation of structure
     assert isinstance(preds, dict)
+    preds: dict[str, list[tuple[str, float] | str]] = preds
     for v in preds.values():
         assert isinstance(v, list) and len(v) == 1
         algo, score = v[0]
@@ -78,7 +79,7 @@ def main():
     print()
     print("Sample decisions (first 12):")
     for inst in list(X_test.index)[:12]:
-        rec = preds.get(inst)
+        rec = preds.get(str(inst))
         if not rec:
             print(f"{inst}: no prediction")
             continue

@@ -72,7 +72,7 @@ def main():
 
     sel.fit(X_train, Y_train)
 
-    preds = sel.predict(X_test)
+    preds: dict[str, list[tuple[str, float] | str]] = sel.predict(X_test)
     sr = compute_solve_rate(preds, Y_test, budget)
 
     # Use ASF metrics for baselines
@@ -94,7 +94,9 @@ def main():
         inst_feature_df = X_test.loc[[inst_name]]
 
         # 1. Get primary selector's choice
-        primary_pred_dict = sel.primary_selector.predict(inst_feature_df)
+        primary_pred_dict: dict[str, list[tuple[str, float] | str]] = (
+            sel.primary_selector.predict(inst_feature_df)
+        )
         assert isinstance(primary_pred_dict, dict)
         primary_pred = primary_pred_dict.get(inst_name)
         if not primary_pred:
@@ -106,7 +108,7 @@ def main():
         chosen_algo_primary = first_item[0]
 
         # 2. Get guardian's confidence in the primary choice
-        guardian_for_choice = sel.guardians.get(chosen_algo_primary)
+        guardian_for_choice = sel.guardians.get(str(chosen_algo_primary))
         prob_success = (
             guardian_for_choice.predict_proba(inst_feature_df)[0, 1]
             if guardian_for_choice
@@ -124,6 +126,9 @@ def main():
             backup_used += 1
             backup_pred_dict = sel.backup_selector.predict(inst_feature_df)
             assert isinstance(backup_pred_dict, dict)
+            backup_pred_dict: dict[str, list[tuple[str, float] | str]] = (
+                backup_pred_dict
+            )
             backup_pred_list = backup_pred_dict.get(inst_name)
             assert isinstance(backup_pred_list, list)
             if backup_pred_list and len(backup_pred_list) > 0:
@@ -191,7 +196,7 @@ def main():
     print()
     print("Sample decisions (first 12):")
     for inst in list(X_test.index)[:12]:
-        algo, _ = preds.get(inst, [(None, None)])[0]
+        algo, _ = preds.get(str(inst), [(None, None)])[0]
         rt = Y_test.at[inst, algo] if algo is not None else float("nan")
         print(f"{inst}: chosen={algo}, true_rt={rt:.2f}")
     print("=" * 60)

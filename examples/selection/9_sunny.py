@@ -137,7 +137,9 @@ if __name__ == "__main__":
     print("=" * 70)
     selector = SUNNY(k=5, use_v2=False, budget=budget)
     selector.fit(train_features, train_performance)
-    predictions = selector.predict(test_features)
+    predictions: dict[str, list[tuple[str, float] | str]] = selector.predict(
+        test_features
+    )
     sr = compute_solve_rate(predictions, test_performance, budget)
     par10 = running_time_selector_performance(
         predictions,
@@ -157,7 +159,9 @@ if __name__ == "__main__":
     print("=" * 70)
     selector_v2 = SUNNY(k=5, use_v2=True, budget=budget, k_candidates=[3, 5, 7, 10, 15])
     selector_v2.fit(train_features, train_performance)
-    predictions_v2 = selector_v2.predict(test_features)
+    predictions_v2: dict[str, list[tuple[str, float] | str]] = selector_v2.predict(
+        test_features
+    )
     sr_v2 = compute_solve_rate(predictions_v2, test_performance, budget)
     par10_v2 = running_time_selector_performance(
         predictions_v2,
@@ -177,7 +181,9 @@ if __name__ == "__main__":
     print("=" * 70)
     selector_tsunny = SUNNY(k=5, use_tsunny=True, budget=budget)
     selector_tsunny.fit(train_features, train_performance)
-    predictions_tsunny = selector_tsunny.predict(test_features)
+    predictions_tsunny: dict[str, list[tuple[str, float] | str]] = (
+        selector_tsunny.predict(test_features)
+    )
     sr_tsunny = compute_solve_rate(predictions_tsunny, test_performance, budget)
     par10_tsunny = running_time_selector_performance(
         predictions_tsunny,
@@ -197,7 +203,9 @@ if __name__ == "__main__":
     print("=" * 70)
     selector_hardcoded = SUNNY(k=5, algorithm_limit=2, budget=budget)
     selector_hardcoded.fit(train_features, train_performance)
-    predictions_hardcoded = selector_hardcoded.predict(test_features)
+    predictions_hardcoded: dict[str, list[tuple[str, float] | str]] = (
+        selector_hardcoded.predict(test_features)
+    )
     sr_hardcoded = compute_solve_rate(predictions_hardcoded, test_performance, budget)
     par10_hardcoded = running_time_selector_performance(
         predictions_hardcoded,
@@ -219,7 +227,9 @@ if __name__ == "__main__":
         use_v2=True, use_tsunny=True, budget=budget, k_candidates=[3, 5, 7, 10, 15]
     )
     selector_combined.fit(train_features, train_performance)
-    predictions_combined = selector_combined.predict(test_features)
+    predictions_combined: dict[str, list[tuple[str, float] | str]] = (
+        selector_combined.predict(test_features)
+    )
     sr_combined = compute_solve_rate(predictions_combined, test_performance, budget)
     par10_combined = running_time_selector_performance(
         predictions_combined,

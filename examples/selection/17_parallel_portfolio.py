@@ -68,7 +68,7 @@ def main():
             random_state=42,
         )
         sel.fit(X_train, Y_train)
-        preds = sel.predict(X_test)
+        preds: dict[str, list[tuple[str, float] | str]] = sel.predict(X_test)
 
         # Use ASF metrics for evaluation (handles parallel portfolios correctly)
         solve_rate = compute_solve_rate(preds, Y_test, budget)
@@ -101,11 +101,11 @@ def main():
         random_state=42,
     )
     sel.fit(X_train, Y_train)
-    preds = sel.predict(X_test)
+    preds: dict[str, list[tuple[str, float] | str]] = sel.predict(X_test)
     assert isinstance(preds, dict)
 
     for inst in list(X_test.index)[:10]:
-        portfolio_schedule = preds.get(inst, [])
+        portfolio_schedule = preds.get(str(inst), [])
         assert isinstance(portfolio_schedule, list)
         # Extract algorithm names from schedule
         portfolio_algos = [

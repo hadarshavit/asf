@@ -110,7 +110,7 @@ def main():
     meta.fit(train_X, train_Y)
     meta_preds = meta.predict(test_X)
     assert isinstance(meta_preds, dict)
-    budgeted_meta_preds: dict[str, list[tuple[str, float]]] = {}
+    budgeted_meta_preds: dict[str, list[tuple[str, float] | str]] = {}
     for inst, sched in meta_preds.items():
         if isinstance(sched, list) and len(sched) > 0:
             budgeted_meta_preds[str(inst)] = [(str(algo), budget) for algo, _ in sched]
