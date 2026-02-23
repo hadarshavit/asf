@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from typing import Sequence, cast
 
 from asf.selectors.parallel_portfolio_selector import APPS
 from asf.predictors.random_forest import RandomForestRegressorWrapper
@@ -70,14 +69,11 @@ def main():
         )
         sel.fit(X_train, Y_train)
         preds = sel.predict(X_test)
-        preds_seq: dict[str, Sequence[tuple[str, float] | str]] = cast(
-            dict[str, Sequence[tuple[str, float] | str]], preds
-        )
 
         # Use ASF metrics for evaluation (handles parallel portfolios correctly)
-        solve_rate = compute_solve_rate(preds_seq, Y_test, budget)
+        solve_rate = compute_solve_rate(preds, Y_test, budget)
         par10_score = running_time_selector_performance(
-            preds_seq, Y_test, budget=budget, par=10.0, return_per_instance=False
+            preds, Y_test, budget=budget, par=10.0, return_per_instance=False
         )
 
         # Portfolio size statistics
@@ -112,7 +108,11 @@ def main():
         portfolio_schedule = preds.get(inst, [])
         assert isinstance(portfolio_schedule, list)
         # Extract algorithm names from schedule
-        portfolio_algos = [algo for algo, _ in portfolio_schedule]
+        portfolio_algos = [
+            str(algo)
+            for algo, _ in portfolio_schedule
+            if isinstance(algo, (str, int, float))
+        ]
         # Get min runtime across portfolio (parallel execution)
         portfolio_times = Y_test.loc[inst, portfolio_algos]
         min_time = portfolio_times.min()

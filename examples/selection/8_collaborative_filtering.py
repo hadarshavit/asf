@@ -125,7 +125,7 @@ if __name__ == "__main__":
     # Wrap predictions with budget allocation for metrics
     budgeted_train: dict[str, list[tuple[str, float]]] = {}
     for inst, sched in predictions_train.items():
-        if isinstance(sched, list):
+        if isinstance(sched, list) and len(sched) > 0:
             budgeted_train[inst] = [(algo, budget) for algo, _ in sched]
         else:
             budgeted_train[inst] = []
@@ -147,7 +147,7 @@ if __name__ == "__main__":
     assert isinstance(predictions_test_perf, dict)
     budgeted_test_perf: dict[str, list[tuple[str, float]]] = {}
     for inst, sched in predictions_test_perf.items():
-        if isinstance(sched, list):
+        if isinstance(sched, list) and len(sched) > 0:
             budgeted_test_perf[inst] = [(algo, budget) for algo, _ in sched]
         else:
             budgeted_test_perf[inst] = []
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     assert isinstance(predictions_test_feat, dict)
     budgeted_test_feat: dict[str, list[tuple[str, float]]] = {}
     for inst, sched in predictions_test_feat.items():
-        if isinstance(sched, list):
+        if isinstance(sched, list) and len(sched) > 0:
             budgeted_test_feat[inst] = [(algo, budget) for algo, _ in sched]
         else:
             budgeted_test_feat[inst] = []

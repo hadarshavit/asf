@@ -9,7 +9,7 @@ This module provides:
 from __future__ import annotations
 
 from functools import partial
-from typing import Any, Sequence, cast
+from typing import Any, Sequence, TypeAlias, cast
 
 try:
     from ConfigSpace import (
@@ -19,8 +19,11 @@ try:
     )
     from ConfigSpace.hyperparameters import (
         CategoricalHyperparameter,
-        Hyperparameter,
+        Hyperparameter as _HP,
     )
+
+    # Create type alias for use in type annotations
+    HyperparameterType: TypeAlias = _HP
 
     CONFIGSPACE_AVAILABLE = True
 
@@ -179,7 +182,7 @@ try:
 
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
-    Hyperparameter = Any  # type: ignore
+    HyperparameterType: TypeAlias = Any
 
     # Provide a dummy ClassChoice for type hints when ConfigSpace is not installed
     class ClassChoice:
@@ -246,7 +249,11 @@ def convert_class_choices_to_categorical(cs: ConfigurationSpace) -> Configuratio
         child_hp = hp_map[condition.child.name]
         parent_hp = hp_map[condition.parent.name]  # type: ignore[attr-defined]
         value_obj = getattr(condition, "value", None)
-        new_condition = type(condition)(child_hp, parent_hp, value_obj)
+        # Only pass value if it exists (some conditions don't have a value)
+        if value_obj is not None:
+            new_condition = type(condition)(child_hp, parent_hp, value_obj)
+        else:
+            new_condition = type(condition)(child_hp, parent_hp)
         new_cs.add(new_condition)
 
     # Third pass: re-add forbidden clauses
@@ -320,7 +327,7 @@ def _clone_hyperparameter(hp: Any, prefix: str) -> Any:
             meta=meta,
         )
     elif isinstance(hp, OrdinalHP):
-        return OrdinalHP(  # type: ignore[call-arg]
+        return OrdinalHP(
             name=new_name,
             sequence=list(hp.sequence),
             default_value=hp.default_value,
@@ -337,7 +344,7 @@ def _clone_hyperparameter(hp: Any, prefix: str) -> Any:
 
 
 def _clone_condition(
-    condition: Any, prefix: str, hp_map: dict[str, Hyperparameter]
+    condition: Any, prefix: str, hp_map: dict[str, HyperparameterType]
 ) -> Any:
     """
     Clone a condition with prefixed hyperparameter references.
@@ -393,7 +400,7 @@ def _clone_condition(
 
 
 def _clone_forbidden(
-    forbidden: Any, prefix: str, hp_map: dict[str, Hyperparameter]
+    forbidden: Any, prefix: str, hp_map: dict[str, HyperparameterType]
 ) -> Any:
     """
     Clone a forbidden clause with prefixed hyperparameter references.
@@ -451,7 +458,7 @@ class ConfigurableMixin:
     def _define_hyperparameters(
         **kwargs: Any,
     ) -> tuple[
-        list[Hyperparameter],
+        list[HyperparameterType],
         list[Any],  # conditions
         list[Any],  # forbiddens
     ]:
@@ -477,7 +484,9 @@ class ConfigurableMixin:
         return [], [], []
 
     @staticmethod
-    def _resolve_class_from_hp(hp: Hyperparameter, value: Any) -> type | bool | None:
+    def _resolve_class_from_hp(
+        hp: HyperparameterType, value: Any
+    ) -> type | bool | None:
         """
         Resolve a class choice from a hyperparameter and its value.
 
@@ -552,7 +561,7 @@ class ConfigurableMixin:
         cls,
         cs: ConfigurationSpace | None = None,
         pre_prefix: str = "",
-        parent_param: Hyperparameter | None = None,
+        parent_param: HyperparameterType | None = None,
         parent_value: str | Any | None = None,
         **kwargs: Any,
     ) -> ConfigurationSpace:

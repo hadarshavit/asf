@@ -73,12 +73,12 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
         super().__init__(**kwargs)
 
         if callable(primary_selector):
-            self.primary_selector = primary_selector()
+            self.primary_selector = cast(AbstractSelector, primary_selector())
         else:
             self.primary_selector = primary_selector
 
         if callable(backup_selector):
-            self.backup_selector = backup_selector()
+            self.backup_selector = cast(AbstractSelector, backup_selector())
         else:
             self.backup_selector = backup_selector
 
@@ -141,7 +141,9 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
             for inst_name, pred_list in primary_preds.items():
                 if pred_list:
                     assert isinstance(pred_list, list) and len(pred_list) > 0
-                    chosen_algo = pred_list[0][0]
+                    first_item = pred_list[0]
+                    assert isinstance(first_item, tuple) and len(first_item) >= 1
+                    chosen_algo = first_item[0]
                     if Y_val.index.dtype != object:
                         # Convert back to original index type if necessary
                         index_type = cast(Any, Y_val.index.dtype).type
@@ -348,13 +350,13 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
         params = [
             primary_selector_param,
             use_backup,
-            backup_selector_param,
+            cast(Any, backup_selector_param),
             n_estimators_param,
             n_folds_param,
         ]
 
         conditions = [
-            EqualsCondition(backup_selector_param, use_backup, True),
+            EqualsCondition(cast(Any, backup_selector_param), use_backup, True),
         ]
 
         return params, conditions, []

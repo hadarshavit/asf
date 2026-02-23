@@ -103,7 +103,7 @@ if __name__ == "__main__":
         assert isinstance(preds, dict)
         budgeted_preds = {}
         for inst, sched in preds.items():
-            if isinstance(sched, list):
+            if isinstance(sched, list) and len(sched) > 0:
                 budgeted_preds[inst] = [(algo, budget) for algo, _ in sched]
             else:
                 budgeted_preds[inst] = []
@@ -128,7 +128,7 @@ if __name__ == "__main__":
     assert isinstance(preds_km, dict)
     budgeted_preds_km: dict[str, list[tuple[str, float]]] = {}
     for inst, sched in preds_km.items():
-        if isinstance(sched, list):
+        if isinstance(sched, list) and len(sched) > 0:
             budgeted_preds_km[inst] = [(algo, budget) for algo, _ in sched]
         else:
             budgeted_preds_km[inst] = []
@@ -147,7 +147,7 @@ if __name__ == "__main__":
     assert isinstance(preds_snnap, dict)
     budgeted_preds_snnap: dict[str, list[tuple[str, float]]] = {}
     for inst, sched in preds_snnap.items():
-        if isinstance(sched, list):
+        if isinstance(sched, list) and len(sched) > 0:
             budgeted_preds_snnap[inst] = [(algo, budget) for algo, _ in sched]
         else:
             budgeted_preds_snnap[inst] = []

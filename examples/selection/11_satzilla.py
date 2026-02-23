@@ -73,20 +73,14 @@ if __name__ == "__main__":
     preds = selector.predict(test_X)
     assert isinstance(preds, dict)
 
-    # Metrics expect (algo, allocated_time); SATzilla schedules contain scores, so wrap with budget
-    budgeted_preds: dict[str, list[tuple[str, float]]] = {
-        inst: [(algo, budget) for algo, _ in sched]  # type: ignore[misc]
-        for inst, sched in preds.items()
-    }
-
     # Baselines
     sbs_score = single_best_solver(test_perf, maximize=False, budget=budget, par=10.0)
     vbs_score = virtual_best_solver(test_perf, maximize=False, budget=budget, par=10.0)
 
     # Selector metrics
-    sr = compute_solve_rate(budgeted_preds, test_perf, budget)
+    sr = compute_solve_rate(preds, test_perf, budget)
     par10 = running_time_selector_performance(
-        budgeted_preds, test_perf, budget=budget, par=10.0, return_per_instance=False
+        preds, test_perf, budget=budget, par=10.0, return_per_instance=False
     )
 
     print("\nSATzilla example")

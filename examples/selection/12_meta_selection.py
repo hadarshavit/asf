@@ -112,10 +112,10 @@ def main():
     assert isinstance(meta_preds, dict)
     budgeted_meta_preds: dict[str, list[tuple[str, float]]] = {}
     for inst, sched in meta_preds.items():
-        if isinstance(sched, list):
-            budgeted_meta_preds[inst] = [(algo, budget) for algo, _ in sched]
+        if isinstance(sched, list) and len(sched) > 0:
+            budgeted_meta_preds[str(inst)] = [(str(algo), budget) for algo, _ in sched]
         else:
-            budgeted_meta_preds[inst] = []
+            budgeted_meta_preds[str(inst)] = []
     meta_sr = compute_solve_rate(budgeted_meta_preds, test_Y, budget)
     meta_par10 = running_time_selector_performance(
         budgeted_meta_preds, test_Y, budget=budget, par=10.0, return_per_instance=False

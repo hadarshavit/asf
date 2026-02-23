@@ -258,8 +258,11 @@ class SelectorPipeline(ConfigurableMixin):
         final_preds: dict[str, list[tuple[str, float] | tuple[str, float, float]]] = {}
         assert isinstance(predictions, dict)
         for instance_id in X.index:
-            prediction = predictions.get(str(instance_id), [])
-            final_preds[str(instance_id)] = scheds + feature_steps + list(prediction)
+            instance_key = str(instance_id)
+            prediction = (
+                list(predictions[instance_key]) if instance_key in predictions else []
+            )
+            final_preds[instance_key] = scheds + feature_steps + prediction
 
         return final_preds
 
@@ -416,8 +419,10 @@ class SelectorPipeline(ConfigurableMixin):
             presolver_choice = ClassChoice(
                 "presolver", choices=cast(list[type | bool], ps_choices)
             )
-            hyperparameters.append(presolver_choice)
-            conditions.append(EqualsCondition(presolver_choice, use_presolver, True))
+            hyperparameters.append(cast(Any, presolver_choice))
+            conditions.append(
+                EqualsCondition(cast(Any, presolver_choice), use_presolver, True)
+            )
 
         if preprocessing_class:
             for preproc_cls in preprocessing_class:

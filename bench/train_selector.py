@@ -296,9 +296,13 @@ if __name__ == "__main__":
                 print(
                     f"Completed baseline selector: {selector.__name__} for scenario: {scenario}\n"
                 )
-            elif hasattr(selector, "func"):
+            elif hasattr(selector, "func") and hasattr(selector.func, "__name__"):
                 print(
                     f"Completed selector: {selector.func.__name__} for scenario: {scenario}\n"
+                )
+            elif hasattr(selector, "__name__"):
+                print(
+                    f"Completed selector: {selector.__name__} for scenario: {scenario}\n"
                 )
 
         # Report results after all selectors are evaluated for this scenario

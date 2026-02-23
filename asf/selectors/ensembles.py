@@ -201,7 +201,9 @@ class BaggingSelector(ConfigurableMixin, AbstractSelector):
                 for instance, schedule in preds.items():
                     if schedule:
                         assert isinstance(schedule, list)
-                        algo = str(schedule[0][0])
+                        first_item = schedule[0]
+                        assert isinstance(first_item, tuple) and len(first_item) >= 1
+                        algo = str(first_item[0])
                         votes_for_instance = all_votes[str(instance)]
                         votes_for_instance[algo] = votes_for_instance.get(algo, 0) + 1
 
@@ -534,9 +536,16 @@ class StackingSelector(ConfigurableMixin, AbstractSelector):
         if isinstance(preds, dict):
             labels = []
             for idx in features.index:
-                schedule = preds.get(str(idx))
-                if schedule and isinstance(schedule, list):
-                    labels.append(str(schedule[0][0]))
+                idx_str = str(idx)
+                schedule = preds.get(idx_str) if idx_str in preds else None
+                if schedule and isinstance(schedule, list) and len(schedule) > 0:
+                    first_item = schedule[0]
+                    if isinstance(first_item, tuple) and len(first_item) >= 1:
+                        labels.append(str(first_item[0]))
+                    else:
+                        labels.append(
+                            self.algorithms[0] if self.algorithms else "unknown"
+                        )
                 else:
                     labels.append(self.algorithms[0] if self.algorithms else "unknown")
         else:
@@ -705,7 +714,10 @@ class StackingSelector(ConfigurableMixin, AbstractSelector):
         preds = self.meta_selector_.predict(meta_features)
 
         if isinstance(preds, dict):
-            return {str(k): v for k, v in preds.items()}
+            return cast(
+                dict[str, list[tuple[str, int | float]]],
+                {str(k): v for k, v in preds.items()},
+            )
 
         # Handle other return types
         result: dict[str, list[tuple[str, float]]] = {}

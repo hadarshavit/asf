@@ -168,7 +168,8 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
             # Ensure column order matches training
             data = data[self.algorithm_features.columns.to_list() + self.features]
             assert self.model is not None and not isinstance(self.model, type)
-            prediction = self.model.predict(data)
+            model = cast(Any, self.model)
+            prediction = model.predict(data)
             predictions[:, i] = prediction.flatten()
 
         return pd.DataFrame(predictions, columns=list(self.algorithms))
@@ -200,7 +201,7 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
 
         model_param = ClassChoice(
             name="model",
-            choices=cast(list[type | bool], model),  # type: ignore[arg-type]
+            choices=cast(list[type | bool], model),
             default=model[0],
         )
 

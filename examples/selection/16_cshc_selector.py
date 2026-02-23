@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from typing import Sequence, cast
 
 from asf.selectors.cshc import CSHCSelector
 from asf.selectors.osl_linear import OSLLinearSelector
@@ -73,7 +72,7 @@ def main():
 
     sel.fit(X_train, Y_train)
 
-    preds = cast(dict[str, Sequence[tuple[str, float] | str]], sel.predict(X_test))
+    preds = sel.predict(X_test)
     sr = compute_solve_rate(preds, Y_test, budget)
 
     # Use ASF metrics for baselines
@@ -101,8 +100,10 @@ def main():
         if not primary_pred:
             continue
 
-        assert isinstance(primary_pred, list)
-        chosen_algo_primary = primary_pred[0][0]
+        assert isinstance(primary_pred, list) and len(primary_pred) > 0
+        first_item = primary_pred[0]
+        assert isinstance(first_item, tuple) and len(first_item) >= 1
+        chosen_algo_primary = first_item[0]
 
         # 2. Get guardian's confidence in the primary choice
         guardian_for_choice = sel.guardians.get(chosen_algo_primary)
@@ -125,8 +126,12 @@ def main():
             assert isinstance(backup_pred_dict, dict)
             backup_pred_list = backup_pred_dict.get(inst_name)
             assert isinstance(backup_pred_list, list)
-            if backup_pred_list:
-                final_algo = backup_pred_list[0][0]
+            if backup_pred_list and len(backup_pred_list) > 0:
+                first_backup_item = backup_pred_list[0]
+                assert (
+                    isinstance(first_backup_item, tuple) and len(first_backup_item) >= 1
+                )
+                final_algo = first_backup_item[0]
                 if Y_test.at[inst_name, final_algo] <= budget:
                     backup_success += 1
         else:  # Guardian override

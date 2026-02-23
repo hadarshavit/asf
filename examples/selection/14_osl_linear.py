@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from typing import cast, Sequence
 
 from asf.selectors.osl_linear import OSLLinearSelector
 from asf.metrics import (
@@ -44,7 +43,7 @@ def main():
     )
     sel.fit(X_train, Y_train)
 
-    preds = cast(dict[str, list[tuple[str, float]]], sel.predict(X_test))
+    preds = sel.predict(X_test)
 
     # simple validation of structure
     assert isinstance(preds, dict)
@@ -54,16 +53,13 @@ def main():
         assert isinstance(algo, str) and algo in list(Y.columns)
         assert isinstance(score, (int, float))
 
-    preds_seq: dict[str, Sequence[tuple[str, float] | str]] = cast(
-        dict[str, Sequence[tuple[str, float] | str]], preds
-    )
-    acc = compute_solve_rate(preds_seq, Y_test, budget)
+    acc = compute_solve_rate(preds, Y_test, budget)
 
     # Use ASF metrics for baselines
     sbs_score = single_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
     vbs_score = virtual_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
     par10 = running_time_selector_performance(
-        preds_seq, Y_test, budget=budget, par=10.0, return_per_instance=False
+        preds, Y_test, budget=budget, par=10.0, return_per_instance=False
     )
     oracle = float((Y_test.min(axis=1) <= budget).mean())
 

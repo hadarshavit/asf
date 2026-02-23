@@ -1,4 +1,4 @@
-from typing import List, Any
+from typing import List, Any, cast
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -219,9 +219,9 @@ class APPS(AbstractSelector):
             var2 = np.asarray(sigma_candidates[unequal_mask]) ** 2
 
             a = 0.5 / var1 - 0.5 / var2
-            b = mu_candidates[unequal_mask] / var2 - mu_best_ue / var1
+            b = mu_candidates[unequal_mask] / var2 - cast(float, mu_best_ue) / var1
             c_coeff = (
-                (mu_best_ue**2) / (2 * var1)
+                (cast(float, mu_best_ue) ** 2) / (2 * var1)
                 - (mu_candidates[unequal_mask] ** 2) / (2 * var2)
                 - np.log(
                     np.asarray(sigma_candidates[unequal_mask])
@@ -265,7 +265,7 @@ class APPS(AbstractSelector):
             Array of overlap values for each candidate
         """
         c = self._solve_intersection_vectorized(
-            mu_best, sigma_best, mu_candidates, sigma_candidates
+            float(mu_best), float(sigma_best), mu_candidates, sigma_candidates
         )
 
         # Vectorized CDF computation
