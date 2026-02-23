@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import cast
 
 from asf.selectors.cshc import CSHCSelector
 from asf.selectors.osl_linear import OSLLinearSelector
@@ -72,7 +73,8 @@ def main():
 
     sel.fit(X_train, Y_train)
 
-    preds: dict[str, list[tuple[str, float] | str]] = sel.predict(X_test)
+    preds = sel.predict(X_test)
+    preds = cast(dict[str, list[tuple[str, float] | str]], preds)
     sr = compute_solve_rate(preds, Y_test, budget)
 
     # Use ASF metrics for baselines
@@ -94,10 +96,11 @@ def main():
         inst_feature_df = X_test.loc[[inst_name]]
 
         # 1. Get primary selector's choice
-        primary_pred_dict: dict[str, list[tuple[str, float] | str]] = (
-            sel.primary_selector.predict(inst_feature_df)
-        )
+        primary_pred_dict = sel.primary_selector.predict(inst_feature_df)
         assert isinstance(primary_pred_dict, dict)
+        primary_pred_dict = cast(
+            dict[str, list[tuple[str, float] | str]], primary_pred_dict
+        )
         primary_pred = primary_pred_dict.get(inst_name)
         if not primary_pred:
             continue
@@ -126,8 +129,8 @@ def main():
             backup_used += 1
             backup_pred_dict = sel.backup_selector.predict(inst_feature_df)
             assert isinstance(backup_pred_dict, dict)
-            backup_pred_dict: dict[str, list[tuple[str, float] | str]] = (
-                backup_pred_dict
+            backup_pred_dict = cast(
+                dict[str, list[tuple[str, float] | str]], backup_pred_dict
             )
             backup_pred_list = backup_pred_dict.get(inst_name)
             assert isinstance(backup_pred_list, list)

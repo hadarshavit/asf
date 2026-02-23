@@ -251,9 +251,9 @@ def convert_class_choices_to_categorical(cs: ConfigurationSpace) -> Configuratio
         value_obj = getattr(condition, "value", None)
         # Only pass value if it exists (some conditions don't have a value)
         if value_obj is not None:
-            new_condition = type(condition)(child_hp, parent_hp, value_obj)
+            new_condition = cast(Any, type(condition))(child_hp, parent_hp, value_obj)
         else:
-            new_condition = type(condition)(child_hp, parent_hp)
+            new_condition = cast(Any, type(condition))(child_hp, parent_hp)
         new_cs.add(new_condition)
 
     # Third pass: re-add forbidden clauses

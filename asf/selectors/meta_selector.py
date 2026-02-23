@@ -63,14 +63,14 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
                     pass
 
         if callable(base_selectors):
-            self.base_selectors = cast(list[AbstractSelector], base_selectors())
+            self.base_selectors = cast(Any, base_selectors)()
         else:
             self.base_selectors = (
                 list(base_selectors) if base_selectors is not None else []
             )
 
         if callable(meta_selector):
-            self.meta_selector = cast(AbstractSelector, meta_selector())
+            self.meta_selector = cast(Any, meta_selector)()
         else:
             self.meta_selector = cast(AbstractSelector, meta_selector)
 

@@ -534,10 +534,11 @@ class StackingSelector(ConfigurableMixin, AbstractSelector):
         # Fall back to one-hot encoded predictions
         preds = selector.predict(features)
         if isinstance(preds, dict):
+            preds_dict: dict[str, Any] = cast(Any, preds)
             labels = []
             for idx in features.index:
                 idx_str = str(idx)
-                schedule = preds.get(idx_str) if idx_str in preds else None
+                schedule = preds_dict.get(idx_str) if idx_str in preds_dict else None
                 if schedule and isinstance(schedule, list) and len(schedule) > 0:
                     first_item = schedule[0]
                     if isinstance(first_item, tuple) and len(first_item) >= 1:

@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import cast
 from sklearn.cluster import KMeans
 
 from asf.selectors.isac import ISAC
@@ -101,6 +102,7 @@ if __name__ == "__main__":
         selector.fit(train_features, train_perf)
         preds = selector.predict(test_features)
         assert isinstance(preds, dict)
+        preds = cast(dict[str, list[tuple[str, float] | str]], preds)
         budgeted_preds: dict[str, list[tuple[str, float] | str]] = {}
         for inst, sched in preds.items():
             if isinstance(sched, list) and len(sched) > 0:
@@ -126,6 +128,7 @@ if __name__ == "__main__":
     selector_km.fit(train_features, train_perf)
     preds_km = selector_km.predict(test_features)
     assert isinstance(preds_km, dict)
+    preds_km = cast(dict[str, list[tuple[str, float] | str]], preds_km)
     budgeted_preds_km: dict[str, list[tuple[str, float] | str]] = {}
     for inst, sched in preds_km.items():
         if isinstance(sched, list) and len(sched) > 0:
@@ -145,6 +148,7 @@ if __name__ == "__main__":
     selector_snnap.fit(train_features, train_perf)
     preds_snnap = selector_snnap.predict(test_features)
     assert isinstance(preds_snnap, dict)
+    preds_snnap = cast(dict[str, list[tuple[str, float] | str]], preds_snnap)
     budgeted_preds_snnap: dict[str, list[tuple[str, float] | str]] = {}
     for inst, sched in preds_snnap.items():
         if isinstance(sched, list) and len(sched) > 0:

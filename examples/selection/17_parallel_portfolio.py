@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import cast
 
 from asf.selectors.parallel_portfolio_selector import APPS
 from asf.predictors.random_forest import RandomForestRegressorWrapper
@@ -68,7 +69,8 @@ def main():
             random_state=42,
         )
         sel.fit(X_train, Y_train)
-        preds: dict[str, list[tuple[str, float] | str]] = sel.predict(X_test)
+        preds = sel.predict(X_test)
+        preds = cast(dict[str, list[tuple[str, float] | str]], preds)
 
         # Use ASF metrics for evaluation (handles parallel portfolios correctly)
         solve_rate = compute_solve_rate(preds, Y_test, budget)
@@ -101,8 +103,9 @@ def main():
         random_state=42,
     )
     sel.fit(X_train, Y_train)
-    preds: dict[str, list[tuple[str, float] | str]] = sel.predict(X_test)
+    preds = sel.predict(X_test)
     assert isinstance(preds, dict)
+    preds = cast(dict[str, list[tuple[str, float] | str]], preds)
 
     for inst in list(X_test.index)[:10]:
         portfolio_schedule = preds.get(str(inst), [])

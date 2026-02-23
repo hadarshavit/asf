@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import cast
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 
@@ -79,15 +80,11 @@ def main():
     selector_rf.fit(X_train, Y_train)
     preds_rf = selector_rf.predict(X_test)
     assert isinstance(preds_rf, dict)
-    budgeted_preds_rf: dict[str, list[tuple[str, float]]] = {}
-    for inst, sched in preds_rf.items():
-        if isinstance(sched, list) and len(sched) > 0:
-            budgeted_preds_rf[str(inst)] = [(str(algo), budget) for algo, _ in sched]
-        else:
-            budgeted_preds_rf[str(inst)] = []
-    sr_rf = compute_solve_rate(budgeted_preds_rf, Y_test, budget)
+    preds_rf = cast(dict[str, list[tuple[str, float] | str]], preds_rf)
+
+    sr_rf = compute_solve_rate(preds_rf, Y_test, budget)
     par10_rf = running_time_selector_performance(
-        budgeted_preds_rf, Y_test, budget=budget, par=10.0, return_per_instance=False
+        preds_rf, Y_test, budget=budget, par=10.0, return_per_instance=False
     )
     print(f"  Solve-rate: {sr_rf:.2%} | PAR10: {par10_rf:.2f}")
     print()
@@ -103,15 +100,11 @@ def main():
     selector_dt.fit(X_train, Y_train)
     preds_dt = selector_dt.predict(X_test)
     assert isinstance(preds_dt, dict)
-    budgeted_preds_dt: dict[str, list[tuple[str, float]]] = {}
-    for inst, sched in preds_dt.items():
-        if isinstance(sched, list) and len(sched) > 0:
-            budgeted_preds_dt[str(inst)] = [(str(algo), budget) for algo, _ in sched]
-        else:
-            budgeted_preds_dt[str(inst)] = []
-    sr_dt = compute_solve_rate(budgeted_preds_dt, Y_test, budget)
+    preds_dt = cast(dict[str, list[tuple[str, float] | str]], preds_dt)
+    
+    sr_dt = compute_solve_rate(preds_dt, Y_test, budget)
     par10_dt = running_time_selector_performance(
-        budgeted_preds_dt, Y_test, budget=budget, par=10.0, return_per_instance=False
+        preds_dt, Y_test, budget=budget, par=10.0, return_per_instance=False
     )
     print(f"  Solve-rate: {sr_dt:.2%} | PAR10: {par10_dt:.2f}")
     print()
@@ -129,6 +122,7 @@ def main():
     selector_rf_top3.fit(X_train, Y_train)
     portfolios = selector_rf_top3.predict(X_test)
     assert isinstance(portfolios, dict)
+    portfolios = cast(dict[str, list[tuple[str, float] | str]], portfolios)
     # Convert shortlist to schedules with equal time slices summing to budget
 
     sr_top3 = compute_solve_rate(portfolios, Y_test, budget)
@@ -144,7 +138,7 @@ def main():
     # Show first 10 portfolios and which algorithms solve
     print("\nDetailed portfolios (first 10 instances):")
     for inst in list(X_test.index)[:10]:
-        portfolio = portfolios.get(inst, [])
+        portfolio = portfolios.get(str(inst), [])
         assert isinstance(portfolio, list)
         solvers = []
         if len(portfolio) > 0:

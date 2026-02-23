@@ -73,12 +73,12 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
         super().__init__(**kwargs)
 
         if callable(primary_selector):
-            self.primary_selector = cast(AbstractSelector, primary_selector())
+            self.primary_selector = cast(Any, primary_selector)()
         else:
             self.primary_selector = primary_selector
 
         if callable(backup_selector):
-            self.backup_selector = cast(AbstractSelector, backup_selector())
+            self.backup_selector = cast(Any, backup_selector)()
         else:
             self.backup_selector = backup_selector
 

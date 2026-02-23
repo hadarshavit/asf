@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import cast
 from sklearn.model_selection import train_test_split
 
 from asf.selectors.satzilla import SATzilla
@@ -72,7 +73,7 @@ if __name__ == "__main__":
 
     preds = selector.predict(test_X)
     assert isinstance(preds, dict)
-    preds: dict[str, list[tuple[str, float] | str]] = preds
+    preds = cast(dict[str, list[tuple[str, float] | str]], preds)
 
     # Baselines
     sbs_score = single_best_solver(test_perf, maximize=False, budget=budget, par=10.0)

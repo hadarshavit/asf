@@ -300,10 +300,9 @@ if __name__ == "__main__":
                 print(
                     f"Completed selector: {selector.func.__name__} for scenario: {scenario}\n"
                 )
-            elif hasattr(selector, "__name__"):
-                print(
-                    f"Completed selector: {selector.__name__} for scenario: {scenario}\n"
-                )
+            else:
+                selector_name = getattr(selector, "__name__", str(selector))
+                print(f"Completed selector: {selector_name} for scenario: {scenario}\n")
 
         # Report results after all selectors are evaluated for this scenario
         report_results(scenario)

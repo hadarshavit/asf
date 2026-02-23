@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import cast
 
 from asf.selectors.osl_linear import OSLLinearSelector
 from asf.metrics import (
@@ -47,7 +48,7 @@ def main():
 
     # simple validation of structure
     assert isinstance(preds, dict)
-    preds: dict[str, list[tuple[str, float] | str]] = preds
+    preds = cast(dict[str, list[tuple[str, float] | str]], preds)
     for v in preds.values():
         assert isinstance(v, list) and len(v) == 1
         algo, score = v[0]

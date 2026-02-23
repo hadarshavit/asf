@@ -186,8 +186,8 @@ class APPS(AbstractSelector):
 
     def _solve_intersection_vectorized(
         self,
-        mu_best: np.ndarray,
-        sigma_best: np.ndarray,
+        mu_best: float,
+        sigma_best: float,
         mu_candidates: np.ndarray,
         sigma_candidates: np.ndarray,
     ) -> np.ndarray:

@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import cast
 
 from asf.selectors.dyad_ranking import DyadRanking
 from asf.selectors.simple_ranking import SimpleRanking
@@ -195,10 +196,9 @@ def main():
         maximize=False,
     )
     selector_default.fit(X_train, Y_train)
-    preds_default: dict[str, list[tuple[str, float] | str]] = selector_default.predict(
-        X_test
-    )
+    preds_default = selector_default.predict(X_test)
     assert isinstance(preds_default, dict)
+    preds_default = cast(dict[str, list[tuple[str, float] | str]], preds_default)
 
     sr_default = compute_solve_rate(preds_default, Y_test, budget)
     par10_default = running_time_selector_performance(
@@ -220,8 +220,9 @@ def main():
         maximize=False,
     )
     selector_more.fit(X_train, Y_train)
-    preds_more: dict[str, list[tuple[str, float] | str]] = selector_more.predict(X_test)
+    preds_more = selector_more.predict(X_test)
     assert isinstance(preds_more, dict)
+    preds_more = cast(dict[str, list[tuple[str, float] | str]], preds_more)
 
     sr_more = compute_solve_rate(preds_more, Y_test, budget)
     par10_more = running_time_selector_performance(
@@ -239,10 +240,9 @@ def main():
         maximize=False,
     )
     selector_onehot.fit(X_train, Y_train)
-    preds_onehot: dict[str, list[tuple[str, float] | str]] = selector_onehot.predict(
-        X_test
-    )
+    preds_onehot = selector_onehot.predict(X_test)
     assert isinstance(preds_onehot, dict)
+    preds_onehot = cast(dict[str, list[tuple[str, float] | str]], preds_onehot)
 
     sr_onehot = compute_solve_rate(preds_onehot, Y_test, budget)
     par10_onehot = running_time_selector_performance(
@@ -261,10 +261,9 @@ def main():
         maximize=False,
     )
     selector_simple.fit(X_train, Y_train)
-    preds_simple: dict[str, list[tuple[str, float] | str]] = selector_simple.predict(
-        X_test
-    )
+    preds_simple = selector_simple.predict(X_test)
     assert isinstance(preds_simple, dict)
+    preds_simple = cast(dict[str, list[tuple[str, float] | str]], preds_simple)
 
     sr_simple = compute_solve_rate(preds_simple, Y_test, budget)
     par10_simple = running_time_selector_performance(
@@ -316,8 +315,8 @@ def main():
         f"  SimpleRanking:       PAR10={par10_simple:.2f}, solve-rate={sr_simple:.2%}"
     )
     print()
-    vbs_float = float(vbs_score) if isinstance(vbs_score, (int, float)) else 0.0
-    sbs_float = float(sbs_score) if isinstance(sbs_score, (int, float)) else 0.0
+    vbs_float = float(vbs_score) if isinstance(vbs_score, (int, float, np.integer, np.floating)) else 0.0
+    sbs_float = float(sbs_score) if isinstance(sbs_score, (int, float, np.integer, np.floating)) else 0.0
     print(f"  Gap to VBS:          {float(par10_default) - vbs_float:.2f}")
     print(
         f"  Improvement over SBS: {((sbs_float - float(par10_default)) / sbs_float * 100):.1f}%"
