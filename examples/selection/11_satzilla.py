@@ -84,8 +84,8 @@ if __name__ == "__main__":
     vbs_score = virtual_best_solver(test_perf, maximize=False, budget=budget, par=10.0)
 
     # Selector metrics
-    sr = compute_solve_rate(budgeted_preds, test_perf, budget)  # type: ignore[arg-type]
-    par10 = running_time_selector_performance(  # type: ignore[arg-type]
+    sr = compute_solve_rate(budgeted_preds, test_perf, budget)
+    par10 = running_time_selector_performance(
         budgeted_preds, test_perf, budget=budget, par=10.0, return_per_instance=False
     )
 

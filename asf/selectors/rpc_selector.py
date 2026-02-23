@@ -164,6 +164,7 @@ class RPCSelector(AbstractSelector):
         if budget is None:
             budget = float("inf")
 
+        assert isinstance(features, pd.DataFrame)
         scores = self._compute_copeland_scores(features)
         predictions = {}
 

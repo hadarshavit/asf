@@ -1,6 +1,8 @@
 import pandas as pd
 import pytest
 
+from typing import cast
+
 from asf.selectors.dyad_ranking import DyadRanking
 
 
@@ -61,6 +63,7 @@ def test_dyad_ranking_multiple_algorithms():
 
     predictions = selector.predict(features)
     assert isinstance(predictions, dict)
+    predictions = cast(dict[str, list[tuple[str, float]]], predictions)
     assert len(predictions) == len(features)
     for inst_pred in predictions.values():
         assert len(inst_pred) == 1
@@ -84,7 +87,8 @@ def test_dyad_ranking_parameters(n_pairs):
 
     selector.fit(features, performance)
     predictions = selector.predict(features)
-
+    assert isinstance(predictions, dict)
+    predictions = cast(dict[str, list[tuple[str, float]]], predictions)
     assert len(predictions) == len(features)
     for schedule in predictions.values():
         assert len(schedule) == 1

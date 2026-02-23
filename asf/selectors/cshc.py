@@ -140,11 +140,12 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
             assert isinstance(primary_preds, dict)
             for inst_name, pred_list in primary_preds.items():
                 if pred_list:
+                    assert isinstance(pred_list, list) and len(pred_list) > 0
                     chosen_algo = pred_list[0][0]
                     if Y_val.index.dtype != object:
                         # Convert back to original index type if necessary
                         index_type = cast(Any, Y_val.index.dtype).type
-                        orig_inst_name = index_type(inst_name)  # type: ignore[assignment]
+                        orig_inst_name = index_type(inst_name)
                     else:
                         orig_inst_name = inst_name
 

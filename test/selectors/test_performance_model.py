@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
-from typing import Any
+from typing import Any, cast
 from asf.selectors import PerformanceModel
 from asf.predictors.abstract_predictor import AbstractPredictor
 from asf.predictors import RegressionMLP, XGBoostRegressorWrapper
@@ -50,6 +50,7 @@ def test_performance_model_single_target_branch():
     pm.fit(X, Y)
     preds = pm.predict(X)
     assert isinstance(preds, dict)
+    preds = cast(dict[str, list[tuple[str, float]]], preds)
     assert set(preds.keys()) == set(X.index)
     for lst in preds.values():
         assert isinstance(lst, list)

@@ -198,13 +198,15 @@ def main():
     preds_default = selector_default.predict(X_test)
     assert isinstance(preds_default, dict)
 
-    budgeted_preds_default: dict[str, list[tuple[str, float]]] = {  # type: ignore[misc]
-        inst: [(algo, budget) for algo, _ in sched]
-        for inst, sched in preds_default.items()
-    }
+    budgeted_preds_default: dict[str, list[tuple[str, float]]] = {}
+    for inst, sched in preds_default.items():
+        if isinstance(sched, list):
+            budgeted_preds_default[inst] = [(algo, budget) for algo, _ in sched]
+        else:
+            budgeted_preds_default[inst] = []
 
-    sr_default = compute_solve_rate(budgeted_preds_default, Y_test, budget)  # type: ignore[arg-type]
-    par10_default = running_time_selector_performance(  # type: ignore[arg-type]
+    sr_default = compute_solve_rate(budgeted_preds_default, Y_test, budget)
+    par10_default = running_time_selector_performance(
         budgeted_preds_default,
         Y_test,
         budget=budget,
@@ -226,13 +228,15 @@ def main():
     preds_more = selector_more.predict(X_test)
     assert isinstance(preds_more, dict)
 
-    budgeted_preds_more: dict[str, list[tuple[str, float]]] = {  # type: ignore[misc]
-        inst: [(algo, budget) for algo, _ in sched]
-        for inst, sched in preds_more.items()
-    }
+    budgeted_preds_more: dict[str, list[tuple[str, float]]] = {}
+    for inst, sched in preds_more.items():
+        if isinstance(sched, list):
+            budgeted_preds_more[inst] = [(algo, budget) for algo, _ in sched]
+        else:
+            budgeted_preds_more[inst] = []
 
-    sr_more = compute_solve_rate(budgeted_preds_more, Y_test, budget)  # type: ignore[arg-type]
-    par10_more = running_time_selector_performance(  # type: ignore[arg-type]
+    sr_more = compute_solve_rate(budgeted_preds_more, Y_test, budget)
+    par10_more = running_time_selector_performance(
         budgeted_preds_more, Y_test, budget=budget, par=10.0, return_per_instance=False
     )
     print(f"  Solve-rate: {sr_more:.2%} | PAR10: {par10_more:.2f}")
@@ -250,13 +254,15 @@ def main():
     preds_onehot = selector_onehot.predict(X_test)
     assert isinstance(preds_onehot, dict)
 
-    budgeted_preds_onehot: dict[str, list[tuple[str, float]]] = {  # type: ignore[misc]
-        inst: [(algo, budget) for algo, _ in sched]
-        for inst, sched in preds_onehot.items()
-    }
+    budgeted_preds_onehot: dict[str, list[tuple[str, float]]] = {}
+    for inst, sched in preds_onehot.items():
+        if isinstance(sched, list):
+            budgeted_preds_onehot[inst] = [(algo, budget) for algo, _ in sched]
+        else:
+            budgeted_preds_onehot[inst] = []
 
-    sr_onehot = compute_solve_rate(budgeted_preds_onehot, Y_test, budget)  # type: ignore[arg-type]
-    par10_onehot = running_time_selector_performance(  # type: ignore[arg-type]
+    sr_onehot = compute_solve_rate(budgeted_preds_onehot, Y_test, budget)
+    par10_onehot = running_time_selector_performance(
         budgeted_preds_onehot,
         Y_test,
         budget=budget,
@@ -275,13 +281,15 @@ def main():
     preds_simple = selector_simple.predict(X_test)
     assert isinstance(preds_simple, dict)
 
-    budgeted_preds_simple: dict[str, list[tuple[str, float]]] = {  # type: ignore[misc]
-        inst: [(algo, budget) for algo, _ in sched]
-        for inst, sched in preds_simple.items()
-    }
+    budgeted_preds_simple: dict[str, list[tuple[str, float]]] = {}
+    for inst, sched in preds_simple.items():
+        if isinstance(sched, list):
+            budgeted_preds_simple[inst] = [(algo, budget) for algo, _ in sched]
+        else:
+            budgeted_preds_simple[inst] = []
 
-    sr_simple = compute_solve_rate(budgeted_preds_simple, Y_test, budget)  # type: ignore[arg-type]
-    par10_simple = running_time_selector_performance(  # type: ignore[arg-type]
+    sr_simple = compute_solve_rate(budgeted_preds_simple, Y_test, budget)
+    par10_simple = running_time_selector_performance(
         budgeted_preds_simple,
         Y_test,
         budget=budget,

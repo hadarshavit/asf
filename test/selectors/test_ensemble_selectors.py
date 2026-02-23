@@ -5,6 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
+from typing import cast
+
 
 from asf.selectors import (
     BaggingSelector,
@@ -95,6 +97,7 @@ class TestBaggingSelector:
 
         preds = bagging.predict(test_features)
         assert isinstance(preds, dict)
+        preds = cast(dict[str, list[tuple[str, float]]], preds)
         assert len(preds) == len(test_features)
 
         for instance, schedule in preds.items():

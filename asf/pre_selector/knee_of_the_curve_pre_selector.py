@@ -87,7 +87,11 @@ class KneeOfCurvePreSelector(AbstractPreSelector):
         dfs: list[pd.DataFrame] = []
 
         def process(i: int) -> tuple[int, float, pd.DataFrame]:
-            base_selector = self.base_pre_selector(n_algorithms=i + 1)
+            base_selector = self.base_pre_selector(
+                metric=self.metric,
+                n_algorithms=i + 1,
+                maximize=self.maximize,
+            )
             pre_selected_df = base_selector.fit_transform(performance_frame)
             if not isinstance(pre_selected_df, pd.DataFrame):
                 pre_selected_df = pd.DataFrame(pre_selected_df)

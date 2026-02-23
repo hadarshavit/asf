@@ -2,6 +2,7 @@ from ConfigSpace import ConfigurationSpace
 import numpy as np
 import pytest
 import pandas as pd
+from typing import cast
 from asf.predictors import (
     RegressionMLP,
     XGBoostClassifierWrapper,
@@ -150,7 +151,8 @@ def test_survival_analysis_schedule(dummy_performance, dummy_features):
     selector = SurvivalAnalysis(budget=budget, use_schedule=True)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
-
+    assert isinstance(predictions, dict)
+    predictions = cast(dict[str, list[tuple[str, float]]], predictions)
     assert len(predictions) == len(dummy_features)
     for sched in predictions.values():
         assert isinstance(sched, list)
@@ -217,6 +219,10 @@ def test_sunny_selector(dummy_performance, dummy_features):
 
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
+    from typing import cast
+
+    assert isinstance(predictions, dict)
+    predictions = cast(dict[str, list[tuple[str, float]]], predictions)
     assert len(predictions) == len(dummy_features)
     for sched in predictions.values():
         assert isinstance(sched, list)

@@ -200,6 +200,7 @@ class BaggingSelector(ConfigurableMixin, AbstractSelector):
             if isinstance(preds, dict):
                 for instance, schedule in preds.items():
                     if schedule:
+                        assert isinstance(schedule, list)
                         algo = str(schedule[0][0])
                         votes_for_instance = all_votes[str(instance)]
                         votes_for_instance[algo] = votes_for_instance.get(algo, 0) + 1
@@ -534,7 +535,7 @@ class StackingSelector(ConfigurableMixin, AbstractSelector):
             labels = []
             for idx in features.index:
                 schedule = preds.get(str(idx))
-                if schedule:
+                if schedule and isinstance(schedule, list):
                     labels.append(str(schedule[0][0]))
                 else:
                     labels.append(self.algorithms[0] if self.algorithms else "unknown")

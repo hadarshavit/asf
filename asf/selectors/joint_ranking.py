@@ -167,7 +167,7 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
             data = selected_features.assign(**self.algorithm_features.loc[algorithm])
             # Ensure column order matches training
             data = data[self.algorithm_features.columns.to_list() + self.features]
-            assert not isinstance(self.model, type)
+            assert self.model is not None and not isinstance(self.model, type)
             prediction = self.model.predict(data)
             predictions[:, i] = prediction.flatten()
 

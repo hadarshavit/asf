@@ -427,6 +427,7 @@ class HARRIS(AbstractSelector):
         if budget is None:
             budget = float("inf")
 
+        assert isinstance(features, pd.DataFrame)
         X = features.values
         predictions = {}
 
