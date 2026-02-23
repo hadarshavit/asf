@@ -101,7 +101,7 @@ def main():
     preds_dt = selector_dt.predict(X_test)
     assert isinstance(preds_dt, dict)
     preds_dt = cast(dict[str, list[tuple[str, float] | str]], preds_dt)
-    
+
     sr_dt = compute_solve_rate(preds_dt, Y_test, budget)
     par10_dt = running_time_selector_performance(
         preds_dt, Y_test, budget=budget, par=10.0, return_per_instance=False

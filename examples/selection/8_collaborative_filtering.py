@@ -123,7 +123,9 @@ if __name__ == "__main__":
     # 1. Predict on training set (no NaNs)
     predictions_train = selector.predict(None, None)
     assert isinstance(predictions_train, dict)
-    predictions_train = cast(dict[str, list[tuple[str, float] | str]], predictions_train)
+    predictions_train = cast(
+        dict[str, list[tuple[str, float] | str]], predictions_train
+    )
 
     sr_train = compute_solve_rate(predictions_train, train_performance_full, budget)
     par10_train = running_time_selector_performance(
@@ -141,7 +143,9 @@ if __name__ == "__main__":
     # 2. Predict on test set (with sparse performance matrix)
     predictions_test_perf = selector.predict(None, test_performance)
     assert isinstance(predictions_test_perf, dict)
-    predictions_test_perf = cast(dict[str, list[tuple[str, float] | str]], predictions_test_perf)
+    predictions_test_perf = cast(
+        dict[str, list[tuple[str, float] | str]], predictions_test_perf
+    )
     sr_test_perf = compute_solve_rate(
         predictions_test_perf, test_performance_full, budget
     )
@@ -162,7 +166,9 @@ if __name__ == "__main__":
     # 3. Predict on test set (cold start, using features only)
     predictions_test_feat = selector.predict(test_features, None)
     assert isinstance(predictions_test_feat, dict)
-    predictions_test_feat = cast(dict[str, list[tuple[str, float] | str]], predictions_test_feat)
+    predictions_test_feat = cast(
+        dict[str, list[tuple[str, float] | str]], predictions_test_feat
+    )
 
     sr_test_feat = compute_solve_rate(
         predictions_test_feat, test_performance_full, budget

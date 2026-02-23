@@ -158,7 +158,9 @@ if __name__ == "__main__":
     schedule_selector.fit(train_features, train_performance)
     schedule_predictions = schedule_selector.predict(test_features)
     assert isinstance(schedule_predictions, dict)
-    schedule_predictions = cast(dict[str, list[tuple[str, float] | str]], schedule_predictions)
+    schedule_predictions = cast(
+        dict[str, list[tuple[str, float] | str]], schedule_predictions
+    )
 
     print("Predicted algorithm schedules for each test instance:")
     for i, instance in enumerate(test_features.index):

@@ -315,8 +315,16 @@ def main():
         f"  SimpleRanking:       PAR10={par10_simple:.2f}, solve-rate={sr_simple:.2%}"
     )
     print()
-    vbs_float = float(vbs_score) if isinstance(vbs_score, (int, float, np.integer, np.floating)) else 0.0
-    sbs_float = float(sbs_score) if isinstance(sbs_score, (int, float, np.integer, np.floating)) else 0.0
+    vbs_float = (
+        float(vbs_score)
+        if isinstance(vbs_score, (int, float, np.integer, np.floating))
+        else 0.0
+    )
+    sbs_float = (
+        float(sbs_score)
+        if isinstance(sbs_score, (int, float, np.integer, np.floating))
+        else 0.0
+    )
     print(f"  Gap to VBS:          {float(par10_default) - vbs_float:.2f}")
     print(
         f"  Improvement over SBS: {((sbs_float - float(par10_default)) / sbs_float * 100):.1f}%"

@@ -184,7 +184,9 @@ if __name__ == "__main__":
     selector_tsunny.fit(train_features, train_performance)
     predictions_tsunny = selector_tsunny.predict(test_features)
     assert isinstance(predictions_tsunny, dict)
-    predictions_tsunny = cast(dict[str, list[tuple[str, float] | str]], predictions_tsunny)
+    predictions_tsunny = cast(
+        dict[str, list[tuple[str, float] | str]], predictions_tsunny
+    )
     sr_tsunny = compute_solve_rate(predictions_tsunny, test_performance, budget)
     par10_tsunny = running_time_selector_performance(
         predictions_tsunny,
@@ -206,7 +208,9 @@ if __name__ == "__main__":
     selector_hardcoded.fit(train_features, train_performance)
     predictions_hardcoded = selector_hardcoded.predict(test_features)
     assert isinstance(predictions_hardcoded, dict)
-    predictions_hardcoded = cast(dict[str, list[tuple[str, float] | str]], predictions_hardcoded)
+    predictions_hardcoded = cast(
+        dict[str, list[tuple[str, float] | str]], predictions_hardcoded
+    )
     sr_hardcoded = compute_solve_rate(predictions_hardcoded, test_performance, budget)
     par10_hardcoded = running_time_selector_performance(
         predictions_hardcoded,
@@ -230,7 +234,9 @@ if __name__ == "__main__":
     selector_combined.fit(train_features, train_performance)
     predictions_combined = selector_combined.predict(test_features)
     assert isinstance(predictions_combined, dict)
-    predictions_combined = cast(dict[str, list[tuple[str, float] | str]], predictions_combined)
+    predictions_combined = cast(
+        dict[str, list[tuple[str, float] | str]], predictions_combined
+    )
     sr_combined = compute_solve_rate(predictions_combined, test_performance, budget)
     par10_combined = running_time_selector_performance(
         predictions_combined,
