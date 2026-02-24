@@ -27,6 +27,8 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
 
     Trains multiple base selectors and uses another selector (the meta-selector)
     to choose among them for each instance based on their out-of-fold performance.
+
+    Important: All base selectors and the meta selector must have RETURN_TYPE 'single'
     """
 
     base_selectors: list[AbstractSelector]
@@ -51,6 +53,27 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
     ) -> None:
         """
         Initialize the MetaSelector.
+
+        Parameters
+        ----------
+        base_selectors : list[AbstractSelector] or Callable or None, default=None
+            List of base selectors to ensemble, a callable that returns a list of
+            selectors, or None if candidate_selectors is provided.
+        meta_selector : AbstractSelector or Callable or None, default=None
+            The selector to use for choosing among base selectors, or a callable
+            that returns a selector instance.
+        candidate_selectors : list[type] or None, default=None
+            List of selector classes to instantiate as base selectors if
+            base_selectors is None.
+        par_factor : int, default=10
+            Penalty factor for timeout instances when computing meta-features.
+            Penalty = budget * par_factor.
+        n_folds : int, default=5
+            Number of folds for cross-validation during meta-selector training.
+        random_state : int, default=42
+            Random seed for the KFold cross-validation splitter.
+        **kwargs : Any
+            Additional keyword arguments passed to parent class.
         """
         super().__init__(**kwargs)
 
