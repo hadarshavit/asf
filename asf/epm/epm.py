@@ -116,11 +116,12 @@ class EPM:
         if self.features_preprocessing is not None and not isinstance(
             self.features_preprocessing, str
         ):
-            X_df = self.features_preprocessing.fit_transform(X_df)  # type: ignore
+            X_df = self.features_preprocessing.fit_transform(X_df)
 
         self.normalization = self.normalization_class()
         self.normalization.fit(np.asarray(y_ser))
         y_ser_scaled = self.normalization.transform(np.asarray(y_ser))
+        assert y_ser is not None
         y_ser = pd.Series(y_ser_scaled, index=y_ser.index)
 
         if self.imputer is not None:

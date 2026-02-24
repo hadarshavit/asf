@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import Sequence, cast
+from typing import cast
 
 from asf.selectors.cshc import CSHCSelector
 from asf.selectors.osl_linear import OSLLinearSelector
@@ -73,7 +73,8 @@ def main():
 
     sel.fit(X_train, Y_train)
 
-    preds = cast(dict[str, Sequence[tuple[str, float] | str]], sel.predict(X_test))
+    preds = sel.predict(X_test)
+    preds = cast(dict[str, list[tuple[str, float] | str]], preds)
     sr = compute_solve_rate(preds, Y_test, budget)
 
     # Use ASF metrics for baselines
@@ -95,14 +96,22 @@ def main():
         inst_feature_df = X_test.loc[[inst_name]]
 
         # 1. Get primary selector's choice
-        primary_pred = sel.primary_selector.predict(inst_feature_df).get(inst_name)
+        primary_pred_dict = sel.primary_selector.predict(inst_feature_df)
+        assert isinstance(primary_pred_dict, dict)
+        primary_pred_dict = cast(
+            dict[str, list[tuple[str, float] | str]], primary_pred_dict
+        )
+        primary_pred = primary_pred_dict.get(inst_name)
         if not primary_pred:
             continue
 
-        chosen_algo_primary = primary_pred[0][0]
+        assert isinstance(primary_pred, list) and len(primary_pred) > 0
+        first_item = primary_pred[0]
+        assert isinstance(first_item, tuple) and len(first_item) >= 1
+        chosen_algo_primary = first_item[0]
 
         # 2. Get guardian's confidence in the primary choice
-        guardian_for_choice = sel.guardians.get(chosen_algo_primary)
+        guardian_for_choice = sel.guardians.get(str(chosen_algo_primary))
         prob_success = (
             guardian_for_choice.predict_proba(inst_feature_df)[0, 1]
             if guardian_for_choice
@@ -118,11 +127,19 @@ def main():
                 primary_success += 1
         elif sel.backup_selector:
             backup_used += 1
-            backup_pred_list = sel.backup_selector.predict(inst_feature_df).get(
-                inst_name
+            backup_pred_dict = sel.backup_selector.predict(inst_feature_df)
+            assert isinstance(backup_pred_dict, dict)
+            backup_pred_dict = cast(
+                dict[str, list[tuple[str, float] | str]], backup_pred_dict
             )
-            if backup_pred_list:
-                final_algo = backup_pred_list[0][0]
+            backup_pred_list = backup_pred_dict.get(inst_name)
+            assert isinstance(backup_pred_list, list)
+            if backup_pred_list and len(backup_pred_list) > 0:
+                first_backup_item = backup_pred_list[0]
+                assert (
+                    isinstance(first_backup_item, tuple) and len(first_backup_item) >= 1
+                )
+                final_algo = first_backup_item[0]
                 if Y_test.at[inst_name, final_algo] <= budget:
                     backup_success += 1
         else:  # Guardian override
@@ -182,7 +199,7 @@ def main():
     print()
     print("Sample decisions (first 12):")
     for inst in list(X_test.index)[:12]:
-        algo, _ = preds.get(inst, [(None, None)])[0]
+        algo, _ = preds.get(str(inst), [(None, None)])[0]
         rt = Y_test.at[inst, algo] if algo is not None else float("nan")
         print(f"{inst}: chosen={algo}, true_rt={rt:.2f}")
     print("=" * 60)

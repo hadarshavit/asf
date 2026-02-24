@@ -1,5 +1,5 @@
 import os
-from typing import Sequence, cast
+from typing import cast
 
 from asf.selectors.cosine_selector import CosineSelector
 from asf.scenario.aslib_reader import read_aslib_scenario
@@ -54,12 +54,11 @@ def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
     )
     sel.fit(X_train, Y_train, algorithm_features=alg_df)
 
-    preds_seq: dict[str, Sequence[tuple[str, float] | str]] = cast(
-        dict[str, Sequence[tuple[str, float] | str]], sel.predict(X_test)
-    )
-    sr = compute_solve_rate(preds_seq, Y_test, budget)
+    preds = sel.predict(X_test)
+    preds = cast(dict[str, list[tuple[str, float] | str]], preds)
+    sr = compute_solve_rate(preds, Y_test, budget)
     par10 = running_time_selector_performance(
-        preds_seq, Y_test, budget=budget, par=10.0, return_per_instance=False
+        preds, Y_test, budget=budget, par=10.0, return_per_instance=False
     )
 
     best = ((Y_train <= budget).mean(axis=0)).idxmax()
@@ -89,12 +88,12 @@ def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
     print()
     print("Sample decisions (first 12):")
     for inst in list(X_test.index)[:12]:
-        algo, score = cast(dict, preds_seq).get(inst, [(None, None)])[0]
+        algo, score = cast(dict, preds).get(inst, [(None, None)])[0]
         rt = Y_test.at[inst, algo] if algo is not None else float("nan")
         print(f"{inst}: chosen={algo} predicted_score={score:.4f} true_rt={rt:.2f}")
     print("=" * 60)
 
-    return sel, X_test, Y_test, preds_seq
+    return sel, X_test, Y_test, preds
 
 
 if __name__ == "__main__":

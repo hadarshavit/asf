@@ -2,6 +2,7 @@ from ConfigSpace import ConfigurationSpace
 import numpy as np
 import pytest
 import pandas as pd
+from typing import cast
 from asf.predictors import (
     RegressionMLP,
     XGBoostClassifierWrapper,
@@ -115,7 +116,7 @@ def validate_predictions(predictions):
 
 
 def test_simple_ranking(dummy_performance, dummy_features):
-    selector = SimpleRanking(model_class=XGBRanker, budget=450.0)  # type: ignore[arg-type]
+    selector = SimpleRanking(model_class=XGBRanker, budget=450.0)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
@@ -150,9 +151,10 @@ def test_survival_analysis_schedule(dummy_performance, dummy_features):
     selector = SurvivalAnalysis(budget=budget, use_schedule=True)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
-
+    assert isinstance(predictions, dict)
+    predictions = cast(dict[str, list[tuple[str, float]]], predictions)
     assert len(predictions) == len(dummy_features)
-    for sched in predictions.values():  # type: ignore[attr-defined]
+    for sched in predictions.values():
         assert isinstance(sched, list)
         assert all(isinstance(x, tuple) and len(x) == 2 for x in sched)
         assert all(
@@ -217,8 +219,12 @@ def test_sunny_selector(dummy_performance, dummy_features):
 
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
+    from typing import cast
+
+    assert isinstance(predictions, dict)
+    predictions = cast(dict[str, list[tuple[str, float]]], predictions)
     assert len(predictions) == len(dummy_features)
-    for sched in predictions.values():  # type: ignore[attr-defined]
+    for sched in predictions.values():
         assert isinstance(sched, list)
         assert all(
             isinstance(x, tuple) and len(x) == 2
@@ -285,7 +291,7 @@ def test_meta_selector(dummy_performance, dummy_features):
         SATzilla(budget=budget),
         ISAC(budget=budget),
     ]
-    meta_sel = SimpleRanking(model_class=XGBRanker, budget=budget)  # type: ignore[arg-type]
+    meta_sel = SimpleRanking(model_class=XGBRanker, budget=budget)
 
     meta = MetaSelector(
         base_selectors=base_selectors, meta_selector=meta_sel, budget=budget, n_folds=2
@@ -303,7 +309,7 @@ def test_meta_selector_rejects_schedule_base(dummy_performance, dummy_features):
     with pytest.raises(ValueError):
         MetaSelector(
             base_selectors=[SNNAP(k=3, budget=budget), ISA(budget=budget)],
-            meta_selector=SimpleRanking(model_class=XGBRanker, budget=budget),  # type: ignore[arg-type]
+            meta_selector=SimpleRanking(model_class=XGBRanker, budget=budget),
             budget=budget,
         )
 
@@ -464,8 +470,8 @@ def test_cosine_selector_default(dummy_performance, dummy_features):
             [0.0, 1.0],
             [0.5, 0.5],
         ],
-        index=["algo1", "algo2", "algo3"],  # type: ignore[arg-type]
-        columns=["af1", "af2"],  # type: ignore[arg-type]
+        index=["algo1", "algo2", "algo3"],
+        columns=["af1", "af2"],
     )
 
     sel = CosineSelector(
@@ -487,8 +493,8 @@ def test_cosine_selector_custom_params(dummy_performance, dummy_features):
             [0.0, 1.0],
             [0.5, 0.5],
         ],
-        index=["algo1", "algo2", "algo3"],  # type: ignore[arg-type]
-        columns=["af1", "af2"],  # type: ignore[arg-type]
+        index=["algo1", "algo2", "algo3"],
+        columns=["af1", "af2"],
     )
 
     sel = CosineSelector(

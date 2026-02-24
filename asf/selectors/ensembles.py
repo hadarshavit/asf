@@ -9,7 +9,7 @@ This module provides ensemble methods for combining multiple algorithm selectors
 from __future__ import annotations
 
 import copy
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import numpy as np
 import pandas as pd
@@ -200,10 +200,12 @@ class BaggingSelector(ConfigurableMixin, AbstractSelector):
             if isinstance(preds, dict):
                 for instance, schedule in preds.items():
                     if schedule:
-                        algo = str(schedule[0][0])
-                        all_votes[str(instance)][algo] = (
-                            all_votes[str(instance)].get(algo, 0) + 1
-                        )
+                        assert isinstance(schedule, list)
+                        first_item = schedule[0]
+                        assert isinstance(first_item, tuple) and len(first_item) >= 1
+                        algo = str(first_item[0])
+                        votes_for_instance = all_votes[str(instance)]
+                        votes_for_instance[algo] = votes_for_instance.get(algo, 0) + 1
 
         # Aggregate votes
         result: dict[str, list[tuple[str, float]]] = {}
@@ -248,7 +250,10 @@ class BaggingSelector(ConfigurableMixin, AbstractSelector):
 
         if base_selector_class:
             hyperparameters.append(
-                ClassChoice("base_selector", choices=base_selector_class)
+                ClassChoice(
+                    "base_selector",
+                    choices=cast(list[type | bool], base_selector_class),
+                )
             )
 
         return hyperparameters, [], []
@@ -529,11 +534,19 @@ class StackingSelector(ConfigurableMixin, AbstractSelector):
         # Fall back to one-hot encoded predictions
         preds = selector.predict(features)
         if isinstance(preds, dict):
+            preds_dict: dict[str, Any] = cast(Any, preds)
             labels = []
             for idx in features.index:
-                schedule = preds.get(str(idx), [])
-                if schedule:
-                    labels.append(str(schedule[0][0]))
+                idx_str = str(idx)
+                schedule = preds_dict.get(idx_str) if idx_str in preds_dict else None
+                if schedule and isinstance(schedule, list) and len(schedule) > 0:
+                    first_item = schedule[0]
+                    if isinstance(first_item, tuple) and len(first_item) >= 1:
+                        labels.append(str(first_item[0]))
+                    else:
+                        labels.append(
+                            self.algorithms[0] if self.algorithms else "unknown"
+                        )
                 else:
                     labels.append(self.algorithms[0] if self.algorithms else "unknown")
         else:
@@ -702,7 +715,10 @@ class StackingSelector(ConfigurableMixin, AbstractSelector):
         preds = self.meta_selector_.predict(meta_features)
 
         if isinstance(preds, dict):
-            return {str(k): v for k, v in preds.items()}
+            return cast(
+                dict[str, list[tuple[str, int | float]]],
+                {str(k): v for k, v in preds.items()},
+            )
 
         # Handle other return types
         result: dict[str, list[tuple[str, float]]] = {}
@@ -743,7 +759,10 @@ class StackingSelector(ConfigurableMixin, AbstractSelector):
 
         if meta_selector_classes:
             hyperparameters.append(
-                ClassChoice("meta_selector", choices=meta_selector_classes)
+                ClassChoice(
+                    "meta_selector",
+                    choices=cast(list[type | bool], meta_selector_classes),
+                )
             )
 
         return hyperparameters, [], []

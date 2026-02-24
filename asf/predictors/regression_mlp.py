@@ -136,7 +136,7 @@ class RegressionMLP(AbstractPredictor, ConfigurableMixin):
             input_size = X.shape[1] if hasattr(X, "shape") else len(X.columns)
             self.model = get_mlp(input_size=input_size, output_size=1)
 
-        self.model.to(self.device)  # type: ignore[attr-defined]
+        self.model.to(self.device)
 
         if self.compile_model:
             self.model = torch.compile(self.model)
@@ -149,11 +149,11 @@ class RegressionMLP(AbstractPredictor, ConfigurableMixin):
         dataloader = self._get_dataloader(features_imputed, Y)
 
         optimizer = self.optimizer(
-            self.model.parameters(),  # type: ignore[attr-defined]
+            self.model.parameters(),
             lr=self.learning_rate,
             weight_decay=self.weight_decay,
         )
-        self.model.train()  # type: ignore[attr-defined]
+        self.model.train()
         for epoch in range(self.epochs):
             total_loss = 0.0
             for i, (X_batch, y_batch) in enumerate(dataloader):
@@ -187,7 +187,7 @@ class RegressionMLP(AbstractPredictor, ConfigurableMixin):
         """
         if self.model is None:
             raise RuntimeError("Model not fitted")
-        self.model.eval()  # type: ignore[attr-defined]
+        self.model.eval()
 
         features_tensor = torch.from_numpy(X.values).to(self.device).float()
         predictions = self.model(features_tensor).detach().cpu().numpy().squeeze(1)

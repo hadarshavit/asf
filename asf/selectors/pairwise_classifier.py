@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -193,7 +193,7 @@ class PairwiseClassifier(
             model_class = [RandomForestClassifierWrapper, XGBoostClassifierWrapper]
 
         hyperparameters = [
-            ClassChoice("model_class", choices=model_class),
+            ClassChoice("model_class", choices=cast(list[type | bool], model_class)),
             Categorical("use_weights", items=[True, False], default=True),
         ]
         return hyperparameters, [], []

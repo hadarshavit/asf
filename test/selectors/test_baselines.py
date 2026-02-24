@@ -65,7 +65,9 @@ class TestSingleBestSolver:
         for inst_id, schedule in predictions.items():
             assert isinstance(schedule, list)
             assert len(schedule) > 0
-            algo, time = schedule[0]
+            first_item = schedule[0]
+            assert isinstance(first_item, tuple)
+            algo, _ = first_item
             assert isinstance(algo, str)
 
     def test_predict_with_new_features(self):

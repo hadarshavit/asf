@@ -113,13 +113,13 @@ else:
     # Use Any to silence type checker complaining about union types
     from typing import Any
 
-    class RegressionDataset(Any):  # type: ignore
+    class RegressionDataset(Any):
         def __init__(self, *args, **kwargs):
             raise RuntimeError(
                 "PyTorch is not installed. Install it with: pip install torch"
             )
 
-    class RankingDataset(Any):  # type: ignore
+    class RankingDataset(Any):
         def __init__(self, *args, **kwargs):
             raise RuntimeError(
                 "PyTorch is not installed. Install it with: pip install torch"

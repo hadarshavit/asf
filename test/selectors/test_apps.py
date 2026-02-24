@@ -1,3 +1,5 @@
+from typing import cast
+
 from asf.selectors.parallel_portfolio_selector import APPS
 from asf.predictors.random_forest import RandomForestRegressorWrapper
 import numpy as np
@@ -14,6 +16,8 @@ def test_apps_selector(dummy_performance, dummy_features):
 
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
+    assert isinstance(predictions, dict)
+    predictions = cast(dict[str, list[tuple[str, float]]], predictions)
 
     assert len(predictions) == len(dummy_features), "Predictions length mismatch"
     assert all(isinstance(v, list) for v in predictions.values()), (
@@ -21,6 +25,7 @@ def test_apps_selector(dummy_performance, dummy_features):
     )
 
     for inst_name, portfolio in predictions.items():
+        assert isinstance(portfolio, list)
         assert len(portfolio) > 0, f"Empty portfolio for {inst_name}"
         assert all(isinstance(item, tuple) and len(item) == 2 for item in portfolio), (
             f"Portfolio for {inst_name} should contain (algo, budget) tuples"
@@ -47,6 +52,8 @@ def test_apps_selector_different_thresholds(dummy_performance, dummy_features):
         )
         selector.fit(dummy_features, dummy_performance)
         predictions = selector.predict(dummy_features)
+        assert isinstance(predictions, dict)
+        predictions = cast(dict[str, list[tuple[str, float]]], predictions)
 
         avg_size = np.mean([len(portfolio) for portfolio in predictions.values()])
         portfolios_by_p[p_val] = avg_size

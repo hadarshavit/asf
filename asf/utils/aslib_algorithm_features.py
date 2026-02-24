@@ -35,7 +35,7 @@ def _load_arff_bytes(b: bytes) -> pd.DataFrame:
     )
     obj = arff.load(io.StringIO(text))
     cols = [str(c[0]) for c in obj["attributes"]]
-    return pd.DataFrame(obj["data"], columns=cols)  # type: ignore[arg-type]
+    return pd.DataFrame(obj["data"], columns=cols)
 
 
 def get_algorithm_features_from_aslib(scenario_dir: str) -> pd.DataFrame:

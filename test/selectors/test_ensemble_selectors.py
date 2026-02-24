@@ -5,6 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
+from typing import cast
+
 
 from asf.selectors import (
     BaggingSelector,
@@ -95,12 +97,13 @@ class TestBaggingSelector:
 
         preds = bagging.predict(test_features)
         assert isinstance(preds, dict)
+        preds = cast(dict[str, list[tuple[str, float]]], preds)
         assert len(preds) == len(test_features)
 
         for instance, schedule in preds.items():
             assert isinstance(instance, str)
             assert isinstance(schedule, list)
-            if schedule:
+            if schedule and len(schedule) > 0:
                 assert len(schedule[0]) == 2  # (algo, budget)
 
     def test_bootstrap_sampling(
@@ -202,6 +205,7 @@ class TestVotingSelector:
 
         voting.fit(features, performance)
         preds = voting.predict(test_features)
+        assert isinstance(preds, dict)
 
         # Should return valid predictions
         assert all(isinstance(v, list) for v in preds.values())

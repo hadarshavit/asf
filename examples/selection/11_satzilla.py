@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import cast
 from sklearn.model_selection import train_test_split
 
 from asf.selectors.satzilla import SATzilla
@@ -71,20 +72,17 @@ if __name__ == "__main__":
     print(test_perf.head(10))
 
     preds = selector.predict(test_X)
-
-    # Metrics expect (algo, allocated_time); SATzilla schedules contain scores, so wrap with budget
-    budgeted_preds = {
-        inst: [(algo, budget) for algo, _ in sched] for inst, sched in preds.items()
-    }
+    assert isinstance(preds, dict)
+    preds = cast(dict[str, list[tuple[str, float] | str]], preds)
 
     # Baselines
     sbs_score = single_best_solver(test_perf, maximize=False, budget=budget, par=10.0)
     vbs_score = virtual_best_solver(test_perf, maximize=False, budget=budget, par=10.0)
 
     # Selector metrics
-    sr = compute_solve_rate(budgeted_preds, test_perf, budget)
+    sr = compute_solve_rate(preds, test_perf, budget)
     par10 = running_time_selector_performance(
-        budgeted_preds, test_perf, budget=budget, par=10.0, return_per_instance=False
+        preds, test_perf, budget=budget, par=10.0, return_per_instance=False
     )
 
     print("\nSATzilla example")

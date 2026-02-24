@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -196,7 +196,7 @@ class SimpleRanking(ConfigurableMixin, AbstractModelBasedSelector):
 
         model_class_param = ClassChoice(
             name="model_class",
-            choices=model_class,
+            choices=cast(list[type | bool], model_class),
             default=model_class[0],
         )
 

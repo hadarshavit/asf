@@ -276,6 +276,7 @@ class HybridDecisionTree:
             Predicted performances for the single instance (n_algorithms,)
         """
         if self.is_leaf:
+            assert self.regression_label is not None
             return self.regression_label
 
         if x[self.feature_idx] <= self.threshold:
@@ -410,8 +411,8 @@ class HARRIS(AbstractSelector):
             self.feature_indices_per_tree.append(feature_indices)
 
     def _predict(
-        self, features: pd.DataFrame, performance: pd.DataFrame | None = None
-    ) -> dict:
+        self, features: pd.DataFrame | None, performance: pd.DataFrame | None = None
+    ) -> dict[str, list[tuple[str, float]]]:
         """
         Predict the best algorithm for each instance.
 
@@ -426,6 +427,7 @@ class HARRIS(AbstractSelector):
         if budget is None:
             budget = float("inf")
 
+        assert isinstance(features, pd.DataFrame)
         X = features.values
         predictions = {}
 

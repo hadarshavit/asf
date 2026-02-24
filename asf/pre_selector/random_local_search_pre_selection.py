@@ -83,10 +83,10 @@ class RandomLocalSearchPreSelector(AbstractPreSelector):
         for _ in range(self.max_iterations):
             improved = False
             subset_indices = list(range(len(current_subset)))
-            rng.shuffle(subset_indices)  # type: ignore
+            rng.shuffle(subset_indices)
 
             not_in_subset = [a for a in all_algorithms if a not in current_subset]
-            rng.shuffle(not_in_subset)  # type: ignore
+            rng.shuffle(not_in_subset)
 
             for i in subset_indices:
                 for new_algo in not_in_subset:
@@ -131,7 +131,7 @@ class RandomLocalSearchPreSelector(AbstractPreSelector):
         if isinstance(performance, np.ndarray):
             performance_frame = pd.DataFrame(
                 performance,
-                columns=[f"Algorithm_{i}" for i in range(performance.shape[1])],  # type: ignore[arg-type]
+                columns=[f"Algorithm_{i}" for i in range(performance.shape[1])],
             )
             is_numpy = True
         else:

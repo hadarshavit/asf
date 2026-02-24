@@ -1,4 +1,4 @@
-from typing import List, Any
+from typing import List, Any, cast
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -186,8 +186,8 @@ class APPS(AbstractSelector):
 
     def _solve_intersection_vectorized(
         self,
-        mu_best: np.ndarray,
-        sigma_best: np.ndarray,
+        mu_best: float,
+        sigma_best: float,
         mu_candidates: np.ndarray,
         sigma_candidates: np.ndarray,
     ) -> np.ndarray:
@@ -210,20 +210,32 @@ class APPS(AbstractSelector):
         # Compute for unequal variance cases
         unequal_mask = ~equal_var
         if np.any(unequal_mask):
-            sigma_best_ue = (
-                sigma_best if np.isscalar(sigma_best) else sigma_best[unequal_mask]
-            )
-            mu_best_ue = mu_best if np.isscalar(mu_best) else mu_best[unequal_mask]
+            sigma_best_arr = np.asarray(sigma_best)
+            mu_best_arr = np.asarray(mu_best)
 
-            var1 = sigma_best_ue**2
-            var2 = sigma_candidates[unequal_mask] ** 2
+            if sigma_best_arr.ndim == 0:
+                sigma_best_ue = cast(float, sigma_best_arr.item())
+            else:
+                sigma_best_ue = sigma_best_arr[unequal_mask]
+
+            if mu_best_arr.ndim == 0:
+                mu_best_ue = cast(float, mu_best_arr.item())
+            else:
+                mu_best_ue = mu_best_arr[unequal_mask]
+
+            var1 = np.asarray(sigma_best_ue) ** 2
+            var2 = np.asarray(sigma_candidates[unequal_mask]) ** 2
 
             a = 0.5 / var1 - 0.5 / var2
-            b = mu_candidates[unequal_mask] / var2 - mu_best_ue / var1
+            mu_best_arr = np.asarray(mu_best_ue)
+            b = mu_candidates[unequal_mask] / var2 - mu_best_arr / var1
             c_coeff = (
-                (mu_best_ue**2) / (2 * var1)
+                (mu_best_arr**2) / (2 * var1)
                 - (mu_candidates[unequal_mask] ** 2) / (2 * var2)
-                - np.log(sigma_candidates[unequal_mask] / sigma_best_ue)
+                - np.log(
+                    np.asarray(sigma_candidates[unequal_mask])
+                    / np.asarray(sigma_best_ue)
+                )
             )
 
             delta = b**2 - 4 * a * c_coeff
@@ -262,7 +274,7 @@ class APPS(AbstractSelector):
             Array of overlap values for each candidate
         """
         c = self._solve_intersection_vectorized(
-            mu_best, sigma_best, mu_candidates, sigma_candidates
+            float(mu_best), float(sigma_best), mu_candidates, sigma_candidates
         )
 
         # Vectorized CDF computation

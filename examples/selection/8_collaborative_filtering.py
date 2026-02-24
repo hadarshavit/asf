@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from typing import cast
 
 from asf.selectors.collaborative_filtering_selector import (
     CollaborativeFilteringSelector,
@@ -121,14 +122,14 @@ if __name__ == "__main__":
 
     # 1. Predict on training set (no NaNs)
     predictions_train = selector.predict(None, None)
-    # Wrap predictions with budget allocation for metrics
-    budgeted_train = {
-        inst: [(algo, budget) for algo, _ in sched]
-        for inst, sched in predictions_train.items()
-    }
-    sr_train = compute_solve_rate(budgeted_train, train_performance_full, budget)
+    assert isinstance(predictions_train, dict)
+    predictions_train = cast(
+        dict[str, list[tuple[str, float] | str]], predictions_train
+    )
+
+    sr_train = compute_solve_rate(predictions_train, train_performance_full, budget)
     par10_train = running_time_selector_performance(
-        budgeted_train,
+        predictions_train,
         train_performance_full,
         budget=budget,
         par=10.0,
@@ -141,13 +142,15 @@ if __name__ == "__main__":
 
     # 2. Predict on test set (with sparse performance matrix)
     predictions_test_perf = selector.predict(None, test_performance)
-    budgeted_test_perf = {
-        inst: [(algo, budget) for algo, _ in sched]
-        for inst, sched in predictions_test_perf.items()
-    }
-    sr_test_perf = compute_solve_rate(budgeted_test_perf, test_performance_full, budget)
+    assert isinstance(predictions_test_perf, dict)
+    predictions_test_perf = cast(
+        dict[str, list[tuple[str, float] | str]], predictions_test_perf
+    )
+    sr_test_perf = compute_solve_rate(
+        predictions_test_perf, test_performance_full, budget
+    )
     par10_test_perf = running_time_selector_performance(
-        budgeted_test_perf,
+        predictions_test_perf,
         test_performance_full,
         budget=budget,
         par=10.0,
@@ -162,13 +165,16 @@ if __name__ == "__main__":
 
     # 3. Predict on test set (cold start, using features only)
     predictions_test_feat = selector.predict(test_features, None)
-    budgeted_test_feat = {
-        inst: [(algo, budget) for algo, _ in sched]
-        for inst, sched in predictions_test_feat.items()
-    }
-    sr_test_feat = compute_solve_rate(budgeted_test_feat, test_performance_full, budget)
+    assert isinstance(predictions_test_feat, dict)
+    predictions_test_feat = cast(
+        dict[str, list[tuple[str, float] | str]], predictions_test_feat
+    )
+
+    sr_test_feat = compute_solve_rate(
+        predictions_test_feat, test_performance_full, budget
+    )
     par10_test_feat = running_time_selector_performance(
-        budgeted_test_feat,
+        predictions_test_feat,
         test_performance_full,
         budget=budget,
         par=10.0,

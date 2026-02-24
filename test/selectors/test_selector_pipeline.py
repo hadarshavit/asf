@@ -144,8 +144,9 @@ class TestSelectorPipelineConfig:
         hp1 = hps[hp_name_1]
 
         # Check choices
-        assert "DummyPreprocessor1" in hp1.choices
-        assert "False" in hp1.choices
+        assert hasattr(hp1, "choices")
+        assert "DummyPreprocessor1" in hp1.choices  # type: ignore[attr-defined]
+        assert "False" in hp1.choices  # type: ignore[attr-defined]
         assert hp1.default_value == "False"
 
         # Sample configuration

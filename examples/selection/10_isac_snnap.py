@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from typing import cast
 from sklearn.cluster import KMeans
 
 from asf.selectors.isac import ISAC
@@ -100,9 +101,14 @@ if __name__ == "__main__":
         selector = ISAC()
         selector.fit(train_features, train_perf)
         preds = selector.predict(test_features)
-        budgeted_preds = {
-            inst: [(algo, budget) for algo, _ in sched] for inst, sched in preds.items()
-        }
+        assert isinstance(preds, dict)
+        preds = cast(dict[str, list[tuple[str, float] | str]], preds)
+        budgeted_preds: dict[str, list[tuple[str, float] | str]] = {}
+        for inst, sched in preds.items():
+            if isinstance(sched, list) and len(sched) > 0:
+                budgeted_preds[str(inst)] = [(str(algo), budget) for algo, _ in sched]
+            else:
+                budgeted_preds[str(inst)] = []
         sr = compute_solve_rate(budgeted_preds, test_perf, budget)
         par10 = running_time_selector_performance(
             budgeted_preds,
@@ -121,9 +127,14 @@ if __name__ == "__main__":
     selector_km = ISAC(clusterer=KMeans, clusterer_kwargs={"n_clusters": 6})
     selector_km.fit(train_features, train_perf)
     preds_km = selector_km.predict(test_features)
-    budgeted_preds_km = {
-        inst: [(algo, budget) for algo, _ in sched] for inst, sched in preds_km.items()
-    }
+    assert isinstance(preds_km, dict)
+    preds_km = cast(dict[str, list[tuple[str, float] | str]], preds_km)
+    budgeted_preds_km: dict[str, list[tuple[str, float] | str]] = {}
+    for inst, sched in preds_km.items():
+        if isinstance(sched, list) and len(sched) > 0:
+            budgeted_preds_km[str(inst)] = [(str(algo), budget) for algo, _ in sched]
+        else:
+            budgeted_preds_km[str(inst)] = []
     sr_km = compute_solve_rate(budgeted_preds_km, test_perf, budget)
     par10_km = running_time_selector_performance(
         budgeted_preds_km, test_perf, budget=budget, par=10.0, return_per_instance=False
@@ -136,10 +147,14 @@ if __name__ == "__main__":
     selector_snnap = SNNAP(k=5)
     selector_snnap.fit(train_features, train_perf)
     preds_snnap = selector_snnap.predict(test_features)
-    budgeted_preds_snnap = {
-        inst: [(algo, budget) for algo, _ in sched]
-        for inst, sched in preds_snnap.items()
-    }
+    assert isinstance(preds_snnap, dict)
+    preds_snnap = cast(dict[str, list[tuple[str, float] | str]], preds_snnap)
+    budgeted_preds_snnap: dict[str, list[tuple[str, float] | str]] = {}
+    for inst, sched in preds_snnap.items():
+        if isinstance(sched, list) and len(sched) > 0:
+            budgeted_preds_snnap[str(inst)] = [(str(algo), budget) for algo, _ in sched]
+        else:
+            budgeted_preds_snnap[str(inst)] = []
     sr_snnap = compute_solve_rate(budgeted_preds_snnap, test_perf, budget)
     par10_snnap = running_time_selector_performance(
         budgeted_preds_snnap,

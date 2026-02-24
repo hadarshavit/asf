@@ -8,6 +8,7 @@ from asf.selectors.collaborative_filtering_selector import (
 )
 from asf.selectors.cosine_selector import CosineSelector
 from asf.selectors.cshc import CSHCSelector
+from asf.selectors.dyad_ranking import DyadRanking
 from asf.selectors.ensembles import (
     BaggingSelector,
     StackingSelector,
@@ -48,6 +49,7 @@ __all__ = [
     "AbstractModelBasedSelector",
     "SimpleRanking",
     "JointRanking",
+    "DyadRanking",
     "SurvivalAnalysis",
     "tune_selector",
     "SelectorPipeline",

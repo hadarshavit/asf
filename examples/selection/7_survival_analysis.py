@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
-from typing import Sequence, cast
+from typing import cast
+
 from asf.selectors.survival_analysis import SurvivalAnalysis
 from asf.metrics import (
     compute_solve_rate,
@@ -102,9 +103,9 @@ if __name__ == "__main__":
     print("--- Single Best Algorithm Predictions ---")
     selector = SurvivalAnalysis(budget=BUDGET)
     selector.fit(train_features, train_performance)
-    predictions = cast(
-        dict[str, Sequence[tuple[str, float] | str]], selector.predict(test_features)
-    )
+    predictions = selector.predict(test_features)
+    assert isinstance(predictions, dict)
+    predictions = cast(dict[str, list[tuple[str, float] | str]], predictions)
 
     print("Predicted best algorithm for each test instance:")
     for i, instance in enumerate(test_features.index):
@@ -113,8 +114,8 @@ if __name__ == "__main__":
         print(f"{instance}: {algo} (true type: {true_type})")
 
     # Wrap predictions with budget for metrics
-    budgeted_preds: dict[str, Sequence[tuple[str, float] | str]] = {
-        inst: [(algo, BUDGET) for algo, _ in sched]
+    budgeted_preds: dict[str, list[tuple[str, float] | str]] = {
+        str(inst): [(algo, BUDGET) for algo, _ in sched]
         for inst, sched in predictions.items()
     }
 
@@ -155,9 +156,10 @@ if __name__ == "__main__":
         maxiter=100,
     )
     schedule_selector.fit(train_features, train_performance)
+    schedule_predictions = schedule_selector.predict(test_features)
+    assert isinstance(schedule_predictions, dict)
     schedule_predictions = cast(
-        dict[str, Sequence[tuple[str, float] | str]],
-        schedule_selector.predict(test_features),
+        dict[str, list[tuple[str, float] | str]], schedule_predictions
     )
 
     print("Predicted algorithm schedules for each test instance:")

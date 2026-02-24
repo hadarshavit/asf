@@ -4,7 +4,7 @@ Knee-of-the-curve algorithm for algorithm pre-selection.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import numpy as np
 import pandas as pd
@@ -75,7 +75,7 @@ class KneeOfCurvePreSelector(AbstractPreSelector):
         if isinstance(performance, np.ndarray):
             performance_frame = pd.DataFrame(
                 performance,
-                columns=[f"Algorithm_{i}" for i in range(performance.shape[1])],  # type: ignore[arg-type]
+                columns=[f"Algorithm_{i}" for i in range(performance.shape[1])],
             )
             is_numpy = True
         else:
@@ -87,9 +87,10 @@ class KneeOfCurvePreSelector(AbstractPreSelector):
         dfs: list[pd.DataFrame] = []
 
         def process(i: int) -> tuple[int, float, pd.DataFrame]:
-            base_selector = self.base_pre_selector(
-                n_algorithms=i + 1,
+            # Cast to Any to allow passing metric/maximize parameters that subclasses accept
+            base_selector = cast(Any, self.base_pre_selector)(
                 metric=self.metric,
+                n_algorithms=i + 1,
                 maximize=self.maximize,
             )
             pre_selected_df = base_selector.fit_transform(performance_frame)

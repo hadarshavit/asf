@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import cast, Sequence
+from typing import cast
 
 from asf.selectors.osl_linear import OSLLinearSelector
 from asf.metrics import (
@@ -44,26 +44,24 @@ def main():
     )
     sel.fit(X_train, Y_train)
 
-    preds = cast(dict[str, list[tuple[str, float]]], sel.predict(X_test))
+    preds = sel.predict(X_test)
 
     # simple validation of structure
     assert isinstance(preds, dict)
+    preds = cast(dict[str, list[tuple[str, float] | str]], preds)
     for v in preds.values():
         assert isinstance(v, list) and len(v) == 1
         algo, score = v[0]
         assert isinstance(algo, str) and algo in list(Y.columns)
         assert isinstance(score, (int, float))
 
-    preds_seq: dict[str, Sequence[tuple[str, float] | str]] = cast(
-        dict[str, Sequence[tuple[str, float] | str]], preds
-    )
-    acc = compute_solve_rate(preds_seq, Y_test, budget)
+    acc = compute_solve_rate(preds, Y_test, budget)
 
     # Use ASF metrics for baselines
     sbs_score = single_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
     vbs_score = virtual_best_solver(Y_test, maximize=False, budget=budget, par=10.0)
     par10 = running_time_selector_performance(
-        preds_seq, Y_test, budget=budget, par=10.0, return_per_instance=False
+        preds, Y_test, budget=budget, par=10.0, return_per_instance=False
     )
     oracle = float((Y_test.min(axis=1) <= budget).mean())
 
@@ -82,7 +80,7 @@ def main():
     print()
     print("Sample decisions (first 12):")
     for inst in list(X_test.index)[:12]:
-        rec = preds.get(inst)
+        rec = preds.get(str(inst))
         if not rec:
             print(f"{inst}: no prediction")
             continue

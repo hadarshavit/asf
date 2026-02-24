@@ -292,10 +292,22 @@ if __name__ == "__main__":
 
                     traceback.print_exc()
 
+            selector_name = getattr(selector, "__name__", None)
+            if (
+                selector_name is None
+                and hasattr(selector, "func")
+                and hasattr(selector.func, "__name__")
+            ):
+                selector_name = selector.func.__name__
+            if selector_name is None:
+                selector_name = str(selector)
+
             if selector == SingleBestSolver or selector == VirtualBestSolver:
                 print(
-                    f"Completed baseline selector: {selector.__name__} for scenario: {scenario}\n"
+                    f"Completed baseline selector: {selector_name} for scenario: {scenario}\n"
                 )
+            else:
+                print(f"Completed selector: {selector_name} for scenario: {scenario}\n")
 
         # Report results after all selectors are evaluated for this scenario
         report_results(scenario)

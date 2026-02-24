@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
-from typing import Any
+from typing import Any, cast
 from asf.selectors import PerformanceModel
 from asf.predictors.abstract_predictor import AbstractPredictor
 from asf.predictors import RegressionMLP, XGBoostRegressorWrapper
@@ -26,7 +26,7 @@ class DummyRegressor(AbstractPredictor):
         ):
             return np.full(n, self._y)
         else:
-            return np.tile(self._y, (n, 1))
+            return np.tile(self._y, (n, 1))  # type: ignore[call-overload]
 
     def save(self, file_path: str) -> None:
         pass
@@ -49,8 +49,11 @@ def test_performance_model_single_target_branch():
     pm = PerformanceModel(model_class=DummyRegressor, budget=5.0, normalize=None)
     pm.fit(X, Y)
     preds = pm.predict(X)
+    assert isinstance(preds, dict)
+    preds = cast(dict[str, list[tuple[str, float]]], preds)
     assert set(preds.keys()) == set(X.index)
     for lst in preds.values():
+        assert isinstance(lst, list)
         algo, bud = lst[0]
         assert algo in ("a", "b")
         assert bud == 5.0
@@ -63,6 +66,7 @@ def test_performance_model_multi_target_only():
     )
     pm_mt.fit(X, Y)
     preds_mt = pm_mt.predict(X)
+    assert isinstance(preds_mt, dict)
     assert set(preds_mt.keys()) == set(X.index)
 
 

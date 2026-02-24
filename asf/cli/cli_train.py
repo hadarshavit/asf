@@ -399,7 +399,7 @@ if __name__ == "__main__":
         dummy_rt = pd.DataFrame(
             0.0,
             index=features.index,
-            columns=["total_feature_time"],  # type: ignore[arg-type]
+            columns=["total_feature_time"],
         )
 
         selector = tune_selector(

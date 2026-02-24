@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -186,6 +186,6 @@ class PairwiseRegressor(
             model_class = [RandomForestRegressorWrapper, XGBoostRegressorWrapper]
 
         hyperparameters = [
-            ClassChoice("model_class", choices=model_class),
+            ClassChoice("model_class", choices=cast(list[type | bool], model_class)),
         ]
         return hyperparameters, [], []

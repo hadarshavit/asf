@@ -108,12 +108,12 @@ def tune_epm(
     if isinstance(X, np.ndarray) and isinstance(y, np.ndarray):
         X_df = pd.DataFrame(
             X,
-            index=range(len(X)),
-            columns=[f"f_{i}" for i in range(X.shape[1])],  # type: ignore[arg-type]
+            index=list(range(len(X))),
+            columns=[f"f_{i}" for i in range(X.shape[1])],
         )
         y_ser = pd.Series(
             y,
-            index=range(len(y)),
+            index=list(range(len(y))),
         )
     else:
         X_df = pd.DataFrame(X) if not isinstance(X, pd.DataFrame) else X
@@ -165,11 +165,21 @@ def tune_epm(
     if isinstance(best_config, list):
         best_config = best_config[0]
 
+    # Cast to Any since SMAC's Configuration type is not always available
+    best_config = cast(Any, best_config)
+
+    # Convert Configuration to dict
+    config_dict = (
+        dict(best_config.items())
+        if hasattr(best_config, "items")
+        else dict(best_config)
+    )
+
     return EPM(
         predictor_class=model_class,
         normalization_class=normalization_class,
         transform_back=True,
-        predictor_config=dict(best_config),
+        predictor_config=cast(dict[str, Any], config_dict),
         features_preprocessing=features_preprocessing,
         categorical_features=categorical_features,
         numerical_features=numerical_features,

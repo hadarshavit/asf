@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import logging
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import numpy as np
 import pandas as pd
@@ -21,6 +21,12 @@ try:
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
+
+    class Configuration:
+        """Dummy Configuration class when ConfigSpace is not installed."""
+
+        pass
+
 
 try:
     from smac import HyperparameterOptimizationFacade, Scenario
@@ -41,8 +47,10 @@ def _create_pipeline(
     """
     Helper function to create a SelectorPipeline from a configuration.
     """
+    # Cast to accepted type for get_from_configuration
+    config_dict: dict[str, Any] | Configuration = cast(Any, config)
     pipeline_partial = SelectorPipeline.get_from_configuration(
-        configuration=config,
+        configuration=config_dict,
         feature_groups=feature_groups,
         max_feature_time=max_feature_time,
         budget=budget,
@@ -219,8 +227,11 @@ def tune_selector(
 
     if isinstance(best_config, list):
         best_config = best_config[0]
+    assert isinstance(best_config, (dict, Configuration))
+    # Cast to handle union type
+    final_config = cast(Configuration | dict[str, Any], best_config)
     return _create_pipeline(
-        best_config,
+        final_config,
         budget,
         maximize,
         sel_kwargs,

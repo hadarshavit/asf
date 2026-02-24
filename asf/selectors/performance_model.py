@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -307,7 +307,15 @@ class PerformanceModel(
         ]
 
         hyperparameters = [
-            ClassChoice("model_class", choices=model_class, default=model_class[0]),
-            ClassChoice("normalize", choices=norm_choices, default=LogNormalization),
+            ClassChoice(
+                "model_class",
+                choices=cast(list[type | bool], model_class),
+                default=model_class[0],
+            ),
+            ClassChoice(
+                "normalize",
+                choices=cast(list[type | bool], norm_choices),
+                default=LogNormalization,
+            ),
         ]
         return hyperparameters, [], []

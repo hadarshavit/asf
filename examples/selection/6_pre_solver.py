@@ -1,6 +1,6 @@
 from asf.selectors import PairwiseClassifier
 from asf.selectors import SelectorPipeline
-from sklearn.ensemble import RandomForestClassifier
+from asf.predictors.random_forest import RandomForestClassifierWrapper
 from asf.pre_selector import MarginalContributionBasedPreSelector
 from asf.preprocessing import get_default_preprocessor
 from asf.metrics import virtual_best_solver
@@ -112,7 +112,7 @@ if __name__ == "__main__":
     print("Best algorithm distribution (train):", dict(best_algorithms))
 
     selector = SelectorPipeline(
-        selector=PairwiseClassifier(model_class=RandomForestClassifier),
+        selector=PairwiseClassifier(model_class=RandomForestClassifierWrapper),
         preprocessor=get_default_preprocessor(),
         algorithm_pre_selector=MarginalContributionBasedPreSelector(
             metric=virtual_best_solver, n_algorithms=3
