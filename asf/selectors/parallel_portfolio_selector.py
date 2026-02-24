@@ -31,7 +31,7 @@ class APPS(AbstractSelector):
         random_state: int = 42,
         use_jackknife: bool = True,
         n_jackknife_folds: int | None = None,
-        **kwargs,
+        **kwargs: Any,
     ):
         """
         Initialize the Parallel Portfolio Selector.
