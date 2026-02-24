@@ -78,6 +78,7 @@ class ISAC(ConfigurableMixin, AbstractSelector):
         self.random_state = random_state
         self.clusterer_instance: Any | None = None
         self.cluster_to_best_algo: dict[int, str] = {}
+        self.fallback_algo: str | None = None
 
     def _fit(
         self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
@@ -105,6 +106,10 @@ class ISAC(ConfigurableMixin, AbstractSelector):
 
         self.clusterer_instance.fit(features.values)  # type: ignore[attr-defined]
         cluster_labels = self.clusterer_instance.predict(features.values)  # type: ignore[attr-defined]
+
+        # Compute global fallback algorithm
+        global_perf_means = performance.mean(axis=0)
+        self.fallback_algo = str(global_perf_means.idxmin())
 
         n_clusters = len(np.unique(cluster_labels))
         for cluster_id in range(n_clusters):
@@ -140,7 +145,7 @@ class ISAC(ConfigurableMixin, AbstractSelector):
         predictions: dict[str, list[tuple[str, float]]] = {}
         for idx, instance in enumerate(features.index):
             cluster_id = int(cluster_labels[idx])
-            best_algo = self.cluster_to_best_algo.get(cluster_id)
+            best_algo = self.cluster_to_best_algo.get(cluster_id, self.fallback_algo)
             if best_algo:
                 predictions[str(instance)] = [(str(best_algo), float(self.budget or 0))]
             else:
