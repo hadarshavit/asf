@@ -45,6 +45,8 @@ if SKSURV_AVAILABLE:
             Tolerance for differential evolution.
         dominance_resolution : int
             Resolution for dominance analysis.
+        random_state : int or None
+            Random seed for differential evolution.
         survival_features : list[str]
             Feature column names used by the survival model.
         model : RandomSurvivalForestWrapper or None
@@ -63,6 +65,7 @@ if SKSURV_AVAILABLE:
             maxiter: int = 150,
             tol: float = 0.01,
             dominance_resolution: int = 100,
+            random_state: int | None = 42,
             **kwargs: Any,
         ) -> None:
             """
@@ -84,6 +87,8 @@ if SKSURV_AVAILABLE:
                 Tolerance for convergence.
             dominance_resolution : int, default=100
                 Resolution for dominance analysis grid.
+            random_state : int or None, default=42
+                Random seed for differential evolution.
             **kwargs : Any
                 Additional keyword arguments.
             """
@@ -94,6 +99,7 @@ if SKSURV_AVAILABLE:
             self.maxiter = int(maxiter)
             self.tol = float(tol)
             self.dominance_resolution = int(dominance_resolution)
+            self.random_state = random_state
 
             if use_schedule:
                 self.RETURN_TYPE = "schedule"
@@ -326,7 +332,7 @@ if SKSURV_AVAILABLE:
                 popsize=self.popsize,
                 maxiter=self.maxiter,
                 tol=self.tol,
-                seed=42,
+                seed=self.random_state,
             )
 
             best_x = result.x
@@ -423,6 +429,12 @@ if SKSURV_AVAILABLE:
                 default=100,
             )
 
+            random_state_param = Integer(
+                name="random_state",
+                bounds=(0, 2**31 - 1),
+                default=42,
+            )
+
             params = [
                 model_class_param,
                 use_schedule_param,
@@ -430,6 +442,7 @@ if SKSURV_AVAILABLE:
                 maxiter_param,
                 tol_param,
                 dominance_resolution_param,
+                random_state_param,
             ]
 
             conditions = [
@@ -437,6 +450,7 @@ if SKSURV_AVAILABLE:
                 EqualsCondition(maxiter_param, use_schedule_param, True),
                 EqualsCondition(tol_param, use_schedule_param, True),
                 EqualsCondition(dominance_resolution_param, use_schedule_param, True),
+                EqualsCondition(random_state_param, use_schedule_param, True),
             ]
 
             return params, conditions, []
