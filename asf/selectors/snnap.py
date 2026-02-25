@@ -4,14 +4,13 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.neighbors import NearestNeighbors
 
+from asf.predictors.random_forest import RandomForestRegressorWrapper
 from asf.selectors.abstract_selector import AbstractSelector
 from asf.utils.configurable import ConfigurableMixin
 
 try:
     from ConfigSpace import (  # noqa: F401
-        Categorical,
         ConfigurationSpace,
         Integer,
     )
@@ -23,22 +22,27 @@ except ImportError:
 
 class SNNAP(ConfigurableMixin, AbstractSelector):
     """
-    SNNAP (Simple Nearest Neighbor Algorithm Portfolio) selector.
+    SNNAP (Solver-based Nearest Neighbor for Algorithm Portfolio) selector.
+
+    Uses per-algorithm performance prediction models and Jaccard distance on predicted
+    top algorithms to find similar instances, then selects from neighbors' best algorithms.
 
     Attributes
     ----------
     k : int
-        Number of neighbors to use.
-    metric : str
-        Distance metric for NearestNeighbors.
-    random_state : int or None
-        Random seed for reproducibility.
-    nn_model : NearestNeighbors or None
-        Trained NearestNeighbors model.
+        Number of similar instances (neighbors) to use.
+    top_n : int
+        Number of top algorithms to consider for Jaccard distance calculation.
+    algorithm_models : dict[str, AbstractPredictor] or None
+        Per-algorithm regression models for predicting scaled runtime.
+    scaled_performance_df : pd.DataFrame or None
+        Z-score normalized performance matrix (per instance).
+    original_performance_df : pd.DataFrame or None
+        Original unnormalized performance data.
+    training_top_n_sets : list[set[str]] or None
+        Pre-computed top-n algorithm sets for each training instance.
     features_df : pd.DataFrame or None
         Training features.
-    performance_df : pd.DataFrame or None
-        Training performance.
     """
 
     PREFIX = "snnap"
@@ -47,8 +51,7 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
     def __init__(
         self,
         k: int = 5,
-        metric: str = "euclidean",
-        random_state: int | None = None,
+        top_n: int = 3,
         **kwargs: Any,
     ) -> None:
         """
@@ -57,42 +60,92 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
         Parameters
         ----------
         k : int, default=5
-            Number of neighbors to use.
-        metric : str, default='euclidean'
-            Distance metric for NearestNeighbors.
-        random_state : int or None, default=None
-            Random seed for reproducibility.
+            Number of nearest neighbors (similar instances) to consider.
+        top_n : int, default=3
+            Number of top algorithms to use for Jaccard distance calculation.
         **kwargs : Any
             Additional keyword arguments.
         """
         super().__init__(**kwargs)
         self.k = int(k)
-        self.metric = str(metric)
-        self.random_state = random_state
+        self.top_n = int(top_n)
 
         self.features_df: pd.DataFrame | None = None
-        self.performance_df: pd.DataFrame | None = None
-        self.nn_model: NearestNeighbors | None = None
+        self.original_performance_df: pd.DataFrame | None = None
+        self.scaled_performance_df: pd.DataFrame | None = None
+        self.algorithm_models: dict[str, Any] | None = None
+        self.training_top_n_sets: list[set[str]] | None = None
 
     def _fit(
         self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
     ) -> None:
         """
-        Fit the NearestNeighbors model.
+        Fit per-algorithm regression models on z-score normalized performance.
 
         Parameters
         ----------
         features : pd.DataFrame
-            The training features.
+            The training features (instances x features).
         performance : pd.DataFrame
-            The training performance data.
+            The training performance data (instances x algorithms).
         """
         self.features_df = features.copy()
-        self.performance_df = performance.copy()
+        self.original_performance_df = performance[self.algorithms].copy()
 
-        n_neighbors = min(self.k, len(self.features_df))
-        self.nn_model = NearestNeighbors(n_neighbors=n_neighbors, metric=self.metric)
-        self.nn_model.fit(self.features_df.values)
+        # Step 1: Z-score normalize performance per instance (row-wise)
+        self.scaled_performance_df = self.original_performance_df.copy()
+        for idx in self.scaled_performance_df.index:
+            row = self.scaled_performance_df.loc[idx]
+            mean_val = row.mean()
+            std_val = row.std()
+            if std_val > 0:
+                self.scaled_performance_df.loc[idx] = (row - mean_val) / std_val
+            else:
+                # If all values are the same, set to 0
+                self.scaled_performance_df.loc[idx] = 0
+
+        # Step 2: Train one regressor per algorithm
+        self.algorithm_models = {}
+        for algo in self.algorithms:
+            y = self.scaled_performance_df[algo]
+            model = RandomForestRegressorWrapper()
+            model.fit(features, y)
+            self.algorithm_models[str(algo)] = model
+
+        # Step 3: Pre-compute top-n sets for each training instance
+        self.training_top_n_sets = []
+        for train_idx in range(len(self.scaled_performance_df)):
+            train_scaled_perf = self.scaled_performance_df.iloc[train_idx]
+            # For minimize: lowest scaled runtime is best. For maximize: highest is best.
+            ascending = not self.maximize
+            train_sorted = train_scaled_perf.sort_values(ascending=ascending)
+            train_top_n = set(str(algo) for algo in train_sorted.index[: self.top_n])
+            self.training_top_n_sets.append(train_top_n)
+
+    @staticmethod
+    def _jaccard_distance(set1: set[str], set2: set[str]) -> float:
+        """
+        Compute Jaccard distance between two sets.
+
+        Parameters
+        ----------
+        set1 : set[str]
+            First set of algorithm names.
+        set2 : set[str]
+            Second set of algorithm names.
+
+        Returns
+        -------
+        float
+            Jaccard distance: 1 - |intersection| / |union|
+        """
+        if not set1 or not set2:
+            return 1.0
+        intersection = len(set1 & set2)
+        union = len(set1 | set2)
+        if union == 0:
+            return 1.0
+        return 1.0 - (intersection / union)
 
     def _predict(
         self,
@@ -100,69 +153,90 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
         performance: pd.DataFrame | None = None,
     ) -> dict[str, list[tuple[str, float]]]:
         """
-                Predict the best algorithm for each instance.
+        Predict the best algorithm using Jaccard distance on top-n algorithms.
 
-                Parameters
-                ----------
-                features : pd.DataFrame
-                    The input features.
+        Parameters
+        ----------
+        features : pd.DataFrame
+            The input features.
+        performance : pd.DataFrame, optional
+            Unused, kept for interface compatibility.
 
-                Returns
+        Returns
         -------
-                dict
-                    Mapping from instance name to algorithm schedules.
+        dict
+            Mapping from instance name to algorithm schedules.
         """
         if features is None:
             raise ValueError("SNNAP requires features for prediction.")
         if (
-            self.nn_model is None
+            self.algorithm_models is None
             or self.features_df is None
-            or self.performance_df is None
+            or self.original_performance_df is None
+            or self.scaled_performance_df is None
+            or self.training_top_n_sets is None
         ):
             raise RuntimeError("SNNAP must be fitted before prediction.")
 
         predictions: dict[str, list[tuple[str, float]]] = {}
+
         for instance_name in features.index:
-            x = features.loc[[instance_name]].values
-            n_neighbors = min(self.k, len(self.features_df))
-            _, neighbor_idxs = self.nn_model.kneighbors(x, n_neighbors=n_neighbors)
-            neighbor_idxs = neighbor_idxs.flatten()
+            # Step 1: Use per-algorithm models to predict scaled runtimes for query instance
+            query_features = features.loc[[instance_name]]
+            predicted_scaled_runtimes = {}
+            for algo in self.algorithms:
+                model = self.algorithm_models[str(algo)]
+                pred = model.predict(query_features)[0]
+                predicted_scaled_runtimes[algo] = pred
 
-            votes: dict[str, int] = {}
-            runtimes_for_candidates: dict[str, list[float]] = {}
+            # Step 2: Identify query's predicted top-n algorithms (respecting maximize flag)
+            sorted_algos = sorted(
+                predicted_scaled_runtimes.items(),
+                key=lambda x: x[1],
+                reverse=self.maximize,  # If maximize, sort descending; if minimize, ascending
+            )
+            query_top_n = set(str(algo) for algo, _ in sorted_algos[: self.top_n])
 
+            # Step 3: Compute Jaccard distance for each training instance
+            jaccard_distances = []
+            for train_idx in range(len(self.features_df)):
+                # Use pre-computed top-n set
+                train_top_n = self.training_top_n_sets[train_idx]
+
+                # Compute Jaccard distance
+                jdist = self._jaccard_distance(query_top_n, train_top_n)
+                jaccard_distances.append((train_idx, jdist))
+
+            # Step 4: Select k neighbors with lowest Jaccard distance
+            jaccard_distances.sort(key=lambda x: x[1])
+            k_actual = min(self.k, len(self.features_df))
+            neighbor_idxs = [idx for idx, _ in jaccard_distances[:k_actual]]
+
+            # Step 5: Compute mean runtime for ALL algorithms across neighbors, then select best
+            # This differs from selecting best-per-neighbor and averaging only winners
+            runtimes_by_algo: dict[str, list[float]] = {}
             for ni in neighbor_idxs:
-                neighbor_perf = self.performance_df.iloc[ni]
-                valid = neighbor_perf.dropna()
-                if valid.empty:
-                    continue
-                # Best algorithm for this neighbor
-                best_algo = str(valid.idxmax() if self.maximize else valid.idxmin())
-                votes[best_algo] = votes.get(best_algo, 0) + 1
-                runtimes_for_candidates.setdefault(best_algo, []).append(
-                    float(valid.loc[best_algo])
-                )
+                neighbor_perf = self.original_performance_df.iloc[ni]
+                # For each algorithm, collect its actual runtime in this neighbor
+                for algo in self.algorithms:
+                    if algo in neighbor_perf.index and pd.notna(neighbor_perf[algo]):
+                        if algo not in runtimes_by_algo:
+                            runtimes_by_algo[algo] = []
+                        runtimes_by_algo[algo].append(float(neighbor_perf[algo]))
 
-            if not votes:
+            if not runtimes_by_algo:
                 predictions[str(instance_name)] = []
                 continue
 
-            # Identify candidate(s) with max votes
-            max_votes = max(votes.values())
-            candidates = [a for a, c in votes.items() if c == max_votes]
-
-            if len(candidates) == 1:
-                chosen = candidates[0]
+            # Compute mean runtime for all algorithms
+            mean_runtimes = {
+                algo: float(np.mean(times)) for algo, times in runtimes_by_algo.items()
+            }
+            # Select algorithm with best mean runtime
+            if self.maximize:
+                chosen = max(mean_runtimes.items(), key=lambda x: x[1])[0]
             else:
-                # Tie-break: Smallest mean runtime (or largest mean performance)
-                mean_perfs = {
-                    algo: float(np.mean(runtimes_for_candidates[algo]))
-                    for algo in candidates
-                }
-                if self.maximize:
-                    chosen = max(mean_perfs.items(), key=lambda x: x[1])[0]
-                else:
-                    chosen = min(mean_perfs.items(), key=lambda x: x[1])[0]
+                chosen = min(mean_runtimes.items(), key=lambda x: x[1])[0]
 
             predictions[str(instance_name)] = [(str(chosen), float(self.budget or 0))]
 
@@ -194,10 +268,10 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
             default=5,
         )
 
-        metric_param = Categorical(
-            name="metric",
-            items=["euclidean", "manhattan", "minkowski", "cosine"],
-            default="euclidean",
+        top_n_param = Integer(
+            name="top_n",
+            bounds=(1, 20),
+            default=3,
         )
 
-        return [k_param, metric_param], [], []
+        return [k_param, top_n_param], [], []
