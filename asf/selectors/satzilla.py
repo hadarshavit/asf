@@ -29,16 +29,16 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
     """
     SATzilla-like selector using iterative imputation for censored runtimes.
 
-    Uses per-algorithm ridge models on expanded features.
+    Uses per-algorithm ridge models on expanded features with optional instance label conditioning.
 
     Attributes
     ----------
     epms : dict[str, dict[str, EPM]]
         Mapping from algorithm name to another mapping of label to EPM.
-    label_classifier : AbstractPredictor or None
-        Model trained to predict instance labels (e.g., SAT/UNSAT).
-    labels : list[str]
-        Unique labels used for conditioning EPMs.
+    label_classifier_model : type or Callable
+        The classifier class used for the label classifier (only used when labels are provided).
+    epm_regressor_model : type or Callable
+        The regressor class used internally by EPM for per-algorithm performance prediction.
     """
 
     PREFIX = "satzilla"
@@ -46,13 +46,25 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
 
     def __init__(
         self,
-        model_class: type[Any] = RandomForestClassifierWrapper,
+        label_classifier_model: type[Any] = RandomForestClassifierWrapper,
+        epm_regressor_model: type[Any] = RidgeRegressorWrapper,
         **kwargs: Any,
     ) -> None:
         """
         Initialize the SATzilla selector.
+
+        Parameters
+        ----------
+        label_classifier_model : type, default=RandomForestClassifierWrapper
+            The classifier class for predicting instance labels (e.g., SAT/UNSAT).
+        epm_regressor_model : type, default=RidgeRegressorWrapper
+            The regressor class used internally by EPM for per-algorithm runtime prediction.
+        **kwargs : Any
+            Additional keyword arguments passed to parent classes.
         """
-        super().__init__(model_class=model_class, **kwargs)
+        super().__init__(model_class=label_classifier_model, **kwargs)
+        self.epm_regressor_model = epm_regressor_model
+        self.epm_kwargs["predictor_class"] = epm_regressor_model
         self.epms: dict[str, dict[str, EPM]] = {}
         self.label_classifier: Any = None
         self.labels: list[str] = []
@@ -174,33 +186,46 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
 
     @staticmethod
     def _define_hyperparameters(
-        model_class: list[type] | None = None, **kwargs: Any
+        label_classifier_model: list[type] | None = None,
+        epm_regressor_model: list[type] | None = None,
+        **kwargs: Any,
     ) -> tuple[list[Any], list[Any], list[Any]]:
         """
-                Define hyperparameters for SATzilla.
+        Define hyperparameters for SATzilla.
 
-                Parameters
-                ----------
-                model_class : list[type] or None, default=None
-                    List of model classes to choose from.
-                **kwargs : Any
-                    Additional keyword arguments.
+        Parameters
+        ----------
+        label_classifier_model : list[type] or None, default=None
+            List of classifier classes to choose from for the label classifier.
+        epm_regressor_model : list[type] or None, default=None
+            List of regressor classes to choose from for the EPM's internal regressor.
+        **kwargs : Any
+            Additional keyword arguments.
 
-                Returns
+        Returns
         -------
-                tuple
-                    Tuple of (hyperparameters, conditions, forbiddens).
+        tuple
+            Tuple of (hyperparameters, conditions, forbiddens).
         """
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
 
-        if model_class is None:
-            model_class = [RidgeRegressorWrapper]
+        if label_classifier_model is None:
+            label_classifier_model = [RandomForestClassifierWrapper]
 
-        model_class_param = ClassChoice(
-            name="model_class",
-            choices=cast(list[type | bool], model_class),
-            default=model_class[0],
+        if epm_regressor_model is None:
+            epm_regressor_model = [RidgeRegressorWrapper]
+
+        label_classifier_model_param = ClassChoice(
+            name="label_classifier_model",
+            choices=cast(list[type | bool], label_classifier_model),
+            default=label_classifier_model[0],
+        )
+
+        epm_regressor_model_param = ClassChoice(
+            name="epm_regressor_model",
+            choices=cast(list[type | bool], epm_regressor_model),
+            default=epm_regressor_model[0],
         )
 
         use_log10_param = Categorical(
@@ -230,7 +255,8 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
         )
 
         params = [
-            model_class_param,
+            label_classifier_model_param,
+            epm_regressor_model_param,
             use_log10_param,
             em_max_iter_param,
             em_tol_param,
