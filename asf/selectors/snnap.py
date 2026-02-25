@@ -109,7 +109,7 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
         for algo in self.algorithms:
             y = self.scaled_performance_df[algo]
             model = RandomForestRegressorWrapper()
-            model.fit(features, y)
+            model.fit(features.values, y.values)
             self.algorithm_models[str(algo)] = model
 
         # Step 3: Pre-compute top-n sets for each training instance
@@ -186,7 +186,7 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
             predicted_scaled_runtimes = {}
             for algo in self.algorithms:
                 model = self.algorithm_models[str(algo)]
-                pred = model.predict(query_features)[0]
+                pred = model.predict(query_features.values)[0]
                 predicted_scaled_runtimes[algo] = pred
 
             # Step 2: Identify query's predicted top-n algorithms (respecting maximize flag)

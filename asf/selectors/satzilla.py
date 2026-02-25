@@ -228,39 +228,9 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
             default=epm_regressor_model[0],
         )
 
-        use_log10_param = Categorical(
-            name="use_log10",
-            items=[True, False],
-            default=True,
-        )
-
-        em_max_iter_param = Integer(
-            name="em_max_iter",
-            bounds=(5, 50),
-            default=20,
-        )
-
-        em_tol_param = Float(
-            name="em_tol",
-            bounds=(1e-6, 1e-2),
-            log=True,
-            default=1e-3,
-        )
-
-        em_min_sigma_param = Float(
-            name="em_min_sigma",
-            bounds=(1e-8, 1e-1),
-            log=True,
-            default=1e-6,
-        )
-
         params = [
             label_classifier_model_param,
             epm_regressor_model_param,
-            use_log10_param,
-            em_max_iter_param,
-            em_tol_param,
-            em_min_sigma_param,
         ]
 
         return params, [], []
