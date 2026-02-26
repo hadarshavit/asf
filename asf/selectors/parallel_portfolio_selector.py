@@ -10,7 +10,7 @@ from asf.predictors import AbstractPredictor, RandomForestRegressorWrapper
 
 class APPS(AbstractSelector):
     """
-    Automatic Parallel Portfolio Selector based on the approach by Kashgarani and Kotthoff.
+    Automatic Parallel Portfolio Selector (APPS).
 
     This selector predicts performance distributions for each algorithm and selects
     a parallel portfolio based on the overlap of each algorithm's predicted runtime

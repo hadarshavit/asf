@@ -29,7 +29,10 @@ if SKSURV_AVAILABLE:
 
     class SurvivalAnalysis(ConfigurableMixin, AbstractModelBasedSelector):
         """
-        Selector using survival analysis for algorithm selection.
+        Survival analysis-based algorithm selector.
+
+        Models completion probability under runtime budgets using censored-data
+        survival learning and can return either a single algorithm or a schedule.
 
         Attributes
         ----------

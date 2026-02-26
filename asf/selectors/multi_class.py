@@ -23,7 +23,10 @@ except ImportError:
 
 class MultiClassClassifier(ConfigurableMixin, AbstractModelBasedSelector):
     """
-    Multi-class classification algorithm selector.
+    Multi-class classification selector.
+
+    Treats each algorithm as a class label and predicts the best algorithm
+    directly from instance features.
 
     Attributes
     ----------

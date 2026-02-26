@@ -26,10 +26,11 @@ except ImportError:
 
 class CSHCSelector(ConfigurableMixin, AbstractSelector):
     """
-    Confidence-Switching Hybrid Selector.
+    Confidence-Switching Hybrid Constructor (CSHC) meta-selector.
 
-    A meta-selector that uses a primary selector along with guardian models to
-    predict the success probability of the primary's choice.
+    Uses a primary selector and guardian confidence models to estimate whether
+    the primary choice is likely to succeed, and switches to a backup selector
+    when confidence is below a learned threshold.
 
     Attributes
     ----------

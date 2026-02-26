@@ -29,7 +29,8 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
     """
     SATzilla-like selector using iterative imputation for censored runtimes.
 
-    Uses per-algorithm ridge models on expanded features with optional instance label conditioning.
+    Uses per-algorithm empirical performance models and can optionally condition
+    predictions on instance labels (e.g., SAT/UNSAT).
 
     Attributes
     ----------

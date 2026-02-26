@@ -29,7 +29,10 @@ class PairwiseClassifier(
     ConfigurableMixin, AbstractModelBasedSelector, AbstractFeatureGenerator
 ):
     """
-    Selector using pairwise comparison of algorithms.
+    Pairwise classification selector.
+
+    Trains one binary classifier per algorithm pair and aggregates pairwise
+    outcomes into a final winner for each instance.
 
     Attributes
     ----------

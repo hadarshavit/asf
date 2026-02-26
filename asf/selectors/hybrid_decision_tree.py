@@ -289,7 +289,7 @@ class HybridDecisionTree:
 
 class HARRIS(AbstractSelector):
     """
-    Hybrid Ranking and Regression Forests for Algorithm Selection.
+    Hybrid Decision Tree selector (HARRIS).
 
     HARRIS builds an ensemble of decision trees trained with a hybrid loss
     that combines regression (MSE) and ranking (Spearman correlation) objectives.

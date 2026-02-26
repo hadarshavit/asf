@@ -31,10 +31,10 @@ class PerformanceModel(
     ConfigurableMixin, AbstractModelBasedSelector, AbstractFeatureGenerator
 ):
     """
-    PerformanceModel predicts algorithm performance based on instance features.
+    Performance model-based selector.
 
-    It can handle both single-target (one model per algorithm) and multi-target
-    regression models.
+    Predicts per-algorithm performance from instance features and selects the
+    best predicted algorithm using single-target, multi-target, or joint models.
 
     Attributes
     ----------

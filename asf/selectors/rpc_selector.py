@@ -11,7 +11,8 @@ class RPCSelector(AbstractSelector):
     Ranking by Pairwise Comparison (RPC) for Algorithm Selection.
 
     RPC decomposes the k-label ranking problem into m = k(k-1)/2 binary
-    classification tasks (one for each pair of algorithms).
+    classification tasks (one for each pair of algorithms), and aggregates
+    pairwise wins with Copeland scores.
     """
 
     PREFIX = "rpc"

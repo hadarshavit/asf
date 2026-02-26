@@ -28,6 +28,9 @@ class ISA(ConfigurableMixin, AbstractSelector):
     """
     ISA (Instance-Specific Aspeed) selector.
 
+    Finds nearest training instances and runs Aspeed on that neighborhood to
+    produce an instance-specific algorithm schedule.
+
     Attributes
     ----------
     k : int

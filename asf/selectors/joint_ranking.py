@@ -22,10 +22,10 @@ except ImportError:
 
 class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator):
     """
-    Ranking-based algorithm selector.
+    Joint instance-algorithm neural ranking selector.
 
-    Combines feature generation and model-based selection to predict algorithm
-    performance.
+    Learns ranking scores for concatenated instance and algorithm representations,
+    then selects the algorithm with the best predicted ranking per instance.
 
     Reference:
         Ortuzk et al. (2022)

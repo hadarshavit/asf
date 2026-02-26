@@ -24,7 +24,10 @@ except ImportError:
 
 class OSLLinearSelector(ConfigurableMixin, AbstractSelector):
     """
-    Selector using Optimistic Superset Loss (OSL) to predict runtimes.
+    Linear runtime selector with Optimistic Superset Loss (OSL).
+
+    Fits one linear model per algorithm while handling right-censored timeout
+    observations through OSL optimization.
 
     Attributes
     ----------

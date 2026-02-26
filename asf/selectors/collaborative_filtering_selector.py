@@ -25,7 +25,11 @@ except ImportError:
 
 class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelector):
     """
-    Collaborative filtering selector using SGD matrix factorization (ALORS-style).
+    Collaborative filtering selector for sparse algorithm performance matrices.
+
+    Treats algorithm selection as a recommendation problem by factorizing the
+    instance-algorithm performance matrix into latent factors and supports
+    cold-start instances via feature-based latent-factor prediction.
 
     Attributes
     ----------

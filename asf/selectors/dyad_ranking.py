@@ -21,13 +21,14 @@ except ImportError:
 
 class DyadRanking(ConfigurableMixin, AbstractModelBasedSelector):
     """
-    Dyad Ranking for Algorithm Selection.
+    Dyad ranking selector for instance-algorithm pair learning.
 
     Implements the approach from:
     Tornede et al. (2019) "Algorithm Selection as Recommendation:
     From Collaborative Filtering to Dyad Ranking"
 
-    Uses XGBoost instead of PLNet for ranking, but the overall approach is the same.
+    Builds dyads by combining instance and algorithm features and learns pairwise
+    preferences to rank algorithms per instance.
 
 
     How it works:

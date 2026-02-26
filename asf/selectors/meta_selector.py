@@ -23,10 +23,10 @@ except ImportError:
 
 class MetaSelector(ConfigurableMixin, AbstractSelector):
     """
-    Meta-selector that ensembles multiple base selectors.
+    Meta-selector that chooses among multiple base selectors.
 
-    Trains multiple base selectors and uses another selector (the meta-selector)
-    to choose among them for each instance based on their out-of-fold performance.
+    Builds a meta-performance dataset from out-of-fold base-selector outcomes and
+    trains a meta-selector that predicts which base selector to trust per instance.
 
     Important: All base selectors and the meta selector must have RETURN_TYPE 'single'
     """

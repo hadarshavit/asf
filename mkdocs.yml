@@ -33,6 +33,7 @@ nav:
   - Advanced Features: 
     - Algorithm Selection Pipeline: features/algorithm_selection_pipeline.md
     - Selectors: features/selectors.md
+    - Which Selector to Choose: features/which_selector.md
     - Hyperparameter Tuning: features/hyperparameter_tuning.md
     # - Algorithm Features: features/algorithm_features.md
     - Performance Prediction: features/performance_prediction.md

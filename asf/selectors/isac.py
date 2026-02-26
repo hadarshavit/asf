@@ -33,8 +33,8 @@ class ISAC(ConfigurableMixin, AbstractSelector):
     """
     ISAC (Instance-Specific Algorithm Configuration) selector.
 
-    Clusters instances in feature space and assigns to each cluster the best
-    algorithm (by mean performance).
+    Clusters instances in feature space and assigns each cluster its best
+    performing algorithm, with a global fallback for unassigned points.
 
     Attributes
     ----------

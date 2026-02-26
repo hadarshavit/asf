@@ -198,7 +198,7 @@ else:
 
 class CosineSelector(ConfigurableMixin, AbstractSelector):
     """
-    Algorithm selector based on the AS-LLM architecture.
+    Cosine similarity-based selector using the AS-LLM architecture.
 
     Uses cosine similarity in a learned latent space to match instances to algorithms.
     This implementation follows the AS-LLM paper (arXiv:2311.13184) architecture:

@@ -23,7 +23,10 @@ except ImportError:
 
 class SimpleRanking(ConfigurableMixin, AbstractModelBasedSelector):
     """
-    Algorithm Selection via Ranking.
+    Learning-to-rank selector over instance-algorithm pairs.
+
+    Trains a ranker on combined instance and algorithm features and selects the
+    highest-ranked algorithm for each instance.
 
     Attributes
     ----------

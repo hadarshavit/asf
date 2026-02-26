@@ -2,6 +2,8 @@
 
 This page provides an overview of all available algorithm selectors in ASF. Click on any selector name below to jump to its description.
 
+Looking for recommendation guidance instead of per-selector details? See [Which Selector to Choose](which_selector.md).
+
 ## Quick Index
 
 | | | | |
@@ -765,25 +767,8 @@ Uses survival analysis (Random Survival Forest) to model algorithm completion pr
 
 ---
 
-## Selecting the Right Selector
-
-Here's a quick guide to choosing which selector fits your use case:
-
-| Your Situation | Recommended Selectors |
-|---|---|
-| Fast, simple baseline | ISAC, Multi-class |
-| Instance similarity matters (single) | ISAC, SNNAP |
-| Instance similarity matters (schedule) | SUNNY, ISA |
-| Performance predictions available | SATzilla, Performance Model |
-| Have algorithm features | Dyad Ranking, Simple Ranking, Cosine, Joint Ranking |
-| Limited/sparse data | Collaborative Filtering |
-| Combine Selectors | Meta Selector, CSHC |
-| Need interpretability | Hybrid Decision Tree |
-| Budget/timeout constraints | Survival Analysis, OSL Linear |
-| Portfolio/Schedule | SUNNY, ISA, APPS, Survival Analysis |
-
----
-
 ## API Reference
 
 For detailed API documentation on each selector, visit the [Selectors API Reference](../api/selectors.md).
+
+For recommendation-oriented guidance, visit [Which Selector to Choose](which_selector.md).

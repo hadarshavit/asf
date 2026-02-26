@@ -27,7 +27,10 @@ class PairwiseRegressor(
     ConfigurableMixin, AbstractModelBasedSelector, AbstractFeatureGenerator
 ):
     """
-    Selector using pairwise regression of algorithms.
+    Pairwise regression selector.
+
+    Trains one regressor per algorithm pair to predict performance differences,
+    then aggregates pairwise margins into a final ranking.
 
     Attributes
     ----------

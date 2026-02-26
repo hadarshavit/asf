@@ -28,7 +28,8 @@ class SUNNY(ConfigurableMixin, AbstractSelector):
     SUNNY/SUNNY-AS2 algorithm selector.
 
     This selector uses k-nearest neighbors (k-NN) in feature space to construct
-    a schedule. When SUNNY-AS2 is enabled, k is optimized.
+    a schedule via greedy portfolio construction. When SUNNY-AS2 is enabled,
+    neighborhood size is tuned via cross-validation.
 
     Attributes
     ----------
