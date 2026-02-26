@@ -10,8 +10,10 @@ from typing import Any, Callable
 
 import pandas as pd
 from sklearn import preprocessing
+from sklearn.base import TransformerMixin
 
 from asf import predictors, presolving, selectors
+from asf.scenario import read_aslib_scenario
 from asf.selectors import (
     AbstractModelBasedSelector,
     AbstractSelector,
@@ -38,6 +40,15 @@ model_list: dict[str, Any] = {
     if not name.startswith("Abstract")
     and name not in ["SklearnWrapper", "RankingMLP", "RegressionMLP", "EPMRandomForest"]
 }
+
+presolver_list = [name for name in presolving.__all__ if name != "AbstractPresolver"]
+
+preprocessor_list = sorted(
+    name
+    for name in dir(preprocessing)
+    if isinstance(getattr(preprocessing, name), type)
+    and issubclass(getattr(preprocessing, name), TransformerMixin)
+)
 
 
 def _fraction_type(val: str) -> float:
@@ -104,23 +115,36 @@ def parser_function() -> argparse.ArgumentParser:
         required=False,
         help="Budget for the solvers",
     )
-    parser.add_argument(
+    maximize_group = parser.add_mutually_exclusive_group()
+    maximize_group.add_argument(
         "--maximize",
-        type=bool,
+        action="store_true",
         default=False,
-        required=False,
         help="Maximize the objective",
+    )
+    maximize_group.add_argument(
+        "--minimize",
+        action="store_false",
+        dest="maximize",
+        default=None,
+        help="Minimize the objective (default)",
+    )
+    parser.add_argument(
+        "--aslib-scenario",
+        type=Path,
+        default=None,
+        help="Path to ASlib scenario directory (uses algorithm_runs.arff and feature_values.arff)",
     )
     parser.add_argument(
         "--feature-data",
         type=Path,
-        required=True,
+        required=False,
         help="Path to feature data",
     )
     parser.add_argument(
         "--performance-data",
         type=Path,
-        required=True,
+        required=False,
         help="Path to performance data",
     )
     parser.add_argument(
@@ -133,12 +157,14 @@ def parser_function() -> argparse.ArgumentParser:
         "--preprocessors",
         nargs="*",
         default=None,
+        choices=preprocessor_list,
         help="Preprocessors to apply, choose from Sklearn preprocessors",
     )
     parser.add_argument(
         "--presolvers",
         nargs="*",
         default=None,
+        choices=presolver_list,
         help="Presolvers to apply",
     )
     parser.add_argument(
@@ -152,6 +178,12 @@ def parser_function() -> argparse.ArgumentParser:
         type=int,
         default=100,
         help="Maximum number of SMAC evaluations when tuning is enabled (default: 100).",
+    )
+    parser.add_argument(
+        "--random-state",
+        type=int,
+        default=0,
+        help="Random seed for tuning (default: 0).",
     )
     return parser
 
@@ -171,6 +203,7 @@ def build_cli_command(
     presolvers: list[type | Any] | None = None,
     presolver_budget: float | None = None,
     runcount_limit: int | None = None,
+    random_state: int | None = None,
 ) -> list[str]:
     """
     Build CLI command from selector objects.
@@ -201,6 +234,8 @@ def build_cli_command(
         Budget fraction for presolving.
     runcount_limit : int or None, default=None
         Limit on SMAC runs.
+    random_state : int or None, default=None
+        Random seed for tuning.
 
     Returns
     -------
@@ -268,12 +303,18 @@ def build_cli_command(
             pass
 
     if maximize is not None:
-        cmd += ["--maximize", str(bool(maximize))]
+        if maximize:
+            cmd.append("--maximize")
+        else:
+            cmd.append("--minimize")
     else:
         try:
             first = sel_list[0] if len(sel_list) > 0 else None
             if first is not None:
-                cmd += ["--maximize", str(bool(getattr(first, "maximize", False)))]
+                if bool(getattr(first, "maximize", False)):
+                    cmd.append("--maximize")
+                else:
+                    cmd.append("--minimize")
         except Exception:
             pass
 
@@ -302,6 +343,8 @@ def build_cli_command(
         cmd += ["--presolver-budget", str(presolver_budget)]
     if runcount_limit is not None and tuning:
         cmd += ["--runcount-limit", str(runcount_limit)]
+    if random_state is not None:
+        cmd += ["--random-state", str(random_state)]
 
     return cmd
 
@@ -324,14 +367,7 @@ if __name__ == "__main__":
     presolver_names = args.presolvers if args.presolvers is not None else []
     preprocessor_names = args.preprocessors if args.preprocessors is not None else []
 
-    budget = args.budget
-    presolver_ratio = args.presolver_budget
-    selector_budget = budget
-    presolver_budget = 0
-
-    if presolver_ratio > 0.0:
-        selector_budget = int(budget * (1.0 - presolver_ratio))
-        presolver_budget = budget - selector_budget
+    print(model_list, presolver_list, preprocessor_list)
 
     selector_classes = [getattr(selectors, name) for name in selector_names]
     print("Selector classes:", selector_classes)
@@ -339,16 +375,57 @@ if __name__ == "__main__":
     model_class = model_list[args.model]
     print("Model class:", model_class)
 
+    if args.aslib_scenario is None:
+        if args.feature_data is None or args.performance_data is None:
+            parser.error("--feature-data and --performance-data are required")
+        features = pandas_read_map[args.feature_data.suffix](
+            args.feature_data, index_col=0
+        )
+        performance = pandas_read_map[args.performance_data.suffix](
+            args.performance_data, index_col=0
+        )
+        features_running_time = None
+        budget = args.budget
+        maximize = args.maximize if args.maximize is not None else False
+    else:
+        if args.feature_data is not None or args.performance_data is not None:
+            print("[WARN] --aslib-scenario overrides feature/performance inputs")
+        (
+            features,
+            performance,
+            features_running_time,
+            _,
+            _,
+            scenario_maximize,
+            scenario_budget,
+            _,
+        ) = read_aslib_scenario(str(args.aslib_scenario))
+        budget = float(scenario_budget) if args.budget is None else args.budget
+        maximize = scenario_maximize if args.maximize is None else bool(args.maximize)
+
+    presolver_ratio = args.presolver_budget
+    selector_budget = budget
+    presolver_budget = 0
+
+    if presolver_ratio > 0.0:
+        if budget is None:
+            parser.error("--presolver-budget requires --budget to be set")
+        selector_budget = int(budget * (1.0 - presolver_ratio))
+        presolver_budget = budget - selector_budget
+
     if args.tuning:
         presolver_classes = [getattr(presolving, name) for name in presolver_names]
         preprocessing_steps = [
             getattr(preprocessing, name) for name in preprocessor_names
         ]
     else:
-        presolver_classes = [
-            getattr(presolving, name)(budget=presolver_budget / len(presolver_names))
-            for name in presolver_names
-        ]
+        presolver_classes = []
+        if presolver_names:
+            presolver_per_budget = presolver_budget / len(presolver_names)
+            presolver_classes = [
+                getattr(presolving, name)(budget=presolver_per_budget)
+                for name in presolver_names
+            ]
         preprocessing_steps = [
             getattr(preprocessing, name)() for name in preprocessor_names
         ]
@@ -357,25 +434,30 @@ if __name__ == "__main__":
     print("Presolver budget fraction:", presolver_ratio)
     print("Preprocessing classes:", preprocessing_steps)
 
-    # Parse training data into variables
-    features: pd.DataFrame = pandas_read_map[args.feature_data.suffix](
-        args.feature_data, index_col=0
-    )
-    performance: pd.DataFrame = pandas_read_map[args.performance_data.suffix](
-        args.performance_data, index_col=0
-    )
+    if not features.index.equals(performance.index):
+        common_index = features.index.intersection(performance.index)
+        if common_index.empty:
+            parser.error(
+                "features and performance indices do not overlap; check your input files"
+            )
+        print(
+            "[WARN] Aligning features/performance indices to shared instances;"
+            f" kept {len(common_index)} rows"
+        )
+        features = features.loc[common_index]
+        performance = performance.loc[common_index]
 
     if not args.tuning:
         selector_class = selector_classes[0]
         if issubclass(selector_class, AbstractModelBasedSelector):
             selector = selector_class(
                 model_class,
-                maximize=args.maximize,
+                maximize=maximize,
                 budget=selector_budget,
             )
         elif issubclass(selector_class, AbstractSelector):
             selector = selector_class(
-                maximize=args.maximize,
+                maximize=maximize,
                 budget=selector_budget,
             )
         else:
@@ -395,19 +477,21 @@ if __name__ == "__main__":
         pipeline.save(args.model_path)
 
     else:
-        # Create dummy features_running_time if not available
-        dummy_rt = pd.DataFrame(
-            0.0,
-            index=features.index,
-            columns=["total_feature_time"],
-        )
+        if features_running_time is None:
+            features_running_time = pd.DataFrame(
+                0.0,
+                index=features.index,
+                columns=["total_feature_time"],
+            )
 
         selector = tune_selector(
             features,
             performance,
             selector_class=selector_classes,
-            features_running_time=dummy_rt,
+            features_running_time=features_running_time,
             budget=budget,
+            maximize=maximize,
+            seed=args.random_state,
             runcount_limit=args.runcount_limit,
             preprocessing_class=preprocessing_steps
             if len(preprocessing_steps) > 0
