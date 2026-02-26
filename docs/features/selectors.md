@@ -10,7 +10,7 @@ This page provides an overview of all available algorithm selectors in ASF. Clic
 | [Dyad Ranking](#dyad-ranking) | [Hybrid Decision Tree](#hybrid-decision-tree) | [ISA](#isa) | [ISAC](#isac) |
 | [Joint Ranking](#joint-ranking) | [Meta Selector](#meta-selector) | [Multi-class](#multi-class) | [OSL Linear](#osl-linear) |
 | [Pairwise Classifier](#pairwise-classifier) | [Pairwise Regressor](#pairwise-regressor) | [Performance Model](#performance-model) | [RPC Selector](#rpc-selector) |
-| [SATzilla](#satzilla) | [Selector Pipeline](#selector-pipeline) | [Simple Ranking](#simple-ranking) | [SNNAP](#snnap) |
+| [SATzilla](#satzilla) | [Simple Ranking](#simple-ranking) | [SNNAP](#snnap) |
 | [SUNNY](#sunny) | [Survival Analysis](#survival-analysis) | | |
 
 ---

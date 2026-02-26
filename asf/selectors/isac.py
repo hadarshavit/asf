@@ -108,17 +108,29 @@ class ISAC(ConfigurableMixin, AbstractSelector):
         cluster_labels = self.clusterer_instance.predict(features.values)  # type: ignore[attr-defined]
 
         # Compute global fallback algorithm
-        global_perf_means = performance.mean(axis=0)
-        self.fallback_algo = str(global_perf_means.idxmin())
+        perf_by_algo = performance[self.algorithms]
+        global_perf_means = perf_by_algo.mean(axis=0)
+        if global_perf_means.isna().all():
+            self.fallback_algo = str(self.algorithms[0])
+        else:
+            if self.maximize:
+                self.fallback_algo = str(global_perf_means.idxmax())
+            else:
+                self.fallback_algo = str(global_perf_means.idxmin())
 
         n_clusters = len(np.unique(cluster_labels))
         for cluster_id in range(n_clusters):
             idxs = np.where(cluster_labels == cluster_id)[0]
             if len(idxs) == 0:
                 continue
-            cluster_perf = performance.iloc[idxs]
+            cluster_perf = performance.iloc[idxs][self.algorithms]
             algo_means = cluster_perf.mean(axis=0)
-            best_algo = algo_means.idxmin()
+            if algo_means.isna().all():
+                best_algo = self.fallback_algo
+            elif self.maximize:
+                best_algo = str(algo_means.idxmax())
+            else:
+                best_algo = str(algo_means.idxmin())
             self.cluster_to_best_algo[int(cluster_id)] = str(best_algo)
 
     def _predict(
