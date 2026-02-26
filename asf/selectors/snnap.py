@@ -97,7 +97,7 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
         self.original_performance_df = performance[self.algorithms].copy()
 
         # Step 1: Z-score normalize performance per instance (row-wise)
-        self.scaled_performance_df = self.original_performance_df.copy()
+        self.scaled_performance_df = self.original_performance_df.copy().astype(float)
         for idx in self.scaled_performance_df.index:
             row = self.scaled_performance_df.loc[idx]
             mean_val = row.mean()
