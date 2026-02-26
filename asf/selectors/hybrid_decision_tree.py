@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Any
 import numpy as np
 import pandas as pd
 
@@ -309,7 +309,7 @@ class HARRIS(AbstractSelector):
         max_features: Optional[str] = "sqrt",
         max_thresholds: int = 32,
         random_state: int = 42,
-        **kwargs,
+        **kwargs: Any,
     ):
         """
         Initialize HARRIS selector.

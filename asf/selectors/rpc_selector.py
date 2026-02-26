@@ -24,7 +24,7 @@ class RPCSelector(AbstractSelector):
         classifier_kwargs: Dict | None = None,
         random_state: int = 42,
         top_n: int = 1,
-        **kwargs,
+        **kwargs: Any,
     ):
         """
         Initialize RPC selector.

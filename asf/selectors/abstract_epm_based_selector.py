@@ -26,17 +26,10 @@ class AbstractEPMBasedSelector(AbstractSelector):
         Initialize the AbstractEPMBasedSelector.
         """
         self.epm_kwargs = {}
-        # Pull em_ prefixed arguments into epm_kwargs
+        # Remove em_ prefixed arguments and use_log10 (they are not used by EPM)
         to_del = []
         for k, v in kwargs.items():
-            if k.startswith("em_"):
-                self.epm_kwargs[k] = v
-                to_del.append(k)
-
-        # Pull other EPM related arguments if they exist
-        for k in ["use_log10"]:
-            if k in kwargs:
-                self.epm_kwargs[k] = kwargs[k]
+            if k.startswith("em_") or k == "use_log10":
                 to_del.append(k)
 
         for k in to_del:

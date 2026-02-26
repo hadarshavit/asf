@@ -78,6 +78,7 @@ class ISAC(ConfigurableMixin, AbstractSelector):
         self.random_state = random_state
         self.clusterer_instance: Any | None = None
         self.cluster_to_best_algo: dict[int, str] = {}
+        self.fallback_algo: str | None = None
 
     def _fit(
         self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
@@ -106,14 +107,30 @@ class ISAC(ConfigurableMixin, AbstractSelector):
         self.clusterer_instance.fit(features.values)  # type: ignore[attr-defined]
         cluster_labels = self.clusterer_instance.predict(features.values)  # type: ignore[attr-defined]
 
+        # Compute global fallback algorithm
+        perf_by_algo = performance[self.algorithms]
+        global_perf_means = perf_by_algo.mean(axis=0)
+        if global_perf_means.isna().all():
+            self.fallback_algo = str(self.algorithms[0])
+        else:
+            if self.maximize:
+                self.fallback_algo = str(global_perf_means.idxmax())
+            else:
+                self.fallback_algo = str(global_perf_means.idxmin())
+
         n_clusters = len(np.unique(cluster_labels))
         for cluster_id in range(n_clusters):
             idxs = np.where(cluster_labels == cluster_id)[0]
             if len(idxs) == 0:
                 continue
-            cluster_perf = performance.iloc[idxs]
+            cluster_perf = performance.iloc[idxs][self.algorithms]
             algo_means = cluster_perf.mean(axis=0)
-            best_algo = algo_means.idxmin()
+            if algo_means.isna().all():
+                best_algo = self.fallback_algo
+            elif self.maximize:
+                best_algo = str(algo_means.idxmax())
+            else:
+                best_algo = str(algo_means.idxmin())
             self.cluster_to_best_algo[int(cluster_id)] = str(best_algo)
 
     def _predict(
@@ -140,7 +157,7 @@ class ISAC(ConfigurableMixin, AbstractSelector):
         predictions: dict[str, list[tuple[str, float]]] = {}
         for idx, instance in enumerate(features.index):
             cluster_id = int(cluster_labels[idx])
-            best_algo = self.cluster_to_best_algo.get(cluster_id)
+            best_algo = self.cluster_to_best_algo.get(cluster_id, self.fallback_algo)
             if best_algo:
                 predictions[str(instance)] = [(str(best_algo), float(self.budget or 0))]
             else:
