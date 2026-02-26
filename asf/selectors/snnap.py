@@ -52,6 +52,7 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
         self,
         k: int = 5,
         top_n: int = 3,
+        random_state: int | None = 42,
         **kwargs: Any,
     ) -> None:
         """
@@ -63,12 +64,15 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
             Number of nearest neighbors (similar instances) to consider.
         top_n : int, default=3
             Number of top algorithms to use for Jaccard distance calculation.
+        random_state : int or None, default=42
+            Random seed for the RandomForest models.
         **kwargs : Any
             Additional keyword arguments.
         """
         super().__init__(**kwargs)
         self.k = int(k)
         self.top_n = int(top_n)
+        self.random_state = random_state
 
         self.features_df: pd.DataFrame | None = None
         self.original_performance_df: pd.DataFrame | None = None
@@ -108,7 +112,7 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
         self.algorithm_models = {}
         for algo in self.algorithms:
             y = self.scaled_performance_df[algo]
-            model = RandomForestRegressorWrapper()
+            model = RandomForestRegressorWrapper(random_state=self.random_state)
             model.fit(features.values, y.values)
             self.algorithm_models[str(algo)] = model
 
@@ -274,4 +278,10 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
             default=3,
         )
 
-        return [k_param, top_n_param], [], []
+        random_state_param = Integer(
+            name="random_state",
+            bounds=(0, 2**31 - 1),
+            default=42,
+        )
+
+        return [k_param, top_n_param, random_state_param], [], []
