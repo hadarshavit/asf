@@ -367,8 +367,6 @@ if __name__ == "__main__":
     presolver_names = args.presolvers if args.presolvers is not None else []
     preprocessor_names = args.preprocessors if args.preprocessors is not None else []
 
-    print(model_list, presolver_list, preprocessor_list)
-
     selector_classes = [getattr(selectors, name) for name in selector_names]
     print("Selector classes:", selector_classes)
 
