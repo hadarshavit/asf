@@ -119,7 +119,7 @@ def parser_function() -> argparse.ArgumentParser:
     maximize_group.add_argument(
         "--maximize",
         action="store_true",
-        default=False,
+        default=None,
         help="Maximize the objective",
     )
     maximize_group.add_argument(
