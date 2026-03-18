@@ -144,15 +144,18 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
                     first_item = pred_list[0]
                     assert isinstance(first_item, tuple) and len(first_item) >= 1
                     chosen_algo = first_item[0]
-                    if Y_val.index.dtype != object:
-                        # Convert back to original index type if necessary
-                        index_type = cast(Any, Y_val.index.dtype).type
-                        orig_inst_name = index_type(inst_name)
+                    if inst_name in Y_val.index:
+                        resolved_inst_name = inst_name
+                    elif str(inst_name) in Y_val.index:
+                        resolved_inst_name = str(inst_name)
                     else:
-                        orig_inst_name = inst_name
+                        match = Y_val.index[Y_val.index.astype(str) == str(inst_name)]
+                        if len(match) == 0:
+                            continue
+                        resolved_inst_name = match[0]
 
-                    runtime = Y_val.at[orig_inst_name, chosen_algo]
-                    inst_feature_df = X_val.loc[[orig_inst_name]]
+                    runtime = Y_val.at[resolved_inst_name, chosen_algo]
+                    inst_feature_df = X_val.loc[[resolved_inst_name]]
                     guardian_for_choice = fold_guardians.get(chosen_algo)
 
                     if guardian_for_choice:
