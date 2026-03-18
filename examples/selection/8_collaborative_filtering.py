@@ -55,7 +55,6 @@ def generate_correlated_data(n_instances=100, n_algorithms=6, seed=42):
 
 
 def print_sample_predictions(predictions, true_performance, label, n=10):
-    print(f"\nSample predictions for test set ({label}):")
     for instance in list(true_performance.index)[:n]:
         if instance not in predictions:
             continue
@@ -78,8 +77,7 @@ if __name__ == "__main__":
     print("Full performance matrix (no NaNs):")
     print(performance_full.head(10))
 
-    # Use budget as 95th percentile of runtimes for metrics evaluation
-    budget = float(performance_full.values.flatten().max()) * 1.1
+    budget = float(performance_full.values.flatten().max()) * 0.5
 
     # Split into train/test
     n_train = int(0.7 * len(features))
@@ -99,9 +97,28 @@ if __name__ == "__main__":
         test_performance_full, maximize=False, budget=budget, par=10.0
     )
 
+    # Compute solve rates for baselines
+    # SBS: single best solver (same algorithm for all instances)
+    best_algo = test_performance_full.mean(axis=0).idxmin()
+    sbs_predictions = {
+        inst: [(best_algo, budget)] for inst in test_performance_full.index
+    }
+    sbs_sr = compute_solve_rate(sbs_predictions, test_performance_full, budget)
+
+    # VBS: virtual best solver (oracle - best algorithm per instance)
+    vbs_predictions = {
+        inst: [(test_performance_full.loc[inst].idxmin(), budget)]
+        for inst in test_performance_full.index
+    }
+    vbs_sr = compute_solve_rate(vbs_predictions, test_performance_full, budget)
+
     print(f"\nBudget (for metrics): {budget:.2f}")
-    print(f"Single Best Solver PAR10: {sbs_score:.2f}")
-    print(f"Virtual Best Solver (Oracle) PAR10: {vbs_score:.2f}")
+    print(
+        f"Single Best Solver (SBS):        PAR10: {sbs_score:.2f}, Solve-rate: {sbs_sr:.2%}"
+    )
+    print(
+        f"Virtual Best Solver (VBS):       PAR10: {vbs_score:.2f}, Solve-rate: {vbs_sr:.2%}"
+    )
 
     # Insert NaNs for training and test sets
     missing_rate = 0.3
@@ -116,7 +133,7 @@ if __name__ == "__main__":
     print(train_performance.head(10))
 
     selector = CollaborativeFilteringSelector(
-        n_components=8, n_iter=500, lr=0.001, reg=0.2
+        n_components=8, n_iter=500, lr=0.001, reg=0.2, budget=budget
     )
     selector.fit(train_features, train_performance)
 

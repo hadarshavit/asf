@@ -5,7 +5,7 @@ from typing import Any, Callable, cast
 import numpy as np
 import pandas as pd
 
-from asf.predictors.linear_model import RidgeRegressorWrapper
+from asf.predictors.random_forest import RandomForestRegressorWrapper
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 from asf.utils.configurable import ClassChoice, ConfigurableMixin
 
@@ -25,7 +25,7 @@ except ImportError:
 
 class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelector):
     """
-    Collaborative filtering selector using SGD matrix factorization (ALORS-style).
+    Collaborative filtering selector using SGD matrix factorization.
 
     Attributes
     ----------
@@ -60,7 +60,7 @@ class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelect
 
     def __init__(
         self,
-        model_class: type | Callable[..., Any] = RidgeRegressorWrapper,
+        model_class: type | Callable[..., Any] = RandomForestRegressorWrapper,
         n_components: int = 10,
         n_iter: int = 100,
         lr: float = 0.001,
@@ -142,7 +142,9 @@ class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelect
         self.b_V = np.zeros(n_algorithms, dtype=float)
 
         for _ in range(self.n_iter):
-            for i, j in zip(rows, cols):
+            perm = rng.permutation(len(rows))
+            for idx in perm:
+                i, j = rows[idx], cols[idx]
                 r_ij = float(vals[i, j])
                 pred = (
                     float(self.mu or 0)
@@ -154,8 +156,9 @@ class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelect
                 err = r_ij - pred
                 err = np.clip(err, -10.0, 10.0)
 
+                u_old = self.U[i].copy()
                 self.U[i] += self.lr * (err * self.V[j] - self.reg * self.U[i])
-                self.V[j] += self.lr * (err * self.U[i] - self.reg * self.V[j])
+                self.V[j] += self.lr * (err * u_old - self.reg * self.V[j])
                 self.b_U[i] += self.lr * (err - self.reg * self.b_U[i])
                 self.b_V[j] += self.lr * (err - self.reg * self.b_V[j])
 
@@ -226,6 +229,9 @@ class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelect
 
         predictions: dict[str, list[tuple[str, float]]] = {}
 
+        # Use budget if set, otherwise use max training performance
+        budget = self.budget or float(self.performance_matrix.values.max())
+
         # Case 1: Return best algorithm for training instances
         if features is None and performance is None:
             pred_matrix = (
@@ -237,18 +243,16 @@ class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelect
             for idx, instance in enumerate(self.performance_matrix.index):
                 scores = np.asarray(pred_matrix[idx], dtype=float).flatten()
                 best_idx = int(np.argmin(scores))
-                predictions[str(instance)] = [
-                    (str(self.algorithms[best_idx]), float(self.budget or 0))
-                ]
+                predictions[str(instance)] = [(str(self.algorithms[best_idx]), budget)]
             return predictions
 
         # Case 2: Warm-start prediction with some observed performance
         if performance is not None:
-            rng = np.random.RandomState(self.random_state)
             for instance in performance.index:
                 perf_row = performance.loc[instance]
                 if not perf_row.isnull().all():
-                    u = rng.normal(scale=0.1, size=(self.n_components,)).astype(float)
+                    u = self.U.mean(axis=0).copy()
+                    b_u = 0.0
                     # SGD refinement for instance factors
                     for _ in range(20):
                         for j, _ in enumerate(self.algorithms):
@@ -256,19 +260,24 @@ class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelect
                             if not pd.isna(r_ij):
                                 pred = (
                                     float(self.mu or 0)
+                                    + b_u
                                     + self.b_V[j]
                                     + float(np.dot(u, self.V[j]))
                                 )
                                 err = float(r_ij) - pred
                                 u += self.lr * (err * self.V[j] - self.reg * u)
+                                b_u += self.lr * (err - self.reg * b_u)
 
                     scores = (
-                        float(self.mu or 0) + self.b_V + np.dot(u, self.V.T).flatten()
+                        float(self.mu or 0)
+                        + b_u
+                        + self.b_V
+                        + np.dot(u, self.V.T).flatten()
                     )
                     scores = np.asarray(scores, dtype=float).flatten()
                     best_idx = int(np.argmin(scores))
                     predictions[str(instance)] = [
-                        (str(self.algorithms[best_idx]), float(self.budget or 0))
+                        (str(self.algorithms[best_idx]), budget)
                     ]
                 else:
                     if features is None:
@@ -276,15 +285,13 @@ class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelect
                         avg_scores = self.performance_matrix.mean(axis=0)
                         best_idx = int(np.argmin(avg_scores.values))
                         predictions[str(instance)] = [
-                            (str(self.algorithms[best_idx]), float(self.budget or 0))
+                            (str(self.algorithms[best_idx]), budget)
                         ]
                     else:
                         best_algo, _ = self._predict_cold_start(
                             features.loc[instance], str(instance)
                         )
-                        predictions[str(instance)] = [
-                            (best_algo, float(self.budget or 0))
-                        ]
+                        predictions[str(instance)] = [(best_algo, budget)]
             return predictions
 
         # Case 3: Cold-start prediction using only features
@@ -293,7 +300,7 @@ class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelect
                 best_algo, _ = self._predict_cold_start(
                     features.loc[instance], str(instance)
                 )
-                predictions[str(instance)] = [(best_algo, float(self.budget or 0))]
+                predictions[str(instance)] = [(best_algo, budget)]
             return predictions
 
         return predictions
@@ -321,7 +328,7 @@ class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelect
             return [], [], []
 
         if model_class is None:
-            model_class = [RidgeRegressorWrapper]
+            model_class = [RandomForestRegressorWrapper]
 
         model_class_param = ClassChoice(
             name="model_class",
