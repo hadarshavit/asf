@@ -229,8 +229,7 @@ class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelect
 
         predictions: dict[str, list[tuple[str, float]]] = {}
 
-        # Use budget if set, otherwise use max training performance
-        budget = self.budget or float(self.performance_matrix.values.max())
+        budget = self.budget
 
         # Case 1: Return best algorithm for training instances
         if features is None and performance is None:
