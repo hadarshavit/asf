@@ -119,7 +119,7 @@ def parser_function() -> argparse.ArgumentParser:
     maximize_group.add_argument(
         "--maximize",
         action="store_true",
-        default=False,
+        default=None,
         help="Maximize the objective",
     )
     maximize_group.add_argument(
@@ -366,8 +366,6 @@ if __name__ == "__main__":
     selector_names = args.selectors
     presolver_names = args.presolvers if args.presolvers is not None else []
     preprocessor_names = args.preprocessors if args.preprocessors is not None else []
-
-    print(model_list, presolver_list, preprocessor_list)
 
     selector_classes = [getattr(selectors, name) for name in selector_names]
     print("Selector classes:", selector_classes)
