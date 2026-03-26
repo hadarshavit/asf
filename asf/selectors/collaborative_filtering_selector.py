@@ -27,6 +27,12 @@ class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelect
     """
     Collaborative filtering selector using SGD matrix factorization (ALORS-style).
 
+    References
+    ----------
+    Misir, M., and Sebag, M. (2016).
+    "ALORS: An algorithm recommender system."
+    https://www.sciencedirect.com/science/article/pii/S0004370216301436
+
     Attributes
     ----------
     n_components : int

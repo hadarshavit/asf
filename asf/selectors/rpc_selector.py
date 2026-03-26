@@ -1,4 +1,6 @@
-from typing import Any, List, Dict, Tuple, Type
+from __future__ import annotations
+
+from typing import Any, Dict, List, Tuple, Type
 import inspect
 import numpy as np
 import pandas as pd
@@ -12,6 +14,12 @@ class RPCSelector(AbstractSelector):
 
     RPC decomposes the k-label ranking problem into m = k(k-1)/2 binary
     classification tasks (one for each pair of algorithms).
+
+    References
+    ----------
+    Hüllermeier, E., et al. (2008).
+    "Label Ranking by Learning Pairwise Preferences."
+    https://en.cs.uni-paderborn.de/fileadmin-eim/informatik/fg/is/Publications/mpub109.pdf
     """
 
     PREFIX = "rpc"
@@ -21,7 +29,7 @@ class RPCSelector(AbstractSelector):
         self,
         classifier_class: Type = RandomForestClassifierWrapper,
         n_estimators: int = 100,
-        classifier_kwargs: Dict | None = None,
+        classifier_kwargs: dict[str, Any] | None = None,
         random_state: int = 42,
         top_n: int = 1,
         **kwargs: Any,

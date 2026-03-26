@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import Any, Callable
+from typing import Any, Callable, Protocol, cast
 
 import numpy as np
 import pandas as pd
@@ -35,6 +35,12 @@ class ISAC(ConfigurableMixin, AbstractSelector):
 
     Clusters instances in feature space and assigns to each cluster the best
     algorithm (by mean performance).
+
+    References
+    ----------
+    Kadioglu, S., et al. (2010).
+    "ISAC - Instance-Specific Algorithm Configuration."
+    https://www.researchgate.net/profile/Yuri-Malitsky/publication/220837402_ISAC_-_Instance-Specific_Algorithm_Configuration/links/02e7e52738cb135ccc000000/ISAC-Instance-Specific-Algorithm-Configuration.pdf
 
     Attributes
     ----------
@@ -104,8 +110,9 @@ class ISAC(ConfigurableMixin, AbstractSelector):
                 "clusterer must be a class, partial, or an instance with fit/predict"
             )
 
-        self.clusterer_instance.fit(features.values)  # type: ignore[attr-defined]
-        cluster_labels = self.clusterer_instance.predict(features.values)  # type: ignore[attr-defined]
+        clusterer = cast(_ClustererProtocol, self.clusterer_instance)
+        clusterer.fit(features.values)
+        cluster_labels = clusterer.predict(features.values)
 
         # Compute global fallback algorithm
         perf_by_algo = performance[self.algorithms]
@@ -153,7 +160,10 @@ class ISAC(ConfigurableMixin, AbstractSelector):
         """
         if features is None:
             raise ValueError("ISAC require features for prediction.")
-        cluster_labels = self.clusterer_instance.predict(features.values)  # type: ignore[attr-defined]
+        if self.clusterer_instance is None:
+            raise RuntimeError("ISAC has not been fitted.")
+        clusterer = cast(_ClustererProtocol, self.clusterer_instance)
+        cluster_labels = clusterer.predict(features.values)
         predictions: dict[str, list[tuple[str, float]]] = {}
         for idx, instance in enumerate(features.index):
             cluster_id = int(cluster_labels[idx])
@@ -196,3 +206,9 @@ class ISAC(ConfigurableMixin, AbstractSelector):
         )
 
         return [clusterer_param], [], []
+
+
+class _ClustererProtocol(Protocol):
+    def fit(self, X: np.ndarray) -> Any: ...
+
+    def predict(self, X: np.ndarray) -> np.ndarray: ...

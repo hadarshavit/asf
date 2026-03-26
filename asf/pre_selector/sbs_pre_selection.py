@@ -23,7 +23,9 @@ class SBSPreSelector(AbstractPreSelector):
     """
     Sequential Backward Selection-based pre-selector.
 
-    This selector selects algorithms based on their individual aggregate performance.
+    This selector starts from the full portfolio and iteratively removes the
+    algorithm whose removal yields the best subset score under the provided
+    metric until only ``n_algorithms`` remain.
 
     Parameters
     ----------
@@ -69,7 +71,9 @@ class SBSPreSelector(AbstractPreSelector):
         if isinstance(performance, np.ndarray):
             performance_frame = pd.DataFrame(
                 performance,
-                columns=[f"Algorithm_{i}" for i in range(performance.shape[1])],
+                columns=pd.Index(
+                    [f"Algorithm_{i}" for i in range(performance.shape[1])]
+                ),
             )
             is_numpy = True
         else:
@@ -78,17 +82,38 @@ class SBSPreSelector(AbstractPreSelector):
 
         if self.n_algorithms is None:
             raise ValueError("n_algorithms must be set")
+        if self.n_algorithms <= 0:
+            raise ValueError("n_algorithms must be positive")
+        if self.n_algorithms > performance_frame.shape[1]:
+            raise ValueError(
+                "n_algorithms cannot exceed the number of available algorithms"
+            )
 
-        # Calculate the sum of performances for each algorithm
-        algorithms_performances = performance_frame.sum(axis=0)
-        # Sort algorithms based on their performance
-        algorithms_performances = algorithms_performances.sort_values(
-            ascending=not self.maximize
+        selected_algorithms = list(performance_frame.columns)
+        while len(selected_algorithms) > self.n_algorithms:
+            best_subset: list[str] | None = None
+            best_score = float("-inf") if self.maximize else float("inf")
+
+            for algorithm in selected_algorithms:
+                candidate_subset = [
+                    candidate
+                    for candidate in selected_algorithms
+                    if candidate != algorithm
+                ]
+                score = self.metric(performance_frame[candidate_subset])
+                is_better = score > best_score if self.maximize else score < best_score
+                if is_better:
+                    best_score = score
+                    best_subset = candidate_subset
+
+            if best_subset is None:
+                raise RuntimeError("Failed to identify a valid subset.")
+            selected_algorithms = best_subset
+
+        selected_algorithms.sort(
+            key=lambda algorithm: self.metric(performance_frame[[algorithm]]),
+            reverse=self.maximize,
         )
-
-        # Select the top `n_algorithms`
-        selected_algorithms = algorithms_performances.index[: self.n_algorithms]
-        selected_algorithms = selected_algorithms.tolist()
 
         selected_performance = performance_frame[selected_algorithms]
 

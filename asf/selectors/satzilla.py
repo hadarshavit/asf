@@ -31,6 +31,12 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
 
     Uses per-algorithm ridge models on expanded features with optional instance label conditioning.
 
+    References
+    ----------
+    Xu, L., et al. (2008).
+    "SATzilla: Portfolio-based Algorithm Selection for SAT."
+    https://www.jair.org/index.php/jair/article/view/10556
+
     Attributes
     ----------
     epms : dict[str, dict[str, EPM]]

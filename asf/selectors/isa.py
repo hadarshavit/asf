@@ -28,6 +28,12 @@ class ISA(ConfigurableMixin, AbstractSelector):
     """
     ISA (Instance-Specific Aspeed) selector.
 
+    References
+    ----------
+    Lindauer, M., et al. (2016).
+    "Instance-Specific Algorithm Selection Schedules."
+    https://ml.informatik.uni-freiburg.de/wp-content/uploads/papers/16-LION-ASschedules.pdf
+
     Attributes
     ----------
     k : int

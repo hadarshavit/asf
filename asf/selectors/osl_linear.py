@@ -26,6 +26,12 @@ class OSLLinearSelector(ConfigurableMixin, AbstractSelector):
     """
     Selector using Optimistic Superset Loss (OSL) to predict runtimes.
 
+    References
+    ----------
+    Hanselle, J., et al. (2021).
+    "Superset Learning for Algorithm Selection with Right Censored Data."
+    https://epub.ub.uni-muenchen.de/91670/1/_PAKDD__Superset_Learning_for_Algorithm_Selection_with_Right_Censored_Data.pdf
+
     Attributes
     ----------
     reg : float

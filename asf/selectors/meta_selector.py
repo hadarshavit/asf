@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import copy
-from typing import Any, Callable, cast
+from collections.abc import Callable, Sequence
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -28,6 +29,12 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
     Trains multiple base selectors and uses another selector (the meta-selector)
     to choose among them for each instance based on their out-of-fold performance.
 
+    References
+    ----------
+    Feurer, M., et al. (2021).
+    "Meta-Algorithm Selection."
+    https://arxiv.org/abs/2107.09414
+
     Important: All base selectors and the meta selector must have RETURN_TYPE 'single'
     """
 
@@ -39,9 +46,20 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
     PREFIX = "meta"
     RETURN_TYPE = "single"
 
+    @staticmethod
+    def _clone_selector(selector: AbstractSelector) -> AbstractSelector:
+        """
+        Create a fresh selector copy while preserving constructor configuration.
+
+        Deep copy is preferred here because several selectors do not expose a
+        reliable parameter introspection API, and ``sel.__class__()`` would
+        silently reset user-provided hyperparameters to defaults.
+        """
+        return copy.deepcopy(selector)
+
     def __init__(
         self,
-        base_selectors: list[AbstractSelector]
+        base_selectors: Sequence[AbstractSelector]
         | Callable[[], list[AbstractSelector]]
         | None = None,
         meta_selector: AbstractSelector | Callable[[], AbstractSelector] | None = None,
@@ -56,7 +74,7 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
 
         Parameters
         ----------
-        base_selectors : list[AbstractSelector] or Callable or None, default=None
+        base_selectors : Sequence[AbstractSelector] or Callable or None, default=None
             List of base selectors to ensemble, a callable that returns a list of
             selectors, or None if candidate_selectors is provided.
         meta_selector : AbstractSelector or Callable or None, default=None
@@ -156,12 +174,7 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
             X_val = features.loc[val_ix]
 
             for sel_idx, sel in enumerate(self.base_selectors):
-                try:
-                    # Try to create a fresh instance if possible
-                    # This avoids potential issues with partials or pre-fitted models
-                    sel_copy = sel.__class__()
-                except Exception:
-                    sel_copy = copy.deepcopy(sel)
+                sel_copy = self._clone_selector(sel)
                 sel_copy.fit(X_train, Y_train)
                 preds = cast(dict[str, Any], sel_copy.predict(X_val))
 
@@ -182,10 +195,7 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
 
         self.base_selectors_ = []
         for sel in self.base_selectors:
-            try:
-                sel_full = sel.__class__()
-            except Exception:
-                sel_full = copy.deepcopy(sel)
+            sel_full = self._clone_selector(sel)
             sel_full.fit(features, performance)
             self.base_selectors_.append(sel_full)
 

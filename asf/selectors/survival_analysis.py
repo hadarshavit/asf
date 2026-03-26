@@ -31,6 +31,12 @@ if SKSURV_AVAILABLE:
         """
         Selector using survival analysis for algorithm selection.
 
+        References
+        ----------
+        Tornede, A., et al. (2020).
+        "Algorithm Selection with Survival Forests."
+        https://arxiv.org/abs/2007.02816
+
         Attributes
         ----------
         use_schedule : bool
@@ -366,7 +372,7 @@ if SKSURV_AVAILABLE:
 
         @staticmethod
         def _define_hyperparameters(
-            model_class: list[type[RandomSurvivalForestWrapper]] | None = None,
+            model_class: list[type | bool] | None = None,
             **kwargs: Any,
         ) -> tuple[list[Any], list[Any], list[Any]]:
             """
@@ -388,13 +394,13 @@ if SKSURV_AVAILABLE:
                 return [], [], []
 
             if model_class is None:
-                choices: list[Any] = [RandomSurvivalForestWrapper]
+                choices: list[type | bool] = [RandomSurvivalForestWrapper]
             else:
                 choices = model_class
 
             model_class_param = ClassChoice(
                 name="model_class",
-                choices=choices,  # type: ignore[arg-type]
+                choices=choices,
                 default=choices[0],
             )
 

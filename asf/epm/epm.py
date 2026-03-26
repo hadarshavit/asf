@@ -161,7 +161,7 @@ class EPM:
             predictor = self.predictor_class(**self.predictor_kwargs)
         else:
             # Assume get_from_configuration returns a partial or a class
-            predictor_factory = self.predictor_class.get_from_configuration(  # type: ignore
+            predictor_factory = self.predictor_class.get_from_configuration(
                 self.predictor_config, **self.predictor_kwargs
             )
             if callable(predictor_factory):
@@ -194,7 +194,7 @@ class EPM:
         if self.features_preprocessing is not None and not isinstance(
             self.features_preprocessing, str
         ):
-            X_df = self.features_preprocessing.transform(X_df)  # type: ignore
+            X_df = self.features_preprocessing.transform(X_df)
 
         y_pred = self.predictor.predict(X_df)
 

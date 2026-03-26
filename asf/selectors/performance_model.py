@@ -36,6 +36,12 @@ class PerformanceModel(
     It can handle both single-target (one model per algorithm) and multi-target
     regression models.
 
+    References
+    ----------
+    Hutter, F., et al. (2011).
+    "Sequential Model-Based Optimization for General Algorithm Configuration."
+    https://arxiv.org/abs/1111.2249
+
     Attributes
     ----------
     model_class : type
@@ -232,9 +238,9 @@ class PerformanceModel(
                 if not isinstance(self.regressors, list):
                     raise RuntimeError("Individual regressors missing.")
                 for i, _ in enumerate(self.algorithms):
-                    regressor: Any = self.regressors[i]
+                    regressor = cast(AbstractPredictor, self.regressors[i])
                     predictions[:, i] = np.asarray(
-                        regressor.predict(base_features)  # type: ignore[union-attr]
+                        regressor.predict(base_features)
                     ).flatten()
             else:
                 if not isinstance(self.regressors, AbstractPredictor):

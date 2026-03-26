@@ -1,3 +1,5 @@
+from typing import cast
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -39,7 +41,9 @@ def test_brute_force_selects_lowest_sum_dataframe():
 
     selected = selector.fit_transform(performance)
 
-    assert list(selected.columns) == ["a", "c"]  # type: ignore[attr-defined]
+    assert isinstance(selected, pd.DataFrame)
+    selected_df = cast(pd.DataFrame, selected)
+    assert list(selected_df.columns) == ["a", "c"]
 
 
 def test_brute_force_returns_numpy_for_array_input():
@@ -78,7 +82,9 @@ def test_beam_search_respects_metric_minimize():
 
     selected = selector.fit_transform(performance)
 
-    assert set(selected.columns) == {"A", "B"}  # type: ignore[attr-defined]
+    assert isinstance(selected, pd.DataFrame)
+    selected_df = cast(pd.DataFrame, selected)
+    assert set(selected_df.columns) == {"A", "B"}
 
 
 def test_marginal_contribution_based_maximize_selects_largest_column():
@@ -98,7 +104,9 @@ def test_marginal_contribution_based_maximize_selects_largest_column():
 
     selected = selector.fit_transform(performance)
 
-    assert list(selected.columns) == ["C"]  # type: ignore[attr-defined]
+    assert isinstance(selected, pd.DataFrame)
+    selected_df = cast(pd.DataFrame, selected)
+    assert list(selected_df.columns) == ["C"]
 
 
 def test_sbs_pre_selector_handles_numpy_input():
@@ -115,6 +123,31 @@ def test_sbs_pre_selector_handles_numpy_input():
 
     assert isinstance(selected, np.ndarray)
     assert selected.shape == (2, 2)
+
+
+def test_sbs_pre_selector_uses_metric_for_backward_elimination():
+    performance = pd.DataFrame(
+        {
+            "A": [1.0, 100.0, 100.0],
+            "B": [100.0, 1.0, 1.0],
+            "C": [40.0, 40.0, 40.0],
+        }
+    )
+
+    def schedule_metric(frame: pd.DataFrame) -> float:
+        return float(frame.min(axis=1).max())
+
+    selector = SBSPreSelector(
+        metric=schedule_metric,
+        n_algorithms=2,
+        maximize=False,
+    )
+
+    selected = selector.fit_transform(performance)
+
+    assert isinstance(selected, pd.DataFrame)
+    selected_df = cast(pd.DataFrame, selected)
+    assert list(selected_df.columns) == ["A", "B"]
 
 
 class _RecordingOptimizer:
@@ -160,7 +193,9 @@ def test_optimize_pre_selection_uses_custom_optimizer():
 
     assert optimizer.called_with is not None
     assert optimizer.called_with["bounds"] == [(0, 1)] * 3
-    assert set(selected.columns) == {"A", "B"}  # type: ignore[attr-defined]
+    assert isinstance(selected, pd.DataFrame)
+    selected_df = cast(pd.DataFrame, selected)
+    assert set(selected_df.columns) == {"A", "B"}
 
 
 class _DummyBasePreSelector(AbstractPreSelector):
@@ -197,7 +232,9 @@ def test_knee_of_curve_pre_selector_detects_knee():
 
     selected = selector.fit_transform(performance)
 
-    assert list(selected.columns) == ["A", "B"]  # type: ignore[attr-defined]
+    assert isinstance(selected, pd.DataFrame)
+    selected_df = cast(pd.DataFrame, selected)
+    assert list(selected_df.columns) == ["A", "B"]
 
 
 def test_knee_of_curve_pre_selector_returns_original_when_no_knee():
@@ -300,7 +337,9 @@ def test_brute_force_maximize_returns_best_columns():
 
     selected = selector.fit_transform(performance)
 
-    assert list(selected.columns) == ["B"]  # type: ignore[attr-defined]
+    assert isinstance(selected, pd.DataFrame)
+    selected_df = cast(pd.DataFrame, selected)
+    assert list(selected_df.columns) == ["B"]
 
 
 def test_sbs_pre_selector_dataframe_minimize_orders_correctly():
@@ -316,4 +355,6 @@ def test_sbs_pre_selector_dataframe_minimize_orders_correctly():
 
     selected = selector.fit_transform(performance)
 
-    assert list(selected.columns) == ["C", "A"]  # type: ignore[attr-defined]
+    assert isinstance(selected, pd.DataFrame)
+    selected_df = cast(pd.DataFrame, selected)
+    assert list(selected_df.columns) == ["C", "A"]

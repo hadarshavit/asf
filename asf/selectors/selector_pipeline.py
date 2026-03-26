@@ -389,10 +389,7 @@ class SelectorPipeline(ConfigurableMixin):
                 and isinstance(selector_class[0], tuple)
             ):
                 selector_choices = [
-                    c[0]  # type: ignore[index]
-                    for c in (
-                        selector_class if isinstance(selector_class, list) else []
-                    )
+                    c[0] if isinstance(c, tuple) else c for c in selector_class
                 ]
             else:
                 selector_choices = (

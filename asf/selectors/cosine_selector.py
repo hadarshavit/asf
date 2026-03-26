@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -183,6 +183,9 @@ else:
         def __init__(self, *args, **kwargs):
             pass
 
+        def to(self, *args, **kwargs):
+            return self
+
         def __call__(self, *args, **kwargs):
             pass
 
@@ -205,6 +208,12 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
     - Instance features → MLP → instance embedding
     - Algorithm index → Embedding → LSTM → fused with algorithm_features → algorithm embedding
     - Cosine similarity + MLP for final compatibility prediction
+
+    References
+    ----------
+    Wu, et al. (2023).
+    "Algorithm Selection with Large Language Model."
+    https://arxiv.org/abs/2311.13184
 
     Attributes
     ----------
@@ -442,7 +451,7 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
         num_user_features = X.shape[1]
         num_algorithms = len(self.algorithms)
 
-        self._model = _ASLLMRecommendationModel(  # type: ignore[attr-defined]
+        model = _ASLLMRecommendationModel(  # type: ignore[attr-defined]
             num_algorithms=num_algorithms,
             num_user_features=num_user_features,
             algorithm_features=alg_features_tensor,
@@ -451,7 +460,8 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
             num_layers=self.num_layers,
             alpha=self.alpha,
             beta=self.beta,
-        ).to(self._device)
+        )
+        self._model = cast(Any, model).to(self._device)
 
         # Training
         optimizer = torch.optim.Adam(self._model.parameters(), lr=self.lr)
@@ -501,7 +511,7 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
             for i, inst in enumerate(features.index):
                 inst_features = X[i]
                 best_score = -float("inf")
-                best_algo = None
+                best_algo = self.algorithms[0]
 
                 for j in range(num_algorithms):
                     # Create input: instance features + one-hot + algo index
@@ -523,7 +533,7 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
                         best_score = score
                         best_algo = self.algorithms[j]
 
-                out[str(inst)] = [(best_algo, float(self.budget or 0))]  # type: ignore[assignment]
+                out[str(inst)] = [(str(best_algo), float(self.budget or 0))]
 
         return out
 

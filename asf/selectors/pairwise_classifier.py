@@ -31,6 +31,12 @@ class PairwiseClassifier(
     """
     Selector using pairwise comparison of algorithms.
 
+    References
+    ----------
+    Xu, L., et al. (2012).
+    "SATzilla Solver Description."
+    https://ml.informatik.uni-freiburg.de/wp-content/uploads/papers/12-SATzilla-solver-description.pdf
+
     Attributes
     ----------
     classifiers : list[AbstractPredictor]
@@ -155,7 +161,11 @@ class PairwiseClassifier(
         else:
             features_df = base_features
 
-        votes = pd.DataFrame(0, index=features_df.index, columns=list(self.algorithms))
+        votes = pd.DataFrame(
+            0,
+            index=features_df.index,
+            columns=pd.Index(list(self.algorithms)),
+        )
         cnt = 0
         for i, algo1 in enumerate(self.algorithms):
             for _j, algo2 in enumerate(self.algorithms[i + 1 :]):

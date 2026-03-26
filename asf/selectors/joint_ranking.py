@@ -27,8 +27,11 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
     Combines feature generation and model-based selection to predict algorithm
     performance.
 
-    Reference:
-        Ortuzk et al. (2022)
+    References
+    ----------
+    Ozturk, E., et al. (2022).
+    "Joint Ranking for Learning Algorithm Selection."
+    https://arxiv.org/abs/2206.08476
 
     Attributes
     ----------
@@ -84,8 +87,8 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
             encoder = OneHotEncoder(sparse_output=False)
             self.algorithm_features = pd.DataFrame(
                 encoder.fit_transform(np.array(self.algorithms).reshape(-1, 1)),
-                index=list(self.algorithms),
-                columns=[f"algo_{i}" for i in range(len(self.algorithms))],
+                index=pd.Index(list(self.algorithms)),
+                columns=pd.Index([f"algo_{i}" for i in range(len(self.algorithms))]),
             )
 
         if self.model is None:
@@ -172,7 +175,7 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
             prediction = model.predict(data)
             predictions[:, i] = prediction.flatten()
 
-        return pd.DataFrame(predictions, columns=list(self.algorithms))
+        return pd.DataFrame(predictions, columns=pd.Index(list(self.algorithms)))
 
     @staticmethod
     def _define_hyperparameters(

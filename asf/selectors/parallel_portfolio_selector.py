@@ -18,6 +18,12 @@ class APPS(AbstractSelector):
 
     The size of the portfolio is controlled by the p_intersection threshold, which
     determines the minimum overlap required for an algorithm to be included.
+
+    References
+    ----------
+    Kashgarani, H. J., and Kotthoff, L. (2020).
+    "Automatic Parallel Portfolio Construction."
+    https://par.nsf.gov/biblio/10470673
     """
 
     PREFIX = "parallel_portfolio"
@@ -159,7 +165,8 @@ class APPS(AbstractSelector):
                         model, test_idx = model_tuple
                     else:
                         model = model_tuple
-                    pred = model.predict(features)  # type: ignore[union-attr]
+                    predictor = cast(AbstractPredictor, model)
+                    pred = predictor.predict(features)
                     all_predictions.append(pred)
 
                 all_predictions = np.array(all_predictions)  # (n_folds, n_test)

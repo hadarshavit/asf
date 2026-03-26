@@ -31,6 +31,12 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
     A meta-selector that uses a primary selector along with guardian models to
     predict the success probability of the primary's choice.
 
+    References
+    ----------
+    Malitsky, Y., et al. (2021).
+    "Confidence-based Switching Hybrid Solver Construction."
+    https://link.springer.com/chapter/10.1007/978-3-642-44973-4_17
+
     Attributes
     ----------
     primary_selector : AbstractSelector

@@ -27,6 +27,12 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
     Uses per-algorithm performance prediction models and Jaccard distance on predicted
     top algorithms to find similar instances, then selects from neighbors' best algorithms.
 
+    References
+    ----------
+    Collautti, M., et al. (2013).
+    "A Solver-Based Nearest Neighbor Method for Portfolio Selection."
+    https://link.springer.com/chapter/10.1007/978-3-642-40994-3_28
+
     Attributes
     ----------
     k : int

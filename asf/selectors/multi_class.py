@@ -25,6 +25,12 @@ class MultiClassClassifier(ConfigurableMixin, AbstractModelBasedSelector):
     """
     Multi-class classification algorithm selector.
 
+    References
+    ----------
+    Xu, L., et al. (2013).
+    "SATzilla2012: Improved Algorithm Selection Based on Cost-sensitive Classification Models."
+    https://arxiv.org/abs/1306.1031
+
     Attributes
     ----------
     classifier : AbstractPredictor or None

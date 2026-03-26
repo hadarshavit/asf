@@ -295,6 +295,12 @@ class HARRIS(AbstractSelector):
     that combines regression (MSE) and ranking (Spearman correlation) objectives.
     Each tree makes splits based on both objectives, but returns predictions
     based on regression labels at leaf nodes.
+
+    References
+    ----------
+    Fehring, et al. (2022).
+    "HARRIS-Hybrid Algorithm Selection using Regression and Ranking."
+    https://arxiv.org/pdf/2210.17341
     """
 
     PREFIX = "harris"

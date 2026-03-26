@@ -19,7 +19,8 @@ repos:
   hooks:
     - id: ty
       name: ty
-      entry: ty check --force-exclude
+      entry: ty check asf --force-exclude
       language: system
       types_or: [python, pyi]
+      pass_filenames: false
       require_serial: true

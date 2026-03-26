@@ -27,6 +27,9 @@ class DyadRanking(ConfigurableMixin, AbstractModelBasedSelector):
     Tornede et al. (2019) "Algorithm Selection as Recommendation:
     From Collaborative Filtering to Dyad Ranking"
 
+    Reference link:
+    https://ris.uni-paderborn.de/download/15011/17060/ci_workshop_tornede.pdf
+
     Uses XGBoost instead of PLNet for ranking, but the overall approach is the same.
 
 
@@ -190,8 +193,8 @@ class DyadRanking(ConfigurableMixin, AbstractModelBasedSelector):
 
         return pd.DataFrame(
             encoded,
-            index=list(self.algorithms),
-            columns=[f"algo_{i}" for i in range(len(self.algorithms))],
+            index=pd.Index(list(self.algorithms)),
+            columns=pd.Index([f"algo_{i}" for i in range(len(self.algorithms))]),
         )
 
     def _create_dyads_for_prediction(self, features: pd.DataFrame) -> pd.DataFrame:
