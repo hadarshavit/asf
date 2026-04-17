@@ -56,6 +56,8 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         learning_rate: float = 1e-3,
         min_lr: float = 1e-6,
         weight_decay: float = 0.0,
+        hidden_sizes: list[int] | None = None,
+        dropout: float = 0.1,
         **kwargs,
     ):
         params = init_params if isinstance(init_params, dict) else {}
@@ -74,6 +76,8 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         learning_rate = params.pop("learning_rate", learning_rate)
         min_lr = params.pop("min_lr", min_lr)
         weight_decay = params.pop("weight_decay", weight_decay)
+        hidden_sizes = params.pop("hidden_sizes", hidden_sizes)
+        dropout = params.pop("dropout", dropout)
 
         super().__init__(**params)
         if not TORCH_AVAILABLE:
@@ -89,7 +93,15 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
 
         if model is None:
             assert input_size is not None
-            self.model = get_mlp(input_size=input_size, output_size=1)
+            # Default hidden sizes from ZAP paper: 3 layers of 256 units
+            if hidden_sizes is None:
+                hidden_sizes = [256, 256, 256]
+            self.model = get_mlp(
+                input_size=input_size, 
+                output_size=1, 
+                hidden_sizes=hidden_sizes, 
+                dropout=dropout
+            )
         else:
             self.model = model
 
@@ -113,10 +125,15 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         performance: pd.DataFrame,
         algorithm_features: pd.DataFrame,
     ) -> Any:
-        dataset = RankingDataset(features, performance, algorithm_features)
-        return torch.utils.data.DataLoader(
-            dataset, batch_size=self.batch_size, shuffle=True, num_workers=4
+        dataset = RankingDataset(
+            features, performance, algorithm_features, device=self.device
         )
+        # num_workers must be 0 when data is on CUDA (can't share CUDA tensors across processes)
+        num_workers = 0 if self.device != "cpu" else 4
+        return torch.utils.data.DataLoader(
+            dataset, batch_size=self.batch_size, shuffle=True, num_workers=num_workers
+        )
+
 
     def fit(
         self,
@@ -179,9 +196,9 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
 
     def predict(self, X: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
         self.model.eval()
-
+        
         features_tensor = torch.from_numpy(X.values).to(self.device).float()
-        predictions = self.model(features_tensor).detach().numpy()
+        predictions = self.model(features_tensor).detach().cpu().numpy()
 
         return predictions
 

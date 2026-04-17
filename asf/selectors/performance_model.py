@@ -126,7 +126,10 @@ class PerformanceModel(
         try:
             sig = inspect.signature(self.model_class)
             if "input_size" in sig.parameters:
-                regressor_init_args["input_size"] = features.shape[1]
+                base_input_size = features.shape[1]
+                if getattr(self, "algorithm_features", None) is not None:
+                    base_input_size += len(self.algorithm_features.columns)
+                regressor_init_args["input_size"] = base_input_size
         except (ValueError, TypeError):
             pass
 
@@ -146,27 +149,35 @@ class PerformanceModel(
                     cur_model.fit(features, algo_times)
                     self.regressors.append(cur_model)
             else:
-                train_data_list = []
+                # Build long-format training data: each row = instance x algorithm
+                train_rows = []
                 for i, algorithm in enumerate(self.algorithms):
                     # Align algorithm features with instance features
-                    data = pd.merge(
-                        features,
+                    alg_feats = (
                         self.algorithm_features.loc[[algorithm]]
                         .reindex([algorithm] * len(features))
-                        .set_index(features.index),
-                        left_index=True,
-                        right_index=True,
+                        .set_index(features.index)
                     )
-                    data = pd.merge(
-                        data,
-                        performance.iloc[:, [i]],
-                        left_index=True,
-                        right_index=True,
-                    )
-                    train_data_list.append(data)
-                train_data = pd.concat(train_data_list)
+                    # Combine instance features with algorithm features
+                    data = pd.concat([features, alg_feats], axis=1)
+                    # Add target column named 'target' from performance for this algorithm
+                    target = performance.iloc[:, i].rename("target")
+                    data = data.join(target)
+                    train_rows.append(data)
+                # Concatenate all algorithm-specific rows into a single long-format DataFrame
+                train_data = pd.concat(train_rows, axis=0, ignore_index=False)
+                
+                # Recompute input_size for models that take combined features
+                try:
+                    sig = inspect.signature(self.model_class)
+                    if "input_size" in sig.parameters:
+                        regressor_init_args["input_size"] = train_data.shape[1] - 1  # exclude target
+                except (ValueError, TypeError):
+                    pass
+                X_train = train_data.drop(columns=["target"])
+                y_train = train_data["target"]
                 self.regressors = self.model_class(**regressor_init_args)
-                self.regressors.fit(train_data.iloc[:, :-1], train_data.iloc[:, -1])
+                self.regressors.fit(X_train, y_train)
 
     def _predict(
         self,

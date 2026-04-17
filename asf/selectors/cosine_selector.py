@@ -254,14 +254,14 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
     def __init__(
         self,
         normalize_features: bool = True,
-        embed_size: int = 50,
-        num_hiddens: int = 50,
+        embed_size: int = 128,
+        num_hiddens: int = 128,
         num_layers: int = 2,
         alpha: float = 0.9,
         beta: float = 0.1,
-        lr: float = 0.001,
-        num_epochs: int = 100,
-        batch_size: int = 128,
+        lr: float = 5e-4,
+        num_epochs: int = 400,
+        batch_size: int = 256,
         device: str | None = None,
         random_state: int = 42,
         **kwargs: Any,
@@ -346,7 +346,10 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
         training_labels = []
 
         for i in range(num_instances):
-            best_algo = int(np.argmin(performance[i]))
+            if self.maximize:
+                best_algo = int(np.argmax(performance[i]))
+            else:
+                best_algo = int(np.argmin(performance[i]))
             for j in range(num_algorithms):
                 # One-hot encoding for algorithm
                 alg_embed = [0] * num_algorithms
@@ -454,7 +457,10 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
         ).to(self._device)
 
         # Training
-        optimizer = torch.optim.Adam(self._model.parameters(), lr=self.lr)
+        optimizer = torch.optim.AdamW(self._model.parameters(), lr=self.lr)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=self.num_epochs, eta_min=1e-6
+        )
         loss_fn = nn.CrossEntropyLoss()
 
         self._model.train()
@@ -468,6 +474,7 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
                 loss = loss_fn(outputs, batch_y)
                 loss.backward()
                 optimizer.step()
+            scheduler.step()
 
         self._num_user_features = num_user_features
 

@@ -14,19 +14,32 @@ def get_mlp(
     hidden_sizes: list[int] = [128, 64],
     dropout: float = 0.0,
 ):
+    """
+    Build an MLP matching the ZAP paper's batch_mlp architecture.
+    
+    Architecture: For each hidden layer:
+        Linear -> Dropout -> ReLU
+    Followed by final Linear output layer.
+    
+    Reference: https://arxiv.org/pdf/2206.08476
+    """
     if not TORCH_AVAILABLE:
         raise RuntimeError(
             "PyTorch is not installed. Install it with: pip install torch"
         )
-    layers = [torch.nn.Linear(input_size, hidden_sizes[0]), torch.nn.ReLU()]
-
-    for i in range(len(hidden_sizes) - 1):
-        layers.append(torch.nn.Linear(hidden_sizes[i], hidden_sizes[i + 1]))
+    
+    layers = []
+    prev_size = input_size
+    
+    for hidden_size in hidden_sizes:
+        layers.append(torch.nn.Linear(prev_size, hidden_size))
+        layers.append(torch.nn.Dropout(dropout))
         layers.append(torch.nn.ReLU())
-
-    layers.append(torch.nn.Dropout(dropout))
-    layers.append(torch.nn.Linear(hidden_sizes[-1], output_size))
+        prev_size = hidden_size
+    
+    layers.append(torch.nn.Linear(prev_size, output_size))
 
     model = torch.nn.Sequential(*layers)
 
     return model
+

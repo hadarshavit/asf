@@ -90,11 +90,11 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
 
         if self.model is None:
             self.model = RankingMLP(
-                input_size=len(self.features) + len(self.algorithms)
+                input_size=len(self.features) + len(self.algorithm_features.columns)
             )
         elif callable(self.model) and not isinstance(self.model, RankingMLP):
             self.model = self.model(
-                input_size=len(self.features) + len(self.algorithms)
+                input_size=len(self.features) + len(self.algorithm_features.columns)
             )
 
         if self.model is None:

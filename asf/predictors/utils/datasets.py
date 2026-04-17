@@ -57,9 +57,11 @@ if TORCH_AVAILABLE:
             performance: pd.DataFrame,
             algorithm_features: pd.DataFrame,
             dtype=None,
+            device: str = "cpu",
         ):
             if dtype is None:
                 dtype = torch.float32
+            self._device = device
             performance = performance.melt(
                 ignore_index=False, var_name="algo", value_name="performance"
             )
@@ -72,61 +74,73 @@ if TORCH_AVAILABLE:
             self.algorithm_features_cols = algorithm_features.columns.to_list()
             self._dtype = dtype
 
-            # Build index mapping for efficient access
-            # Each entry is (instance_id, row_position_within_instance)
-            self._index_map = []
-            self._instance_data = {}
-            for iid in self.all.index.unique():
-                instance_data = self.all.loc[iid]
-                if isinstance(instance_data, pd.Series):
-                    # Single row case - convert to DataFrame
-                    instance_data = instance_data.to_frame().T
-                self._instance_data[iid] = instance_data
-                for row_idx in range(len(instance_data)):
-                    self._index_map.append((iid, row_idx))
+            # Convert to tensors for fast access, optionally on GPU
+            cols = self.algorithm_features_cols + self.features_cols
+            self._all_features_tensor = torch.tensor(
+                self.all[cols].to_numpy().astype(np.float32)
+            ).to(dtype=self._dtype, device=self._device)
+            self._all_perf_tensor = torch.tensor(
+                self.all["performance"].to_numpy().astype(np.float32)
+            ).to(dtype=self._dtype, device=self._device)
+
+            # Pre-calculate indices for smaller/larger per dataset
+            self._num_samples = len(self.all)
+            self._smaller_indices = [[] for _ in range(self._num_samples)]
+            self._larger_indices = [[] for _ in range(self._num_samples)]
+
+            # Group indices by instance_id
+            indices_per_iid = {}
+            for i, iid in enumerate(self.all.index):
+                if iid not in indices_per_iid:
+                    indices_per_iid[iid] = []
+                indices_per_iid[iid].append(i)
+
+            for iid, i_list in indices_per_iid.items():
+                perfs = self._all_perf_tensor[i_list]
+                for rel_idx, abs_idx in enumerate(i_list):
+                    p = perfs[rel_idx]
+                    
+                    # smaller
+                    s_rel = (perfs < p).nonzero().flatten()
+                    if len(s_rel) > 0:
+                        self._smaller_indices[abs_idx] = [i_list[j] for j in s_rel.tolist()]
+                    
+                    # larger
+                    l_rel = (perfs > p).nonzero().flatten()
+                    if len(l_rel) > 0:
+                        self._larger_indices[abs_idx] = [i_list[j] for j in l_rel.tolist()]
 
         def __len__(self):
             # Return total number of (dataset, algorithm) pairs
-            return len(self._index_map)
+            return self._num_samples
 
         def __getitem__(self, index):
-            iid, row_idx = self._index_map[index]
-            data = self._instance_data[iid]
-
             # The main point is the specific (dataset, algorithm) pair
-            main_point = data.iloc[row_idx]
-            main_perf = main_point["performance"]
+            main_feats = self._all_features_tensor[index]
+            main_perf = self._all_perf_tensor[index]
 
             # Find algorithms with smaller performance on the same dataset
-            smaller_mask = data["performance"] < main_perf
-            if smaller_mask.any():
-                smaller = data[smaller_mask].sample(1).iloc[0]
+            if self._smaller_indices[index]:
+                s_idx = np.random.choice(self._smaller_indices[index])
+                smaller_feats = self._all_features_tensor[s_idx]
+                smaller_perf = self._all_perf_tensor[s_idx]
             else:
-                smaller = main_point
+                smaller_feats = main_feats
+                smaller_perf = main_perf
 
             # Find algorithms with larger performance on the same dataset
-            larger_mask = data["performance"] > main_perf
-            if larger_mask.any():
-                larger = data[larger_mask].sample(1).iloc[0]
+            if self._larger_indices[index]:
+                l_idx = np.random.choice(self._larger_indices[index])
+                larger_feats = self._all_features_tensor[l_idx]
+                larger_perf = self._all_perf_tensor[l_idx]
             else:
-                larger = main_point
-
-            # Extract features
-            cols = self.algorithm_features_cols + self.features_cols
-            main_feats = torch.tensor(
-                main_point[cols].to_numpy().astype(np.float32)
-            ).to(self._dtype)
-            smaller_feats = torch.tensor(
-                smaller[cols].to_numpy().astype(np.float32)
-            ).to(self._dtype)
-            larger_feats = torch.tensor(larger[cols].to_numpy().astype(np.float32)).to(
-                self._dtype
-            )
+                larger_feats = main_feats
+                larger_perf = main_perf
 
             return (main_feats, smaller_feats, larger_feats), (
-                main_point["performance"],
-                smaller["performance"],
-                larger["performance"],
+                main_perf,
+                smaller_perf,
+                larger_perf,
             )
 else:
     # Use Any to silence type checker complaining about union types
