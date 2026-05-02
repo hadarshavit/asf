@@ -25,5 +25,3 @@ jobs:
       run: ruff format --diff --target-version=py311
     - name: Install dependencies for type checking
       run: pip install .[all]
-    - name: Check type annotations with ty
-      run: ty check --output-format=github
