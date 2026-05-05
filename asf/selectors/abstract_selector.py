@@ -195,7 +195,8 @@ class AbstractSelector(ABC):
 
             if self.feature_groups is None:
                 return {
-                    instance: _lookup_schedule(instance) for instance in df_features.index
+                    instance: _lookup_schedule(instance)
+                    for instance in df_features.index
                 }
 
             fg_steps = list(self.feature_groups)
