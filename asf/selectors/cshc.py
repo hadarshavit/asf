@@ -221,11 +221,11 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
         if not self.guardians:
             raise RuntimeError("The selector has not been fitted yet.")
 
-        primary_preds = cast(dict[str, Any], self.primary_selector.predict(features))
+        primary_preds = cast(dict[Any, Any], self.primary_selector.predict(features))
         final_preds: dict[str, list[tuple[str, float]]] = {}
 
         for inst_name in features.index:
-            preds = primary_preds.get(str(inst_name), [])
+            preds = primary_preds.get(inst_name, primary_preds.get(str(inst_name), []))
             if not isinstance(preds, list):
                 preds = []
 
@@ -241,9 +241,11 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
             if not pred_list:
                 if self.backup_selector:
                     backup_pred = cast(
-                        dict[str, Any], self.backup_selector.predict(inst_feature_df)
+                        dict[Any, Any], self.backup_selector.predict(inst_feature_df)
                     )
-                    preds = backup_pred.get(str(inst_name), [])
+                    preds = backup_pred.get(
+                        inst_name, backup_pred.get(str(inst_name), [])
+                    )
                     if preds:
                         final_preds[str(inst_name)] = [
                             (str(preds[0][0]), float(self.budget or 0))
@@ -272,9 +274,9 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
                 ]
             elif self.backup_selector:
                 backup_pred = cast(
-                    dict[str, Any], self.backup_selector.predict(inst_feature_df)
+                    dict[Any, Any], self.backup_selector.predict(inst_feature_df)
                 )
-                preds = backup_pred.get(str(inst_name), [])
+                preds = backup_pred.get(inst_name, backup_pred.get(str(inst_name), []))
                 if preds:
                     final_preds[str(inst_name)] = [
                         (str(preds[0][0]), float(self.budget or 0))

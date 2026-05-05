@@ -136,7 +136,7 @@ class AbstractSelector(ABC):
         self,
         features: pd.DataFrame | np.ndarray | None,
         performance: pd.DataFrame | None = None,
-    ) -> dict[str, list[tuple[str, float]]] | pd.Series | np.ndarray:
+    ) -> dict[Any, list[tuple[str, float]]] | pd.Series | np.ndarray:
         """
         Predict algorithm selections/rankings.
 
@@ -181,23 +181,34 @@ class AbstractSelector(ABC):
 
         scheds = self._predict(df_features, performance=performance)
 
+        def _lookup_schedule(instance: Any) -> list[tuple[str, float]]:
+            if instance in scheds:
+                return list(scheds[instance])
+            instance_str = str(instance)
+            if instance_str in scheds:
+                return list(scheds[instance_str])
+            return []
+
         if self.prediction_mode == "aslib":
-            if self.feature_groups is None:
+            if df_features is None:
                 return scheds
+
+            if self.feature_groups is None:
+                return {
+                    instance: _lookup_schedule(instance) for instance in df_features.index
+                }
 
             fg_steps = list(self.feature_groups)
             return {
-                str(instance): fg_steps + list(scheds.get(str(instance), []))
-                for instance in (
-                    df_features.index if df_features is not None else scheds.keys()
-                )
+                instance: fg_steps + _lookup_schedule(instance)
+                for instance in df_features.index
             }
         elif self.prediction_mode == "pandas":
             if df_features is None:
                 raise ValueError("Pandas mode requires features.")
             return pd.Series(
                 {
-                    instance: scheds.get(str(instance), [(None, 0.0)])[0][0]
+                    instance: (_lookup_schedule(instance) or [(None, 0.0)])[0][0]
                     for instance in df_features.index
                 }
             )
@@ -205,7 +216,7 @@ class AbstractSelector(ABC):
             if df_features is None:
                 raise ValueError("Numpy mode requires features.")
             labels = [
-                scheds.get(str(instance), [(None, 0.0)])[0][0]
+                (_lookup_schedule(instance) or [(None, 0.0)])[0][0]
                 for instance in df_features.index
             ]
             encoder = OneHotEncoder(sparse_output=False, categories=[self.algorithms])

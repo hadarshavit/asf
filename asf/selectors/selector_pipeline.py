@@ -211,7 +211,7 @@ class SelectorPipeline(ConfigurableMixin):
         features: pd.DataFrame,
         performance: pd.DataFrame | None = None,
         **kwargs: Any,
-    ) -> dict[str, list[tuple[str, float] | tuple[str, float, float]]]:
+    ) -> dict[Any, list[tuple[str, float] | tuple[str, float, float]]]:
         """
         Make predictions.
 
@@ -255,14 +255,16 @@ class SelectorPipeline(ConfigurableMixin):
                 (str(fg), float(self.max_feature_time)) for fg in feature_steps
             ]
 
-        final_preds: dict[str, list[tuple[str, float] | tuple[str, float, float]]] = {}
+        final_preds: dict[Any, list[tuple[str, float] | tuple[str, float, float]]] = {}
         assert isinstance(predictions, dict)
         for instance_id in X.index:
-            instance_key = str(instance_id)
-            prediction = (
-                list(predictions[instance_key]) if instance_key in predictions else []
-            )
-            final_preds[instance_key] = scheds + feature_steps + prediction
+            if instance_id in predictions:
+                prediction = list(predictions[instance_id])
+            elif str(instance_id) in predictions:
+                prediction = list(predictions[str(instance_id)])
+            else:
+                prediction = []
+            final_preds[instance_id] = scheds + feature_steps + prediction
 
         return final_preds
 

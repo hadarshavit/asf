@@ -20,7 +20,7 @@ def test_pairwise_generate_features_and_predict():
     assert list(feats.columns) == sel.algorithms
     preds = sel.predict(X)
     assert isinstance(preds, dict)
-    assert set(preds.keys()) == {str(i) for i in X.index}
+    assert set(preds.keys()) == set(X.index)
     for v in preds.values():
         assert isinstance(v, list) and len(v) == 1
 

@@ -52,4 +52,4 @@ def test_multi_class_classifier_handles_non_contiguous_classes():
     selector.fit(X, Y)
     preds = selector.predict(X)
 
-    assert set(preds.keys()) == {str(i) for i in X.index}  # type: ignore[attr-defined]
+    assert set(preds.keys()) == set(X.index)  # type: ignore[attr-defined]

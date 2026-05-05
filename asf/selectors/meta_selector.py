@@ -223,7 +223,7 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
         dict
             Mapping from instance names to algorithm schedules.
         """
-        meta_predictions = cast(dict[str, Any], self.meta_selector.predict(features))
+        meta_predictions = cast(dict[Any, Any], self.meta_selector.predict(features))
 
         if features is None:
             raise ValueError("MetaSelector require features for prediction.")
@@ -239,16 +239,14 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
                 final_predictions[str(instance_name)] = []
                 continue
 
-            # Convert instance_name back to original index type if necessary
-            if features.index.dtype != object:
-                orig_instance_name = features.index.dtype.type(instance_name)
-            else:
-                orig_instance_name = instance_name
+            orig_instance_name = instance_name
             instance_features = features.loc[[orig_instance_name]]
             final_prediction = cast(
-                dict[str, Any], chosen_selector.predict(instance_features)
+                dict[Any, Any], chosen_selector.predict(instance_features)
             )
-            preds = final_prediction.get(str(instance_name), [])
+            preds = final_prediction.get(
+                instance_name, final_prediction.get(str(instance_name), [])
+            )
 
             formatted = []
             for entry in preds:
