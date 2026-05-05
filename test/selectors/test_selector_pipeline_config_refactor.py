@@ -199,8 +199,7 @@ def test_survival_scheduler_pipeline_config_space_converts():
 
     assert len(conditions) == 1
     assert (
-        str(conditions[0])
-        == "pipeline:selector:survival_schedule:popsize | "
+        str(conditions[0]) == "pipeline:selector:survival_schedule:popsize | "
         "pipeline:selector == 'SurvivalAnalysisScheduler'"
     )
     assert "pipeline:selector:survival_schedule:random_state" not in set(converted)

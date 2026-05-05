@@ -17,7 +17,6 @@ from functools import partial
 logging.basicConfig(level=logging.INFO, force=True)
 
 
-
 def run(selector, scenario, fold, base_path, use_HPO=False):
     if hasattr(selector, "__name__"):
         selector_name = selector.__name__

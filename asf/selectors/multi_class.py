@@ -119,7 +119,9 @@ class MultiClassClassifier(ConfigurableMixin, AbstractModelBasedSelector):
             raise ValueError("MultiClassClassifier require features for prediction.")
         predictions = self.classifier.predict(features)
         if self._observed_class_ids is None:
-            raise RuntimeError("Classifier class mapping was not initialized during fit.")
+            raise RuntimeError(
+                "Classifier class mapping was not initialized during fit."
+            )
 
         results: dict[str, list[tuple[str, float]]] = {}
         for i, instance_name in enumerate(features.index):

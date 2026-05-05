@@ -85,7 +85,9 @@ class TestGMeansWrapper:
             statistic = 1.0
             critical_values = [0.0, 0.0, 0.0, 0.0, 0.0]
 
-        monkeypatch.setattr("asf.utils.g_means.anderson", lambda _: FakeAndersonResult())
+        monkeypatch.setattr(
+            "asf.utils.g_means.anderson", lambda _: FakeAndersonResult()
+        )
         X = np.array(
             [
                 [0.0, 0.0],

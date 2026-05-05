@@ -376,7 +376,6 @@ if SKSURV_AVAILABLE:
 
             return [model_class_param], [], []
 
-
     class SurvivalAnalysisScheduler(SurvivalAnalysis):
         """
         Scheduling variant of SurvivalAnalysis.
