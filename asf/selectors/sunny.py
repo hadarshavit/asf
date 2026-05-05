@@ -14,7 +14,6 @@ try:
     from ConfigSpace import (  # noqa: F401
         Categorical,
         ConfigurationSpace,
-        EqualsCondition,
         Integer,
     )
 
@@ -452,8 +451,4 @@ class SUNNY(ConfigurableMixin, AbstractSelector):
         )
 
         params = [use_v2_param, k_param, n_folds_param, k_candidates_param]
-        conditions = [
-            EqualsCondition(n_folds_param, use_v2_param, True),
-            EqualsCondition(k_candidates_param, use_v2_param, True),
-        ]
-        return params, conditions, []
+        return params, [], []

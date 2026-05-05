@@ -79,22 +79,19 @@ class GMeans:
                 continue
 
             x_prime = np.dot(cluster_data, v) / v_norm_sq
-            x_prime = (x_prime - np.mean(x_prime)) / np.std(x_prime)
+            x_prime_std = np.std(x_prime)
+            if x_prime_std == 0:
+                i += 1
+                continue
+            x_prime = (x_prime - np.mean(x_prime)) / x_prime_std
 
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 ad_test = anderson(x_prime)
 
             if ad_test.statistic > ad_test.critical_values[self.strictness]:
-                # Non-Gaussian: keep the split
-                self.clusters.pop(i)
-                # We need to be careful with labels if we split
-                # Actually, G-Means usually splits and replaces.
-                # Here we just keep track of the final K.
-                # A better implementation would be recursive.
-                # Let's simplify and just use the number of clusters found.
-                # For now, let's just implement the basic logic.
-                pass  # Simplified: basic G-means used for clustering in ISAC
+                # Non-Gaussian: keep the split model so prediction has centers.
+                self.clusters[i] = new_kmeans
 
             i += 1
 

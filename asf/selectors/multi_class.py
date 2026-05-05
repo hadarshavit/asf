@@ -57,6 +57,7 @@ class MultiClassClassifier(ConfigurableMixin, AbstractModelBasedSelector):
         """
         AbstractModelBasedSelector.__init__(self, model_class, **kwargs)
         self.classifier: AbstractPredictor | None = None
+        self._observed_class_ids: np.ndarray | None = None
 
     def _fit(
         self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
@@ -78,9 +79,20 @@ class MultiClassClassifier(ConfigurableMixin, AbstractModelBasedSelector):
         if self.classifier is None:
             raise RuntimeError("Classifier could not be initialized.")
 
-        # Best algorithm (lowest value) per instance
-        target = np.argmin(performance.values, axis=1)
-        self.classifier.fit(features, target)
+        # Best algorithm (lowest value) per instance.
+        target_global = np.argmin(performance.values, axis=1).astype(int)
+        observed_class_ids = np.unique(target_global)
+        class_to_local = {
+            int(class_id): local_idx
+            for local_idx, class_id in enumerate(observed_class_ids.tolist())
+        }
+        target_local = np.asarray(
+            [class_to_local[int(class_id)] for class_id in target_global],
+            dtype=int,
+        )
+
+        self._observed_class_ids = observed_class_ids
+        self.classifier.fit(features, target_local)
 
     def _predict(
         self,
@@ -106,10 +118,13 @@ class MultiClassClassifier(ConfigurableMixin, AbstractModelBasedSelector):
         if features is None:
             raise ValueError("MultiClassClassifier require features for prediction.")
         predictions = self.classifier.predict(features)
+        if self._observed_class_ids is None:
+            raise RuntimeError("Classifier class mapping was not initialized during fit.")
 
         results: dict[str, list[tuple[str, float]]] = {}
         for i, instance_name in enumerate(features.index):
-            idx = int(predictions[i])
+            local_idx = int(predictions[i])
+            idx = int(self._observed_class_ids[local_idx])
             results[str(instance_name)] = [
                 (str(self.algorithms[idx]), float(self.budget or 0))
             ]

@@ -134,7 +134,86 @@ def test_selector_pipeline_auto_discovery():
     assert isinstance(pipeline_recovered.selector, DummySelector)
 
 
+def test_isa_pipeline_config_space_has_only_parent_conditions():
+    from asf.selectors.isa import ISA
+
+    cs = SelectorPipeline.get_configuration_space(selector_class=[ISA])
+    conditions = [
+        condition
+        for condition in cs.conditions
+        if condition.child.name == "pipeline:selector:isa:n_folds"
+    ]
+
+    assert len(conditions) == 1
+    assert (
+        str(conditions[0])
+        == "pipeline:selector:isa:n_folds | pipeline:selector == 'ISA'"
+    )
+
+
+def test_sunny_pipeline_config_space_has_only_parent_conditions():
+    from asf.selectors.sunny import SUNNY
+
+    cs = SelectorPipeline.get_configuration_space(selector_class=[SUNNY])
+    conditions = [
+        condition
+        for condition in cs.conditions
+        if condition.child.name == "pipeline:selector:sunny:n_folds"
+    ]
+
+    assert len(conditions) == 1
+    assert (
+        str(conditions[0])
+        == "pipeline:selector:sunny:n_folds | pipeline:selector == 'SUNNY'"
+    )
+
+
+def test_survival_pipeline_config_space_has_no_schedule_parameters():
+    from asf.selectors.survival_analysis import SKSURV_AVAILABLE, SurvivalAnalysis
+
+    if not SKSURV_AVAILABLE:
+        return
+
+    cs = SelectorPipeline.get_configuration_space(selector_class=[SurvivalAnalysis])
+    assert "pipeline:selector:survival:use_schedule" not in set(cs)
+    assert "pipeline:selector:survival:popsize" not in set(cs)
+    assert "pipeline:selector:survival:random_state" not in set(cs)
+
+
+def test_survival_scheduler_pipeline_config_space_converts():
+    from asf.selectors.survival_analysis import (
+        SKSURV_AVAILABLE,
+        SurvivalAnalysisScheduler,
+    )
+    from asf.utils.configurable import convert_class_choices_to_categorical
+
+    if not SKSURV_AVAILABLE:
+        return
+
+    cs = SelectorPipeline.get_configuration_space(
+        selector_class=[SurvivalAnalysisScheduler]
+    )
+    converted = convert_class_choices_to_categorical(cs)
+    conditions = [
+        condition
+        for condition in converted.conditions
+        if condition.child.name == "pipeline:selector:survival_schedule:popsize"
+    ]
+
+    assert len(conditions) == 1
+    assert (
+        str(conditions[0])
+        == "pipeline:selector:survival_schedule:popsize | "
+        "pipeline:selector == 'SurvivalAnalysisScheduler'"
+    )
+    assert "pipeline:selector:survival_schedule:random_state" not in set(converted)
+
+
 if __name__ == "__main__":
     test_selector_pipeline_config_space_refactor()
     test_selector_pipeline_none_preprocessing()
     test_selector_pipeline_auto_discovery()
+    test_isa_pipeline_config_space_has_only_parent_conditions()
+    test_sunny_pipeline_config_space_has_only_parent_conditions()
+    test_survival_pipeline_config_space_has_no_schedule_parameters()
+    test_survival_scheduler_pipeline_config_space_converts()

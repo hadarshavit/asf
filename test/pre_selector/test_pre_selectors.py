@@ -125,7 +125,7 @@ def test_sbs_pre_selector_handles_numpy_input():
     assert selected.shape == (2, 2)
 
 
-def test_sbs_pre_selector_uses_metric_for_backward_elimination():
+def test_sbs_pre_selector_selects_top_k_by_metric():
     performance = pd.DataFrame(
         {
             "A": [1.0, 100.0, 100.0],
@@ -147,7 +147,7 @@ def test_sbs_pre_selector_uses_metric_for_backward_elimination():
 
     assert isinstance(selected, pd.DataFrame)
     selected_df = cast(pd.DataFrame, selected)
-    assert list(selected_df.columns) == ["A", "B"]
+    assert list(selected_df.columns) == ["C", "A"]
 
 
 class _RecordingOptimizer:

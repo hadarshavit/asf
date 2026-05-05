@@ -3,6 +3,14 @@ import numpy as np
 import pandas as pd
 
 from asf.selectors.abstract_selector import AbstractSelector
+from asf.utils.configurable import ConfigurableMixin
+
+try:
+    from ConfigSpace import Categorical, Float, Integer
+
+    CONFIGSPACE_AVAILABLE = True
+except ImportError:
+    CONFIGSPACE_AVAILABLE = False
 
 
 class HybridDecisionTree:
@@ -287,7 +295,7 @@ class HybridDecisionTree:
             return self.right._predict_single(x)
 
 
-class HARRIS(AbstractSelector):
+class HARRIS(ConfigurableMixin, AbstractSelector):
     """
     Hybrid Ranking and Regression Forests for Algorithm Selection.
 
@@ -348,6 +356,33 @@ class HARRIS(AbstractSelector):
         self.algorithms: List[str] = []
         self.feature_indices_per_tree: List[np.ndarray] = []
 
+    @staticmethod
+    def _define_hyperparameters(
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """
+        Define hyperparameters for HARRIS.
+
+        The defaults mirror the constructor defaults, while the ranges keep the
+        search space compact enough for selector-level HPO.
+        """
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
+
+        hyperparameters = [
+            Integer("n_estimators", bounds=(10, 200), default=100, log=True),
+            Integer("max_depth", bounds=(2, 20), default=10),
+            Integer("min_samples_split", bounds=(2, 20), default=2),
+            Float("lambda_param", bounds=(0.0, 1.0), default=0.5),
+            Categorical(
+                "max_features",
+                items=["sqrt", "log2", "all"],
+                default="sqrt",
+            ),
+            Integer("max_thresholds", bounds=(4, 128), default=32, log=True),
+        ]
+        return hyperparameters, [], []
+
     def _scale_performance(self, performance: pd.DataFrame) -> np.ndarray:
         """Scale performance to [0, 1] using min-max normalization."""
         y = performance.values
@@ -382,6 +417,8 @@ class HARRIS(AbstractSelector):
             performance: DataFrame of algorithm performance (runtimes).
         """
         self.algorithms = list(performance.columns)
+        self.trees = []
+        self.feature_indices_per_tree = []
 
         X = features.values
         y = self._scale_performance(performance)
@@ -457,6 +494,41 @@ class HARRIS(AbstractSelector):
                 best_algo_idx = np.argmin(avg_prediction)
             best_algo = self.algorithms[best_algo_idx]
 
-            predictions[inst_name] = [(best_algo, budget)]
+            predictions[str(inst_name)] = [(str(best_algo), float(budget))]
 
         return predictions
+
+
+class tuned_harris(HARRIS):
+    """Named HARRIS variant used for tuned selector experiments."""
+
+    PREFIX = "tuned_harris"
+
+    @staticmethod
+    def _define_hyperparameters(
+        **kwargs: Any,
+    ) -> tuple[list[Any], list[Any], list[Any]]:
+        """
+        Define a bounded HARRIS search space for selector tuning.
+
+        Deep trees with tiny leaves and all features are prohibitively slow on
+        larger ASlib folds, especially because SMAC evaluates each config inside
+        cross-validation. Keep the tuned variant in the useful, tractable part
+        of the search space.
+        """
+        if not CONFIGSPACE_AVAILABLE:
+            return [], [], []
+
+        hyperparameters = [
+            Integer("n_estimators", bounds=(10, 60), default=30, log=True),
+            Integer("max_depth", bounds=(2, 12), default=8),
+            Integer("min_samples_split", bounds=(5, 30), default=10),
+            Float("lambda_param", bounds=(0.0, 1.0), default=0.5),
+            Categorical(
+                "max_features",
+                items=["sqrt", "log2"],
+                default="sqrt",
+            ),
+            Integer("max_thresholds", bounds=(4, 32), default=16, log=True),
+        ]
+        return hyperparameters, [], []

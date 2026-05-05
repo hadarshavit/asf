@@ -1,7 +1,7 @@
 from typing import cast
 
 import pytest
-from asf.selectors import MetaSelector, SingleBestSolver, SurvivalAnalysis
+from asf.selectors import MetaSelector, SingleBestSolver, SurvivalAnalysisScheduler
 
 
 class _ConfiguredSingleBestSolver(SingleBestSolver):
@@ -48,8 +48,7 @@ def test_meta_selector_preserves_base_selector_configuration(
 
 def test_meta_selector_rejects_schedule_base(dummy_performance, dummy_features):
     # MetaSelector currently only supports base selectors that return a single algorithm
-    # SurvivalAnalysis returns a schedule if use_schedule=True
-    base_selectors = [SurvivalAnalysis(budget=3.0, use_schedule=True)]
+    base_selectors = [SurvivalAnalysisScheduler(budget=3.0)]
     meta = SingleBestSolver(budget=3.0)
 
     # This should fail during initialization due to RETURN_TYPE check

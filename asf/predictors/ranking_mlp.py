@@ -69,7 +69,7 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         epochs = params.pop("epochs", epochs)
         seed = params.pop("seed", seed)
         device = params.pop("device", device)
-        params.pop("compile", compile)
+        compile = params.pop("compile", compile)
         learning_rate = params.pop("learning_rate", learning_rate)
         weight_decay = params.pop("weight_decay", weight_decay)
 
@@ -112,7 +112,7 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
     ) -> Any:
         dataset = RankingDataset(features, performance, algorithm_features)
         return torch.utils.data.DataLoader(
-            dataset, batch_size=self.batch_size, shuffle=True, num_workers=4
+            dataset, batch_size=self.batch_size, shuffle=True, num_workers=0
         )
 
     def fit(
@@ -174,7 +174,7 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         self.model.eval()
 
         features_tensor = torch.from_numpy(X.values).to(self.device).float()
-        predictions = self.model(features_tensor).detach().numpy()
+        predictions = self.model(features_tensor).detach().cpu().numpy()
 
         return predictions
 

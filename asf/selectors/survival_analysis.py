@@ -16,9 +16,7 @@ if SKSURV_AVAILABLE:
 
     try:
         from ConfigSpace import (  # noqa: F401
-            Categorical,
             ConfigurationSpace,
-            EqualsCondition,
             Float,
             Integer,
         )
@@ -65,13 +63,6 @@ if SKSURV_AVAILABLE:
         def __init__(
             self,
             model_class: Any = RandomSurvivalForestWrapper,
-            use_schedule: bool = False,
-            max_schedule_length: int | None = None,
-            popsize: int = 20,
-            maxiter: int = 150,
-            tol: float = 0.01,
-            dominance_resolution: int = 100,
-            random_state: int | None = 42,
             **kwargs: Any,
         ) -> None:
             """
@@ -81,34 +72,17 @@ if SKSURV_AVAILABLE:
             ----------
             model_class : type[RandomSurvivalForestWrapper], default=RandomSurvivalForestWrapper
                 Wrapper class for the survival model.
-            use_schedule : bool, default=False
-                Whether to build a schedule.
-            max_schedule_length : int or None, default=None
-                Maximum number of algorithms in a schedule.
-            popsize : int, default=20
-                Population size for differential_evolution.
-            maxiter : int, default=150
-                Max iterations for differential_evolution.
-            tol : float, default=0.01
-                Tolerance for convergence.
-            dominance_resolution : int, default=100
-                Resolution for dominance analysis grid.
-            random_state : int or None, default=42
-                Random seed for differential evolution.
             **kwargs : Any
                 Additional keyword arguments.
             """
             super().__init__(model_class=model_class, **kwargs)
-            self.use_schedule = bool(use_schedule)
-            self.max_schedule_length = max_schedule_length
-            self.popsize = int(popsize)
-            self.maxiter = int(maxiter)
-            self.tol = float(tol)
-            self.dominance_resolution = int(dominance_resolution)
-            self.random_state = random_state
-
-            if use_schedule:
-                self.RETURN_TYPE = "schedule"
+            self.use_schedule = False
+            self.max_schedule_length: int | None = None
+            self.popsize = 20
+            self.maxiter = 150
+            self.tol = 0.01
+            self.dominance_resolution = 100
+            self.random_state: int | None = 42
 
             if not isinstance(self.budget, (int, float)) or self.budget <= 0:
                 raise ValueError(
@@ -117,6 +91,17 @@ if SKSURV_AVAILABLE:
 
             self.survival_features: list[str] = []
             self.model: RandomSurvivalForestWrapper | None = None
+
+        def _build_design_matrix(self, features: pd.DataFrame) -> np.ndarray:
+            """Build the instance-algorithm design matrix without object-heavy pandas expansion."""
+            n_instances = features.shape[0]
+            n_algorithms = len(self.algorithms)
+            instance_features = features.to_numpy(dtype=np.float32, copy=False)
+            expanded_features = np.repeat(instance_features, n_algorithms, axis=0)
+            algorithm_features = np.tile(
+                np.eye(n_algorithms, dtype=np.float32), (n_instances, 1)
+            )
+            return np.concatenate((expanded_features, algorithm_features), axis=1)
 
         def _fit(
             self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
@@ -131,38 +116,22 @@ if SKSURV_AVAILABLE:
             performance : pd.DataFrame
                 Training performance data.
             """
-            fit_data = []
-            for instance in features.index:
-                instance_features = features.loc[instance]
-                for algo in self.algorithms:
-                    runtime = performance.loc[instance, algo]
-                    finished = not pd.isna(runtime) and runtime < float(
-                        self.budget or 0
-                    )
-                    status = int(finished)
-                    runtime_val = (
-                        float(runtime) if finished else float(self.budget or 0)
-                    )
-                    row = {
-                        **instance_features.to_dict(),
-                        "algorithm": algo,
-                        "runtime": runtime_val,
-                        "status": status,
-                    }
-                    fit_data.append(row)
-            fit_df = pd.DataFrame(fit_data)
+            self.survival_features = [str(col) for col in features.columns] + [
+                f"algo_{algo}" for algo in self.algorithms
+            ]
 
-            fit_features = pd.get_dummies(
-                fit_df.drop(columns=["runtime", "status"]),
-                columns=["algorithm"],
-                prefix="algo",
-            )
+            fit_features = self._build_design_matrix(features)
 
-            self.survival_features = fit_features.columns.tolist()
+            budget = float(self.budget or 0)
+            runtimes = performance.reindex(
+                index=features.index, columns=self.algorithms
+            ).to_numpy(dtype=float, copy=False)
+            finished = np.isfinite(runtimes) & (runtimes < budget)
+            runtime_values = np.where(finished, runtimes, budget)
 
             y_structured = Surv.from_arrays(
-                event=fit_df["status"].astype(bool).values,
-                time=fit_df["runtime"].values,
+                event=finished.ravel(),
+                time=runtime_values.ravel(),
             )
 
             self.model = self.model_class()
@@ -191,20 +160,21 @@ if SKSURV_AVAILABLE:
             if self.model is None:
                 raise ValueError("Model has not been fitted yet.")
 
+            pred_features = self._build_design_matrix(features)
+            predicted_survival_functions = self.model.predict_survival_function(
+                pred_features
+            )
+
+            survival_by_instance: dict[Any, dict[str, Any]] = {}
+            n_algorithms = len(self.algorithms)
+            for row_idx, surv_func in enumerate(predicted_survival_functions):
+                instance = features.index[row_idx // n_algorithms]
+                algo = self.algorithms[row_idx % n_algorithms]
+                survival_by_instance.setdefault(instance, {})[str(algo)] = surv_func
+
             predictions: dict[str, list[tuple[str, float]]] = {}
-            for instance, instance_features in features.iterrows():
-                surv_funcs = {}
-                for algo in self.algorithms:
-                    pred_row = pd.DataFrame(
-                        [{**instance_features.to_dict(), "algorithm": algo}]
-                    )
-                    pred_row = pd.get_dummies(
-                        pred_row, columns=["algorithm"], prefix="algo"
-                    )
-                    pred_row = pred_row.reindex(
-                        columns=self.survival_features, fill_value=0
-                    )
-                    surv_funcs[algo] = self.model.predict_survival_function(pred_row)[0]
+            for instance in features.index:
+                surv_funcs = survival_by_instance[instance]
 
                 if not self.use_schedule:
                     best_algo = None
@@ -404,10 +374,60 @@ if SKSURV_AVAILABLE:
                 default=choices[0],
             )
 
-            use_schedule_param = Categorical(
-                name="use_schedule",
-                items=[True, False],
-                default=False,
+            return [model_class_param], [], []
+
+
+    class SurvivalAnalysisScheduler(SurvivalAnalysis):
+        """
+        Scheduling variant of SurvivalAnalysis.
+
+        This selector predicts schedules of multiple algorithms and exposes the
+        differential-evolution schedule optimizer hyperparameters.
+        """
+
+        PREFIX = "survival_schedule"
+        RETURN_TYPE = "schedule"
+
+        def __init__(
+            self,
+            model_class: Any = RandomSurvivalForestWrapper,
+            max_schedule_length: int | None = None,
+            popsize: int = 20,
+            maxiter: int = 150,
+            tol: float = 0.01,
+            dominance_resolution: int = 100,
+            random_state: int | None = 42,
+            **kwargs: Any,
+        ) -> None:
+            super().__init__(model_class=model_class, **kwargs)
+            self.use_schedule = True
+            self.max_schedule_length = max_schedule_length
+            self.popsize = int(popsize)
+            self.maxiter = int(maxiter)
+            self.tol = float(tol)
+            self.dominance_resolution = int(dominance_resolution)
+            self.random_state = random_state
+
+        @staticmethod
+        def _define_hyperparameters(
+            model_class: list[type | bool] | None = None,
+            **kwargs: Any,
+        ) -> tuple[list[Any], list[Any], list[Any]]:
+            """
+            Define hyperparameters for SurvivalAnalysisScheduler.
+            """
+            if not CONFIGSPACE_AVAILABLE:
+                return [], [], []
+
+            if model_class is None:
+                choices: list[type | bool] = [RandomSurvivalForestWrapper]
+            else:
+                choices = model_class
+
+            model_class_param = ClassChoice(
+                name="model_class",
+                choices=choices,
+                default=choices[0],
             )
 
             popsize_param = Integer(
@@ -435,31 +455,15 @@ if SKSURV_AVAILABLE:
                 default=100,
             )
 
-            random_state_param = Integer(
-                name="random_state",
-                bounds=(0, 2**31 - 1),
-                default=42,
-            )
-
             params = [
                 model_class_param,
-                use_schedule_param,
                 popsize_param,
                 maxiter_param,
                 tol_param,
                 dominance_resolution_param,
-                random_state_param,
             ]
 
-            conditions = [
-                EqualsCondition(popsize_param, use_schedule_param, True),
-                EqualsCondition(maxiter_param, use_schedule_param, True),
-                EqualsCondition(tol_param, use_schedule_param, True),
-                EqualsCondition(dominance_resolution_param, use_schedule_param, True),
-                EqualsCondition(random_state_param, use_schedule_param, True),
-            ]
-
-            return params, conditions, []
+            return params, [], []
 
 
 else:
@@ -474,3 +478,6 @@ else:
             **kwargs: Any,
         ) -> tuple[list[Any], list[Any], list[Any]]:
             return [], [], []
+
+    class SurvivalAnalysisScheduler(SurvivalAnalysis):
+        pass

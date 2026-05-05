@@ -245,16 +245,7 @@ def convert_class_choices_to_categorical(cs: ConfigurationSpace) -> Configuratio
 
     # Second pass: re-add conditions with updated references
     for condition in cs.conditions:
-        # Create new condition with updated hyperparameter references
-        child_hp = hp_map[condition.child.name]
-        parent_hp = hp_map[condition.parent.name]  # type: ignore[attr-defined]
-        value_obj = getattr(condition, "value", None)
-        # Only pass value if it exists (some conditions don't have a value)
-        if value_obj is not None:
-            new_condition = cast(Any, type(condition))(child_hp, parent_hp, value_obj)
-        else:
-            new_condition = cast(Any, type(condition))(child_hp, parent_hp)
-        new_cs.add(new_condition)
+        new_cs.add(_clone_condition(condition, "", hp_map))
 
     # Third pass: re-add forbidden clauses
     for forbidden in cs.forbidden_clauses:
@@ -397,6 +388,18 @@ def _clone_condition(
         return InCondition(child=child, parent=parent, values=condition.values)
     else:
         raise TypeError(f"Unknown condition type: {type(condition)}")
+
+
+def _condition_children(condition: Any) -> list[HyperparameterType]:
+    """Return all child hyperparameters controlled by a condition."""
+    if hasattr(condition, "components"):
+        children: list[HyperparameterType] = []
+        for component in condition.components:
+            children.extend(_condition_children(component))
+        return children
+
+    child = getattr(condition, "child", None)
+    return [child] if child is not None else []
 
 
 def _clone_forbidden(
@@ -629,11 +632,35 @@ class ConfigurableMixin:
             _clone_forbidden(forb, prefix, hp_map) for forb in forbiddens
         ]
 
-        # Add parent conditions if this is a nested configuration
+        # Add parent conditions if this is a nested configuration. ConfigSpace
+        # allows only one condition per child, so combine the parent selector
+        # condition with existing local conditions where needed.
         if parent_param is not None and parent_value is not None:
+            from ConfigSpace.conditions import AndConjunction
+
+            conditioned_child_names = set()
+            combined_conditions = []
+            for condition in prefixed_conditions:
+                children = _condition_children(condition)
+                conditioned_child_names.update(child.name for child in children)
+                parent_conditions_for_children = [
+                    EqualsCondition(
+                        child=child, parent=parent_param, value=parent_value
+                    )
+                    for child in children
+                ]
+                if parent_conditions_for_children:
+                    combined_conditions.append(
+                        AndConjunction(condition, *parent_conditions_for_children)
+                    )
+                else:
+                    combined_conditions.append(condition)
+
+            prefixed_conditions = combined_conditions
             parent_conditions = [
                 EqualsCondition(child=hp, parent=parent_param, value=parent_value)
                 for hp in prefixed_hps
+                if hp.name not in conditioned_child_names
             ]
         else:
             parent_conditions = []

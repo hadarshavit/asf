@@ -27,3 +27,12 @@ def test_harris_selector_basic(
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
+
+
+def test_harris_selector_refit_resets_forest(dummy_performance, dummy_features):
+    selector = HARRIS(n_estimators=3, max_thresholds=5)
+    selector.fit(dummy_features, dummy_performance)
+    selector.fit(dummy_features, dummy_performance)
+
+    assert len(selector.trees) == 3
+    assert len(selector.feature_indices_per_tree) == 3

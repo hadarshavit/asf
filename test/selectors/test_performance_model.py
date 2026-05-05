@@ -5,6 +5,7 @@ from typing import Any, cast
 from asf.selectors import PerformanceModel
 from asf.predictors.abstract_predictor import AbstractPredictor
 from asf.predictors import RegressionMLP, XGBoostRegressorWrapper
+from asf.preprocessing.performance_scaling import MinMaxNormalization
 
 
 class DummyRegressor(AbstractPredictor):
@@ -68,6 +69,18 @@ def test_performance_model_multi_target_only():
     preds_mt = pm_mt.predict(X)
     assert isinstance(preds_mt, dict)
     assert set(preds_mt.keys()) == set(X.index)
+
+
+def test_performance_model_normalization_preserves_matrix_shape():
+    X, Y = small_df()
+    selector = PerformanceModel(
+        model_class=DummyRegressor,
+        use_multi_target=True,
+        normalize=MinMaxNormalization,
+    )
+    selector.fit(X, Y)
+    features = selector.generate_features(X)
+    assert features.shape == Y.shape
 
 
 @pytest.mark.parametrize("model_class", [RegressionMLP, XGBoostRegressorWrapper])

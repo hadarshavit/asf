@@ -95,7 +95,8 @@ def single_best_solver(
     maximize: bool = False,
     budget: float | None = 5000.0,
     par: float | None = 10.0,
-) -> float:
+    batch: bool = False,
+) -> float | pd.Series:
     """
     Selects the single best solver across all instances based on the aggregated performance.
 
@@ -109,11 +110,14 @@ def single_best_solver(
         The runtime budget. If provided with par, timeouts are penalized.
     par : float or None, default=10.0
         The penalization factor for timeouts.
+    batch : bool, default=False
+        If True, return one score per algorithm.
 
     Returns
     -------
-    float
-        The best aggregated performance value across all instances.
+    float or pd.Series
+        The best aggregated performance value across all instances. In batch
+        mode, returns each algorithm's aggregated performance.
     """
     if budget is not None and par is not None:
         performance_vals = np.where(performance <= budget, performance, budget * par)
@@ -121,6 +125,9 @@ def single_best_solver(
         performance_vals = performance.values
 
     perf_sum = np.sum(performance_vals, axis=0)
+    if batch:
+        return pd.Series(perf_sum, index=performance.columns)
+
     if maximize:
         return float(np.max(perf_sum))
     else:
@@ -132,7 +139,8 @@ def virtual_best_solver(
     maximize: bool = False,
     budget: float | None = 5000.0,
     par: float | None = 10.0,
-) -> float:
+    batch: bool = False,
+) -> float | pd.Series:
     """
     Selects the virtual best solver for each instance by choosing the best performance per instance.
 
@@ -146,16 +154,22 @@ def virtual_best_solver(
         The runtime budget. If provided with par, timeouts are penalized.
     par : float or None, default=10.0
         The penalization factor for timeouts.
+    batch : bool, default=False
+        If True, return one score per algorithm.
 
     Returns
     -------
-    float
-        The sum of the best performance values for each instance.
+    float or pd.Series
+        The sum of the best performance values for each instance. In batch
+        mode, returns each algorithm's aggregated performance.
     """
     if budget is not None and par is not None:
         performance_vals = np.where(performance <= budget, performance, budget * par)
     else:
         performance_vals = performance.values
+
+    if batch:
+        return pd.Series(np.sum(performance_vals, axis=0), index=performance.columns)
 
     if maximize:
         return float(np.max(performance_vals, axis=1).sum())

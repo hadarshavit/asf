@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import cast
 
-from asf.selectors.survival_analysis import SurvivalAnalysis
+from asf.selectors.survival_analysis import SurvivalAnalysis, SurvivalAnalysisScheduler
 from asf.metrics import (
     compute_solve_rate,
     single_best_solver,
@@ -148,9 +148,8 @@ if __name__ == "__main__":
 
     # --- 2. Algorithm Schedule Prediction ---
     print("--- Algorithm Schedule Predictions ---")
-    schedule_selector = SurvivalAnalysis(
+    schedule_selector = SurvivalAnalysisScheduler(
         budget=BUDGET,
-        use_schedule=True,
         max_schedule_length=3,  # Limit schedules to a max of 3 algorithms
         popsize=15,
         maxiter=100,

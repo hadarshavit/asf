@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from asf.utils.g_means import GMeans
 from asf.clustering.wrappers import (
     GMeansWrapper,
     KMeansWrapper,
@@ -77,6 +78,29 @@ class TestGMeansWrapper:
         assert isinstance(labels, np.ndarray)
         assert len(labels) == 4
 
+    def test_keeps_split_model_after_non_gaussian_test(self, monkeypatch):
+        """Accepted GMeans splits must leave usable centers for prediction."""
+
+        class FakeAndersonResult:
+            statistic = 1.0
+            critical_values = [0.0, 0.0, 0.0, 0.0, 0.0]
+
+        monkeypatch.setattr("asf.utils.g_means.anderson", lambda _: FakeAndersonResult())
+        X = np.array(
+            [
+                [0.0, 0.0],
+                [0.1, 0.1],
+                [10.0, 10.0],
+                [10.1, 10.1],
+            ]
+        )
+
+        model = GMeans(random_state=0).fit(X)
+        labels = model.predict(X)
+
+        assert model.clusters
+        assert len(labels) == len(X)
+
 
 class TestKMeansWrapper:
     """Tests for KMeansWrapper."""
@@ -142,6 +166,17 @@ class TestKMeansWrapper:
         assert isinstance(labels, np.ndarray)
         assert len(labels) == 4
 
+    def test_ignores_selector_metadata_kwargs(self):
+        """Selector-level configuration kwargs should not leak into sklearn."""
+        wrapper = KMeansWrapper(
+            n_clusters=2,
+            budget=100.0,
+            maximize=False,
+            n_algorithms=3,
+        )
+
+        assert wrapper.model.n_clusters == 2
+
 
 class TestAgglomerativeClusteringWrapper:
     """Tests for AgglomerativeClusteringWrapper."""
@@ -197,6 +232,16 @@ class TestAgglomerativeClusteringWrapper:
         # The underlying sklearn model has labels_
         assert hasattr(wrapper.model, "labels_")
         assert len(wrapper.model.labels_) == 4
+
+    def test_ignores_unsupported_isac_kwargs(self):
+        """ISAC may pass random_state; selector config may pass budget."""
+        wrapper = AgglomerativeClusteringWrapper(
+            n_clusters=2,
+            random_state=1,
+            budget=100.0,
+        )
+
+        assert wrapper.model.n_clusters == 2
 
 
 class TestDBSCANWrapper:

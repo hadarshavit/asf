@@ -16,6 +16,7 @@ except ImportError:
 
 from typing import Any
 import numpy as np
+import pandas as pd
 
 try:
     from xgboost import XGBRegressor, XGBClassifier, XGBRanker
@@ -73,12 +74,25 @@ class XGBoostClassifierWrapper(ConfigurableMixin, SklearnWrapper):
         **kwargs : Any
             Additional keyword arguments for the scikit-learn model's `fit` method.
         """
-        if Y.dtype == bool:
+        X_in = X.to_numpy() if isinstance(X, (pd.DataFrame, pd.Series)) else X
+        Y_in = Y.to_numpy() if isinstance(Y, (pd.DataFrame, pd.Series)) else Y
+        Y_in = np.asarray(Y_in)
+        if Y_in.ndim > 1:
+            Y_in = Y_in.reshape(-1)
+
+        if sample_weight is not None and isinstance(
+            sample_weight, (pd.DataFrame, pd.Series)
+        ):
+            sample_weight = sample_weight.to_numpy()
+        if sample_weight is not None:
+            sample_weight = np.asarray(sample_weight).reshape(-1)
+
+        if Y_in.dtype == bool:
             self.bool_labels = True
         else:
             self.bool_labels = False
 
-        self.model_class.fit(X, Y, sample_weight=sample_weight, **kwargs)
+        self.model_class.fit(X_in, Y_in, sample_weight=sample_weight, **kwargs)
 
     def predict(self, X: np.ndarray, **kwargs: Any) -> np.ndarray:
         """
@@ -96,9 +110,10 @@ class XGBoostClassifierWrapper(ConfigurableMixin, SklearnWrapper):
         np.ndarray
             Predicted values of shape (n_samples,).
         """
+        X_in = X.to_numpy() if isinstance(X, (pd.DataFrame, pd.Series)) else X
         if self.bool_labels:
-            return self.model_class.predict(X, **kwargs).astype(bool)
-        return self.model_class.predict(X, **kwargs)
+            return self.model_class.predict(X_in, **kwargs).astype(bool)
+        return self.model_class.predict(X_in, **kwargs)
 
     @staticmethod
     def _define_hyperparameters(**kwargs):

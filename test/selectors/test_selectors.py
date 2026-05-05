@@ -14,6 +14,7 @@ from asf.selectors import (
     SimpleRanking,
     JointRanking,
     SurvivalAnalysis,
+    SurvivalAnalysisScheduler,
     MultiClassClassifier,
     PerformanceModel,
 )
@@ -148,7 +149,7 @@ def test_survival_analysis(dummy_performance, dummy_features):
 
 def test_survival_analysis_schedule(dummy_performance, dummy_features):
     budget = 450.0
-    selector = SurvivalAnalysis(budget=budget, use_schedule=True)
+    selector = SurvivalAnalysisScheduler(budget=budget)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     assert isinstance(predictions, dict)

@@ -36,7 +36,7 @@ from asf.selectors.selector_tuner import tune_selector
 from asf.selectors.simple_ranking import SimpleRanking
 from asf.selectors.snnap import SNNAP
 from asf.selectors.sunny import SUNNY
-from asf.selectors.survival_analysis import SurvivalAnalysis
+from asf.selectors.survival_analysis import SurvivalAnalysis, SurvivalAnalysisScheduler
 
 __all__ = [
     "PairwiseClassifier",
@@ -51,6 +51,7 @@ __all__ = [
     "JointRanking",
     "DyadRanking",
     "SurvivalAnalysis",
+    "SurvivalAnalysisScheduler",
     "tune_selector",
     "SelectorPipeline",
     "CollaborativeFilteringSelector",

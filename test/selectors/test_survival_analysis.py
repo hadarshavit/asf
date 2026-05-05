@@ -1,4 +1,4 @@
-from asf.selectors import SurvivalAnalysis
+from asf.selectors import SurvivalAnalysis, SurvivalAnalysisScheduler
 
 
 def test_survival_analysis(dummy_performance, dummy_features, validate_predictions):
@@ -10,7 +10,7 @@ def test_survival_analysis(dummy_performance, dummy_features, validate_predictio
 
 def test_survival_analysis_schedule(dummy_performance, dummy_features):
     # Test that it produces a schedule
-    selector = SurvivalAnalysis(budget=2.0)
+    selector = SurvivalAnalysisScheduler(budget=2.0)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     assert isinstance(predictions, dict)

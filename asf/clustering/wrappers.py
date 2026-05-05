@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from abc import ABC, abstractmethod
 from functools import partial
 from typing import Any
@@ -21,6 +22,19 @@ try:
     CONFIGSPACE_AVAILABLE = True
 except ImportError:
     CONFIGSPACE_AVAILABLE = False
+
+
+_ASF_META_KWARGS = {"budget", "maximize", "n_algorithms"}
+
+
+def _filter_constructor_kwargs(
+    estimator: type, kwargs: dict[str, Any]
+) -> dict[str, Any]:
+    """Keep only kwargs accepted by the wrapped estimator constructor."""
+    params = inspect.signature(estimator).parameters
+    if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
+        return {k: v for k, v in kwargs.items() if k not in _ASF_META_KWARGS}
+    return {k: v for k, v in kwargs.items() if k in params}
 
 
 class AbstractClustering(ABC, ConfigurableMixin):
@@ -56,6 +70,7 @@ class GMeansWrapper(AbstractClustering):
     PREFIX: str = "gmeans"
 
     def __init__(self, **kwargs: Any) -> None:
+        kwargs = _filter_constructor_kwargs(GMeans, kwargs)
         self.model = GMeans(**kwargs)
 
     def fit(self, X: pd.DataFrame | np.ndarray) -> GMeansWrapper:
@@ -111,8 +126,7 @@ class GMeansWrapper(AbstractClustering):
         cls, clean_config: dict[str, Any], **kwargs: Any
     ) -> partial:
         """Create a partial class wrapper."""
-        config = clean_config.copy()
-        config.update(kwargs)
+        config = _filter_constructor_kwargs(GMeans, {**clean_config, **kwargs})
         return partial(GMeansWrapper, **config)
 
 
@@ -129,6 +143,7 @@ class KMeansWrapper(AbstractClustering):
     PREFIX: str = "kmeans"
 
     def __init__(self, **kwargs: Any) -> None:
+        kwargs = _filter_constructor_kwargs(KMeans, kwargs)
         self.model = KMeans(**kwargs)
 
     def fit(self, X: pd.DataFrame | np.ndarray) -> KMeansWrapper:
@@ -182,8 +197,7 @@ class KMeansWrapper(AbstractClustering):
         cls, clean_config: dict[str, Any], **kwargs: Any
     ) -> partial:
         """Create a partial class wrapper."""
-        config = clean_config.copy()
-        config.update(kwargs)
+        config = _filter_constructor_kwargs(KMeans, {**clean_config, **kwargs})
         return partial(KMeansWrapper, **config)
 
 
@@ -200,6 +214,7 @@ class AgglomerativeClusteringWrapper(AbstractClustering):
     PREFIX: str = "agglomerative_clustering"
 
     def __init__(self, **kwargs: Any) -> None:
+        kwargs = _filter_constructor_kwargs(AgglomerativeClustering, kwargs)
         self.model = AgglomerativeClustering(**kwargs)
 
     def fit(self, X: pd.DataFrame | np.ndarray) -> AgglomerativeClusteringWrapper:
@@ -263,8 +278,9 @@ class AgglomerativeClusteringWrapper(AbstractClustering):
         cls, clean_config: dict[str, Any], **kwargs: Any
     ) -> partial:
         """Create a partial class wrapper."""
-        config = clean_config.copy()
-        config.update(kwargs)
+        config = _filter_constructor_kwargs(
+            AgglomerativeClustering, {**clean_config, **kwargs}
+        )
         return partial(AgglomerativeClusteringWrapper, **config)
 
 
@@ -281,6 +297,7 @@ class DBSCANWrapper(AbstractClustering):
     PREFIX: str = "dbscan"
 
     def __init__(self, **kwargs: Any) -> None:
+        kwargs = _filter_constructor_kwargs(DBSCAN, kwargs)
         self.model = DBSCAN(**kwargs)
 
     def fit(self, X: pd.DataFrame | np.ndarray) -> DBSCANWrapper:
@@ -342,6 +359,5 @@ class DBSCANWrapper(AbstractClustering):
         cls, clean_config: dict[str, Any], **kwargs: Any
     ) -> partial:
         """Create a partial class wrapper."""
-        config = clean_config.copy()
-        config.update(kwargs)
+        config = _filter_constructor_kwargs(DBSCAN, {**clean_config, **kwargs})
         return partial(DBSCANWrapper, **config)

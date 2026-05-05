@@ -117,10 +117,18 @@ class PerformanceModel(
         """
         if self.normalize is not None:
             normalized = self.normalize.fit_transform(performance)
-            # Preserve DataFrame type if normalize returns ndarray
+            # Preserve performance matrix shape if the transformer flattens values.
             if isinstance(normalized, np.ndarray):
+                norm_array = np.asarray(normalized)
+                if norm_array.shape != performance.shape:
+                    if norm_array.size != performance.size:
+                        raise ValueError(
+                            "Normalization changed performance size unexpectedly: "
+                            f"got {norm_array.shape}, expected compatible with {performance.shape}."
+                        )
+                    norm_array = norm_array.reshape(performance.shape)
                 performance = pd.DataFrame(
-                    normalized,
+                    norm_array,
                     index=performance.index,
                     columns=performance.columns,
                 )
@@ -165,7 +173,9 @@ class PerformanceModel(
                     )
                     data = pd.merge(
                         data,
-                        performance.iloc[:, [i]],
+                        performance.iloc[:, [i]].rename(
+                            columns={performance.columns[i]: "performance"}
+                        ),
                         left_index=True,
                         right_index=True,
                     )

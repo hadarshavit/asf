@@ -7,8 +7,6 @@ import numpy as np
 import pandas as pd
 
 from asf.clustering.wrappers import (
-    AgglomerativeClusteringWrapper,
-    DBSCANWrapper,
     GMeansWrapper,
     KMeansWrapper,
 )
@@ -199,8 +197,6 @@ class ISAC(ConfigurableMixin, AbstractSelector):
             choices=[
                 GMeansWrapper,
                 KMeansWrapper,
-                AgglomerativeClusteringWrapper,
-                DBSCANWrapper,
             ],
             default=GMeansWrapper,
         )

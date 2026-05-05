@@ -6,7 +6,7 @@ import numpy as np
 from asf.metrics.baselines import running_time_closed_gap
 from asf.scenario.aslib_reader import evaluate_selector
 from asf.selectors.baselines import SingleBestSolver, VirtualBestSolver
-from asf.selectors.hybrid_decision_tree import HARRIS
+from asf.selectors.hybrid_decision_tree import HARRIS, tuned_harris
 from asf.selectors.isac import ISAC
 from asf.clustering.wrappers import KMeansWrapper
 from asf.presolving import Static3S
@@ -15,6 +15,7 @@ from functools import partial
 
 # Configure logging to print debug logs for all loggers
 logging.basicConfig(level=logging.INFO, force=True)
+
 
 
 def run(selector, scenario, fold, base_path, use_HPO=False):
@@ -250,16 +251,7 @@ if __name__ == "__main__":
     selectors = [
         SingleBestSolver,
         VirtualBestSolver,
-        partial(
-            HARRIS,
-            n_estimators=100,
-            max_depth=4,
-            min_samples_split=2,
-            lambda_param=0.8,
-            max_features="sqrt",
-            max_thresholds=32,
-            random_state=42,
-        ),
+        tuned_harris,
         partial(
             ISAC,
             clusterer=KMeansWrapper,

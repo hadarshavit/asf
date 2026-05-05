@@ -15,7 +15,7 @@ try:
     from ConfigSpace import (  # noqa: F401
         Categorical,
         ConfigurationSpace,
-        EqualsCondition,
+        Constant,
         Integer,
     )
 
@@ -64,10 +64,10 @@ class ISA(ConfigurableMixin, AbstractSelector):
     def __init__(
         self,
         k: int = 10,
-        use_k_tuning: bool = True,
+        use_k_tuning: bool = False,
         n_folds: int = 5,
         k_candidates: list[int] | None = None,
-        aspeed_cutoff: int = 30,
+        aspeed_cutoff: int = 5,
         cores: int = 1,
         random_state: int = 42,
         **kwargs: Any,
@@ -79,7 +79,7 @@ class ISA(ConfigurableMixin, AbstractSelector):
         ----------
         k : int, default=10
             Number of neighbors for k-NN.
-        use_k_tuning : bool, default=True
+        use_k_tuning : bool, default=False
             Whether to tune k using cross-validation.
         n_folds : int, default=5
             Number of folds for cross-validation when tuning k.
@@ -318,48 +318,8 @@ class ISA(ConfigurableMixin, AbstractSelector):
             default=10,
         )
 
-        use_k_tuning_param = Categorical(
-            name="use_k_tuning",
-            items=[True, False],
-            default=True,
-        )
-
-        n_folds_param = Integer(
-            name="n_folds",
-            bounds=(2, 10),
-            default=5,
-        )
-
-        k_candidates_param = Categorical(
-            name="k_candidates",
-            items=["small", "medium", "broad"],
-            default="medium",
-        )
-
-        aspeed_cutoff_param = Integer(
-            name="aspeed_cutoff",
-            bounds=(1, 300),
-            default=30,
-        )
-
-        cores_param = Integer(
-            name="cores",
-            bounds=(1, 8),
-            default=1,
-        )
-
         params = [
             k_param,
-            use_k_tuning_param,
-            n_folds_param,
-            k_candidates_param,
-            aspeed_cutoff_param,
-            cores_param,
         ]
 
-        conditions = [
-            EqualsCondition(n_folds_param, use_k_tuning_param, True),
-            EqualsCondition(k_candidates_param, use_k_tuning_param, True),
-        ]
-
-        return params, conditions, []
+        return params, [], []

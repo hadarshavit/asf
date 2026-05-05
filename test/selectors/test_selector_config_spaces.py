@@ -167,6 +167,16 @@ class TestSelectorConfigurationSpaces:
         hp_names = {hp.name for hp in cs.values()}
         assert any("simple_ranking" in name for name in hp_names)
 
+    def test_harris_config_space(self):
+        from asf.selectors.hybrid_decision_tree import HARRIS
+
+        cs = HARRIS.get_configuration_space()
+        assert isinstance(cs, ConfigurationSpace)
+        hp_names = {hp.name for hp in cs.values()}
+        assert any("harris" in name for name in hp_names)
+        assert any("lambda_param" in name for name in hp_names)
+        assert any("max_features" in name for name in hp_names)
+
     def test_survival_analysis_config_space(self):
         pytest.importorskip("sksurv")
         from asf.selectors.survival_analysis import SurvivalAnalysis
@@ -175,6 +185,19 @@ class TestSelectorConfigurationSpaces:
         assert isinstance(cs, ConfigurationSpace)
         hp_names = {hp.name for hp in cs.values()}
         assert any("survival" in name for name in hp_names)
+        assert not any("use_schedule" in name for name in hp_names)
+        assert not any("popsize" in name for name in hp_names)
+
+    def test_survival_analysis_scheduler_config_space(self):
+        pytest.importorskip("sksurv")
+        from asf.selectors.survival_analysis import SurvivalAnalysisScheduler
+
+        cs = SurvivalAnalysisScheduler.get_configuration_space()
+        assert isinstance(cs, ConfigurationSpace)
+        hp_names = {hp.name for hp in cs.values()}
+        assert any("survival_schedule" in name for name in hp_names)
+        assert any("popsize" in name for name in hp_names)
+        assert not any("random_state" in name for name in hp_names)
 
     def test_baseline_config_space(self):
         from asf.selectors.baselines import SingleBestSolver, VirtualBestSolver
@@ -230,6 +253,16 @@ class TestSelectorDefaultConfigToInstance:
         default_config = cs.get_default_configuration()
         partial_fn = PairwiseRegressor.get_from_configuration(default_config)
         assert callable(partial_fn)
+
+    def test_harris_default_config(self):
+        """Test HARRIS instantiation from default config."""
+        from asf.selectors.hybrid_decision_tree import HARRIS
+
+        cs = HARRIS.get_configuration_space()
+        default_config = cs.get_default_configuration()
+        partial_fn = HARRIS.get_from_configuration(default_config)
+        selector = partial_fn()
+        assert isinstance(selector, HARRIS)
 
     def test_multi_class_classifier_default_config(self):
         """Test MultiClassClassifier instantiation from default config."""
@@ -369,6 +402,16 @@ class TestSelectorDefaultConfigToInstance:
         cs = SurvivalAnalysis.get_configuration_space()
         default_config = cs.get_default_configuration()
         partial_fn = SurvivalAnalysis.get_from_configuration(default_config)
+        assert callable(partial_fn)
+
+    def test_survival_analysis_scheduler_default_config(self):
+        """Test SurvivalAnalysisScheduler instantiation from default config."""
+        pytest.importorskip("sksurv")
+        from asf.selectors.survival_analysis import SurvivalAnalysisScheduler
+
+        cs = SurvivalAnalysisScheduler.get_configuration_space()
+        default_config = cs.get_default_configuration()
+        partial_fn = SurvivalAnalysisScheduler.get_from_configuration(default_config)
         assert callable(partial_fn)
 
     def test_single_best_solver_default_config(self):

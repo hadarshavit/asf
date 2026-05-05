@@ -1,5 +1,5 @@
 """
-Sequential Backward Selection-based pre-selector for algorithm pre-selection.
+Single-best-solver ranking pre-selector for algorithm pre-selection.
 """
 
 from __future__ import annotations
@@ -21,11 +21,10 @@ except ImportError:
 
 class SBSPreSelector(AbstractPreSelector):
     """
-    Sequential Backward Selection-based pre-selector.
+    Single-best-solver ranking pre-selector.
 
-    This selector starts from the full portfolio and iteratively removes the
-    algorithm whose removal yields the best subset score under the provided
-    metric until only ``n_algorithms`` remain.
+    This selector scores each algorithm independently with the provided metric
+    and keeps the top ``n_algorithms`` algorithms.
 
     Parameters
     ----------
@@ -41,7 +40,7 @@ class SBSPreSelector(AbstractPreSelector):
 
     def __init__(
         self,
-        metric: Callable[[pd.DataFrame], float],
+        metric: Callable[..., float],
         n_algorithms: int,
         maximize: bool = False,
         **kwargs: Any,
@@ -89,31 +88,7 @@ class SBSPreSelector(AbstractPreSelector):
                 "n_algorithms cannot exceed the number of available algorithms"
             )
 
-        selected_algorithms = list(performance_frame.columns)
-        while len(selected_algorithms) > self.n_algorithms:
-            best_subset: list[str] | None = None
-            best_score = float("-inf") if self.maximize else float("inf")
-
-            for algorithm in selected_algorithms:
-                candidate_subset = [
-                    candidate
-                    for candidate in selected_algorithms
-                    if candidate != algorithm
-                ]
-                score = self.metric(performance_frame[candidate_subset])
-                is_better = score > best_score if self.maximize else score < best_score
-                if is_better:
-                    best_score = score
-                    best_subset = candidate_subset
-
-            if best_subset is None:
-                raise RuntimeError("Failed to identify a valid subset.")
-            selected_algorithms = best_subset
-
-        selected_algorithms.sort(
-            key=lambda algorithm: self.metric(performance_frame[[algorithm]]),
-            reverse=self.maximize,
-        )
+        selected_algorithms = self._select_top_k(performance_frame)
 
         selected_performance = performance_frame[selected_algorithms]
 
@@ -121,6 +96,33 @@ class SBSPreSelector(AbstractPreSelector):
             selected_performance = selected_performance.values
 
         return selected_performance
+
+    def _select_top_k(self, performance_frame: pd.DataFrame) -> list[Any]:
+        scores = self._score_algorithms(performance_frame)
+        scores = scores.sort_values(ascending=not self.maximize, kind="stable")
+        return scores.index[: self.n_algorithms].tolist()
+
+    def _score_algorithms(self, performance_frame: pd.DataFrame) -> pd.Series:
+        try:
+            scores = self.metric(performance_frame, batch=True)
+        except TypeError:
+            scores = None
+
+        if scores is not None:
+            if isinstance(scores, pd.Series):
+                return scores.reindex(performance_frame.columns)
+
+            score_values = np.asarray(scores, dtype=float)
+            if score_values.shape == (performance_frame.shape[1],):
+                return pd.Series(score_values, index=performance_frame.columns)
+
+        return pd.Series(
+            [
+                self.metric(performance_frame[[algorithm]])
+                for algorithm in performance_frame.columns
+            ],
+            index=performance_frame.columns,
+        )
 
     @staticmethod
     def get_configuration_space(

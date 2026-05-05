@@ -25,6 +25,16 @@ except ImportError:
     CONFIGSPACE_AVAILABLE = False
 
 
+class _ConstantBinaryPredictor:
+    """Predict a constant binary label for every instance."""
+
+    def __init__(self, constant_label: int) -> None:
+        self.constant_label = int(constant_label)
+
+    def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
+        return np.full(len(X), self.constant_label, dtype=int)
+
+
 class PairwiseClassifier(
     ConfigurableMixin, AbstractModelBasedSelector, AbstractFeatureGenerator
 ):
@@ -68,7 +78,7 @@ class PairwiseClassifier(
         """
         AbstractModelBasedSelector.__init__(self, model_class, **kwargs)
         AbstractFeatureGenerator.__init__(self)
-        self.classifiers: list[AbstractPredictor] = []
+        self.classifiers: list[AbstractPredictor | _ConstantBinaryPredictor] = []
         self.use_weights = bool(use_weights)
 
     def _fit(
@@ -97,6 +107,15 @@ class PairwiseClassifier(
                     diffs = (val1 > val2).astype(int)
                 else:
                     diffs = (val1 < val2).astype(int)
+
+                unique_diffs = np.unique(diffs)
+                if unique_diffs.size == 1:
+                    # Some folds/task groups can contain only one class for a pair.
+                    # Keep behavior deterministic instead of training a model that may fail.
+                    self.classifiers.append(
+                        _ConstantBinaryPredictor(int(unique_diffs[0]))
+                    )
+                    continue
 
                 cur_model = self.model_class()
                 if cur_model is None:

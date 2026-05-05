@@ -381,3 +381,17 @@ class TestPredictorDefaultConfigToInstance:
         default_config = cs.get_default_configuration()
         partial_fn = RandomSurvivalForestWrapper.get_from_configuration(default_config)
         assert callable(partial_fn)
+
+    def test_random_survival_forest_ignores_selector_metadata_kwargs(self):
+        """Selector-level kwargs should not leak into sksurv constructors."""
+        pytest.importorskip("sksurv")
+        from asf.predictors.survival import RandomSurvivalForestWrapper
+
+        wrapper = RandomSurvivalForestWrapper(
+            n_estimators=10,
+            budget=100.0,
+            maximize=False,
+            n_algorithms=3,
+        )
+
+        assert wrapper.model.n_estimators == 10

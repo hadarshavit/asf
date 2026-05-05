@@ -8,6 +8,7 @@ from typing import Any
 
 import joblib
 import numpy as np
+import pandas as pd
 
 from asf.predictors.abstract_predictor import AbstractPredictor
 
@@ -66,7 +67,14 @@ class SklearnWrapper(AbstractPredictor):
         **kwargs : Any
             Additional keyword arguments for the scikit-learn model's `fit` method.
         """
-        self.model_class.fit(X, Y, sample_weight=sample_weight, **kwargs)
+        X_in = X.to_numpy() if isinstance(X, (pd.DataFrame, pd.Series)) else X
+        Y_in = Y.to_numpy() if isinstance(Y, (pd.DataFrame, pd.Series)) else Y
+        sw_in = (
+            sample_weight.to_numpy()
+            if isinstance(sample_weight, (pd.DataFrame, pd.Series))
+            else sample_weight
+        )
+        self.model_class.fit(X_in, Y_in, sample_weight=sw_in, **kwargs)
 
     def predict(self, X: np.ndarray, **kwargs: Any) -> np.ndarray:
         """
@@ -84,7 +92,8 @@ class SklearnWrapper(AbstractPredictor):
         np.ndarray
             Predicted values of shape (n_samples,).
         """
-        return self.model_class.predict(X, **kwargs)
+        X_in = X.to_numpy() if isinstance(X, (pd.DataFrame, pd.Series)) else X
+        return self.model_class.predict(X_in, **kwargs)
 
     def save(self, file_path: str) -> None:
         """
