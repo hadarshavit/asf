@@ -6,7 +6,7 @@ import numpy as np
 from asf.metrics.baselines import running_time_closed_gap
 from asf.scenario.aslib_reader import evaluate_selector
 from asf.selectors.baselines import SingleBestSolver, VirtualBestSolver
-from asf.selectors.hybrid_decision_tree import HARRIS, tuned_harris
+from asf.selectors.hybrid_decision_tree import tuned_harris
 from asf.selectors.isac import ISAC
 from asf.clustering.wrappers import KMeansWrapper
 from asf.presolving import Static3S

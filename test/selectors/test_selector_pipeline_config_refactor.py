@@ -143,12 +143,9 @@ def test_isa_pipeline_config_space_has_only_parent_conditions():
         for condition in cs.conditions
         if condition.child.name == "pipeline:selector:isa:n_folds"
     ]
-
-    assert len(conditions) == 1
-    assert (
-        str(conditions[0])
-        == "pipeline:selector:isa:n_folds | pipeline:selector == 'ISA'"
-    )
+    # ISA does not expose `n_folds` in the configuration space, so there
+    # should be no condition related to `pipeline:selector:isa:n_folds`.
+    assert len(conditions) == 0
 
 
 def test_sunny_pipeline_config_space_has_only_parent_conditions():
