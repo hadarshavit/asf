@@ -1,0 +1,2411 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="ASF is a powerful library for algorithm selection and performance prediction.">
+      
+      
+        <meta name="author" content="Hadar Shavit">
+      
+      
+        <link rel="canonical" href="https://hadarshavit.github.io/asf/0.1.6/features/selectors/">
+      
+      
+        <link rel="prev" href="../algorithm_selection_pipeline/">
+      
+      
+        <link rel="next" href="../hyperparameter_tuning/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../docs/logo.jpg">
+      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Selectors - Algorithm Selection Framework (ASF)</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+  
+
+
+  
+  
+
+<script id="__analytics">function __md_analytics(){function e(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],e("js",new Date),e("config","G-E4SDS0XQE5"),document.addEventListener("DOMContentLoaded",(function(){document.forms.search&&document.forms.search.query.addEventListener("blur",(function(){this.value&&e("event","search",{search_term:this.value})}));document$.subscribe((function(){var t=document.forms.feedback;if(void 0!==t)for(var a of t.querySelectorAll("[type=submit]"))a.addEventListener("click",(function(a){a.preventDefault();var n=document.location.pathname,d=this.getAttribute("data-md-value");e("event","feedback",{page:n,data:d}),t.firstElementChild.disabled=!0;var r=t.querySelector(".md-feedback__note [data-md-value='"+d+"']");r&&(r.hidden=!1)})),t.hidden=!1})),location$.subscribe((function(t){e("config","G-E4SDS0XQE5",{page_path:t.pathname})}))}));var t=document.createElement("script");t.async=!0,t.src="https://www.googletagmanager.com/gtag/js?id=G-E4SDS0XQE5",document.getElementById("__analytics").insertAdjacentElement("afterEnd",t)}</script>
+  
+    <script>"undefined"!=typeof __md_analytics&&__md_analytics()</script>
+  
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#algorithm-selectors-overview" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Algorithm Selection Framework (ASF)" class="md-header__button md-logo" aria-label="Algorithm Selection Framework (ASF)" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Algorithm Selection Framework (ASF)
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Selectors
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/hadarshavit/asf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    hadarshavit/asf
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../installation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../quick_start/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Quick Start
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../algorithm_selection_pipeline/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Advanced Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/epm/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Algorithm Selection Framework (ASF)" class="md-nav__button md-logo" aria-label="Algorithm Selection Framework (ASF)" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Algorithm Selection Framework (ASF)
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/hadarshavit/asf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    hadarshavit/asf
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quick_start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../algorithm_selection_pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Algorithm Selection Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Selectors
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Selectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Index
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        APPS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#collaborative-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collaborative Filtering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cosine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cosine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cshc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CSHC
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dyad-ranking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dyad Ranking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hybrid-decision-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hybrid Decision Tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#isa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ISA
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#isac" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ISAC
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#joint-ranking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Joint Ranking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meta-selector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Meta Selector
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-class
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#osl-linear" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OSL Linear
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pairwise-classifier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pairwise Classifier
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pairwise-regressor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pairwise Regressor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rpc-selector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RPC Selector
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#satzilla" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SATzilla
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#simple-ranking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simple Ranking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#snnap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SNNAP
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sunny" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SUNNY
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#survival-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Survival Analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#selecting-the-right-selector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selecting the Right Selector
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hyperparameter_tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance_prediction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Prediction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/epm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Prediction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/predictors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Predictors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/preprocessing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/scenario/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/selectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Selectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/utils.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Index
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        APPS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#collaborative-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collaborative Filtering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cosine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cosine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cshc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CSHC
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dyad-ranking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dyad Ranking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hybrid-decision-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hybrid Decision Tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#isa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ISA
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#isac" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ISAC
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#joint-ranking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Joint Ranking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meta-selector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Meta Selector
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-class
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#osl-linear" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OSL Linear
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pairwise-classifier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pairwise Classifier
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pairwise-regressor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pairwise Regressor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rpc-selector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RPC Selector
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#satzilla" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SATzilla
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#simple-ranking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simple Ranking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#snnap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SNNAP
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sunny" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SUNNY
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#survival-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Survival Analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#selecting-the-right-selector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selecting the Right Selector
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="algorithm-selectors-overview">Algorithm Selectors Overview</h1>
+<p>This page provides an overview of all available algorithm selectors in ASF. Click on any selector name below to jump to its description.</p>
+<h2 id="quick-index">Quick Index</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#apps">APPS</a></td>
+<td><a href="#collaborative-filtering">Collaborative Filtering</a></td>
+<td><a href="#cosine">Cosine</a></td>
+<td><a href="#cshc">CSHC</a></td>
+</tr>
+<tr>
+<td><a href="#dyad-ranking">Dyad Ranking</a></td>
+<td><a href="#hybrid-decision-tree">Hybrid Decision Tree</a></td>
+<td><a href="#isa">ISA</a></td>
+<td><a href="#isac">ISAC</a></td>
+</tr>
+<tr>
+<td><a href="#joint-ranking">Joint Ranking</a></td>
+<td><a href="#meta-selector">Meta Selector</a></td>
+<td><a href="#multi-class">Multi-class</a></td>
+<td><a href="#osl-linear">OSL Linear</a></td>
+</tr>
+<tr>
+<td><a href="#pairwise-classifier">Pairwise Classifier</a></td>
+<td><a href="#pairwise-regressor">Pairwise Regressor</a></td>
+<td><a href="#performance-model">Performance Model</a></td>
+<td><a href="#rpc-selector">RPC Selector</a></td>
+</tr>
+<tr>
+<td><a href="#satzilla">SATzilla</a></td>
+<td><a href="#simple-ranking">Simple Ranking</a></td>
+<td><a href="#snnap">SNNAP</a></td>
+<td></td>
+</tr>
+<tr>
+<td><a href="#sunny">SUNNY</a></td>
+<td><a href="#survival-analysis">Survival Analysis</a></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="apps">APPS</h2>
+<p><strong>Automatic Parallel Portfolio Selector</strong></p>
+<p>APPS predicts runtime distribution for each algorithm and selects a parallel portfolio based on overlap with the best algorithm's predicted distribution.</p>
+<ul>
+<li><strong>Type</strong>: Performance distribution-based</li>
+<li><strong>Returns</strong>: Parallel Algorithm Portfolio</li>
+<li><strong>References</strong>: <a href="https://par.nsf.gov/biblio/10470673">Kashgarani &amp; Kotthoff (2020)</a></li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>p_intersection</code></strong> (default: 0.82): Overlap threshold for portfolio inclusion. Higher values select smaller portfolios with only very similar performers. Lower values include more diverse algorithms.</li>
+<li><strong><code>use_jackknife</code></strong> (default: True): Whether to use Jackknife method for uncertainty estimation. If False, uses bootstrap sampling instead.</li>
+<li><strong><code>n_jackknife_folds</code></strong> (default: None): Number of folds for Jackknife. If None, uses leave-one-out (one fold per instance, training one model per instance).</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Trains ensemble of performance prediction models for each algorithm</li>
+<li>Predicts mean runtime and uncertainty (std dev) for each algorithm on each instance</li>
+<li>Identifies best predicted algorithm for each instance</li>
+<li>Computes overlap between each algorithm's distribution and the best's distribution</li>
+<li>Includes algorithms exceeding the <code>p_intersection</code> threshold in the portfolio</li>
+</ol>
+<hr />
+<h2 id="collaborative-filtering">Collaborative Filtering</h2>
+<p><strong>Collaborative Filtering Selector</strong></p>
+<p>This selector uses matrix factorization to handle sparse performance data, treating algorithm selection as a collaborative filtering (recommendation) problem. It learns latent factors for both instances and algorithms.</p>
+<ul>
+<li><strong>Type</strong>: Instance and performance-based</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: Sparse performance handling, warm/cold start support</li>
+<li><strong>References</strong>: <a href="https://www.sciencedirect.com/science/article/pii/S0004370216301436">Misir &amp; Sebag (2016)</a></li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>n_components</code></strong> (default: 10): Number of latent factors for the matrix factorization. Higher values capture more complex instance-algorithm relationships but may overfit.</li>
+<li><strong><code>n_iter</code></strong> (default: 100): Number of SGD iterations during training. More iterations lead to better convergence but longer training time.</li>
+<li><strong><code>lr</code></strong> (default: 0.001): Learning rate for stochastic gradient descent. Controls step size during optimization.</li>
+<li><strong><code>reg</code></strong> (default: 0.1): Regularization strength. Higher values prevent overfitting but may underfit the model.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Decomposes the performance matrix into instance latent factors (U) and algorithm latent factors (V)</li>
+<li>Uses stochastic gradient descent to optimize latent factors based on observed performance values</li>
+<li>Learns instance and algorithm biases to capture global preferences</li>
+<li>For cold-start instances, trains a regressor to predict latent factors from features</li>
+<li>Predicts algorithm performance as: <code>mu + bias_instance + bias_algorithm + U·V^T</code></li>
+<li>Selects algorithm with lowest predicted performance</li>
+</ol>
+<hr />
+<h2 id="cosine">Cosine</h2>
+<p><strong>Cosine Similarity-based Selector (AS-LLM)</strong></p>
+<p>A neural network-based selector that learns embeddings for both instances and algorithms using LSTM and cosine similarity in the embedding space for selection. Requires algorithm features in addition to instance features.</p>
+<ul>
+<li><strong>Type</strong>: Neural network-based</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: Dense embeddings, configurable neural architecture, LSTM fusion</li>
+<li><strong>References</strong>: <a href="https://arxiv.org/abs/2311.13184">Wu et al. (2023)</a></li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>embed_size</code></strong> (default: 50): Dimensionality of algorithm embeddings. Larger values capture more complex patterns but increase memory usage.</li>
+<li><strong><code>num_hiddens</code></strong> (default: 50): Hidden units in LSTM. Controls capacity of the sequence modeling in algorithm encoding.</li>
+<li><strong><code>num_layers</code></strong> (default: 2): Number of LSTM layers. More layers can capture hierarchical patterns.</li>
+<li><strong><code>alpha</code></strong> (default: 0.9): Weight for learned LSTM features in fusion. Controls balance between learned and provided algorithm features.</li>
+<li><strong><code>beta</code></strong> (default: 0.1): Weight for algorithm features in fusion.</li>
+<li><strong><code>lr</code></strong> (default: 0.001): Learning rate for training. Controls optimization step size.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Requires algorithm features (<code>algorithm_features</code>) to be set before fitting</li>
+<li>Preprocesses instance features with optional normalization and imputation</li>
+<li>Generates pairwise training data: for each instance, creates pairs (instance, algorithm) with labels indicating best algorithm</li>
+<li>Builds instance embedding via MLP from normalized features</li>
+<li>Builds algorithm embedding via:</li>
+<li>LSTM processing of algorithm embeddings across all algorithms</li>
+<li>Fusion of LSTM output with provided algorithm features using alpha/beta weighting</li>
+<li>MLP projection to final embedding dimension</li>
+<li>Computes cosine similarity between instance and algorithm embeddings</li>
+<li>Concatenates embeddings + similarity through final MLP for binary classification</li>
+<li>Selects algorithm with highest match probability</li>
+</ol>
+<hr />
+<h2 id="cshc">CSHC</h2>
+<p><strong>Confidence-Switching Hybrid Constructor</strong></p>
+<p>CSHC is a meta-selector that combines a primary selector with guardian models. Guardian models predict the success probability of the primary selector's choice and switch to a backup selector when confidence is low.</p>
+<ul>
+<li><strong>Type</strong>: Meta-selector with confidence estimation</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: Confidence-based switching, ensemble design, guardian models</li>
+<li><strong>References</strong>: <a href="https://link.springer.com/chapter/10.1007/978-3-642-44973-4_17">Malitsky et al. (2021)</a></li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>primary_selector</code></strong> (required): The main algorithm selector to use.</li>
+<li><strong><code>backup_selector</code></strong> (default: None): Optional backup selector used when primary's confidence is below threshold. If None, uses the highest-confidence algorithm globally.</li>
+<li><strong><code>n_estimators</code></strong> (default: 100): Number of trees in each guardian RandomForest model. Higher values improve stability but increase training time.</li>
+<li><strong><code>threshold_grid</code></strong> (default: linspace(0.01, 0.99, 99)): Grid of confidence thresholds to evaluate for switching. Finer grids = better threshold but slower.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Trains the primary selector on the full training data</li>
+<li>Performs cross-validation to generate out-of-fold predictions and true algorithm success labels</li>
+<li>For each fold, trains guardian models (RandomForest) to predict which algorithms will succeed</li>
+<li>Evaluates different confidence thresholds on OOF predictions to minimize ratio fn / tn</li>
+<li>At prediction time, gets primary selector's choice and queries the guardian for confidence</li>
+<li>Switches to backup (or best highest-confidence one) if confidence is below threshold</li>
+<li>Otherwise uses primary selector's choice</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When you have a good primary selector but want safety nets for uncertain decisions</li>
+<li>When backup selector is available and complementary to primary</li>
+<li>When false positives are acceptable but false negatives should be minimized</li>
+<li>Budget allows training multiple models (primary + guardians + optional backup)</li>
+</ul>
+<hr />
+<h2 id="dyad-ranking">Dyad Ranking</h2>
+<p><strong>Dyad Ranking Selector</strong></p>
+<p>Treats algorithm selection as learning dyadic (instance-algorithm pair) rankings. Creates training dyads by combining instance features with algorithm features, then trains a ranker to predict which algorithms are better for each instance.</p>
+<ul>
+<li><strong>Type</strong>: Pairwise ranking-based</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: Algorithm features support, pairwise learning, explicit algorithm characterization</li>
+<li><strong>References</strong>: <a href="https://ris.uni-paderborn.de/download/15011/17060/ci_workshop_tornede.pdf">Tornede et al. (2019)</a></li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>model_class</code></strong> (default: XGBoostRankerWrapper): The ranking model to use. XGBoost is recommended for learning-to-rank tasks. Controls prediction quality and training speed.</li>
+<li><strong><code>algorithm_features</code></strong> (required for best performance): DataFrame of algorithm features (n_algorithms × n_features). Each column represents an algorithm characteristic (e.g., configuration, structural property). If None, falls back to one-hot encoding (not recommended).</li>
+<li><strong><code>n_pairs_per_instance</code></strong> (default: 10): Number of algorithm pairs to sample per training instance for pairwise learning. Higher values = more training data per instance but slower training.</li>
+<li><strong><code>random_state</code></strong> (default: 42): Random seed for reproducible pairwise sampling.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Requires algorithm features to characterize each algorithm (not just one-hot encoding)</li>
+<li>Creates "dyads" by concatenating instance features with algorithm features</li>
+<li>For each instance, samples algorithm pairs with different performance values</li>
+<li>Creates training dyads: each dyad is (instance_features || algorithm_features, pairwise_rank)</li>
+<li>Trains XGBoost ranker to predict relative rankings of algorithm dyads within each instance</li>
+<li>At prediction time, scores all dyads for the query instance</li>
+<li>Selects algorithm with lowest predicted score (best rank)</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When you have meaningful algorithm features (parameters, structural properties)</li>
+<li>When pairwise comparisons between algorithms are more informative than absolute performance</li>
+</ul>
+<hr />
+<h2 id="hybrid-decision-tree">Hybrid Decision Tree</h2>
+<p><strong>Hybrid Decision Tree Selector (HARRIS)</strong></p>
+<p>A forest of hybrid decision trees that combines regression and ranking losses for interpretable and efficient algorithm selection. Each tree makes splits optimizing both performance prediction (MSE) and algorithm ranking quality (Spearman correlation).</p>
+<ul>
+<li><strong>Type</strong>: Tree-based ensemble with hybrid loss</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: Interpretability, no algorithm features needed, explicit ranking optimization</li>
+<li><strong>Paper</strong>: <a href="https://arxiv.org/pdf/2210.17341">Fehring et al. (2022)</a></li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>n_estimators</code></strong> (default: 100): Number of trees in the ensemble. More trees improve stability and accuracy but increase training time and memory.</li>
+<li><strong><code>max_depth</code></strong> (default: 10): Maximum depth of each tree. Controls complexity; deeper trees can overfit, shallower trees may underfit.</li>
+<li><strong><code>min_samples_split</code></strong> (default: 2): Minimum samples required to split a node. Higher values create simpler trees, lower values allow more complex patterns.</li>
+<li><strong><code>lambda_param</code></strong> (default: 0.5): Balance between regression (λ=1) and ranking (λ=0) losses. λ=1 focuses on performance prediction, λ=0 focuses on ranking quality. 0.5 balances both.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Bootstrap samples instances (with replacement) for each tree</li>
+<li>Randomly selects subset of features for each tree</li>
+<li>For each node, finds best split threshold that minimizes <strong>hybrid loss</strong>:</li>
+<li>Regression component: MSE between predicted and actual performance</li>
+<li>Ranking component: 1 - (Spearman correlation between predicted and true algorithm rankings)</li>
+<li>Combined: λ × MSE + (1-λ) × Ranking_loss</li>
+<li>Splits recursively until max_depth or min_samples_split reached</li>
+<li>Stores regression label (mean performance) at each leaf node</li>
+<li>At prediction time: ensemble averages predictions across all trees</li>
+<li>Selects algorithm with lowest predicted runtime (or highest if maximizing)</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When interpretability is important (can inspect decision tree splits)</li>
+<li>When you want ranking-aware selection (performance ranking matters, not just absolute values)</li>
+<li>When you need both good average performance prediction and good algorithm ranking</li>
+</ul>
+<hr />
+<h2 id="isa">ISA</h2>
+<p><strong>Instance-Specific Aspeed</strong></p>
+<p>ISA uses k-nearest neighbors to find similar training instances, then applies Aspeed to compute optimal algorithm schedules for each neighborhood. Supports optional k-tuning via cross-validation.</p>
+<ul>
+<li><strong>Type</strong>: k-NN based with schedule optimization</li>
+<li><strong>Returns</strong>: Schedule</li>
+<li><strong>Key Features</strong>: Instance-specific scheduling, Aspeed integration, optional k-tuning</li>
+<li><strong>Return Type</strong>: Schedule</li>
+<li><strong>Dependencies</strong>: clingo (ASP solver for Aspeed)</li>
+<li><strong>Paper</strong>: <a href="https://ml.informatik.uni-freiburg.de/wp-content/uploads/papers/16-LION-ASschedules.pdf">Lindauer et al. (2016)</a></li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>k</code></strong> (default: 10): Number of nearest neighbors to use. Controls how many similar instances influence the schedule. Larger k = broader consensus, smaller k = more instance-specific.</li>
+<li><strong><code>use_k_tuning</code></strong> (default: True): Enable automatic k-tuning via cross-validation to find optimal neighborhood size. Increases training time but often improves performance.</li>
+<li><strong><code>n_folds</code></strong> (default: 5): Number of cross-validation folds for tuning k. More folds = better tuning but slower.</li>
+<li><strong><code>k_candidates</code></strong> (default: [3, 5, 10, 15, 20]): Candidate k values to evaluate during tuning. Can be list, or "small"/"medium"/"broad" for predefined ranges.</li>
+<li><strong><code>aspeed_cutoff</code></strong> (default: 30): Time limit (seconds) for internal Aspeed solver. Controls schedule optimization quality vs computation time.</li>
+<li><strong><code>cores</code></strong> (default: 1): Number of cores for Aspeed solver. More cores speed up schedule optimization for large portfolios.</li>
+<li><strong><code>random_state</code></strong> (default: 42): Random seed for reproducibility in k-NN and cross-validation.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Filters out "trivial" instances: all algorithms solve in budget or all timeout (no learning signal)</li>
+<li>Stores reduced set of "interesting" instances with k-NN index</li>
+<li>If <code>use_k_tuning=True</code>: Cross-validates across candidate k values to find k that minimizes total runtime</li>
+<li>For each query instance:</li>
+<li>Finds k nearest neighbors in instance feature space</li>
+<li>Extracts performance of algorithms on those k neighbors</li>
+<li>Runs Aspeed to compute optimal schedule for that subset</li>
+<li>Returns schedule with algorithm timing allocations</li>
+<li>Aspeed optimizes: given neighbor performance matrix, compute time allocations across algorithms</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When optimal portfolio allocation is important (not just selecting one algorithm)</li>
+<li>When you have computational budget for Aspeed optimization during prediction</li>
+<li>When you want a more sophisticated version of SUNNY with schedule optimization</li>
+</ul>
+<hr />
+<h2 id="isac">ISAC</h2>
+<p><strong>Instance-Specific Algorithm Configuration</strong></p>
+<p>ISAC clusters problem instances in feature space and assigns each cluster its best-performing algorithm. This creates instance groups with tailored selections, enabling simple and fast per-cluster selection. (Original implementation also configures the solver for the given cluster)</p>
+<ul>
+<li><strong>Type</strong>: Clustering-based</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: Unsupervised instance grouping, per-cluster optimization</li>
+<li><strong>References</strong>: <a href="https://www.researchgate.net/profile/Yuri-Malitsky/publication/220837402_ISAC_-_Instance-Specific_Algorithm_Configuration/links/02e7e52738cb135ccc000000/ISAC-Instance-Specific-Algorithm-Configuration.pdf">Kadioglu et al. (2010)</a></li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>clusterer</code></strong> (default: GMeansWrapper): The clustering algorithm to use. Can be a class, partial function, or instance. Options include KMeansWrapper, DBSCANWrapper, AgglomerativeClusteringWrapper, GMeansWrapper.</li>
+<li><strong><code>clusterer_kwargs</code></strong> (default: None): Additional keyword arguments passed to the clusterer. Depends on chosen clustering algorithm (e.g., <code>n_clusters</code> for K-means, <code>eps</code> for DBSCAN).</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>On training: Clusters instances using chosen clustering algorithm in feature space</li>
+<li>For each cluster: Identifies the algorithm with lowest mean performance (best algorithm)</li>
+<li>Stores mapping: cluster_id → best_algorithm</li>
+<li>At prediction time: Assigns each query instance to nearest cluster</li>
+<li>Returns the best algorithm associated with that cluster</li>
+<li>If query instance doesn't fit any cluster (e.g., DBSCAN outlier), falls back to global best algorithm</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When problem instances have natural groupings in feature space</li>
+<li>When you want interpretable selection (can inspect cluster characteristics)</li>
+<li>When fast prediction is critical (no model inference needed)</li>
+<li>For portfolios where per-cluster tuning is acceptable instead of per-instance</li>
+<li>G-means is good default (automatic cluster detection), otherwise try K-means with domain knowledge</li>
+</ul>
+<hr />
+<h2 id="joint-ranking">Joint Ranking</h2>
+<p><strong>Joint Instance and Algorithm Ranking</strong></p>
+<p>A neural network-based selector that jointly learns rankings for both instances and algorithms. Uses a RankingMLP to predict algorithm performance while treating instance and algorithm embeddings symmetrically.</p>
+<ul>
+<li><strong>Type</strong>: Joint ranking-based with neural networks</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: Symmetric instance-algorithm learning, ranking-focused neural architecture</li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>model</code></strong> (default: RankingMLP): The neural network model for joint ranking. RankingMLP is the recommended choice; can be class or callable factory.</li>
+<li><strong>No other direct parameters</strong>: Configuration is via the RankingMLP model kwargs (hidden layers, activation functions, etc.).</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Creates algorithm features via one-hot encoding if not provided (falls back)</li>
+<li>Initializes RankingMLP model with input size = instance features + number of algorithms</li>
+<li>For training: concatenates instance features with each algorithm's features to create (instance || algorithm) dyads</li>
+<li>Trains RankingMLP to predict algorithm performance (ranking) for each instance</li>
+<li>At prediction time: scores each algorithm by concatenating its features with query instance features</li>
+<li>RankingMLP predicts scores for all algorithms</li>
+<li>Selects algorithm with lowest predicted score (best ranking)</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When ranking relationships between algorithms within an instance matter</li>
+<li>When you can afford neural network training overhead</li>
+</ul>
+<hr />
+<h2 id="meta-selector">Meta Selector</h2>
+<p><strong>Meta-Selector (Ensemble of Selectors)</strong></p>
+<p>An ensemble meta-learner that combines multiple base selectors. Uses out-of-fold cross-validation to measure each base selector's performance, then trains a meta-selector to choose the best base selector for each instance.</p>
+<ul>
+<li><strong>Type</strong>: Meta-learning ensemble</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: Multiple base selectors, learned selector weighting, ensemble robustness</li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>base_selectors</code></strong> (required): List of base selector instances or callable factory returning list. Each must have RETURN_TYPE='single'. Core component of the ensemble.</li>
+<li><strong><code>meta_selector</code></strong> (required): The meta-selector instance used to choose among base selectors. Must have RETURN_TYPE='single'. Typically a simple model like Performance Model selector.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Creates meta-performance dataset: measure each base selector's actual runtime on each training instance</li>
+<li>Performs cross-validation:</li>
+<li>For each fold: trains base selectors on training split</li>
+<li>Gets predictions on validation split</li>
+<li>Records actual runtime for predicted algorithm</li>
+<li>Applies penalty (par_factor × budget) for failures/timeouts</li>
+<li>Trains meta-selector to predict which base selector achieves best runtime for each instance</li>
+<li>Retrains all base selectors on full training data</li>
+<li>At prediction time:</li>
+<li>Meta-selector predicts best base selector for query instance</li>
+<li>Delegates prediction to that base selector</li>
+<li>Returns the algorithm chosen by the selected base selector</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When you have multiple diverse selectors and want automatic algorithm selection</li>
+<li>When combining selectors trained with different paradigms (k-NN, tree-based, neural, etc.)</li>
+<li>When you want automatic selector switching per instance</li>
+<li>When you can afford training overhead (trains N+1 selectors where N = base selectors)</li>
+</ul>
+<hr />
+<h2 id="multi-class">Multi-class</h2>
+<p><strong>Multi-class Classification Selector</strong></p>
+<p>Treats algorithm selection as a multi-class classification problem where each algorithm is a distinct class. Trains a classifier to predict which algorithm is best (lowest performance) for each instance.</p>
+<ul>
+<li><strong>Type</strong>: Classification-based (multi-class)</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: Direct classification, probabilistic outputs, simple training</li>
+<li><strong>Common Models</strong>: Random Forest Classifier, XGBoost Classifier</li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>model_class</code></strong> (default: RandomForestClassifierWrapper): The classifier class to use. Options include RandomForestClassifierWrapper (fast, robust) or XGBoostClassifierWrapper (more tunable). Controls prediction quality and interpretability.</li>
+<li><strong>No algorithm features used</strong>: One-hot encoding or learned features not needed; each algorithm is just a class label.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Creates classification labels: for each instance, label = index of best algorithm (lowest performance value)</li>
+<li>Trains multi-class classifier (e.g., Random Forest or XGBoost) on (features → algorithm_class) mapping</li>
+<li>At prediction time: Selects algorithm with highest predicted probability (best class)</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When you want fast, simple baseline (no complex model, just standard classifier)</li>
+<li>When algorithm features are not available or not needed</li>
+<li>For quick prototyping and comparison with other methods</li>
+</ul>
+<hr />
+<h2 id="osl-linear">OSL Linear</h2>
+<p><strong>Optimistic Superset Loss with Linear Models</strong></p>
+<p>Uses linear regression with Optimistic Superset Loss (OSL) to handle censored runtime data (timeouts). Trains per-algorithm linear models that predict runtimes while treating timeout instances as censored observations.</p>
+<ul>
+<li><strong>Type</strong>: Linear regression-based with censored data handling</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: Censored data handling, per-algorithm models, customizable optimization</li>
+<li><strong>References</strong>: <a href="https://epub.ub.uni-muenchen.de/91670/1/_PAKDD__Superset_Learning_for_Algorithm_Selection_with_Right_Censored_Data.pdf">Hanselle et al. (2021)</a></li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>reg</code></strong> (default: 0.0): L2 regularization strength for parameter shrinkage. Higher values prevent overfitting by penalizing large coefficients.</li>
+<li><strong><code>optimizer_method</code></strong> (default: "L-BFGS-B"): Optimization algorithm from scipy.optimize.minimize. Options: "L-BFGS-B", "CG", "BFGS", "TNC", "SLSQP". Controls convergence speed and robustness.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>For each algorithm, fits a linear model: <code>f(x) = w·x + b</code> using instance features x</li>
+<li>Handles censored data (timeouts)</li>
+<li>Total loss = regression_loss + (L2_regularization if reg &gt; 0)</li>
+<li>Optimizes loss using scipy.optimize.minimize with specified method</li>
+<li>Initialization: tries least squares on uncensored data, falls back to zeros</li>
+<li>At prediction time: predicts runtime for each algorithm on query instance</li>
+<li>Selects algorithm with lowest predicted runtime</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>For datasets with many timeouts (censored observations)</li>
+<li>When runtime prediction is more important than timeout probability</li>
+</ul>
+<hr />
+<h2 id="pairwise-classifier">Pairwise Classifier</h2>
+<p><strong>Pairwise Classification Selector</strong></p>
+<p>Reduces algorithm selection to a series of pairwise binary classification tasks. For each pair of algorithms, trains a classifier to predict which one is better, then uses tournament-style selection to find the best algorithm.</p>
+<ul>
+<li><strong>Type</strong>: Pairwise classification-based</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: Tournament-style selection, binary comparisons, pairwise learning</li>
+<li><strong>Common Models</strong>: Logistic Regression, RBF SVM, Binary Random Forest</li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>model_class</code></strong> (default: LogisticRegression or RandomForestClassifier): The binary classifier for pairwise comparisons. Must support binary classification. Controls learning capacity.</li>
+<li><strong><code>use_weight</code></strong> (default: True): Instances are weighed by performance difference between the two algorithms in the pair.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Creates pairwise comparison training data: for each instance, generates pairs of algorithms with different performance</li>
+<li>For each pair (algo_i, algo_j), creates binary label: 1 if algo_i is better, 0 if algo_j is better</li>
+<li>Trains a binary classifier per algorithm pair</li>
+<li>At prediction time: for query instance, scores each pair of algorithms</li>
+<li>Score all pairs and aggregate votes to find most-wins algorithm</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When binary classification is simpler/faster than multi-class for your problem</li>
+<li>When you want explainable pairwise decisions (which algorithm beats which)</li>
+</ul>
+<hr />
+<h2 id="pairwise-regressor">Pairwise Regressor</h2>
+<p><strong>Pairwise Regression Selector</strong></p>
+<p>Uses regression to predict relative performance differences between algorithm pairs. For each pair, predicts which algorithm is better by modeling the performance difference (algo_i - algo_j).</p>
+<ul>
+<li><strong>Type</strong>: Pairwise regression-based</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: Performance difference prediction, tournament-based</li>
+<li><strong>Common Models</strong>: Ridge Regression, Gradient Boosting, SVR</li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>model_class</code></strong> (default: RandomForestRegressor): The regression model for pairwise differences. Predicts performance_i - performance_j. Controls smoothness vs complexity.</li>
+<li><strong>No direct hyperparameters</strong>: Configuration through the chosen model_class and its parameters.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Creates pairwise training data: for each instance, generates all pairs of algorithms</li>
+<li>For each pair (algo_i, algo_j), creates regression target: performance[algo_i] - performance[algo_j]</li>
+<li>Trains binary regression model for each algorithm pair to predict performance difference</li>
+<li>At prediction time: for query instance, scores all algorithm pairings</li>
+<li>Score all pairs, aggregate pairwise outcomes to get ranking</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When you want to model fine-grained algorithm performance differences</li>
+<li>When regression is more natural than classification for your problem</li>
+<li>For portfolios where performance margins matter (not just relative ranking)</li>
+<li>When you want to predict not just which algorithm is better, but by how much</li>
+</ul>
+<hr />
+<h2 id="performance-model">Performance Model</h2>
+<p><strong>Performance Model-based Selector</strong></p>
+<p>A base selector that learns performance prediction models and selects the algorithm with the lowest predicted runtime (or highest if maximizing).</p>
+<ul>
+<li><strong>Type</strong>: Model-based prediction</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: Flexible regressors, optional multi-target, optional normalization</li>
+<li><strong>Superclass</strong>: AbstractModelBasedSelector</li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>model_class</code></strong> (default: RandomForestRegressorWrapper): Regression model wrapper used for performance prediction.</li>
+<li><strong><code>use_multi_target</code></strong> (default: False): If True, fits one multi-target regressor for all algorithms. If False, fits per-algorithm models (or a joint regressor when algorithm features are provided).</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Optionally normalizes the performance matrix.</li>
+<li>If <code>use_multi_target=True</code>, fits one regressor that predicts all algorithm runtimes at once.</li>
+<li>Otherwise:</li>
+<li>If no algorithm features are provided, fits one regressor per algorithm.</li>
+<li>If algorithm features are provided, fits a joint regressor on concatenated (instance + algorithm) features.</li>
+<li>Predicts a runtime for each algorithm on each query instance.</li>
+<li>Selects the algorithm with the best predicted runtime (min or max depending on <code>maximize</code>).</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When straightforward performance prediction is sufficient.</li>
+<li>As a baseline for comparing with more complex selectors.</li>
+<li>When algorithm features are available and you want a joint model.</li>
+</ul>
+<hr />
+<h2 id="rpc-selector">RPC Selector</h2>
+<p><strong>Ranking by Pairwise Comparison (RPC)</strong></p>
+<p>Trains one binary classifier per algorithm pair, then aggregates pairwise wins using Copeland scores to rank algorithms for each instance.</p>
+<ul>
+<li><strong>Type</strong>: Pairwise classification-based ranking</li>
+<li><strong>Returns</strong>: Single (or Parallel when <code>top_n</code> &gt; 1)</li>
+<li><strong>Key Features</strong>: Pairwise models, Copeland aggregation, optional parallel portfolios</li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>classifier_class</code></strong> (default: RandomForestClassifierWrapper): Base classifier class used for each algorithm pair.</li>
+<li><strong><code>top_n</code></strong> (default: 1): Number of top algorithms to return. If &gt; 1, returns a parallel portfolio with equal time slices.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Creates all algorithm pairs.</li>
+<li>For each pair, trains a binary classifier on instance features with labels indicating which algorithm is faster.</li>
+<li>At prediction time, predicts pairwise winners for each instance.</li>
+<li>Computes Copeland scores (number of pairwise wins) per algorithm.</li>
+<li>Selects the top <code>top_n</code> algorithms by score.</li>
+<li>If <code>top_n</code> &gt; 1, splits the budget evenly across the selected algorithms.</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When pairwise comparisons are a good fit for your data.</li>
+<li>When you want a simple voting-style aggregation across algorithms.</li>
+<li>When you want optional parallel portfolios via <code>top_n</code>.</li>
+</ul>
+<hr />
+<h2 id="satzilla">SATzilla</h2>
+<p><strong>SATzilla-like Selector</strong></p>
+<p>Trains per-algorithm empirical performance models (EPM) that predict runtime. Optionally conditions predictions on instance labels (e.g., SAT/UNSAT). Uses iterative imputation to handle censored (timeout) runtimes.</p>
+<ul>
+<li><strong>Type</strong>: EPM-based with optional label conditioning</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: Censored runtime handling, label-conditioned models, separate label classifier and EPM regressors</li>
+<li><strong>References</strong>: <a href="https://www.jair.org/index.php/jair/article/view/10556">Xu et al. (2008)</a></li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>label_classifier_model</code></strong> (default: RandomForestClassifierWrapper): The classifier class for predicting instance labels (e.g., SAT/UNSAT). Only used when instance labels are provided at training time. Ignored if no labels are given.</li>
+<li><strong><code>epm_regressor_model</code></strong> (default: RidgeRegressorWrapper): The regressor class used internally by each EPM for per-algorithm runtime prediction. Controls the performance prediction model used for selection.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>If labels are provided: trains a label classifier to predict instance labels</li>
+<li>Creates EPM (Empirical Performance Model) for each algorithm</li>
+<li>If labels are provided: trains separate EPMs per algorithm-label combination on filtered data</li>
+<li>At prediction time: </li>
+<li>If label classifier exists, predicts instance label(s)</li>
+<li>Predicts runtime for each algorithm using the appropriate EPM</li>
+<li>Combines predictions: <code>total_prediction = sum(label_probability[i] * epm_prediction[i])</code></li>
+<li>Selects algorithm with lowest predicted runtime</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When you have optionally available instance labels (SAT/UNSAT, easy/hard, etc.)</li>
+<li>When handling incomplete performance data (censored runtimes)</li>
+<li>When per-algorithm runtime prediction with a specific regressor (e.g., Ridge) is preferred</li>
+</ul>
+<hr />
+<h2 id="simple-ranking">Simple Ranking</h2>
+<p><strong>Simple Ranking Selector</strong></p>
+<p>A ranking-based selector that trains a learning-to-rank model combining instance features with algorithm features. Predicts algorithm rankings for each instance and selects the top-ranked algorithm.</p>
+<ul>
+<li><strong>Type</strong>: Learning-to-rank with combined instance-algorithm features</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: XGBoost ranking model, algorithm feature support, pairwise ranking loss</li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>model_class</code></strong> (default: XGBoostRankerWrapper): The ranking model to use. Controls how algorithm rankings are learned and predicted.</li>
+<li><strong><code>algorithm_features</code></strong> (optional): DataFrame of algorithm features (n_algorithms × n_features). If None, automatically generates one-hot encoding of algorithm names.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Creates a cross-product of instance features and algorithm features (or auto-generated one-hot encoding)</li>
+<li>Calculates rank labels per instance: algorithms ranked by performance (1 = best, higher = worse)</li>
+<li>Trains the ranking model to predict ranks for instance-algorithm pairs</li>
+<li>At prediction time:</li>
+<li>Creates cross-product of query instance features with all algorithm features</li>
+<li>Gets rank predictions from the model for each instance-algorithm pair</li>
+<li>Selects algorithm with the lowest predicted rank</li>
+<li>Returns the selected algorithm</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When you have explicit algorithm features describing their characteristics</li>
+<li>When pairwise ranking between algorithms is more informative than absolute performance</li>
+</ul>
+<hr />
+<h2 id="snnap">SNNAP</h2>
+<p><strong>Solver-based Nearest Neighbor for Algorithm Portfolio</strong></p>
+<p>Uses per-algorithm regression models trained on z-score normalized performance, then leverages Jaccard distance between predicted and actual algorithm rankings to find similar instances. Selects the best algorithm from the k most similar neighbors.</p>
+<ul>
+<li><strong>Type</strong>: Regression + Jaccard-based instance similarity</li>
+<li><strong>Returns</strong>: Single</li>
+<li><strong>Key Features</strong>: Per-algorithm models, z-score normalization, Jaccard distance on top-n algorithms</li>
+<li><strong>References</strong>: <a href="https://link.springer.com/chapter/10.1007/978-3-642-40994-3_28">Collautti et al. (2013)</a></li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>k</code></strong> (default: 5): Number of nearest neighbors (similar instances) to consider. Determines neighborhood size for aggregating algorithm performance.</li>
+<li><strong><code>top_n</code></strong> (default: 3): Number of top algorithms to use for computing Jaccard distance. Controls specificity of similarity metric: smaller values focus on strongest algorithms, larger values include broader preferences.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>During training:</li>
+<li>Z-score normalizes performance per instance (row-wise normalization across algorithms)</li>
+<li>
+<p>Trains one RandomForest regressor per algorithm on (instance_features → scaled_runtime)</p>
+</li>
+<li>
+<p>At prediction time:</p>
+</li>
+<li>Uses per-algorithm models to predict scaled runtimes for the query instance</li>
+<li>Identifies the query's predicted top-n algorithms</li>
+<li>For each training instance, gets its actual top-n algorithms from scaled performance</li>
+<li>Computes Jaccard distance: 1 - |intersection| / |union| between query's top-n and each training instance's top-n</li>
+<li>
+<p>Selects k training instances with smallest Jaccard distance</p>
+</li>
+<li>
+<p>From the k neighbors:</p>
+</li>
+<li>Finds the algorithm that was best (lowest actual runtime) across the most neighbors</li>
+<li>Selects that algorithm using mean actual (unscaled) runtime as tie-breaker</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When you want algorithm similarity based on predicted preferences, not raw features</li>
+<li>When per-algorithm models can capture instance-specific performance patterns</li>
+<li>When Jaccard distance on algorithm subsets better captures instance similarity than feature distance</li>
+<li>When you have diverse algorithm portfolio and want to leverage neighbor rankings</li>
+<li>For a hybrid approach combining model predictions with instance-based selection</li>
+</ul>
+<hr />
+<h2 id="sunny">SUNNY</h2>
+<p><strong>SUNNY: Successive Nearest Neighbor Algorithm Portfolio</strong></p>
+<p>A k-nearest neighbor-based selector that constructs algorithm schedules by finding similar training instances and greedily building portfolios from their best algorithms. Supports optional k-tuning (SUNNY-AS2) and schedule length tuning (TSunny).</p>
+<ul>
+<li><strong>Type</strong>: k-NN based portfolio construction</li>
+<li><strong>Returns</strong>: Schedule (ordered list of algorithms with time allocations)</li>
+<li><strong>Key Features</strong>: Instance similarity-based, greedy set cover portfolio construction, optional k-tuning, budget-aware schedule allocation</li>
+<li><strong>References</strong>: <a href="https://dl.acm.org/doi/10.1613/jair.1.13116">Liu et al. (2022)</a></li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>k</code></strong> (default: 10): Number of nearest neighbors to use. Controls neighborhood size: smaller k = more instance-specific, larger k = more generalizing.</li>
+<li><strong><code>use_v2</code></strong> (default: False): Enable SUNNY-AS2: tuned k via cross-validation. Searches across k_candidates to find k minimizing validation cost.</li>
+<li><strong><code>n_folds</code></strong> (default: 5): Number of cross-validation folds for k-tuning. More folds = better tuning but slower.</li>
+<li><strong><code>k_candidates</code></strong> (default: [3, 5, 7, 10, 20, 50]): List of k values to evaluate, or string "small"/"medium"/"broad" for predefined ranges.</li>
+<li><strong><code>use_tsunny</code></strong> (default: False): Enable TSunny: tune the maximum schedule length via cross-validation.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li>Builds a k-NN index on training instance features (Euclidean distance)</li>
+<li>If <code>use_v2=True</code>: Cross-validates to find optimal k that minimizes total runtime on validation set</li>
+<li>If <code>use_tsunny=True</code>: Cross-validates to find optimal maximum schedule length</li>
+<li>For each query instance:</li>
+<li>Finds k nearest neighbors in feature space</li>
+<li>Applies greedy set cover algorithm on neighbors' performance data:<ul>
+<li>Recursively selects algorithm that covers most uncovered instances</li>
+<li>Continues until budget exhausted or all instances covered</li>
+</ul>
+</li>
+<li>Allocates budget proportionally to how many instances each algorithm solves</li>
+<li>Sorts algorithms by mean runtime in neighborhood</li>
+<li>Returns schedule with (algorithm, time_allocation) tuples</li>
+<li>Respects <code>algorithm_limit</code> or tuned limit to cap schedule length</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When you want instance-based selection without training complex models</li>
+<li>When algorithm schedules (portfolios) are preferred over single selection</li>
+<li>When k-tuning could improve performance (set <code>use_v2=True</code>)</li>
+<li>When you want simple, interpretable baselines</li>
+<li>When computational budget for k-NN is acceptable</li>
+<li>For combining complementary algorithms: weak individually but strong together</li>
+</ul>
+<hr />
+<h2 id="survival-analysis">Survival Analysis</h2>
+<p><strong>Survival Analysis-based Algorithm Selector</strong></p>
+<p>Uses survival analysis (Random Survival Forest) to model algorithm completion probability under budget constraints. Treats timeout as censored data and predicts which algorithms are most likely to complete within the budget.</p>
+<ul>
+<li><strong>Type</strong>: Survival analysis with random forests</li>
+<li><strong>Returns</strong>: Single algorithm or Schedule (depending on <code>use_schedule</code>)</li>
+<li><strong>Key Features</strong>: Timeout-aware probability modeling, censored data handling, optional schedule optimization</li>
+<li><strong>References</strong>: <a href="https://arxiv.org/abs/2007.02816">Tornede et al. (2020)</a></li>
+</ul>
+<p><strong>Key Parameters</strong></p>
+<ul>
+<li><strong><code>model_class</code></strong> (default: RandomSurvivalForestWrapper): The survival model class. Trains forests to predict completion probability.</li>
+<li><strong><code>use_schedule</code></strong> (default: False): If True, returns optimized schedule maximizing completion probability. If False, returns best single algorithm.</li>
+<li><strong><code>popsize</code></strong> (default: 20): Population size for differential evolution optimization (only used if use_schedule=True).</li>
+<li><strong><code>maxiter</code></strong> (default: 150): Maximum iterations for schedule optimization (only used if use_schedule=True).</li>
+<li><strong><code>dominance_resolution</code></strong> (default: 100): Resolution for dominance analysis grid when identifying non-dominated algorithms.</li>
+</ul>
+<p><strong>How It Works</strong></p>
+<ol>
+<li><strong>Training</strong> (creates structured survival data):</li>
+<li>For each (instance, algorithm) pair, creates row: [instance_features, algorithm_one_hot, status, runtime]</li>
+<li>status=1 if algorithm completed within budget, 0 if timeout (censored)</li>
+<li>runtime=actual_runtime if completed, runtime=budget if timeout</li>
+<li>
+<p>Trains RandomSurvivalForest to predict P(algorithm completes by time t)</p>
+</li>
+<li>
+<p><strong>Single algorithm mode</strong> (<code>use_schedule=False</code>):</p>
+</li>
+<li>For each algorithm, predicts survival probability at query instance</li>
+<li>
+<p>Selects algorithm with highest P(completes within budget)</p>
+</li>
+<li>
+<p><strong>Schedule mode</strong> (<code>use_schedule=True</code>):</p>
+</li>
+<li>Performs dominance analysis: identifies non-dominated algorithms</li>
+<li>Uses differential evolution to optimize schedule:<ul>
+<li>Decision variables: which algorithms to include + time allocation for each</li>
+<li>Objective: maximize P(at least one algorithm completes)</li>
+</ul>
+</li>
+<li>Returns schedule with (algorithm, time_allocation) tuples</li>
+<li>Algorithms tried in order; first to complete satisfies the job</li>
+</ol>
+<p><strong>When to Use</strong></p>
+<ul>
+<li>When timeout/budget constraints are critical and should be explicit in selection</li>
+<li>When you have significant censored data (timeouts are common)</li>
+<li>When completion probability is more meaningful than predicted runtime</li>
+<li>For modeling "time-to-completion" as a stochastic event</li>
+</ul>
+<hr />
+<h2 id="selecting-the-right-selector">Selecting the Right Selector</h2>
+<p>Here's a quick guide to choosing which selector fits your use case:</p>
+<table>
+<thead>
+<tr>
+<th>Your Situation</th>
+<th>Recommended Selectors</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fast, simple baseline</td>
+<td>ISAC, Multi-class</td>
+</tr>
+<tr>
+<td>Instance similarity matters (single)</td>
+<td>ISAC, SNNAP</td>
+</tr>
+<tr>
+<td>Instance similarity matters (schedule)</td>
+<td>SUNNY, ISA</td>
+</tr>
+<tr>
+<td>Performance predictions available</td>
+<td>SATzilla, Performance Model</td>
+</tr>
+<tr>
+<td>Have algorithm features</td>
+<td>Dyad Ranking, Simple Ranking, Cosine, Joint Ranking</td>
+</tr>
+<tr>
+<td>Limited/sparse data</td>
+<td>Collaborative Filtering</td>
+</tr>
+<tr>
+<td>Combine Selectors</td>
+<td>Meta Selector, CSHC</td>
+</tr>
+<tr>
+<td>Need interpretability</td>
+<td>Hybrid Decision Tree</td>
+</tr>
+<tr>
+<td>Budget/timeout constraints</td>
+<td>Survival Analysis, OSL Linear</td>
+</tr>
+<tr>
+<td>Portfolio/Schedule</td>
+<td>SUNNY, ISA, APPS, Survival Analysis</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="api-reference">API Reference</h2>
+<p>For detailed API documentation on each selector, visit the <a href="../../api/selectors/">Selectors API Reference</a>.</p>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.instant.prefetch", "navigation.tracking", "navigation.indexes", "navigation.tabs", "navigation.tabs.sticky"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
