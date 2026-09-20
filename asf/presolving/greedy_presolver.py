@@ -8,7 +8,7 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
-from asf.presolving.presolver import AbstractPresolver
+from asf.presolving.presolver import AbstractPresolver, resolve_presolver_budget
 
 
 class GreedyPresolver(AbstractPresolver):
@@ -54,11 +54,7 @@ class GreedyPresolver(AbstractPresolver):
         params = init_params if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
-        if "presolver_budget" in params:
-            presolver_budget = params.pop("presolver_budget")
-            params.pop("budget", None)
-        else:
-            presolver_budget = params.pop("budget", presolver_budget)
+        presolver_budget = resolve_presolver_budget(presolver_budget, params, 30.0)
         maximize = params.pop("maximize", maximize)
         cutoff_per_solver = params.pop("cutoff_per_solver", cutoff_per_solver)
         max_presolvers = params.pop("max_presolvers", max_presolvers)
