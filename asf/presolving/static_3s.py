@@ -16,14 +16,9 @@ try:
 except ImportError:
     _HAS_CONFIGSPACE = False
 
-try:
-    import pulp
+from scipy.optimize import Bounds, LinearConstraint, milp
 
-    _HAS_PULP = True
-except ImportError:
-    _HAS_PULP = False
-
-from asf.presolving.presolver import AbstractPresolver
+from asf.presolving.presolver import AbstractPresolver, resolve_presolver_budget
 
 
 class Static3S(AbstractPresolver):
@@ -31,8 +26,7 @@ class Static3S(AbstractPresolver):
     Compute a static presolve schedule by solving a resource-constrained set
     covering problem (RCSCP).
 
-    If an IP solver (pulp) is available the exact formulation is solved,
-    otherwise it raises an ImportError as the greedy heuristic is not implemented.
+    The formulation is solved with SciPy's HiGHS-backed mixed-integer solver.
 
     Parameters
     ----------
@@ -59,11 +53,7 @@ class Static3S(AbstractPresolver):
         params = init_params if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
-        if "presolver_budget" in params:
-            presolver_budget = params.pop("presolver_budget")
-            params.pop("budget", None)
-        else:
-            presolver_budget = params.pop("budget", presolver_budget)
+        presolver_budget = resolve_presolver_budget(presolver_budget, params, 200.0)
         runcount_limit = params.pop("runcount_limit", runcount_limit)
         max_candidates_per_solver = params.pop(
             "max_candidates_per_solver", max_candidates_per_solver
@@ -117,6 +107,7 @@ class Static3S(AbstractPresolver):
         """
         if performance is None:
             raise ValueError("Static3S requires performance data for fitting.")
+        self.schedule = None
 
         if isinstance(performance, pd.DataFrame):
             perf = performance.copy()
@@ -150,69 +141,63 @@ class Static3S(AbstractPresolver):
             self.schedule = []
             return
 
-        if not _HAS_PULP:
-            raise ImportError(
-                "pulp is required to use Static3S presolver. Please install pulp."
+        actions = [(s, t) for s, times in candidates.items() for t in times]
+        n_actions = len(actions)
+        n_instances = len(instances)
+        n_vars = n_actions + n_instances
+        objective = np.zeros(n_vars)
+        objective[:n_actions] = [t for _, t in actions]
+        objective[n_actions:] = self.presolver_budget + 1.0
+
+        rows: list[np.ndarray] = []
+        lower: list[float] = []
+        upper: list[float] = []
+
+        for row_i, i in enumerate(instances):
+            row = np.zeros(n_vars)
+            row[n_actions + row_i] = 1.0
+            for action_i, (s, t) in enumerate(actions):
+                try:
+                    rt_f = float(perf.at[i, s])
+                except (TypeError, ValueError):
+                    continue
+                if np.isfinite(rt_f) and rt_f <= t:
+                    row[action_i] = 1.0
+            rows.append(row)
+            lower.append(1.0)
+            upper.append(np.inf)
+
+        row = np.zeros(n_vars)
+        row[:n_actions] = objective[:n_actions]
+        rows.append(row)
+        lower.append(-np.inf)
+        upper.append(self.presolver_budget)
+
+        for solver in self.algorithms:
+            row = np.zeros(n_vars)
+            for action_i, (s, _) in enumerate(actions):
+                if s == solver:
+                    row[action_i] = 1.0
+            rows.append(row)
+            lower.append(-np.inf)
+            upper.append(1.0)
+
+        result = milp(
+            objective,
+            integrality=np.ones(n_vars),
+            bounds=Bounds(np.zeros(n_vars), np.ones(n_vars)),
+            constraints=LinearConstraint(np.asarray(rows), lower, upper),
+        )
+        if not result.success or result.x is None:
+            raise RuntimeError(
+                "Static3S could not find a feasible schedule: " + result.message
             )
 
-        prob = pulp.LpProblem("static_schedule_rcscp", pulp.LpMinimize)
-        x_vars = {}
-        for s, times in candidates.items():
-            for t in times:
-                var = pulp.LpVariable(
-                    f"x_{s}_{t:.4f}".replace(".", "_"), cat=pulp.LpBinary
-                )
-                x_vars[(s, t)] = var
-
-        y_vars = {}
-        for i in instances:
-            y_vars[i] = pulp.LpVariable(f"y_{i}", cat=pulp.LpBinary)
-
-        # Objective: (C+1)*sum y_i + sum t * x_{s,t}
-        bigC = self.presolver_budget + 1.0
-        prob += bigC * pulp.lpSum([y_vars[i] for i in instances]) + pulp.lpSum(
-            [t * var for (s, t), var in x_vars.items()]
-        )
-
-        # Covering constraints
-        for i in instances:
-            terms = [y_vars[i]]
-            for (s, t), var in x_vars.items():
-                # if solver s solves instance i within time t
-                rt = perf.at[i, s]
-                if pd.isna(rt):
-                    continue
-                try:
-                    rt_f = float(rt)
-                except Exception:
-                    continue
-                if rt_f <= t:
-                    terms.append(var)
-            prob += pulp.lpSum(terms) >= 1
-
-        # Resource constraint
-        prob += (
-            pulp.lpSum([t * var for (s, t), var in x_vars.items()])
-            <= self.presolver_budget
-        )
-
-        # Solver selection constraints
-        for s in self.algorithms:
-            solver_x_vars = [
-                var for (solver_name, time), var in x_vars.items() if solver_name == s
-            ]
-            prob += pulp.lpSum(solver_x_vars) <= 1, f"One_selection_{s}"
-
-        prob.solve(pulp.PULP_CBC_CMD(msg=False))
-
-        chosen = []
-        for (s, t), var in x_vars.items():
-            try:
-                val = var.value()
-            except Exception:
-                val = None
-            if val is not None and float(val) > 0.5:
-                chosen.append((s, float(t)))
+        chosen = [
+            (s, float(t))
+            for action_i, (s, t) in enumerate(actions)
+            if result.x[action_i] > 0.5
+        ]
         chosen.sort(key=lambda x: x[1])
 
         total_time = sum(t for _, t in chosen)

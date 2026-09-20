@@ -4,13 +4,6 @@ import pytest
 
 from asf.presolving.static_3s import Static3S
 
-try:
-    import pulp  # noqa: F401
-
-    PULP_AVAILABLE = True
-except ImportError:
-    PULP_AVAILABLE = False
-
 
 @pytest.fixture
 def dummy_data():
@@ -33,7 +26,6 @@ def _validate_predictions(preds, n):
             assert isinstance(entry[1], (int, float, np.floating))
 
 
-@pytest.mark.skipif(not PULP_AVAILABLE, reason="pulp is not installed")
 def test_static3s_basic_flow_and_predict(dummy_data):
     X, Y = dummy_data
     s = Static3S(runcount_limit=5, presolver_budget=30.0, max_candidates_per_solver=8)
@@ -52,7 +44,6 @@ def test_predict_before_fit_raises(dummy_data):
         s.predict()
 
 
-@pytest.mark.skipif(not PULP_AVAILABLE, reason="pulp is not installed")
 def test_schedule_time_and_ordering(dummy_data):
     X, Y = dummy_data
     budget = 40.0
@@ -65,7 +56,6 @@ def test_schedule_time_and_ordering(dummy_data):
     assert sum(times) == pytest.approx(budget, rel=1e-6)
 
 
-@pytest.mark.skipif(not PULP_AVAILABLE, reason="pulp is not installed")
 def test_configuration_and_algorithms(dummy_data):
     X, Y = dummy_data
     s = Static3S(presolver_budget=30.0)

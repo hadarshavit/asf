@@ -7,10 +7,6 @@ import pytest
 class TestStatic3SPresolver:
     """Tests for Static3S presolver."""
 
-    @pytest.fixture(autouse=True)
-    def check_deps(self):
-        pytest.importorskip("pulp")
-
     def test_init(self):
         """Test initialization."""
         from asf.presolving.static_3s import Static3S
