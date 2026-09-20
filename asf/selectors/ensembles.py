@@ -64,10 +64,9 @@ def _clone_selector(selector: AbstractSelector) -> AbstractSelector:
     AbstractSelector
         A new instance of the selector.
     """
-    try:
-        return selector.__class__()
-    except Exception:
-        return copy.deepcopy(selector)
+    # Selector constructors often require configuration (for example a base
+    # estimator or a budget).  A default constructor silently loses it.
+    return copy.deepcopy(selector)
 
 
 class BaggingSelector(ConfigurableMixin, AbstractSelector):
