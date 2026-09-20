@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 import logging
 from typing import Any, Callable, cast
@@ -43,6 +44,7 @@ def _create_pipeline(
     selector_kwargs: dict[str, Any],
     feature_groups: dict[str, Any] | None,
     max_feature_time: float | None = None,
+    feature_selector: Any | None = None,
 ) -> SelectorPipeline:
     """
     Helper function to create a SelectorPipeline from a configuration.
@@ -57,7 +59,10 @@ def _create_pipeline(
         maximize=maximize,
         **selector_kwargs,
     )
-    return pipeline_partial()
+    pipeline = pipeline_partial()
+    if feature_selector is not None:
+        pipeline.feature_selector = copy.deepcopy(feature_selector)
+    return pipeline
 
 
 def tune_selector(
@@ -76,6 +81,7 @@ def tune_selector(
     max_algorithm_pre_selector: int | None = None,
     budget: float | None = None,
     maximize: bool = False,
+    metric_direction: str | None = None,
     feature_groups: dict[str, Any] | None = None,
     output_dir: str = "./smac_output",
     smac_metric: Callable[
@@ -121,6 +127,9 @@ def tune_selector(
         Global cutoff time.
     maximize : bool, default=False
         Whether to maximize the performance metric.
+    metric_direction : {None, "minimize", "maximize"}, default=None
+        Direction used by the tuning objective. ``None`` preserves the legacy
+        behavior derived from ``maximize``.
     feature_groups : dict or None, optional
         Definition of feature groups.
     output_dir : str, default="./smac_output"
@@ -178,6 +187,22 @@ def tune_selector(
 
     cs = convert_class_choices_to_categorical(cs)
 
+    if metric_direction not in (None, "minimize", "maximize"):
+        raise ValueError("metric_direction must be 'minimize', 'maximize', or None")
+
+    cv_groups = groups
+    if isinstance(groups, pd.DataFrame):
+        if groups.shape[1] != 1:
+            raise ValueError("groups must be one-dimensional for grouped CV")
+        cv_groups = groups.iloc[:, 0].to_numpy()
+
+    splitter = (
+        GroupKFoldShuffle(n_splits=cv, shuffle=True, random_state=seed)
+        if cv_groups is not None
+        else KFold(n_splits=cv, shuffle=True, random_state=seed)
+    )
+    folds = list(splitter.split(X, y, cv_groups))
+
     scenario = Scenario(
         configspace=cs,
         n_trials=runcount_limit,
@@ -189,27 +214,27 @@ def tune_selector(
     )
 
     def target_function(config: Configuration, seed: int) -> float:
-        if groups is not None:
-            kfold = GroupKFoldShuffle(n_splits=cv, shuffle=True, random_state=seed)
-        else:
-            kfold = KFold(n_splits=cv, shuffle=True, random_state=seed)
-
         scores = []
-        for train_idx, test_idx in kfold.split(X, y, groups):
+        for train_idx, test_idx in folds:
             X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
             y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
             rt_test = features_running_time.iloc[test_idx]
 
-            pipeline = _create_pipeline(
-                config,
-                budget,
-                maximize,
-                sel_kwargs,
-                feature_groups,
-                max_feature_time=max_feature_time,
-            )
-
-            pipeline.fit(X_train, y_train, algorithm_features=algorithm_features)
+            try:
+                pipeline = _create_pipeline(
+                    config,
+                    budget,
+                    maximize,
+                    sel_kwargs,
+                    feature_groups,
+                    max_feature_time=max_feature_time,
+                    feature_selector=feature_selector,
+                )
+                pipeline.fit(X_train, y_train, algorithm_features=algorithm_features)
+            except ValueError as exc:
+                if "exceeds presolver_budget" in str(exc):
+                    return float("inf")
+                raise
             y_pred = pipeline.predict(X_test)
             assert isinstance(y_pred, dict)  # Added assertion for y_pred type
 
@@ -219,7 +244,8 @@ def tune_selector(
             scores.append(float(score))
 
         final_score = float(np.mean(scores))
-        return -final_score if maximize else final_score
+        direction = metric_direction or ("maximize" if maximize else "minimize")
+        return -final_score if direction == "maximize" else final_score
 
     facade_kwargs = smac_kwargs(scenario) if smac_kwargs is not None else {}
     smac = HyperparameterOptimizationFacade(scenario, target_function, **facade_kwargs)
@@ -237,4 +263,5 @@ def tune_selector(
         sel_kwargs,
         feature_groups,
         max_feature_time=max_feature_time,
+        feature_selector=feature_selector,
     )

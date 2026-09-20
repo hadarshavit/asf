@@ -4,6 +4,7 @@ EPM tuning logic using SMAC.
 
 from __future__ import annotations
 
+import copy
 from typing import Any, Callable, cast
 from pathlib import Path
 
@@ -129,14 +130,22 @@ def tune_epm(
         **smac_scenario_kwargs,
     )
 
-    def target_function(config: Any, seed: int) -> float:
-        if groups is not None:
-            kfold = GroupKFoldShuffle(n_splits=cv, shuffle=True, random_state=seed)
-        else:
-            kfold = KFold(n_splits=cv, shuffle=True, random_state=seed)
+    cv_groups = groups
+    if isinstance(groups, pd.DataFrame):
+        if groups.shape[1] != 1:
+            raise ValueError("groups must be one-dimensional for grouped CV")
+        cv_groups = groups.iloc[:, 0].to_numpy()
 
+    splitter = (
+        GroupKFoldShuffle(n_splits=cv, shuffle=True, random_state=seed)
+        if cv_groups is not None
+        else KFold(n_splits=cv, shuffle=True, random_state=seed)
+    )
+    folds = list(splitter.split(X_df, y_ser, cv_groups))
+
+    def target_function(config: Any, seed: int) -> float:
         scores = []
-        for train_idx, test_idx in kfold.split(X_df, y_ser, groups):
+        for train_idx, test_idx in folds:
             X_train, X_test = X_df.iloc[train_idx], X_df.iloc[test_idx]
             y_train, y_test = y_ser.iloc[train_idx], y_ser.iloc[test_idx]
 
@@ -146,7 +155,7 @@ def tune_epm(
                 transform_back=True,
                 predictor_config=config,
                 predictor_kwargs=predictor_kwargs,
-                features_preprocessing=features_preprocessing,
+                features_preprocessing=copy.deepcopy(features_preprocessing),
                 categorical_features=categorical_features,
                 numerical_features=numerical_features,
             )
@@ -180,6 +189,7 @@ def tune_epm(
         normalization_class=normalization_class,
         transform_back=True,
         predictor_config=cast(dict[str, Any], config_dict),
+        predictor_kwargs=predictor_kwargs,
         features_preprocessing=features_preprocessing,
         categorical_features=categorical_features,
         numerical_features=numerical_features,
