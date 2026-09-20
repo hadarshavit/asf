@@ -42,8 +42,12 @@ def read_epmbench_scenario(
 
     data = pd.read_parquet(os.path.join(path, "data.parquet"))
     if "groups" in metadata:
-        groups = data[metadata["groups"]]
-        data.drop(columns=[metadata["groups"]], inplace=True)
+        group_columns = metadata["groups"]
+        group_columns = (
+            [group_columns] if isinstance(group_columns, str) else list(group_columns)
+        )
+        groups = data[group_columns].copy()
+        data.drop(columns=group_columns, inplace=True)
     else:
         groups = None
 
@@ -110,8 +114,8 @@ def get_cv_fold(
     y_test = test_data[target]
 
     if groups is not None:
-        groups_train = groups[train_idx]
-        groups_test = groups[test_idx]
+        groups_train = groups.loc[train_data.index]
+        groups_test = groups.loc[test_data.index]
     else:
         groups_train = None
         groups_test = None
@@ -169,8 +173,8 @@ def get_subsample(
     y_test = test_data[target]
 
     if groups is not None:
-        groups_train = groups[train_idx]
-        groups_test = groups[test_idx]
+        groups_train = groups.loc[train_data.index]
+        groups_test = groups.loc[test_data.index]
     else:
         groups_train = None
         groups_test = None
