@@ -62,6 +62,8 @@ class PairwiseClassifier(
         self,
         model_class: type[AbstractPredictor] = RandomForestClassifierWrapper,
         use_weights: bool = True,
+        *,
+        estimator: Any | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -73,10 +75,15 @@ class PairwiseClassifier(
             The classifier model class used for pairwise comparisons.
         use_weights : bool, default=True
             Whether to use weights based on performance differences.
+        estimator : object or None, default=None
+            Configured estimator, cloned for each training task. Takes precedence
+            over model_class and must support sklearn.base.clone.
         **kwargs : Any
             Additional keyword arguments.
         """
-        AbstractModelBasedSelector.__init__(self, model_class, **kwargs)
+        AbstractModelBasedSelector.__init__(
+            self, model_class, estimator=estimator, **kwargs
+        )
         AbstractFeatureGenerator.__init__(self)
         self.classifiers: list[AbstractPredictor | _ConstantBinaryPredictor] = []
         self.use_weights = bool(use_weights)
@@ -117,15 +124,14 @@ class PairwiseClassifier(
                     )
                     continue
 
-                cur_model = self.model_class()
+                cur_model = self._make_model()
                 if cur_model is None:
                     raise RuntimeError("Classifier could not be initialized.")
 
-                cur_model.fit(
-                    features,
-                    diffs,
-                    sample_weight=None if not self.use_weights else np.abs(val1 - val2),
+                fit_kwargs = (
+                    {"sample_weight": np.abs(val1 - val2)} if self.use_weights else {}
                 )
+                cur_model.fit(features, diffs, **fit_kwargs)
                 self.classifiers.append(cur_model)
 
     def _predict(

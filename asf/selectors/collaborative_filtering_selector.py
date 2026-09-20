@@ -165,7 +165,7 @@ class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelect
                 self.b_U[i] += self.lr * (err - self.reg * self.b_U[i])
                 self.b_V[j] += self.lr * (err - self.reg * self.b_V[j])
 
-        self.model = self.model_class()
+        self.model = self._make_model()
         if self.model is None:
             raise RuntimeError("Model could not be initialized.")
 

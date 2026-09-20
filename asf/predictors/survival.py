@@ -61,6 +61,10 @@ if SKSURV_AVAILABLE:
             kwargs = _filter_constructor_kwargs(RandomSurvivalForest, kwargs)
             self.model = RandomSurvivalForest(**kwargs)
 
+        def get_params(self, deep: bool = True) -> dict[str, Any]:
+            """Expose the survival forest's configuration for cloning."""
+            return self.model.get_params(deep=deep)
+
         @staticmethod
         def _define_hyperparameters(
             **kwargs: Any,

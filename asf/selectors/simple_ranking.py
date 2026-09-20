@@ -115,7 +115,7 @@ class SimpleRanking(ConfigurableMixin, AbstractModelBasedSelector):
             merged["INSTANCE_ID"].to_numpy().reshape(-1, 1)
         ).flatten()
 
-        self.classifier = self.model_class()
+        self.classifier = self._make_model()
         if self.classifier is None:
             raise RuntimeError("Classifier could not be initialized.")
 

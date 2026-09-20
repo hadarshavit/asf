@@ -134,7 +134,7 @@ if SKSURV_AVAILABLE:
                 time=runtime_values.ravel(),
             )
 
-            self.model = self.model_class()
+            self.model = self._make_model()
             self.model.fit(fit_features, y_structured)
 
         def _predict(

@@ -4,11 +4,11 @@ import pandas as pd
 from scipy import stats
 from sklearn.model_selection import KFold
 
-from asf.selectors.abstract_selector import AbstractSelector
+from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 from asf.predictors import AbstractPredictor, RandomForestRegressorWrapper
 
 
-class APPS(AbstractSelector):
+class APPS(AbstractModelBasedSelector):
     """
     Automatic Parallel Portfolio Selector based on the approach by Kashgarani and Kotthoff.
 
@@ -53,8 +53,7 @@ class APPS(AbstractSelector):
                               E.g., 10 means 10-fold cross-validation (10 models per algorithm).
             **kwargs: Additional arguments passed to parent class.
         """
-        super().__init__(**kwargs)
-        self.model_class = model_class
+        super().__init__(model_class=model_class, **kwargs)
         self.p_intersection = float(p_intersection)
         self.n_estimators_for_std = int(n_estimators_for_std)
         self.random_state = int(random_state)
@@ -82,6 +81,7 @@ class APPS(AbstractSelector):
         self.performance_train = performance.copy()
 
         rng = np.random.RandomState(self.random_state)
+        self.predictors = []
         n_instances = len(features)
 
         if self.use_jackknife:
@@ -103,7 +103,7 @@ class APPS(AbstractSelector):
                     X_train = features.iloc[train_idx]
                     y_train = algo_performance.iloc[train_idx]
 
-                    model = self.model_class()
+                    model = self._make_model()
                     model.fit(X_train, y_train)
                     # Store (model, test_indices) for this fold
                     algo_models.append((model, test_idx))
@@ -122,7 +122,7 @@ class APPS(AbstractSelector):
                     X_boot = features.iloc[sample_indices]
                     y_boot = algo_performance.iloc[sample_indices]
 
-                    model = self.model_class()
+                    model = self._make_model()
                     model.fit(X_boot, y_boot)
                     algo_models.append(model)
 

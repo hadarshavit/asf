@@ -5,6 +5,7 @@ Regression MLP predictor using PyTorch.
 from __future__ import annotations
 
 from typing import Any
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -56,7 +57,7 @@ class RegressionMLP(AbstractPredictor, ConfigurableMixin):
         weight_decay: float = 0.0,
         **kwargs: Any,
     ):
-        params = init_params if isinstance(init_params, dict) else {}
+        params = dict(init_params) if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
         # Extract parameters from params with defaults
@@ -71,6 +72,19 @@ class RegressionMLP(AbstractPredictor, ConfigurableMixin):
         learning_rate = params.pop("learning_rate", learning_rate)
         weight_decay = params.pop("weight_decay", weight_decay)
 
+        self._constructor_params = dict(
+            model=model,
+            loss=loss,
+            optimizer=optimizer,
+            batch_size=batch_size,
+            epochs=epochs,
+            seed=seed,
+            device=device,
+            compile_model=compile_model,
+            learning_rate=learning_rate,
+            weight_decay=weight_decay,
+        )
+
         super().__init__(**params)
         if not TORCH_AVAILABLE:
             raise RuntimeError(
@@ -79,15 +93,19 @@ class RegressionMLP(AbstractPredictor, ConfigurableMixin):
 
         torch.manual_seed(seed)
 
-        self.model = model
+        self.model = deepcopy(model)
         self.device = device
-        self.loss = loss or torch.nn.MSELoss()
+        self.loss = deepcopy(loss) if loss is not None else torch.nn.MSELoss()
         self.batch_size = batch_size
         self.optimizer = optimizer or torch.optim.Adam
         self.epochs = epochs
         self.compile_model = compile_model
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
+
+    def get_params(self, deep: bool = True) -> dict[str, Any]:
+        """Return initialization parameters, never the trained network."""
+        return dict(self._constructor_params)
 
     def _get_dataloader(
         self,
