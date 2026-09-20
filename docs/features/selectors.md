@@ -2,6 +2,10 @@
 
 This page provides an overview of all available algorithm selectors in ASF. Click on any selector name below to jump to its description.
 
+Model-based selectors accept a configured `estimator=` instance and clone it for
+each training task. See [Configuring base models](base_models.md) for examples,
+cloning requirements, and compatibility with the existing `model_class=` API.
+
 ## Quick Index
 
 | | | | |

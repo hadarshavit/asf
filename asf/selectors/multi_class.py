@@ -43,6 +43,8 @@ class MultiClassClassifier(ConfigurableMixin, AbstractModelBasedSelector):
     def __init__(
         self,
         model_class: type[AbstractPredictor] = RandomForestClassifierWrapper,
+        *,
+        estimator: Any | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -52,10 +54,15 @@ class MultiClassClassifier(ConfigurableMixin, AbstractModelBasedSelector):
         ----------
         model_class : type[AbstractPredictor], default=RandomForestClassifierWrapper
             The class of the model to be used for classification.
+        estimator : object or None, default=None
+            Configured estimator, cloned for each training task. Takes precedence
+            over model_class and must support sklearn.base.clone.
         **kwargs : Any
             Additional keyword arguments.
         """
-        AbstractModelBasedSelector.__init__(self, model_class, **kwargs)
+        AbstractModelBasedSelector.__init__(
+            self, model_class, estimator=estimator, **kwargs
+        )
         self.classifier: AbstractPredictor | None = None
         self._observed_class_ids: np.ndarray | None = None
 
@@ -75,12 +82,12 @@ class MultiClassClassifier(ConfigurableMixin, AbstractModelBasedSelector):
         if self.algorithm_features is not None:
             raise ValueError("MultiClassClassifier does not use algorithm features.")
 
-        self.classifier = self.model_class()
+        self.classifier = self._make_model()
         if self.classifier is None:
             raise RuntimeError("Classifier could not be initialized.")
 
-        # Best algorithm (lowest value) per instance.
-        target_global = np.argmin(performance.values, axis=1).astype(int)
+        best = np.argmax if self.maximize else np.argmin
+        target_global = best(performance.values, axis=1).astype(int)
         observed_class_ids = np.unique(target_global)
         class_to_local = {
             int(class_id): local_idx
