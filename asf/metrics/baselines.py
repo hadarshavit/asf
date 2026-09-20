@@ -232,104 +232,85 @@ def running_time_selector_performance(
 
     total_time: dict[str, float] = {}
     for instance, schedule in schedules.items():
-        instance_feature_time = 0.0
-        algorithm_items = []  # List of (algorithm, budget) tuples
-        saw_feature_group = False
 
-        # Process schedule items
-        for item in schedule:
+        def is_feature(item: Any) -> bool:
             if isinstance(item, str):
-                # Feature group without budget: add its full computation time if available
-                if item in feature_time.columns:
-                    saw_feature_group = True
-                    ft_val = feature_time.loc[instance, item]
-                    if hasattr(ft_val, "item"):
-                        ft_val = ft_val.item()
-                    instance_feature_time += (
-                        0.0
-                        if (
-                            ft_val is None
-                            or (isinstance(ft_val, float) and np.isnan(ft_val))
-                        )
-                        else float(ft_val)
-                    )
+                name = item
             elif isinstance(item, tuple) and len(item) == 2:
-                item_name, item_budget = item
-                if item_name in feature_time.columns:
-                    saw_feature_group = True
-                    # Feature group with budget: use min(actual_time, budget)
-                    ft_val = feature_time.loc[instance, item_name]
-                    if hasattr(ft_val, "item"):
-                        ft_val = ft_val.item()
-                    actual_ft = (
-                        0.0
-                        if (
-                            ft_val is None
-                            or (isinstance(ft_val, float) and np.isnan(ft_val))
-                        )
-                        else float(ft_val)
-                    )
-                    instance_feature_time += min(actual_ft, item_budget or 0.0)
-                else:
-                    # Algorithm selection
-                    algorithm_items.append(
-                        (item_name, item_budget if item_budget is not None else 0.0)
-                    )
+                name = item[0]
+            else:
+                return False
+            return name in feature_time.columns
 
-        if not saw_feature_group:
-            instance_feature_time = float(feature_time.loc[instance].sum())
+        def feature_cost(item: Any) -> float:
+            name = item[0] if isinstance(item, tuple) else item
+            value = feature_time.loc[instance, name]
+            cost = 0.0 if pd.isna(value) else float(value)
+            if isinstance(item, tuple) and item[1] is not None:
+                cost = min(cost, item[1])
+            return cost
 
-        # Calculate total algorithm time used
-        total_algorithm_time = sum(alloc_budget for _, alloc_budget in algorithm_items)
-
-        # Validate: at least some algorithm time was allocated
-        if total_algorithm_time <= 0.0:
+        algorithm_items = [
+            (item[0], item[1] if item[1] is not None else 0.0)
+            for item in schedule
+            if isinstance(item, tuple) and len(item) == 2 and not is_feature(item)
+        ]
+        if sum(allocated for _, allocated in algorithm_items) <= 0.0:
             raise ValueError(
                 f"Instance {instance}: No algorithm time allocated in schedule {schedule}. "
             )
 
-        # Check if this is a parallel portfolio (all algorithms get the same budget)
-        # or sequential (budgets may vary)
-        budgets = [alloc_budget for _, alloc_budget in algorithm_items]
+        # Legacy schedules without explicit feature steps pay feature costs upfront.
+        explicit_features = any(is_feature(item) for item in schedule)
+        elapsed = 0.0 if explicit_features else float(feature_time.loc[instance].sum())
+
+        # Preserve the parallel-portfolio convention: a trailing block of algorithms
+        # each receiving the full scenario budget runs concurrently. Interleaved
+        # feature/algorithm steps must instead be evaluated in their stated order.
+        budgets = [allocated for _, allocated in algorithm_items]
+        seen_algorithm = False
+        interleaved_features = False
+        for item in schedule:
+            if is_feature(item):
+                interleaved_features |= seen_algorithm
+            elif isinstance(item, tuple):
+                seen_algorithm = True
         is_parallel = (
-            len(set(budgets)) == 1 and len(algorithm_items) > 1 and budgets[0] >= budget
+            len(algorithm_items) > 1
+            and len(set(budgets)) == 1
+            and budgets[0] >= budget
+            and not interleaved_features
         )
 
+        total_time[instance] = budget * par
         if is_parallel:
-            # Parallel portfolio: each algorithm runs for its budget concurrently
-            # Overall time is the minimum time needed to solve
-            times = []
-            solved = False
-            for algorithm, allocated_budget in algorithm_items:
-                if algorithm in performance.columns:
-                    algo_perf = performance.loc[instance, algorithm]
-                    if algo_perf <= allocated_budget:
-                        times.append(algo_perf)
-                        solved = True
+            elapsed += sum(feature_cost(item) for item in schedule if is_feature(item))
+            times = [
+                float(performance.loc[instance, algorithm])
+                for algorithm, allocated in algorithm_items
+                if algorithm in performance.columns
+                and performance.loc[instance, algorithm] <= allocated
+                and elapsed + performance.loc[instance, algorithm] <= budget
+            ]
+            if times:
+                total_time[instance] = elapsed + min(times)
+            continue
 
-            if solved:
-                total_time[instance] = min(times) + instance_feature_time
-            else:
-                total_time[instance] = budget * par
-        else:
-            # Sequential: algorithms run one after another until one solves
-            cumulative_time = instance_feature_time
-            solved = False
-            for algorithm, allocated_budget in algorithm_items:
-                if solved:
+        for item in schedule:
+            if is_feature(item):
+                elapsed += feature_cost(item)
+            elif isinstance(item, tuple) and len(item) == 2:
+                algorithm, allocated = item
+                if algorithm not in performance.columns:
+                    continue
+                available = min(allocated or 0.0, max(0.0, budget - elapsed))
+                runtime = performance.loc[instance, algorithm]
+                if runtime <= available and elapsed + runtime <= budget:
+                    total_time[instance] = elapsed + float(runtime)
                     break
-                if algorithm in performance.columns:
-                    algo_perf = performance.loc[instance, algorithm]
-                    if algo_perf <= allocated_budget:
-                        cumulative_time += algo_perf
-                        solved = True
-                    else:
-                        cumulative_time += allocated_budget
-
-            if solved:
-                total_time[instance] = cumulative_time
-            else:
-                total_time[instance] = budget * par
+                elapsed += available
+            if elapsed >= budget:
+                break
 
     if return_per_instance:
         return total_time
