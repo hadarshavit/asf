@@ -41,6 +41,8 @@ class PairwiseRegressor(
     def __init__(
         self,
         model_class: type[AbstractPredictor] = RandomForestRegressorWrapper,
+        *,
+        estimator: Any | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -50,10 +52,15 @@ class PairwiseRegressor(
         ----------
         model_class : type[AbstractPredictor], default=RandomForestRegressorWrapper
             The regression model class used for pairwise comparisons.
+        estimator : object or None, default=None
+            Configured estimator, cloned for each training task. Takes precedence
+            over model_class and must support sklearn.base.clone.
         **kwargs : Any
             Additional keyword arguments.
         """
-        AbstractModelBasedSelector.__init__(self, model_class, **kwargs)
+        AbstractModelBasedSelector.__init__(
+            self, model_class, estimator=estimator, **kwargs
+        )
         AbstractFeatureGenerator.__init__(self)
         self.regressors: list[AbstractPredictor] = []
 
@@ -80,7 +87,7 @@ class PairwiseRegressor(
                 val2 = performance[other_algorithm].to_numpy(dtype=float)
 
                 diffs = val1 - val2
-                cur_model = self.model_class()
+                cur_model = self._make_model()
                 if cur_model is None:
                     raise RuntimeError("Regressor could not be initialized.")
 

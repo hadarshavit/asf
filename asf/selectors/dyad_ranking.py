@@ -133,7 +133,7 @@ class DyadRanking(ConfigurableMixin, AbstractModelBasedSelector):
 
         X, y, qid = self._prepare_training_data(dyads_df)
 
-        self.classifier = self.model_class()
+        self.classifier = self._make_model()
         if self.classifier is None:
             raise RuntimeError("Classifier could not be initialized.")
 
