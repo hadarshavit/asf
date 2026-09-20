@@ -303,6 +303,8 @@ class LogNormalization(AbstractNormalization):
         x_min = np.min(np.asarray(X))
         if x_min <= 0:
             self.min_val = x_min
+            # Keep a positive offset for every fit whose data is non-positive.
+            self.eps = self.eps or np.finfo(float).eps
         else:
             self.min_val = 0.0
             self.eps = 0.0
