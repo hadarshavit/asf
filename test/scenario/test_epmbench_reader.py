@@ -5,6 +5,15 @@ import pickle
 
 
 import pandas as pd
+import pytest
+
+try:
+    import pyarrow  # noqa: F401
+except ImportError:
+    try:
+        import fastparquet  # noqa: F401
+    except ImportError:
+        pytest.skip("an optional parquet engine is required", allow_module_level=True)
 
 
 class TestGetCVFold:
