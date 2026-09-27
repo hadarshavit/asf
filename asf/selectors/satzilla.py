@@ -175,7 +175,9 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
                 features.values
             )
         else:
-            hard_preds = np.asarray(self.label_classifier.predict(features.values))
+            hard_preds = np.asarray(
+                self.label_classifier.predict(features.values)
+            ).astype(str)
             classes = np.asarray(self.labels)
             label_probs = (hard_preds[:, None] == classes[None, :]).astype(float)
 

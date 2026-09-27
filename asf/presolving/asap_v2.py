@@ -62,7 +62,7 @@ class ASAPv2(AbstractPresolver):
         self,
         init_params: dict[str, Any] | None = None,
         runcount_limit: float = 100.0,
-        presolver_budget: float = 30.0,
+        presolver_budget: float | None = None,
         maximize: bool = False,
         size_preschedule: int = 3,
         max_runtime_preschedule: float = -1,

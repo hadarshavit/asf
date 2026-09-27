@@ -131,6 +131,7 @@ class EPMRandomForest(ForestRegressor, AbstractPredictor, ConfigurableMixin):
             n_estimators,
             estimator_params=(
                 "criterion",
+                "splitter",
                 "max_depth",
                 "min_samples_split",
                 "min_samples_leaf",

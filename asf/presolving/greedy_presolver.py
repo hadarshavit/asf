@@ -44,7 +44,7 @@ class GreedyPresolver(AbstractPresolver):
     def __init__(
         self,
         init_params: dict[str, Any] | None = None,
-        presolver_budget: float = 30.0,
+        presolver_budget: float | None = None,
         cutoff_per_solver: float = 5.0,
         max_presolvers: int = 3,
         min_coverage: float = 0.01,

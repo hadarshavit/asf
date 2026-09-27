@@ -8,6 +8,25 @@ from asf.presolving.greedy_presolver import GreedyPresolver
 from asf.presolving.submodular_presolver import SubmodularPresolver
 from asf.presolving.configurable_presolver import ConfigurablePresolver
 from asf.presolving.asap_v2 import ASAPv2
+from asf.presolving.static_3s import Static3S
+
+
+@pytest.mark.parametrize(
+    ("presolver_class", "default"),
+    [
+        (GreedyPresolver, 30.0),
+        (SubmodularPresolver, 30.0),
+        (ConfigurablePresolver, 30.0),
+        (ASAPv2, 30.0),
+        (Static3S, 200.0),
+    ],
+)
+def test_presolver_budget_alias_respects_explicit_default(presolver_class, default):
+    assert (
+        presolver_class(presolver_budget=default, budget=5).presolver_budget == default
+    )
+    assert presolver_class(budget=5).presolver_budget == 5
+    assert presolver_class().presolver_budget == default
 
 
 class TestGreedyPresolver:

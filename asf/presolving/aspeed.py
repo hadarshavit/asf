@@ -46,7 +46,7 @@ class Aspeed(AbstractPresolver):
 
     def __init__(
         self,
-        presolver_budget: float = 30.0,
+        presolver_budget: float | None = None,
         aspeed_cutoff: int = 60,
         maximize: bool = False,
         cores: int = 1,

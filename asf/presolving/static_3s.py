@@ -46,7 +46,7 @@ class Static3S(AbstractPresolver):
         self,
         init_params: dict[str, Any] | None = None,
         runcount_limit: float = 0.0,
-        presolver_budget: float = 200.0,
+        presolver_budget: float | None = None,
         max_candidates_per_solver: int = 20,
         **kwargs: Any,
     ) -> None:

@@ -49,7 +49,7 @@ class ConfigurablePresolver(AbstractPresolver):
     def __init__(
         self,
         init_params: dict[str, Any] | None = None,
-        presolver_budget: float = 30.0,
+        presolver_budget: float | None = None,
         maximize: bool = False,
         algorithm_config: dict[str, tuple[bool, float]] | None = None,
         **kwargs: Any,

@@ -55,7 +55,7 @@ class SubmodularPresolver(AbstractPresolver):
     def __init__(
         self,
         init_params: dict[str, Any] | None = None,
-        presolver_budget: float = 30.0,
+        presolver_budget: float | None = None,
         time_discretization: list[float] | None = None,
         max_actions: int = 10,
         epsilon: float = 1e-9,

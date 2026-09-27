@@ -14,16 +14,16 @@ from asf.utils.configurable import ConfigurableMixin
 
 
 def resolve_presolver_budget(
-    value: float, params: dict[str, Any], default: float
+    value: float | None, params: dict[str, Any], default: float
 ) -> float:
     """Resolve the legacy ``budget`` alias without overriding an explicit value."""
     if "presolver_budget" in params:
         value = params.pop("presolver_budget")
         params.pop("budget", None)
-    elif "budget" in params:
-        alias = params.pop("budget")
-        if value == default:
-            value = alias
+    elif value is None:
+        value = params.pop("budget", default)
+    else:
+        params.pop("budget", None)
     value = float(value)
     if not np.isfinite(value) or value < 0:
         raise ValueError("presolver_budget must be finite and non-negative")

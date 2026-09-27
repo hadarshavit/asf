@@ -9,6 +9,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 
 from asf.predictors import RandomForestRegressorWrapper, SklearnWrapper
@@ -199,6 +200,16 @@ def test_satzilla_uses_probabilities_from_configured_classifier():
     # Soft probabilities give b a lower expected runtime (7.75 versus 25.75).
     # A hard prediction of the majority label would incorrectly select a.
     assert all(schedule[0][0] == "b" for schedule in selector.predict(X).values())
+
+
+def test_satzilla_hard_predictions_match_numeric_labels():
+    X = pd.DataFrame({"f": [0.0, 1.0, 2.0, 3.0]})
+    y = pd.DataFrame({"a": [1.0, 1.0, 100.0, 100.0], "b": [100.0, 100.0, 1.0, 1.0]})
+    selector = SATzilla(estimator=LinearSVC(dual=False), epm_estimator=DummyRegressor())
+    selector.fit(X, y, labels=[0, 0, 1, 1])
+    assert all(
+        schedule[0][0] == "b" for schedule in selector.predict(X.iloc[2:]).values()
+    )
 
 
 class RankingTree(DecisionTreeRegressor):
