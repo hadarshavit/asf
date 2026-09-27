@@ -45,17 +45,57 @@ class EPMExtraTrees(ExtraTreesRegressor, AbstractPredictor, ConfigurableMixin):
 
     def __init__(
         self,
+        *,
+        log: bool = False,
+        n_estimators: int = 100,
+        criterion: str = "squared_error",
+        max_depth: int | None = None,
+        min_samples_split: int | float = 2,
+        min_samples_leaf: int | float = 1,
+        min_weight_fraction_leaf: float = 0.0,
+        max_features: int | float | str | None = 1.0,
+        max_leaf_nodes: int | None = None,
+        min_impurity_decrease: float = 0.0,
+        bootstrap: bool = False,
+        oob_score: bool = False,
+        n_jobs: int | None = None,
+        random_state: Any = None,
+        verbose: int = 0,
+        warm_start: bool = False,
+        ccp_alpha: float = 0.0,
+        max_samples: int | float | None = None,
+        monotonic_cst: Any = None,
         **kwargs: Any,
     ) -> None:
-        # Separate args for EPMExtraTrees and ExtraTreesRegressor
-        self.log = kwargs.pop("log", False)
-
-        # Filter out parameters that are for the selector/pipeline and not the model
-        for k in ["budget", "maximize", "n_algorithms"]:
-            kwargs.pop(k, None)
-
-        # Pass remaining kwargs to ExtraTreesRegressor
-        super().__init__(**kwargs)
+        self.log = log
+        self.monotonic_cst = monotonic_cst
+        # Older sklearn versions do not accept monotonic_cst, even when None.
+        if monotonic_cst is not None:
+            kwargs["monotonic_cst"] = monotonic_cst
+        super().__init__(
+            n_estimators=n_estimators,
+            criterion=criterion,
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=min_samples_leaf,
+            min_weight_fraction_leaf=min_weight_fraction_leaf,
+            max_features=max_features,
+            max_leaf_nodes=max_leaf_nodes,
+            min_impurity_decrease=min_impurity_decrease,
+            bootstrap=bootstrap,
+            oob_score=oob_score,
+            n_jobs=n_jobs,
+            random_state=random_state,
+            verbose=verbose,
+            warm_start=warm_start,
+            ccp_alpha=ccp_alpha,
+            max_samples=max_samples,
+            **{
+                k: v
+                for k, v in kwargs.items()
+                if k not in {"budget", "maximize", "n_algorithms"}
+            },
+        )
 
     @staticmethod
     def _define_hyperparameters(
@@ -112,6 +152,7 @@ class EPMExtraTrees(ExtraTreesRegressor, AbstractPredictor, ConfigurableMixin):
             If sample weights are provided.
         """
         assert sample_weight is None, "Sample weights are not supported"
+        X, Y = np.asarray(X), np.asarray(Y)
         super().fit(X=X, y=Y, sample_weight=sample_weight)
 
         if self.log:

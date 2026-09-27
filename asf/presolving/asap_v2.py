@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import differential_evolution, minimize_scalar
 
-from asf.presolving.presolver import AbstractPresolver
+from asf.presolving.presolver import AbstractPresolver, resolve_presolver_budget
 
 try:
     from ConfigSpace import Configuration  # noqa: F401
@@ -62,7 +62,7 @@ class ASAPv2(AbstractPresolver):
         self,
         init_params: dict[str, Any] | None = None,
         runcount_limit: float = 100.0,
-        presolver_budget: float = 30.0,
+        presolver_budget: float | None = None,
         maximize: bool = False,
         size_preschedule: int = 3,
         max_runtime_preschedule: float = -1,
@@ -79,11 +79,7 @@ class ASAPv2(AbstractPresolver):
         params = init_params if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
-        if "presolver_budget" in params:
-            presolver_budget = params.pop("presolver_budget")
-            params.pop("budget", None)
-        else:
-            presolver_budget = params.pop("budget", presolver_budget)
+        presolver_budget = resolve_presolver_budget(presolver_budget, params, 30.0)
         maximize = params.pop("maximize", maximize)
         runcount_limit = params.pop("runcount_limit", runcount_limit)
         size_preschedule = params.pop("size_preschedule", size_preschedule)
@@ -194,6 +190,7 @@ class ASAPv2(AbstractPresolver):
             raise ValueError(
                 "ASAPv2 requires features and performance data for fitting."
             )
+        self.schedule = []
         # Convert to DataFrame if needed
         if isinstance(features, np.ndarray):
             features_frame = pd.DataFrame(features)
@@ -253,11 +250,14 @@ class ASAPv2(AbstractPresolver):
         numInstances = self.performance_train.shape[0]
         numSolvers = self.numAlg
 
-        step_size = max(5, self.max_runtime_preschedule / 100)
+        limit = min(self.max_runtime_preschedule, self.presolver_budget)
+        if limit <= 0:
+            self.ialgos_preschedule = np.array([], dtype=int)
+            self.runtimes_preschedule = np.array([], dtype=float)
+            return
+        step_size = min(5.0, limit / 100)
         # Start from step_size instead of 0 to ensure positive timesteps
-        timesteps = np.arange(
-            step_size, self.max_runtime_preschedule + step_size, step_size
-        )
+        timesteps = np.arange(step_size, limit + step_size, step_size)
         if len(timesteps) == 0:
             timesteps = np.array([self.max_runtime_preschedule])
 

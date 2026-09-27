@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Callable, Any
+from copy import deepcopy
 
 import pandas as pd
 
@@ -57,7 +58,7 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         weight_decay: float = 0.0,
         **kwargs,
     ):
-        params = init_params if isinstance(init_params, dict) else {}
+        params = dict(init_params) if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
         # Extract parameters from params with defaults
@@ -73,36 +74,51 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         learning_rate = params.pop("learning_rate", learning_rate)
         weight_decay = params.pop("weight_decay", weight_decay)
 
+        self._constructor_params = dict(
+            model=model,
+            input_size=input_size,
+            loss=loss,
+            optimizer=optimizer,
+            batch_size=batch_size,
+            epochs=epochs,
+            seed=seed,
+            device=device,
+            compile=compile,
+            learning_rate=learning_rate,
+            weight_decay=weight_decay,
+        )
+
         super().__init__(**params)
         if not TORCH_AVAILABLE:
             raise RuntimeError(
                 "PyTorch is not installed. Install it with: pip install torch"
             )
 
-        assert model is not None or input_size is not None, (
-            "Either model or input_size must be provided."
-        )
-
         torch.manual_seed(seed)
 
-        if model is None:
-            assert input_size is not None
+        if model is None and input_size is not None:
             self.model = get_mlp(input_size=input_size, output_size=1)
         else:
-            self.model = model
+            self.model = deepcopy(model)
 
-        self.model.to(device)
+        if self.model is not None:
+            self.model.to(device)
         self.device = device
 
-        self.loss = loss or bpr_loss
+        self.loss = deepcopy(loss) if loss is not None else bpr_loss
         self.batch_size = batch_size
         self.optimizer = optimizer or torch.optim.Adam
         self.epochs = epochs
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
 
-        if compile:
+        self.compile = compile
+        if compile and self.model is not None:
             self.model = torch.compile(self.model)
+
+    def get_params(self, deep: bool = True) -> dict[str, Any]:
+        """Return initialization parameters, never the trained network."""
+        return dict(self._constructor_params)
 
     def _get_dataloader(
         self,
@@ -127,6 +143,13 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
             raise ValueError(
                 "algorithm_features must be provided in kwargs for RankingMLP.fit"
             )
+
+        if self.model is None:
+            self.model = get_mlp(
+                input_size=X.shape[1] + algorithm_features.shape[1], output_size=1
+            ).to(self.device)
+            if self.compile:
+                self.model = torch.compile(self.model)
 
         dataloader = self._get_dataloader(X, Y, algorithm_features)
 
@@ -171,6 +194,8 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         return None
 
     def predict(self, X: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
+        if self.model is None:
+            raise RuntimeError("Model not fitted")
         self.model.eval()
 
         features_tensor = torch.from_numpy(X.values).to(self.device).float()

@@ -54,6 +54,7 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
         self,
         label_classifier_model: type[Any] = RandomForestClassifierWrapper,
         epm_regressor_model: type[Any] = RidgeRegressorWrapper,
+        epm_estimator: Any | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -65,12 +66,16 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
             The classifier class for predicting instance labels (e.g., SAT/UNSAT).
         epm_regressor_model : type, default=RidgeRegressorWrapper
             The regressor class used internally by EPM for per-algorithm runtime prediction.
+        epm_estimator : object or None, default=None
+            Configured, cloneable regressor for the per-algorithm EPMs. The
+            inherited estimator parameter configures the label classifier.
         **kwargs : Any
             Additional keyword arguments passed to parent classes.
         """
         super().__init__(model_class=label_classifier_model, **kwargs)
         self.epm_regressor_model = epm_regressor_model
         self.epm_kwargs["predictor_class"] = epm_regressor_model
+        self.epm_kwargs["estimator"] = epm_estimator
         self.epms: dict[str, dict[str, EPM]] = {}
         self.label_classifier: Any = None
         self.labels: list[str] = []
@@ -110,16 +115,15 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
             if not labels_series.index.equals(features.index):
                 labels_series = labels_series.reindex(features.index)
 
-            self.label_classifier = self.model_class()
+            self.label_classifier = self._make_model()
             self.label_classifier.fit(features.values, labels_series.values)
 
             # Extract unique labels
-            if hasattr(self.label_classifier, "model_class") and hasattr(
-                self.label_classifier.model_class, "classes_"
-            ):
-                self.labels = [
-                    str(c) for c in self.label_classifier.model_class.classes_
-                ]
+            label_model = getattr(
+                self.label_classifier, "model_class", self.label_classifier
+            )
+            if hasattr(label_model, "classes_"):
+                self.labels = [str(c) for c in label_model.classes_]
             else:
                 self.labels = [str(c) for c in np.unique(labels_series.values)]
 
@@ -162,6 +166,8 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
 
         if self.label_classifier is None:
             label_probs = np.ones((n_instances, 1), dtype=float)
+        elif hasattr(self.label_classifier, "predict_proba"):
+            label_probs = self.label_classifier.predict_proba(features.values)
         elif hasattr(self.label_classifier, "model_class") and hasattr(
             self.label_classifier.model_class, "predict_proba"
         ):
@@ -169,7 +175,9 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
                 features.values
             )
         else:
-            hard_preds = np.asarray(self.label_classifier.predict(features.values))
+            hard_preds = np.asarray(
+                self.label_classifier.predict(features.values)
+            ).astype(str)
             classes = np.asarray(self.labels)
             label_probs = (hard_preds[:, None] == classes[None, :]).astype(float)
 

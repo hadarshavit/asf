@@ -51,3 +51,10 @@ def test_epm_random_forest_return_var(regression_data):
     assert means.shape[0] == X.shape[0]
     assert vars.shape[0] == X.shape[0]
     assert np.all(vars >= 0)
+
+
+def test_epm_random_forest_passes_splitter_to_trees(regression_data):
+    X, y = regression_data
+    model = ForestRegressorWrapper(n_estimators=2, splitter="random", random_state=0)
+    model.fit(X, y)
+    assert all(tree.splitter == "random" for tree in model.estimators_)

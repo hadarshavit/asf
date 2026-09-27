@@ -63,6 +63,8 @@ class PerformanceModel(
         use_multi_target: bool = False,
         normalize: AbstractNormalization | None = None,
         init_params: dict[str, Any] | None = None,
+        *,
+        estimator: Any | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -78,6 +80,9 @@ class PerformanceModel(
             Method to normalize performance data. If None, defaults to LogNormalization().
         init_params : dict[str, Any] or None, default=None
             Initialization parameters from configuration.
+        estimator : object or None, default=None
+            Configured estimator, cloned for each training task. Takes precedence
+            over model_class and must support sklearn.base.clone.
         **kwargs : Any
             Additional arguments for the parent classes.
         """
@@ -88,7 +93,9 @@ class PerformanceModel(
         use_multi_target = params.pop("use_multi_target", use_multi_target)
         normalize = params.pop("normalize", normalize)
 
-        AbstractModelBasedSelector.__init__(self, model_class, **params)
+        AbstractModelBasedSelector.__init__(
+            self, model_class, estimator=params.pop("estimator", estimator), **params
+        )
         AbstractFeatureGenerator.__init__(self)
 
         self.regressors: list[AbstractPredictor] | AbstractPredictor | None = None
@@ -149,14 +156,14 @@ class PerformanceModel(
                 raise ValueError(
                     "PerformanceModel does not use algorithm features for multi-target regression."
                 )
-            self.regressors = self.model_class(**regressor_init_args)
+            self.regressors = self._make_model(**regressor_init_args)
             self.regressors.fit(features, performance)
         else:
             if self.algorithm_features is None:
                 self.regressors = []
                 for i, _ in enumerate(self.algorithms):
                     algo_times = performance.iloc[:, i]
-                    cur_model = self.model_class(**regressor_init_args)
+                    cur_model = self._make_model(**regressor_init_args)
                     cur_model.fit(features, algo_times)
                     self.regressors.append(cur_model)
             else:
@@ -181,7 +188,7 @@ class PerformanceModel(
                     )
                     train_data_list.append(data)
                 train_data = pd.concat(train_data_list)
-                self.regressors = self.model_class(**regressor_init_args)
+                self.regressors = self._make_model(**regressor_init_args)
                 self.regressors.fit(train_data.iloc[:, :-1], train_data.iloc[:, -1])
 
     def _predict(
@@ -238,7 +245,7 @@ class PerformanceModel(
         predictions = np.zeros((base_features.shape[0], len(self.algorithms)))
 
         if self.use_multi_target:
-            if not isinstance(self.regressors, AbstractPredictor):
+            if isinstance(self.regressors, list):
                 raise RuntimeError("Multi-target regressor missing.")
             predictions = self.regressors.predict(base_features)
             if isinstance(predictions, pd.DataFrame):
@@ -253,7 +260,7 @@ class PerformanceModel(
                         regressor.predict(base_features)
                     ).flatten()
             else:
-                if not isinstance(self.regressors, AbstractPredictor):
+                if isinstance(self.regressors, list):
                     raise RuntimeError("Joint regressor missing.")
                 regressor: AbstractPredictor = self.regressors
                 for i, algorithm in enumerate(self.algorithms):

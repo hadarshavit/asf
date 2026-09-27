@@ -12,7 +12,7 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
-from asf.presolving.presolver import AbstractPresolver
+from asf.presolving.presolver import AbstractPresolver, resolve_presolver_budget
 
 try:
     import ConfigSpace  # noqa: F401
@@ -49,7 +49,7 @@ class ConfigurablePresolver(AbstractPresolver):
     def __init__(
         self,
         init_params: dict[str, Any] | None = None,
-        presolver_budget: float = 30.0,
+        presolver_budget: float | None = None,
         maximize: bool = False,
         algorithm_config: dict[str, tuple[bool, float]] | None = None,
         **kwargs: Any,
@@ -57,11 +57,7 @@ class ConfigurablePresolver(AbstractPresolver):
         params = init_params if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
-        if "presolver_budget" in params:
-            presolver_budget = params.pop("presolver_budget")
-            params.pop("budget", None)
-        else:
-            presolver_budget = params.pop("budget", presolver_budget)
+        presolver_budget = resolve_presolver_budget(presolver_budget, params, 30.0)
         maximize = params.pop("maximize", maximize)
         algorithm_config = params.pop("algorithm_config", algorithm_config)
 
@@ -84,6 +80,20 @@ class ConfigurablePresolver(AbstractPresolver):
 
         super().__init__(presolver_budget=presolver_budget, maximize=maximize, **params)
         self.algorithm_config = algorithm_config or {}
+        total = 0.0
+        for use, duration in self.algorithm_config.values():
+            if use:
+                duration = float(duration)
+                if not np.isfinite(duration) or duration <= 0:
+                    raise ValueError(
+                        "Configured presolver durations must be positive and finite."
+                    )
+                total += duration
+        if total > self.presolver_budget + 1e-12:
+            raise ValueError(
+                "Configured presolver schedule exceeds presolver_budget: "
+                f"{total} > {self.presolver_budget}."
+            )
         self.schedule: list[tuple[str, float]] = []
         self.algorithms: list[str] = []
 
@@ -115,10 +125,19 @@ class ConfigurablePresolver(AbstractPresolver):
 
         self.schedule = []
 
+        total = 0.0
+
         # Build schedule from algorithm_config
         for algo_name, (use_algo, time_budget) in self.algorithm_config.items():
             if use_algo and algo_name in self.algorithms and time_budget > 0:
+                total += float(time_budget)
                 self.schedule.append((algo_name, time_budget))
+
+        if total > self.presolver_budget + 1e-12:
+            raise ValueError(
+                "Configured presolver schedule exceeds presolver_budget: "
+                f"{total} > {self.presolver_budget}."
+            )
 
         # Sort by time budget (shorter times first - run quick solvers first)
         self.schedule.sort(key=lambda x: x[1])

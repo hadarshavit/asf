@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from asf.presolving.presolver import AbstractPresolver
+from asf.presolving.presolver import AbstractPresolver, resolve_presolver_budget
 
 try:
     import clingo
@@ -46,12 +46,13 @@ class Aspeed(AbstractPresolver):
 
     def __init__(
         self,
-        presolver_budget: float = 30.0,
+        presolver_budget: float | None = None,
         aspeed_cutoff: int = 60,
         maximize: bool = False,
         cores: int = 1,
         data_threshold: int = 300,
         data_fraction: float = 0.3,
+        seed: int = 0,
         **kwargs: Any,
     ) -> None:
         if not CLINGO_AVAIL:
@@ -59,16 +60,14 @@ class Aspeed(AbstractPresolver):
                 "clingo is not installed. Please install it to use the Aspeed presolver."
             )
 
-        # Handle 'budget' as an alias for 'presolver_budget' if needed
-        actual_budget = kwargs.pop("budget", presolver_budget)
-        if "presolver_budget" in kwargs:
-            actual_budget = kwargs.pop("presolver_budget")
+        actual_budget = resolve_presolver_budget(presolver_budget, kwargs, 30.0)
 
         super().__init__(presolver_budget=actual_budget, maximize=maximize, **kwargs)
 
         self.cores = int(cores)
         self.data_threshold = int(data_threshold)
         self.data_fraction = float(data_fraction)
+        self.seed = int(seed)
         self.aspeed_cutoff = int(aspeed_cutoff)
         self.schedule: list[tuple[str, float]] = []
         self.algorithms: list[str] = []
@@ -130,6 +129,7 @@ class Aspeed(AbstractPresolver):
         """
         if performance is None:
             raise ValueError("Aspeed requires performance data for fitting.")
+        self.schedule = []
         if isinstance(performance, pd.DataFrame):
             perf_frame = performance
             self.algorithms = list(performance.columns)
@@ -192,13 +192,17 @@ solved(I)   :- solved(I,_).
 #show slice/3.
     """
 
+        asp_program = asp_program.replace(
+            "#const cores=1.", f"#const cores={self.cores}."
+        )
+
         # Create a Clingo Control object
         ctl = clingo.Control(arguments=[f"-t{self.cores}"])
         ctl.add(asp_program)
 
         # Subsample if needed
         if perf_frame.shape[0] > self.data_threshold:
-            random_indx = np.random.choice(
+            random_indx = np.random.default_rng(self.seed).choice(
                 range(perf_frame.shape[0]),
                 size=min(
                     perf_frame.shape[0],

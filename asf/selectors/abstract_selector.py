@@ -71,6 +71,7 @@ class AbstractSelector(ABC):
         self.prediction_mode = str(prediction_mode)
         self.algorithms: list[str] = []
         self.features: list[str] = []
+        self.input_features_: list[Any] = []
 
     def fit(
         self,
@@ -119,6 +120,7 @@ class AbstractSelector(ABC):
                 "Features and performance must be pandas DataFrames or numpy arrays."
             )
 
+        self.input_features_ = list(features.columns)
         if self.hierarchical_generator is not None:
             self.hierarchical_generator.fit(features, performance, algorithm_features)
             features = pd.concat(
@@ -157,9 +159,10 @@ class AbstractSelector(ABC):
         if features is None:
             df_features: pd.DataFrame | None = None
         elif isinstance(features, np.ndarray):
+            input_features = getattr(self, "input_features_", self.features)
             cols = (
-                self.features
-                if self.features
+                input_features
+                if input_features
                 else [f"f_{i}" for i in range(features.shape[1])]
             )
             df_features = pd.DataFrame(features, columns=pd.Index(cols))

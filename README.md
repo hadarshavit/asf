@@ -69,7 +69,9 @@ We can then define a selector:
 from asf.selectors import PairwiseClassifier
 from sklearn.ensemble import RandomForestClassifier
 
-selector = PairwiseClassifier(model_class=RandomForestClassifier)
+selector = PairwiseClassifier(
+    estimator=RandomForestClassifier(n_estimators=200, random_state=42)
+)
 
 selector.fit(features, performance)
 ```
