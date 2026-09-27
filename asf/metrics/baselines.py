@@ -177,6 +177,9 @@ def running_time_selector_performance(
     The schedule can contain both feature groups (strings) and algorithm selections (tuples).
     Feature groups are evaluated in order, and their computation time is only added if the
     instance is not yet solved when the feature group appears in the schedule.
+    Algorithm time and feature time share the global budget; a solution exactly at
+    the cutoff is accepted. Schedules without explicit feature groups retain the
+    legacy convention of computing all supplied features before algorithm execution.
 
     Parameters
     ----------
@@ -293,22 +296,40 @@ def running_time_selector_performance(
                         times.append(algo_perf)
                         solved = True
 
-            if solved:
+            if solved and min(times) + instance_feature_time <= budget:
                 total_time[instance] = min(times) + instance_feature_time
             else:
                 total_time[instance] = budget * par
         else:
             # Sequential: algorithms run one after another until one solves
-            cumulative_time = instance_feature_time
+            cumulative_time = 0.0 if saw_feature_group else instance_feature_time
             solved = False
-            for algorithm, allocated_budget in algorithm_items:
-                if solved:
+            for item in schedule:
+                if cumulative_time > budget:
                     break
+                if isinstance(item, str):
+                    item_name, item_budget = item, None
+                elif isinstance(item, tuple) and len(item) == 2:
+                    item_name, item_budget = item
+                else:
+                    raise ValueError(f"Invalid schedule item: {item!r}")
+                if item_name in feature_time.columns:
+                    value = feature_time.loc[instance, item_name]
+                    cost = 0.0 if pd.isna(value) else float(value)
+                    if item_budget is not None:
+                        cost = min(cost, float(item_budget))
+                    cumulative_time += cost
+                    continue
+                if isinstance(item, str):
+                    continue  # Preserve compatibility with unknown feature groups.
+                algorithm = item_name
+                allocated_budget = min(float(item_budget or 0.0), budget - cumulative_time)
                 if algorithm in performance.columns:
                     algo_perf = performance.loc[instance, algorithm]
                     if algo_perf <= allocated_budget:
                         cumulative_time += algo_perf
                         solved = True
+                        break  # Do not charge subsequent feature computations.
                     else:
                         cumulative_time += allocated_budget
 

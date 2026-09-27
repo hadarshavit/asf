@@ -131,13 +131,19 @@ def _load_aslib_features(
     return features.sort_index(), features_running_time.sort_index()
 
 
-def _load_aslib_cv(path: str) -> pd.DataFrame:
-    """Internal helper to load cv.arff."""
+def _load_aslib_cv(path: str, repetition: int = 1) -> pd.DataFrame:
+    """Load one CV repetition, never mixing repeated train/test assignments."""
     cv_path = os.path.join(path, "cv.arff")
     with open(cv_path, "r") as f:
         cv_data: dict[str, Any] = load(f)
     cv = pd.DataFrame(cv_data["data"], columns=[a[0] for a in cv_data["attributes"]])
+    if "repetition" in cv.columns:
+        cv = cv.loc[cv["repetition"] == repetition]
+        if cv.empty:
+            raise ValueError(f"CV repetition {repetition} is missing in {cv_path}")
     cv = cv.set_index("instance_id").drop(columns=["repetition"], errors="ignore")
+    if not cv.index.is_unique:
+        raise ValueError(f"Duplicate instances within CV repetition {repetition} in {cv_path}")
     return cv.sort_index()
 
 
@@ -190,6 +196,7 @@ def read_aslib_scenario(
     path: str,
     add_running_time_features: bool = True,
     training_par_factor: float | None = 10.0,
+    cv_repetition: int = 1,
 ) -> tuple[
     pd.DataFrame,
     pd.DataFrame,
@@ -212,6 +219,8 @@ def read_aslib_scenario(
     training_par_factor : float or None, default=10.0
         PAR factor to apply to training performance data. Timeouts (values > budget)
         are replaced with budget * training_par_factor. Set to None to disable.
+    cv_repetition : int, default=1
+        CV repetition to use. Repetitions must not be pooled into a single split.
 
     Returns
     -------
@@ -253,7 +262,7 @@ def read_aslib_scenario(
         path, feature_groups, add_running_time_features
     )
 
-    cv = _load_aslib_cv(path)
+    cv = _load_aslib_cv(path, repetition=cv_repetition)
 
     algorithm_features = _load_aslib_algorithm_features(path, algorithm_feature_groups)
 
