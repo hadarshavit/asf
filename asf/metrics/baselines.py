@@ -323,7 +323,9 @@ def running_time_selector_performance(
                 if isinstance(item, str):
                     continue  # Preserve compatibility with unknown feature groups.
                 algorithm = item_name
-                allocated_budget = min(float(item_budget or 0.0), budget - cumulative_time)
+                allocated_budget = min(
+                    float(item_budget or 0.0), budget - cumulative_time
+                )
                 if algorithm in performance.columns:
                     algo_perf = performance.loc[instance, algorithm]
                     if algo_perf <= allocated_budget:

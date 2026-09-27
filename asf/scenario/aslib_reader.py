@@ -143,7 +143,9 @@ def _load_aslib_cv(path: str, repetition: int = 1) -> pd.DataFrame:
             raise ValueError(f"CV repetition {repetition} is missing in {cv_path}")
     cv = cv.set_index("instance_id").drop(columns=["repetition"], errors="ignore")
     if not cv.index.is_unique:
-        raise ValueError(f"Duplicate instances within CV repetition {repetition} in {cv_path}")
+        raise ValueError(
+            f"Duplicate instances within CV repetition {repetition} in {cv_path}"
+        )
     return cv.sort_index()
 
 
