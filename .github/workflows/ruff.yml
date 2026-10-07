@@ -16,14 +16,12 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.x'
-    - name: Install the code linting and formatting tool Ruff
-      run: pip install ruff ty
+        python-version: '3.11'
+    - name: Install development dependencies
+      run: python -m pip install ".[dev]"
     - name: Lint code with Ruff
       run: ruff check --output-format=github --target-version=py311
     - name: Check code formatting with Ruff
       run: ruff format --diff --target-version=py311
-    - name: Install dependencies for type checking
-      run: pip install .[all]
-    # - name: Check type annotations with ty
-    #   run: ty check --output-format=github
+    - name: Check types with ty (advisory)
+      run: ty check --output-format=github
