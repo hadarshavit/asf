@@ -492,3 +492,20 @@ def test_asap_small_budget_never_emits_larger_step():
     performance = pd.DataFrame({"a": [0.2, 0.3], "b": [0.4, 0.5]})
     presolver.fit(pd.DataFrame({"f": [0.0, 1.0]}), performance)
     assert sum(t for _, t in presolver.schedule) <= 1.0
+
+
+def test_presolver_budget_precedence_and_init_params_copy():
+    init_params = {"presolver_budget": 40.0, "budget": 50.0}
+    presolver = GreedyPresolver(
+        init_params=init_params,
+        presolver_budget=30.0,
+    )
+
+    assert presolver.presolver_budget == 30.0
+    assert init_params == {"presolver_budget": 40.0, "budget": 50.0}
+
+
+def test_presolver_budget_uses_init_params_when_argument_omitted():
+    presolver = GreedyPresolver(init_params={"budget": 40.0})
+
+    assert presolver.presolver_budget == 40.0

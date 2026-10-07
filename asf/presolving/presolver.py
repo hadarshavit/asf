@@ -12,18 +12,24 @@ import pandas as pd
 
 from asf.utils.configurable import ConfigurableMixin
 
+DEFAULT_BUDGET = object()
+
 
 def resolve_presolver_budget(
-    value: float, params: dict[str, Any], default: float
+    value: float | object, params: dict[str, Any], default: float
 ) -> float:
     """Resolve the legacy ``budget`` alias without overriding an explicit value."""
     if "presolver_budget" in params:
-        value = params.pop("presolver_budget")
+        configured = params.pop("presolver_budget")
         params.pop("budget", None)
+        if value is DEFAULT_BUDGET:
+            value = configured
     elif "budget" in params:
         alias = params.pop("budget")
-        if value == default:
+        if value is DEFAULT_BUDGET:
             value = alias
+    elif value is DEFAULT_BUDGET:
+        value = default
     value = float(value)
     if not np.isfinite(value) or value < 0:
         raise ValueError("presolver_budget must be finite and non-negative")

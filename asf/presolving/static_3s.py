@@ -17,8 +17,13 @@ except ImportError:
     _HAS_CONFIGSPACE = False
 
 from scipy.optimize import Bounds, LinearConstraint, milp
+from scipy.sparse import lil_matrix
 
-from asf.presolving.presolver import AbstractPresolver, resolve_presolver_budget
+from asf.presolving.presolver import (
+    DEFAULT_BUDGET,
+    AbstractPresolver,
+    resolve_presolver_budget,
+)
 
 
 class Static3S(AbstractPresolver):
@@ -46,11 +51,11 @@ class Static3S(AbstractPresolver):
         self,
         init_params: dict[str, Any] | None = None,
         runcount_limit: float = 0.0,
-        presolver_budget: float = 200.0,
+        presolver_budget: float | object = DEFAULT_BUDGET,
         max_candidates_per_solver: int = 20,
         **kwargs: Any,
     ) -> None:
-        params = init_params if isinstance(init_params, dict) else {}
+        params = dict(init_params) if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
         presolver_budget = resolve_presolver_budget(presolver_budget, params, 200.0)
@@ -149,36 +154,32 @@ class Static3S(AbstractPresolver):
         objective[:n_actions] = [t for _, t in actions]
         objective[n_actions:] = self.presolver_budget + 1.0
 
-        rows: list[np.ndarray] = []
         lower: list[float] = []
         upper: list[float] = []
+        constraints = lil_matrix(
+            (n_instances + 1 + len(self.algorithms), n_vars), dtype=float
+        )
 
         for row_i, i in enumerate(instances):
-            row = np.zeros(n_vars)
-            row[n_actions + row_i] = 1.0
+            constraints[row_i, n_actions + row_i] = 1.0
             for action_i, (s, t) in enumerate(actions):
                 try:
                     rt_f = float(perf.at[i, s])
                 except (TypeError, ValueError):
                     continue
                 if np.isfinite(rt_f) and rt_f <= t:
-                    row[action_i] = 1.0
-            rows.append(row)
+                    constraints[row_i, action_i] = 1.0
             lower.append(1.0)
             upper.append(np.inf)
 
-        row = np.zeros(n_vars)
-        row[:n_actions] = objective[:n_actions]
-        rows.append(row)
+        constraints[n_instances, :n_actions] = objective[:n_actions]
         lower.append(-np.inf)
         upper.append(self.presolver_budget)
 
-        for solver in self.algorithms:
-            row = np.zeros(n_vars)
+        for solver_i, solver in enumerate(self.algorithms):
             for action_i, (s, _) in enumerate(actions):
                 if s == solver:
-                    row[action_i] = 1.0
-            rows.append(row)
+                    constraints[n_instances + 1 + solver_i, action_i] = 1.0
             lower.append(-np.inf)
             upper.append(1.0)
 
@@ -186,7 +187,7 @@ class Static3S(AbstractPresolver):
             objective,
             integrality=np.ones(n_vars),
             bounds=Bounds(np.zeros(n_vars), np.ones(n_vars)),
-            constraints=LinearConstraint(np.asarray(rows), lower, upper),
+            constraints=LinearConstraint(constraints.tocsc(), lower, upper),
         )
         if not result.success or result.x is None:
             raise RuntimeError(

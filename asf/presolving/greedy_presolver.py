@@ -8,7 +8,11 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
-from asf.presolving.presolver import AbstractPresolver, resolve_presolver_budget
+from asf.presolving.presolver import (
+    DEFAULT_BUDGET,
+    AbstractPresolver,
+    resolve_presolver_budget,
+)
 
 
 class GreedyPresolver(AbstractPresolver):
@@ -44,14 +48,14 @@ class GreedyPresolver(AbstractPresolver):
     def __init__(
         self,
         init_params: dict[str, Any] | None = None,
-        presolver_budget: float = 30.0,
+        presolver_budget: float | object = DEFAULT_BUDGET,
         cutoff_per_solver: float = 5.0,
         max_presolvers: int = 3,
         min_coverage: float = 0.01,
         maximize: bool = False,
         **kwargs: Any,
     ) -> None:
-        params = init_params if isinstance(init_params, dict) else {}
+        params = dict(init_params) if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
         presolver_budget = resolve_presolver_budget(presolver_budget, params, 30.0)
