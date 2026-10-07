@@ -25,9 +25,11 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-  'scikit-learn',
+  'scikit-learn>=1.6',
   'pandas',
   'numpy',
+  'scipy>=1.9',
+  'joblib',
 ]
 
 [project.optional-dependencies]
@@ -35,13 +37,14 @@ aslib = [ 'pyyaml', 'liac-arff' ]
 nn = [ 'torch' ]
 xgb = [ 'xgboost' ]
 tune = [ 'smac' ]
+configspace = [ 'ConfigSpace' ]
 aspeed = [ 'clingo' ]
 survival = [ 'scikit-survival' ] 
-3s = [ 'pulp' ]
+3s = []
 analysis = [ 'plotly', 'scipy' ]
 epmbench = [ 'fastparquet' ]
-dev = [ 'pytest', 'pytest-cov', 'ruff' ]
-all = [ 'pyyaml', 'liac-arff', 'torch', 'xgboost', 'smac', 'clingo', 'scikit-survival', 'pulp', 'plotly', 'scipy', 'fastparquet' ]
+dev = [ 'pytest', 'pytest-cov', 'ruff', 'ty==0.0.25' ]
+all = [ 'pyyaml', 'liac-arff', 'torch', 'xgboost', 'smac', 'ConfigSpace', 'clingo', 'scikit-survival', 'plotly', 'fastparquet' ]
 
 [build-system]
 requires = ["setuptools", "wheel"]
@@ -60,3 +63,14 @@ select = [
     "E", "F",  # Default Ruff rules
     "ANN"      # Enforces all flake8-annotations rules
 ]
+# Allow Any where third-party or dynamic APIs need it.
+ignore = ["ANN401"]
+
+[tool.ty.src]
+include = ["asf"]
+
+[tool.ty.rules]
+all = "warn"
+
+[tool.ty.terminal]
+error-on-warning = false

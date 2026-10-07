@@ -15,12 +15,14 @@ repos:
       language: system
       types_or: [python, pyi]
       require_serial: true
+
 - repo: local
   hooks:
     - id: ty
-      name: ty
-      entry: ty check asf --force-exclude
+      name: ty check
+      entry: ty check
       language: system
-      types_or: [python, pyi]
+      files: ^asf/.*\.pyi?$
       pass_filenames: false
       require_serial: true
+      verbose: true

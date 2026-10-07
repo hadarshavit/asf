@@ -8,8 +8,8 @@ functions, as described in:
 Daniel Golovin, Matthew Streeter (NIPS 2008)
 
 The algorithm greedily selects actions (algorithm, time) pairs that maximize
-the marginal gain per unit time, achieving a (1-1/e)-approximation for
-benefit-maximization and 4-approximation for cost-minimization.
+the marginal gain per unit time. It is a practical heuristic for the
+discretized objective and carries no formal approximation guarantee here.
 """
 
 from __future__ import annotations
@@ -18,7 +18,11 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
-from asf.presolving.presolver import AbstractPresolver
+from asf.presolving.presolver import (
+    DEFAULT_BUDGET,
+    AbstractPresolver,
+    resolve_presolver_budget,
+)
 
 
 class SubmodularPresolver(AbstractPresolver):
@@ -31,9 +35,7 @@ class SubmodularPresolver(AbstractPresolver):
     - f(S) is monotone and submodular
     - Actions are greedily selected to maximize marginal gain per unit time
 
-    The greedy algorithm achieves:
-    - (1 - 1/e) ≈ 0.632 approximation for benefit-maximization
-    - 4-approximation for cost-minimization
+    The greedy algorithm is a heuristic for the discretized objective.
 
     Parameters
     ----------
@@ -57,7 +59,7 @@ class SubmodularPresolver(AbstractPresolver):
     def __init__(
         self,
         init_params: dict[str, Any] | None = None,
-        presolver_budget: float = 30.0,
+        presolver_budget: float | object = DEFAULT_BUDGET,
         time_discretization: list[float] | None = None,
         max_actions: int = 10,
         epsilon: float = 1e-9,
@@ -67,21 +69,21 @@ class SubmodularPresolver(AbstractPresolver):
         """
         Initialize the SubmodularPresolver.
         """
-        params = init_params if isinstance(init_params, dict) else {}
+        params = dict(init_params) if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
-        if "presolver_budget" in params:
-            presolver_budget = params.pop("presolver_budget")
-            params.pop("budget", None)
-        else:
-            presolver_budget = params.pop("budget", presolver_budget)
+        presolver_budget = resolve_presolver_budget(presolver_budget, params, 30.0)
         maximize = params.pop("maximize", maximize)
         time_discretization = params.pop("time_discretization", time_discretization)
         max_actions = params.pop("max_actions", max_actions)
         epsilon = params.pop("epsilon", epsilon)
 
         super().__init__(presolver_budget=presolver_budget, maximize=maximize, **params)
-        self.time_discretization = time_discretization or [1.0, 2.0, 5.0, 10.0, 20.0]
+        self.time_discretization = [
+            float(t)
+            for t in (time_discretization or [1.0, 2.0, 5.0, 10.0, 20.0])
+            if 0 < float(t) <= self.presolver_budget
+        ]
         self.max_actions = int(max_actions)
         self.epsilon = float(epsilon)
         self.schedule: list[tuple[str, float]] = []
@@ -237,7 +239,7 @@ class SubmodularPresolver(AbstractPresolver):
         The greedy algorithm selects actions to maximize marginal gain per unit time:
             g_j = argmax_{(v,τ)} f_{(v,τ)}(G_j) / τ
 
-        This achieves (1-1/e)-approximation for benefit maximization.
+        This is a density-greedy heuristic for benefit maximization.
 
         Parameters
         ----------
@@ -251,6 +253,7 @@ class SubmodularPresolver(AbstractPresolver):
             raise ValueError(
                 "SubmodularPresolver requires performance data for fitting."
             )
+        self.schedule = []
 
         if isinstance(performance, pd.DataFrame):
             self._performance = performance.copy()

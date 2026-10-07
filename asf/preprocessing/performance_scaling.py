@@ -276,6 +276,7 @@ class LogNormalization(AbstractNormalization):
         self.base = float(base)
         self.eps = float(eps)
         self.min_val: float = 0.0
+        self.offset_: float = 0.0
 
     def fit(
         self,
@@ -303,9 +304,10 @@ class LogNormalization(AbstractNormalization):
         x_min = np.min(np.asarray(X))
         if x_min <= 0:
             self.min_val = x_min
+            self.offset_ = self.eps or np.finfo(float).eps
         else:
             self.min_val = 0.0
-            self.eps = 0.0
+            self.offset_ = 0.0
 
         return self
 
@@ -323,9 +325,9 @@ class LogNormalization(AbstractNormalization):
                 np.ndarray
                     Transformed data.
         """
-        X_shifted = np.asarray(X) - self.min_val + self.eps
+        X_shifted = np.asarray(X) - self.min_val + self.offset_
         # Clip to avoid non-positive values for log
-        X_shifted = np.clip(X_shifted, self.eps, None)
+        X_shifted = np.clip(X_shifted, self.offset_, None)
         return np.log(X_shifted) / np.log(self.base)
 
     def inverse_transform(self, X: np.ndarray) -> np.ndarray:
@@ -344,7 +346,7 @@ class LogNormalization(AbstractNormalization):
         """
         X_orig = np.power(self.base, X)
         if self.min_val != 0:
-            X_orig = X_orig + self.min_val - self.eps
+            X_orig = X_orig + self.min_val - self.offset_
         return X_orig
 
 

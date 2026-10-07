@@ -34,7 +34,7 @@ class SklearnWrapper(AbstractPredictor):
         **kwargs: Any,
     ):
         super().__init__()
-        params = init_params if isinstance(init_params, dict) else {}
+        params = dict(init_params) if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
         # Filter out parameters that are for the selector/pipeline and not the model
@@ -45,6 +45,13 @@ class SklearnWrapper(AbstractPredictor):
         }
 
         self.model_class: Any = model_class(**model_params)
+
+    def get_params(self, deep: bool = True) -> dict[str, Any]:
+        """Expose constructor parameters for scikit-learn cloning."""
+        params = self.model_class.get_params(deep=deep)
+        if type(self) is SklearnWrapper:
+            params = {"model_class": type(self.model_class), **params}
+        return params
 
     def fit(
         self,
@@ -74,7 +81,9 @@ class SklearnWrapper(AbstractPredictor):
             if isinstance(sample_weight, (pd.DataFrame, pd.Series))
             else sample_weight
         )
-        self.model_class.fit(X_in, Y_in, sample_weight=sw_in, **kwargs)
+        if sw_in is not None:
+            kwargs["sample_weight"] = sw_in
+        self.model_class.fit(X_in, Y_in, **kwargs)
 
     def predict(self, X: np.ndarray, **kwargs: Any) -> np.ndarray:
         """

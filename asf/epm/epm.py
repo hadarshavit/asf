@@ -13,6 +13,7 @@ from sklearn.base import RegressorMixin, TransformerMixin
 
 from asf.predictors import SklearnWrapper
 from asf.predictors.abstract_predictor import AbstractPredictor
+from asf.predictors.estimator import clone_estimator
 from asf.predictors.random_forest import RandomForestRegressorWrapper
 from asf.preprocessing.performance_scaling import (
     AbstractNormalization,
@@ -48,6 +49,10 @@ class EPM:
         Additional keyword arguments for the predictor.
     imputer : Callable or None, default=None
         Optional imputer function for target variables.
+    estimator : object or None, default=None
+        Configured estimator supporting sklearn.base.clone. Takes precedence over
+        predictor_class. Incompatible with predictor_config or predictor_kwargs;
+        configure the estimator instance directly instead.
     """
 
     def __init__(
@@ -62,7 +67,15 @@ class EPM:
         predictor_config: dict[str, Any] | None = None,
         predictor_kwargs: dict[str, Any] | None = None,
         imputer: Callable[[pd.Series, pd.DataFrame], pd.Series] | None = None,
+        *,
+        estimator: Any | None = None,
     ) -> None:
+        if estimator is not None and (predictor_config is not None or predictor_kwargs):
+            raise ValueError(
+                "Configure estimator directly instead of passing predictor_config "
+                "or predictor_kwargs."
+            )
+        self.estimator = estimator
         if isinstance(predictor_class, type) and issubclass(
             predictor_class, RegressorMixin
         ):
@@ -129,7 +142,8 @@ class EPM:
 
         self.predictor = self._get_predictor()
 
-        self.predictor.fit(X_df, y_ser, sample_weight=sample_weight)
+        fit_kwargs = {} if sample_weight is None else {"sample_weight": sample_weight}
+        self.predictor.fit(X_df, y_ser, **fit_kwargs)
         return self
 
     def _ensure_dataframe(
@@ -155,10 +169,12 @@ class EPM:
 
         return X_df, y_ser
 
-    def _get_predictor(self) -> AbstractPredictor:
+    def _get_predictor(self) -> Any:
         """Get the predictor instance."""
+        if getattr(self, "estimator", None) is not None:
+            return clone_estimator(self.estimator)
         if self.predictor_config is None:
-            predictor = self.predictor_class(**self.predictor_kwargs)
+            predictor = self.model_class(**self.predictor_kwargs)
         else:
             # Assume get_from_configuration returns a partial or a class
             predictor_factory = self.predictor_class.get_from_configuration(

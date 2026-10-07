@@ -8,6 +8,7 @@ import pickle
 from sklearn.preprocessing import OneHotEncoder
 
 from asf.predictors.ranking_mlp import RankingMLP
+from asf.predictors.estimator import clone_estimator
 from asf.selectors.abstract_selector import AbstractSelector
 from asf.selectors.feature_generator import AbstractFeatureGenerator
 from asf.utils.configurable import ClassChoice, ConfigurableMixin
@@ -54,6 +55,8 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
     def __init__(
         self,
         model: RankingMLP | Callable[..., RankingMLP] | None = None,
+        *,
+        estimator: Any | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -63,12 +66,15 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
         ----------
         model : RankingMLP or Callable or None, default=None
             The model to be used for ranking algorithms.
+        estimator : object or None, default=None
+            Configured cloneable ranking predictor. Takes precedence over model.
         **kwargs : Any
             Additional keyword arguments.
         """
         AbstractSelector.__init__(self, **kwargs)
         AbstractFeatureGenerator.__init__(self)
         self.model = model
+        self.estimator = estimator
 
     def _fit(
         self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
@@ -91,7 +97,9 @@ class JointRanking(ConfigurableMixin, AbstractSelector, AbstractFeatureGenerator
                 columns=pd.Index([f"algo_{i}" for i in range(len(self.algorithms))]),
             )
 
-        if self.model is None:
+        if getattr(self, "estimator", None) is not None:
+            self.model = clone_estimator(self.estimator)
+        elif self.model is None:
             self.model = RankingMLP(
                 input_size=len(self.features) + len(self.algorithm_features.columns)
             )

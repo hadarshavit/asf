@@ -132,6 +132,12 @@ class SelectorPipeline(ConfigurableMixin):
             available_features = [f for f in selected_features if f in X.columns]
             if available_features:
                 return X[available_features]
+            if selected_features:
+                missing = sorted(set(selected_features) - set(X.columns))
+                raise ValueError(
+                    "Configured feature groups provide no input columns; missing: "
+                    + ", ".join(map(str, missing))
+                )
         return X
 
     def fit(
@@ -158,7 +164,11 @@ class SelectorPipeline(ConfigurableMixin):
         start = time.time()
         self._logger.debug("Starting fit process")
 
-        X = self.preprocessor.fit_transform(features, performance)
+        # Acquire only the configured feature groups before fitting any
+        # preprocessing step.  Otherwise transformations such as PCA can see
+        # excluded (and uncharged) features.
+        selected_features = self._filter_features(features)
+        X = self.preprocessor.fit_transform(selected_features, performance)
         self._logger.debug(
             f"Preprocessing completed in {time.time() - start:.2f} seconds"
         )
@@ -189,7 +199,7 @@ class SelectorPipeline(ConfigurableMixin):
 
         if self.feature_selector:
             if hasattr(self.feature_selector, "fit_transform"):
-                X, y = self.feature_selector.fit_transform(X, y)
+                X = self.feature_selector.fit_transform(X, y)
             else:
                 self.feature_selector.fit(X, y)
                 X = self.feature_selector.transform(X)
@@ -199,7 +209,6 @@ class SelectorPipeline(ConfigurableMixin):
         )
         start = time.time()
 
-        X = self._filter_features(X)
         self.selector.fit(X, y, algorithm_features=algorithm_features, **kwargs)
 
         self._logger.debug(
@@ -229,7 +238,8 @@ class SelectorPipeline(ConfigurableMixin):
         dict
             Predictions mapping instance IDs to schedules.
         """
-        X = self.preprocessor.transform(features)
+        X = self._filter_features(features)
+        X = self.preprocessor.transform(X)
 
         scheds: list[Any] = []
         if self.pre_solving:
@@ -238,8 +248,6 @@ class SelectorPipeline(ConfigurableMixin):
 
         if self.feature_selector:
             X = self.feature_selector.transform(X)
-
-        X = self._filter_features(X)
 
         predictions = self.selector.predict(X, performance=performance)
 
@@ -534,11 +542,14 @@ class SelectorPipeline(ConfigurableMixin):
         if feature_groups and configuration is not None:
             from asf.preprocessing.feature_group_selector import FeatureGroupSelector
 
-            init_kwargs["feature_groups"] = (
-                FeatureGroupSelector.get_selected_groups_from_config(
-                    feature_groups, configuration, prefix=f"{prefix}feature_group:"
-                )
+            selected = FeatureGroupSelector.get_selected_groups_from_config(
+                feature_groups, configuration, prefix=f"{prefix}feature_group:"
             )
+            init_kwargs["feature_groups"] = {
+                name: feature_groups[name]
+                for name in selected
+                if name in feature_groups
+            }
 
         if "algorithm_pre_selector" in clean_config:
             val = clean_config["algorithm_pre_selector"]

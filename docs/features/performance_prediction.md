@@ -1,5 +1,18 @@
 # Empirical performance prediction
 
+To configure an EPM directly, pass an estimator instance:
+
+```python
+from asf.epm import EPM
+from sklearn.ensemble import RandomForestRegressor
+
+epm = EPM(estimator=RandomForestRegressor(n_estimators=200, random_state=42))
+```
+
+EPM clones the estimator on each fit and leaves the supplied instance untouched.
+See [Configuring base models](base_models.md) for cloning requirements, including
+custom and PyTorch models.
+
 ASF allows to easily tune and train EPMs. For example, to tune an EPM:
 
 ```python

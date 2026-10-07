@@ -4,6 +4,8 @@ EPM tuning logic using SMAC.
 
 from __future__ import annotations
 
+import copy
+import inspect
 from typing import Any, Callable, cast
 from pathlib import Path
 
@@ -27,6 +29,39 @@ from asf.preprocessing.performance_scaling import (
     LogNormalization,
 )
 from asf.utils.groupkfoldshuffle import GroupKFoldShuffle
+
+
+def _seed_predictor_kwargs(
+    model_class: type[AbstractPredictor],
+    predictor_kwargs: dict[str, Any],
+    seed: int,
+) -> dict[str, Any]:
+    """Fill supported unset model seeds while preserving caller values."""
+    result = dict(predictor_kwargs)
+    signature_params = None
+    try:
+        model = model_class(**result)
+        params = model.get_params(deep=False)
+    except (AttributeError, TypeError, ValueError):
+        try:
+            signature_params = inspect.signature(model_class).parameters
+        except (TypeError, ValueError):
+            signature_params = {}
+        params = {}
+    if params:
+        for name in ("random_state", "seed"):
+            if name in params and params[name] is None:
+                result[name] = seed
+    elif signature_params is not None:
+        for name in ("random_state", "seed"):
+            if name in result and result[name] is not None:
+                continue
+            parameter = signature_params.get(name)
+            if parameter is not None and (
+                name in result or parameter.default in (None, inspect.Parameter.empty)
+            ):
+                result[name] = seed
+    return result
 
 
 def tune_epm(
@@ -104,6 +139,7 @@ def tune_epm(
     smac_scenario_kwargs = smac_scenario_kwargs or {}
     smac_kwargs = smac_kwargs or {}
     predictor_kwargs = predictor_kwargs or {}
+    predictor_kwargs = _seed_predictor_kwargs(model_class, predictor_kwargs, seed)
 
     if isinstance(X, np.ndarray) and isinstance(y, np.ndarray):
         X_df = pd.DataFrame(
@@ -129,14 +165,22 @@ def tune_epm(
         **smac_scenario_kwargs,
     )
 
-    def target_function(config: Any, seed: int) -> float:
-        if groups is not None:
-            kfold = GroupKFoldShuffle(n_splits=cv, shuffle=True, random_state=seed)
-        else:
-            kfold = KFold(n_splits=cv, shuffle=True, random_state=seed)
+    cv_groups = groups
+    if isinstance(groups, pd.DataFrame):
+        if groups.shape[1] != 1:
+            raise ValueError("groups must be one-dimensional for grouped CV")
+        cv_groups = groups.iloc[:, 0].to_numpy()
 
+    splitter = (
+        GroupKFoldShuffle(n_splits=cv, shuffle=True, random_state=seed)
+        if cv_groups is not None
+        else KFold(n_splits=cv, shuffle=True, random_state=seed)
+    )
+    folds = list(splitter.split(X_df, y_ser, cv_groups))
+
+    def target_function(config: Any, seed: int) -> float:
         scores = []
-        for train_idx, test_idx in kfold.split(X_df, y_ser, groups):
+        for train_idx, test_idx in folds:
             X_train, X_test = X_df.iloc[train_idx], X_df.iloc[test_idx]
             y_train, y_test = y_ser.iloc[train_idx], y_ser.iloc[test_idx]
 
@@ -146,7 +190,7 @@ def tune_epm(
                 transform_back=True,
                 predictor_config=config,
                 predictor_kwargs=predictor_kwargs,
-                features_preprocessing=features_preprocessing,
+                features_preprocessing=copy.deepcopy(features_preprocessing),
                 categorical_features=categorical_features,
                 numerical_features=numerical_features,
             )
@@ -180,6 +224,7 @@ def tune_epm(
         normalization_class=normalization_class,
         transform_back=True,
         predictor_config=cast(dict[str, Any], config_dict),
+        predictor_kwargs=predictor_kwargs,
         features_preprocessing=features_preprocessing,
         categorical_features=categorical_features,
         numerical_features=numerical_features,

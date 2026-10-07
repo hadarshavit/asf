@@ -2,6 +2,33 @@ import numpy as np
 import pytest
 
 
+def test_seed_predictor_kwargs_only_fills_unset_parameters():
+    from asf.epm.epm_tuner import _seed_predictor_kwargs
+
+    class Predictor:
+        def __init__(self, random_state=None, seed=None):
+            self.random_state = random_state
+            self.seed = seed
+
+        def get_params(self, deep=False):
+            return {"random_state": self.random_state, "seed": self.seed}
+
+    assert _seed_predictor_kwargs(Predictor, {}, 7) == {
+        "random_state": 7,
+        "seed": 7,
+    }
+    assert _seed_predictor_kwargs(Predictor, {"random_state": 3}, 7) == {
+        "random_state": 3,
+        "seed": 7,
+    }
+
+    class DefaultSeedPredictor(Predictor):
+        def __init__(self, random_state=5, seed=None):
+            super().__init__(random_state=random_state, seed=seed)
+
+    assert _seed_predictor_kwargs(DefaultSeedPredictor, {}, 7) == {"seed": 7}
+
+
 def test_tune_epm_requires_smac(monkeypatch):
     # Force SMAC_AVAILABLE to False to test assertion branch
     import asf.epm.epm_tuner as tuner
