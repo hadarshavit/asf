@@ -11,7 +11,11 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import differential_evolution, minimize_scalar
 
-from asf.presolving.presolver import AbstractPresolver, resolve_presolver_budget
+from asf.presolving.presolver import (
+    DEFAULT_BUDGET,
+    AbstractPresolver,
+    resolve_presolver_budget,
+)
 
 try:
     from ConfigSpace import Configuration  # noqa: F401
@@ -62,7 +66,7 @@ class ASAPv2(AbstractPresolver):
         self,
         init_params: dict[str, Any] | None = None,
         runcount_limit: float = 100.0,
-        presolver_budget: float = 30.0,
+        presolver_budget: float | object = DEFAULT_BUDGET,
         maximize: bool = False,
         size_preschedule: int = 3,
         max_runtime_preschedule: float = -1,
@@ -76,7 +80,7 @@ class ASAPv2(AbstractPresolver):
         """
         Initialize ASAPv2 presolver.
         """
-        params = init_params if isinstance(init_params, dict) else {}
+        params = dict(init_params) if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
         presolver_budget = resolve_presolver_budget(presolver_budget, params, 30.0)

@@ -12,7 +12,11 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
-from asf.presolving.presolver import AbstractPresolver, resolve_presolver_budget
+from asf.presolving.presolver import (
+    DEFAULT_BUDGET,
+    AbstractPresolver,
+    resolve_presolver_budget,
+)
 
 try:
     import ConfigSpace  # noqa: F401
@@ -49,12 +53,12 @@ class ConfigurablePresolver(AbstractPresolver):
     def __init__(
         self,
         init_params: dict[str, Any] | None = None,
-        presolver_budget: float = 30.0,
+        presolver_budget: float | object = DEFAULT_BUDGET,
         maximize: bool = False,
         algorithm_config: dict[str, tuple[bool, float]] | None = None,
         **kwargs: Any,
     ) -> None:
-        params = init_params if isinstance(init_params, dict) else {}
+        params = dict(init_params) if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
         presolver_budget = resolve_presolver_budget(presolver_budget, params, 30.0)

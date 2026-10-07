@@ -5,6 +5,7 @@ EPM tuning logic using SMAC.
 from __future__ import annotations
 
 import copy
+import inspect
 from typing import Any, Callable, cast
 from pathlib import Path
 
@@ -28,6 +29,39 @@ from asf.preprocessing.performance_scaling import (
     LogNormalization,
 )
 from asf.utils.groupkfoldshuffle import GroupKFoldShuffle
+
+
+def _seed_predictor_kwargs(
+    model_class: type[AbstractPredictor],
+    predictor_kwargs: dict[str, Any],
+    seed: int,
+) -> dict[str, Any]:
+    """Fill supported unset model seeds while preserving caller values."""
+    result = dict(predictor_kwargs)
+    signature_params = None
+    try:
+        model = model_class(**result)
+        params = model.get_params(deep=False)
+    except (AttributeError, TypeError, ValueError):
+        try:
+            signature_params = inspect.signature(model_class).parameters
+        except (TypeError, ValueError):
+            signature_params = {}
+        params = {}
+    if params:
+        for name in ("random_state", "seed"):
+            if name in params and params[name] is None:
+                result[name] = seed
+    elif signature_params is not None:
+        for name in ("random_state", "seed"):
+            if name in result and result[name] is not None:
+                continue
+            parameter = signature_params.get(name)
+            if parameter is not None and (
+                name in result or parameter.default in (None, inspect.Parameter.empty)
+            ):
+                result[name] = seed
+    return result
 
 
 def tune_epm(
@@ -105,6 +139,7 @@ def tune_epm(
     smac_scenario_kwargs = smac_scenario_kwargs or {}
     smac_kwargs = smac_kwargs or {}
     predictor_kwargs = predictor_kwargs or {}
+    predictor_kwargs = _seed_predictor_kwargs(model_class, predictor_kwargs, seed)
 
     if isinstance(X, np.ndarray) and isinstance(y, np.ndarray):
         X_df = pd.DataFrame(

@@ -92,7 +92,7 @@ def test_log_fit_sets_eps_for_positive_data():
     norm = LogNormalization(base=2, eps=1e-3)
     norm.fit(data)
     assert norm.min_val == 0
-    assert norm.eps == 0
+    assert norm.eps == 1e-3
     transformed = norm.transform(data)
     assert np.allclose(np.log2(data), transformed)
     inverted = norm.inverse_transform(transformed)
@@ -104,4 +104,6 @@ def test_log_refit_nonpositive_data_restores_offset():
     norm.fit(np.array([1.0, 2.0]))
     norm.fit(np.array([-1.0, 0.0]))
     transformed = norm.transform(np.array([-1.0, 0.0]))
+    assert norm.eps == 1e-6
+    assert norm.offset_ == 1e-6
     assert np.isfinite(transformed).all()

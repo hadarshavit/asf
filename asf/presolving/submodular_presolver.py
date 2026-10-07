@@ -18,7 +18,11 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
-from asf.presolving.presolver import AbstractPresolver, resolve_presolver_budget
+from asf.presolving.presolver import (
+    DEFAULT_BUDGET,
+    AbstractPresolver,
+    resolve_presolver_budget,
+)
 
 
 class SubmodularPresolver(AbstractPresolver):
@@ -55,7 +59,7 @@ class SubmodularPresolver(AbstractPresolver):
     def __init__(
         self,
         init_params: dict[str, Any] | None = None,
-        presolver_budget: float = 30.0,
+        presolver_budget: float | object = DEFAULT_BUDGET,
         time_discretization: list[float] | None = None,
         max_actions: int = 10,
         epsilon: float = 1e-9,
@@ -65,7 +69,7 @@ class SubmodularPresolver(AbstractPresolver):
         """
         Initialize the SubmodularPresolver.
         """
-        params = init_params if isinstance(init_params, dict) else {}
+        params = dict(init_params) if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
         presolver_budget = resolve_presolver_budget(presolver_budget, params, 30.0)

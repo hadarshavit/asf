@@ -7,13 +7,15 @@ import pickle
 import pandas as pd
 import pytest
 
-try:
-    import pyarrow  # noqa: F401
-except ImportError:
+
+def require_parquet_engine() -> None:
     try:
-        import fastparquet  # noqa: F401
+        import pyarrow  # noqa: F401
     except ImportError:
-        pytest.skip("an optional parquet engine is required", allow_module_level=True)
+        try:
+            import fastparquet  # noqa: F401
+        except ImportError:
+            pytest.skip("an optional parquet engine is required")
 
 
 class TestGetCVFold:
@@ -119,8 +121,7 @@ class TestGetSubsample:
             "test": [2],
         }
 
-        # Note: get_subsample uses groups.loc[train_idx] but train_idx is [0]
-        # This tests that groups with matching indices work
+        groups = pd.DataFrame({"group": ["train", "train", "test"]})
         X_train, y_train, X_test, y_test, groups_train, groups_test = get_subsample(
             data,
             iter=0,
@@ -128,11 +129,11 @@ class TestGetSubsample:
             features=["f1"],
             target=["target"],
             subsample_dict=subsample_dict,
-            groups=None,  # Pass None to avoid indexing issues
+            groups=groups,
         )
 
-        assert groups_train is None
-        assert groups_test is None
+        assert list(groups_train["group"]) == ["train"]
+        assert list(groups_test["group"]) == ["test"]
 
 
 class TestReadEPMBenchScenario:
@@ -140,6 +141,7 @@ class TestReadEPMBenchScenario:
 
     def test_read_scenario_without_groups(self, tmp_path):
         """Test reading a scenario without groups."""
+        require_parquet_engine()
         from asf.scenario.epmbench_reader import read_epmbench_scenario
 
         # Create test scenario
@@ -170,6 +172,7 @@ class TestReadEPMBenchScenario:
 
     def test_read_scenario_with_groups(self, tmp_path):
         """Test reading a scenario with groups."""
+        require_parquet_engine()
         from asf.scenario.epmbench_reader import read_epmbench_scenario
 
         data = pd.DataFrame(
@@ -195,6 +198,7 @@ class TestReadEPMBenchScenario:
 
     def test_read_scenario_with_subsample(self, tmp_path):
         """Test reading a scenario with subsample data."""
+        require_parquet_engine()
         from asf.scenario.epmbench_reader import read_epmbench_scenario
 
         data = pd.DataFrame({"f1": [1.0, 2.0], "t1": [10.0, 20.0]})

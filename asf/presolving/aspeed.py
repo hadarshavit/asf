@@ -10,7 +10,11 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from asf.presolving.presolver import AbstractPresolver, resolve_presolver_budget
+from asf.presolving.presolver import (
+    DEFAULT_BUDGET,
+    AbstractPresolver,
+    resolve_presolver_budget,
+)
 
 try:
     import clingo
@@ -46,7 +50,7 @@ class Aspeed(AbstractPresolver):
 
     def __init__(
         self,
-        presolver_budget: float = 30.0,
+        presolver_budget: float | object = DEFAULT_BUDGET,
         aspeed_cutoff: int = 60,
         maximize: bool = False,
         cores: int = 1,

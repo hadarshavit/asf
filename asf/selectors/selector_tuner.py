@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from functools import partial
 from pathlib import Path
 import logging
 from typing import Any, Callable, cast
@@ -37,6 +38,38 @@ except ImportError:
     SMAC_AVAILABLE = False
 
 
+def _seed_component(component: Any, seed: int) -> None:
+    """Seed known unset parameters on a configured component in place."""
+    if component is None:
+        return
+    if hasattr(component, "get_params") and hasattr(component, "set_params"):
+        params = component.get_params(deep=False)
+        updates = {
+            name: seed
+            for name in ("random_state", "seed")
+            if name in params and params[name] is None
+        }
+        if updates:
+            component.set_params(**updates)
+    factory = getattr(component, "model_class", None)
+    if callable(factory):
+        try:
+            params = factory().get_params(deep=False)
+        except (AttributeError, TypeError, ValueError):
+            params = {}
+        updates = {
+            name: seed
+            for name in ("random_state", "seed")
+            if name in params and params[name] is None
+        }
+        if updates:
+            component.model_class = partial(factory, **updates)
+    for name in ("estimator", "classifier", "regressor", "model"):
+        child = getattr(component, name, None)
+        if child is not None and child is not component:
+            _seed_component(child, seed)
+
+
 def _create_pipeline(
     config: Configuration | dict[str, Any],
     budget: float | None,
@@ -45,6 +78,7 @@ def _create_pipeline(
     feature_groups: dict[str, Any] | None,
     max_feature_time: float | None = None,
     feature_selector: Any | None = None,
+    seed: int | None = None,
 ) -> SelectorPipeline:
     """
     Helper function to create a SelectorPipeline from a configuration.
@@ -60,8 +94,16 @@ def _create_pipeline(
         **selector_kwargs,
     )
     pipeline = pipeline_partial()
+    if seed is not None:
+        _seed_component(pipeline.selector, seed)
+        _seed_component(pipeline.pre_solving, seed)
+        for _, step in pipeline.preprocessor.steps:
+            _seed_component(step, seed)
     if feature_selector is not None:
         pipeline.feature_selector = copy.deepcopy(feature_selector)
+    if seed is not None:
+        _seed_component(pipeline.feature_selector, seed)
+        _seed_component(pipeline.algorithm_pre_selector, seed)
     return pipeline
 
 
@@ -202,6 +244,7 @@ def tune_selector(
         else KFold(n_splits=cv, shuffle=True, random_state=seed)
     )
     folds = list(splitter.split(X, y, cv_groups))
+    tuning_seed = seed
 
     scenario = Scenario(
         configspace=cs,
@@ -209,7 +252,7 @@ def tune_selector(
         walltime_limit=timeout,
         deterministic=True,
         output_directory=Path(output_dir),
-        seed=seed,
+        seed=tuning_seed,
         **sc_kwargs,
     )
 
@@ -229,6 +272,7 @@ def tune_selector(
                     feature_groups,
                     max_feature_time=max_feature_time,
                     feature_selector=feature_selector,
+                    seed=tuning_seed,
                 )
                 pipeline.fit(X_train, y_train, algorithm_features=algorithm_features)
             except ValueError as exc:
@@ -264,4 +308,5 @@ def tune_selector(
         feature_groups,
         max_feature_time=max_feature_time,
         feature_selector=feature_selector,
+        seed=tuning_seed,
     )
