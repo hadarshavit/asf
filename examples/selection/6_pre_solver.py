@@ -1,3 +1,4 @@
+from typing import Any
 from asf.selectors import PairwiseClassifier
 from asf.selectors import SelectorPipeline
 from asf.predictors.random_forest import RandomForestClassifierWrapper
@@ -9,7 +10,7 @@ import pandas as pd
 import numpy as np
 
 
-def get_data():
+def get_data() -> Any:
     """
     Generates synthetic data for algorithm scheduling with balanced performance.
 
@@ -105,7 +106,8 @@ if __name__ == "__main__":
     test_performance = performance.iloc[test_idx]
 
     print(
-        f"Dataset: {len(features)} instances ({train_size} train, {len(test_features)} test)"
+        f"Dataset: {len(features)} instances ({train_size} train, "
+        f"{len(test_features)} test)"
     )
 
     best_algorithms = train_performance.idxmin(axis=1).value_counts()
@@ -128,7 +130,8 @@ if __name__ == "__main__":
     predictions = selector.predict(test_features)
 
     print("\nASAPv2 learned schedule:")
-    asap_config = selector.pre_solving.get_preschedule_config()  # type: ignore[attr-defined]
+    # type: ignore[attr-defined]
+    asap_config = selector.pre_solving.get_preschedule_config()
 
     # Calculate coverage on test set
     solvable_by_alg = {}
@@ -153,13 +156,15 @@ if __name__ == "__main__":
         unique_count = len(unique_instances)
 
         print(
-            f"  {alg}: {time:.1f}s (solves {solved}/{len(test_performance)} = {solve_rate:.0f}%, unique: {unique_count})"
+            f"  {alg}: {time:.1f}s (solves {solved}/{len(test_performance)} = "
+            f"{solve_rate:.0f}%, unique: {unique_count})"
         )
 
     total_solved = len(all_solvable)
     schedule_coverage = total_solved / len(test_performance) * 100
     print(
-        f"Schedule coverage: {total_solved}/{len(test_performance)} ({schedule_coverage:.0f}%)"
+        f"Schedule coverage: {total_solved}/{len(test_performance)} "
+        f"({schedule_coverage:.0f}%)"
     )
 
     # Show compact examples
@@ -179,5 +184,6 @@ if __name__ == "__main__":
         best_time = test_performance.loc[idx].min()
 
         print(
-            f"  {instance_id}: [{preschedule_str}] → {main_alg} (best: {best_actual}:{best_time:.0f}s)"
+            f"  {instance_id}: [{preschedule_str}] → {main_alg} "
+            f"(best: {best_actual}:{best_time:.0f}s)"
         )

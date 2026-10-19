@@ -1,3 +1,4 @@
+from typing import Any
 from asf.selectors import PairwiseClassifier, PairwiseRegressor, tune_selector
 from asf.predictors import SVMRegressorWrapper, SVMClassifierWrapper
 from asf.presolving.asap_v2 import ASAPv2
@@ -8,7 +9,7 @@ import pandas as pd
 import numpy as np
 
 
-def get_data():
+def get_data() -> Any:
     data = np.array(
         [
             [120, 100, 110],
@@ -149,7 +150,8 @@ if __name__ == "__main__":
             budget,
         ) = aslib_reader.read_aslib_scenario(scenario_path)
 
-        # Subsample for speed (first 100 instances, first 3 algorithms, first 10 features)
+        # Subsample for speed (first 100 instances, first 3 algorithms, first 10
+        # features)
         # features = features.iloc[:100, :10]
         # performance = performance.iloc[:100, :3]
         # if features_running_time is not None:

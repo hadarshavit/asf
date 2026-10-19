@@ -1,9 +1,10 @@
+from typing import Any
 import numpy as np
 import pytest
 
 
 @pytest.fixture
-def classification_data():
+def classification_data() -> Any:
     X = np.array(
         [
             [0.0, 0.0],
@@ -17,7 +18,7 @@ def classification_data():
 
 
 @pytest.fixture
-def regression_data():
+def regression_data() -> Any:
     X = np.array(
         [
             [0.0, 0.0],

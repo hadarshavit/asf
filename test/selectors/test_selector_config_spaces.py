@@ -9,7 +9,7 @@ from ConfigSpace import ConfigurationSpace
 class TestSelectorConfigurationSpaces:
     """Test configuration spaces for selectors that have them."""
 
-    def test_pairwise_classifier_config_space(self):
+    def test_pairwise_classifier_config_space(self) -> None:
         """Test PairwiseClassifier configuration space."""
         from asf.selectors.pairwise_classifier import PairwiseClassifier
 
@@ -22,7 +22,7 @@ class TestSelectorConfigurationSpaces:
         assert any("model_class" in name for name in hp_names)
         assert any("use_weights" in name for name in hp_names)
 
-    def test_pairwise_regressor_config_space(self):
+    def test_pairwise_regressor_config_space(self) -> None:
         """Test PairwiseRegressor configuration space."""
         from asf.selectors.pairwise_regressor import PairwiseRegressor
 
@@ -33,7 +33,7 @@ class TestSelectorConfigurationSpaces:
         # Should have pairwise_regressor prefix
         assert any("pairwise_regressor" in name for name in hp_names)
 
-    def test_multi_class_classifier_config_space(self):
+    def test_multi_class_classifier_config_space(self) -> None:
         """Test MultiClassClassifier configuration space."""
         from asf.selectors.multi_class import MultiClassClassifier
 
@@ -44,7 +44,7 @@ class TestSelectorConfigurationSpaces:
         # Should have multi_class prefix and model_class
         assert any("multi_class" in name for name in hp_names)
 
-    def test_performance_model_config_space(self):
+    def test_performance_model_config_space(self) -> None:
         """Test PerformanceModel configuration space."""
         from asf.selectors.performance_model import PerformanceModel
 
@@ -55,7 +55,7 @@ class TestSelectorConfigurationSpaces:
         # Should have performance_model prefix
         assert any("performance_model" in name for name in hp_names)
 
-    def test_satzilla_config_space(self):
+    def test_satzilla_config_space(self) -> None:
         """Test SATzilla configuration space."""
         from asf.selectors.satzilla import SATzilla
 
@@ -66,7 +66,7 @@ class TestSelectorConfigurationSpaces:
         # Should have satzilla prefix
         assert any("satzilla" in name for name in hp_names)
 
-    def test_isac_config_space(self):
+    def test_isac_config_space(self) -> None:
         """Test ISAC configuration space."""
         from asf.selectors.isac import ISAC
 
@@ -77,7 +77,7 @@ class TestSelectorConfigurationSpaces:
         # Should have isac prefix and k_clusters
         assert any("isac" in name for name in hp_names)
 
-    def test_snnap_config_space(self):
+    def test_snnap_config_space(self) -> None:
         """Test SNNAP configuration space."""
         from asf.selectors.snnap import SNNAP
 
@@ -88,7 +88,7 @@ class TestSelectorConfigurationSpaces:
         # Should have snnap prefix
         assert any("snnap" in name for name in hp_names)
 
-    def test_sunny_config_space(self):
+    def test_sunny_config_space(self) -> None:
         """Test SUNNY configuration space."""
         from asf.selectors.sunny import SUNNY
 
@@ -99,7 +99,7 @@ class TestSelectorConfigurationSpaces:
         # Should have sunny prefix
         assert any("sunny" in name for name in hp_names)
 
-    def test_collaborative_filtering_config_space(self):
+    def test_collaborative_filtering_config_space(self) -> None:
         from asf.selectors.collaborative_filtering_selector import (
             CollaborativeFilteringSelector,
         )
@@ -109,7 +109,7 @@ class TestSelectorConfigurationSpaces:
         hp_names = {hp.name for hp in cs.values()}
         assert any("collaborative_filtering" in name for name in hp_names)
 
-    def test_cosine_config_space(self):
+    def test_cosine_config_space(self) -> None:
         from asf.selectors.cosine_selector import CosineSelector
 
         cs = CosineSelector.get_configuration_space()
@@ -117,18 +117,20 @@ class TestSelectorConfigurationSpaces:
         hp_names = {hp.name for hp in cs.values()}
         assert any("cosine" in name for name in hp_names)
 
-    def test_cshc_config_space(self):
+    def test_cshc_config_space(self) -> None:
         from asf.selectors.cshc import CSHCSelector
 
-        # CSHC requires candidate_selectors in definition if we want to test its full space
-        # But ConfigurableMixin should handle partial definition gracefully or just use default.
+        # CSHC requires candidate_selectors in definition if we want to test its full
+        # space
+        # But ConfigurableMixin should handle partial definition gracefully or just use
+        # default.
         # But _define_hyperparameters expects candidate_selectors.
         # It handles None by returning empty.
         cs = CSHCSelector.get_configuration_space()
         assert isinstance(cs, ConfigurationSpace)
         # Without candidate_selectors, it might be empty or minimal.
 
-    def test_isa_config_space(self):
+    def test_isa_config_space(self) -> None:
         from asf.selectors.isa import ISA
 
         cs = ISA.get_configuration_space()
@@ -136,7 +138,7 @@ class TestSelectorConfigurationSpaces:
         hp_names = {hp.name for hp in cs.values()}
         assert any("isa" in name for name in hp_names)
 
-    def test_joint_ranking_config_space(self):
+    def test_joint_ranking_config_space(self) -> None:
         from asf.selectors.joint_ranking import JointRanking
 
         cs = JointRanking.get_configuration_space()
@@ -144,14 +146,14 @@ class TestSelectorConfigurationSpaces:
         hp_names = {hp.name for hp in cs.values()}
         assert any("joint_ranking" in name for name in hp_names)
 
-    def test_meta_selector_config_space(self):
+    def test_meta_selector_config_space(self) -> None:
         from asf.selectors.meta_selector import MetaSelector
 
         cs = MetaSelector.get_configuration_space()
         assert isinstance(cs, ConfigurationSpace)
         # Expect empty if no candidates provided
 
-    def test_osl_linear_config_space(self):
+    def test_osl_linear_config_space(self) -> None:
         from asf.selectors.osl_linear import OSLLinearSelector
 
         cs = OSLLinearSelector.get_configuration_space()
@@ -159,7 +161,7 @@ class TestSelectorConfigurationSpaces:
         hp_names = {hp.name for hp in cs.values()}
         assert any("osl_linear" in name for name in hp_names)
 
-    def test_simple_ranking_config_space(self):
+    def test_simple_ranking_config_space(self) -> None:
         from asf.selectors.simple_ranking import SimpleRanking
 
         cs = SimpleRanking.get_configuration_space()
@@ -167,7 +169,7 @@ class TestSelectorConfigurationSpaces:
         hp_names = {hp.name for hp in cs.values()}
         assert any("simple_ranking" in name for name in hp_names)
 
-    def test_harris_config_space(self):
+    def test_harris_config_space(self) -> None:
         from asf.selectors.hybrid_decision_tree import HARRIS
 
         cs = HARRIS.get_configuration_space()
@@ -177,7 +179,7 @@ class TestSelectorConfigurationSpaces:
         assert any("lambda_param" in name for name in hp_names)
         assert any("max_features" in name for name in hp_names)
 
-    def test_survival_analysis_config_space(self):
+    def test_survival_analysis_config_space(self) -> None:
         pytest.importorskip("sksurv")
         from asf.selectors.survival_analysis import SurvivalAnalysis
 
@@ -188,7 +190,7 @@ class TestSelectorConfigurationSpaces:
         assert not any("use_schedule" in name for name in hp_names)
         assert not any("popsize" in name for name in hp_names)
 
-    def test_survival_analysis_scheduler_config_space(self):
+    def test_survival_analysis_scheduler_config_space(self) -> None:
         pytest.importorskip("sksurv")
         from asf.selectors.survival_analysis import SurvivalAnalysisScheduler
 
@@ -199,7 +201,7 @@ class TestSelectorConfigurationSpaces:
         assert any("popsize" in name for name in hp_names)
         assert not any("random_state" in name for name in hp_names)
 
-    def test_baseline_config_space(self):
+    def test_baseline_config_space(self) -> None:
         from asf.selectors.baselines import SingleBestSolver, VirtualBestSolver
 
         cs1 = SingleBestSolver.get_configuration_space()
@@ -211,7 +213,7 @@ class TestSelectorConfigurationSpaces:
 class TestSelectorConfigSpaceParams:
     """Test that selectors accept pre_prefix and parent_param correctly."""
 
-    def test_pairwise_classifier_with_pre_prefix(self):
+    def test_pairwise_classifier_with_pre_prefix(self) -> None:
         """Test PairwiseClassifier configuration space with pre_prefix."""
         from asf.selectors.pairwise_classifier import PairwiseClassifier
 
@@ -221,7 +223,7 @@ class TestSelectorConfigSpaceParams:
         # All names should start with parent:
         assert all(name.startswith("parent:") for name in hp_names)
 
-    def test_pairwise_classifier_nested_model_config(self):
+    def test_pairwise_classifier_nested_model_config(self) -> None:
         """Test that nested model config spaces are included."""
         from asf.selectors.pairwise_classifier import PairwiseClassifier
 
@@ -236,7 +238,7 @@ class TestSelectorConfigSpaceParams:
 class TestSelectorDefaultConfigToInstance:
     """Test that each selector can be instantiated from its default configuration."""
 
-    def test_pairwise_classifier_default_config(self):
+    def test_pairwise_classifier_default_config(self) -> None:
         """Test PairwiseClassifier instantiation from default config."""
         from asf.selectors.pairwise_classifier import PairwiseClassifier
 
@@ -245,7 +247,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = PairwiseClassifier.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_pairwise_regressor_default_config(self):
+    def test_pairwise_regressor_default_config(self) -> None:
         """Test PairwiseRegressor instantiation from default config."""
         from asf.selectors.pairwise_regressor import PairwiseRegressor
 
@@ -254,7 +256,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = PairwiseRegressor.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_harris_default_config(self):
+    def test_harris_default_config(self) -> None:
         """Test HARRIS instantiation from default config."""
         from asf.selectors.hybrid_decision_tree import HARRIS
 
@@ -264,7 +266,7 @@ class TestSelectorDefaultConfigToInstance:
         selector = partial_fn()
         assert isinstance(selector, HARRIS)
 
-    def test_multi_class_classifier_default_config(self):
+    def test_multi_class_classifier_default_config(self) -> None:
         """Test MultiClassClassifier instantiation from default config."""
         from asf.selectors.multi_class import MultiClassClassifier
 
@@ -273,7 +275,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = MultiClassClassifier.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_performance_model_default_config(self):
+    def test_performance_model_default_config(self) -> None:
         """Test PerformanceModel instantiation from default config."""
         from asf.selectors.performance_model import PerformanceModel
 
@@ -282,7 +284,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = PerformanceModel.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_satzilla_default_config(self):
+    def test_satzilla_default_config(self) -> None:
         """Test SATzilla instantiation from default config."""
         from asf.selectors.satzilla import SATzilla
 
@@ -291,7 +293,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = SATzilla.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_isac_default_config(self):
+    def test_isac_default_config(self) -> None:
         """Test ISAC instantiation from default config."""
         from asf.selectors.isac import ISAC
 
@@ -300,7 +302,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = ISAC.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_snnap_default_config(self):
+    def test_snnap_default_config(self) -> None:
         """Test SNNAP instantiation from default config."""
         from asf.selectors.snnap import SNNAP
 
@@ -309,7 +311,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = SNNAP.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_sunny_default_config(self):
+    def test_sunny_default_config(self) -> None:
         """Test SUNNY instantiation from default config."""
         from asf.selectors.sunny import SUNNY
 
@@ -318,7 +320,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = SUNNY.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_collaborative_filtering_default_config(self):
+    def test_collaborative_filtering_default_config(self) -> None:
         """Test CollaborativeFilteringSelector instantiation from default config."""
         from asf.selectors.collaborative_filtering_selector import (
             CollaborativeFilteringSelector,
@@ -331,7 +333,7 @@ class TestSelectorDefaultConfigToInstance:
         )
         assert callable(partial_fn)
 
-    def test_cosine_default_config(self):
+    def test_cosine_default_config(self) -> None:
         """Test CosineSelector instantiation from default config."""
         from asf.selectors.cosine_selector import CosineSelector
 
@@ -340,7 +342,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = CosineSelector.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_cshc_default_config(self):
+    def test_cshc_default_config(self) -> None:
         """Test CSHCSelector instantiation from default config."""
         from asf.selectors.cshc import CSHCSelector
 
@@ -349,7 +351,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = CSHCSelector.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_isa_default_config(self):
+    def test_isa_default_config(self) -> None:
         """Test ISA instantiation from default config."""
         from asf.selectors.isa import ISA
 
@@ -358,7 +360,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = ISA.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_joint_ranking_default_config(self):
+    def test_joint_ranking_default_config(self) -> None:
         """Test JointRanking instantiation from default config."""
         from asf.selectors.joint_ranking import JointRanking
 
@@ -367,7 +369,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = JointRanking.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_meta_selector_default_config(self):
+    def test_meta_selector_default_config(self) -> None:
         """Test MetaSelector instantiation from default config."""
         from asf.selectors.meta_selector import MetaSelector
 
@@ -376,7 +378,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = MetaSelector.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_osl_linear_default_config(self):
+    def test_osl_linear_default_config(self) -> None:
         """Test OSLLinearSelector instantiation from default config."""
         from asf.selectors.osl_linear import OSLLinearSelector
 
@@ -385,7 +387,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = OSLLinearSelector.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_simple_ranking_default_config(self):
+    def test_simple_ranking_default_config(self) -> None:
         """Test SimpleRanking instantiation from default config."""
         from asf.selectors.simple_ranking import SimpleRanking
 
@@ -394,7 +396,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = SimpleRanking.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_survival_analysis_default_config(self):
+    def test_survival_analysis_default_config(self) -> None:
         """Test SurvivalAnalysis instantiation from default config."""
         pytest.importorskip("sksurv")
         from asf.selectors.survival_analysis import SurvivalAnalysis
@@ -404,7 +406,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = SurvivalAnalysis.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_survival_analysis_scheduler_default_config(self):
+    def test_survival_analysis_scheduler_default_config(self) -> None:
         """Test SurvivalAnalysisScheduler instantiation from default config."""
         pytest.importorskip("sksurv")
         from asf.selectors.survival_analysis import SurvivalAnalysisScheduler
@@ -414,7 +416,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = SurvivalAnalysisScheduler.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_single_best_solver_default_config(self):
+    def test_single_best_solver_default_config(self) -> None:
         """Test SingleBestSolver instantiation from default config."""
         from asf.selectors.baselines import SingleBestSolver
 
@@ -423,7 +425,7 @@ class TestSelectorDefaultConfigToInstance:
         partial_fn = SingleBestSolver.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_virtual_best_solver_default_config(self):
+    def test_virtual_best_solver_default_config(self) -> None:
         """Test VirtualBestSolver instantiation from default config."""
         from asf.selectors.baselines import VirtualBestSolver
 

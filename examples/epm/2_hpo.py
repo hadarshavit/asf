@@ -1,9 +1,10 @@
+from typing import Any
 from asf.epm import tune_epm
 from asf.predictors import RandomForestRegressorWrapper
 import numpy as np
 
 
-def get_data():
+def get_data() -> Any:
     performance = np.array(
         [
             120,

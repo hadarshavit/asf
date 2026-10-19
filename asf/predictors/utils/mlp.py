@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 try:
     import torch
 
@@ -13,7 +15,7 @@ def get_mlp(
     output_size: int,
     hidden_sizes: list[int] = [128, 64],
     dropout: float = 0.0,
-):
+) -> Any:
     if not TORCH_AVAILABLE:
         raise RuntimeError(
             "PyTorch is not installed. Install it with: pip install torch"

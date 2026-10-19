@@ -4,6 +4,8 @@ Tests for feature and performance analysis functions, including
 statistics, correlation, clustering, CDF, baselines, and contribution values.
 """
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -15,7 +17,7 @@ class TestFeatureStatistics:
     """Tests for feature statistics functions."""
 
     @pytest.fixture
-    def sample_features(self):
+    def sample_features(self) -> Any:
         """Sample feature data for testing."""
         np.random.seed(42)
         return pd.DataFrame(
@@ -27,7 +29,7 @@ class TestFeatureStatistics:
             index=[f"inst_{i}" for i in range(100)],
         )
 
-    def test_get_feature_statistics(self, sample_features):
+    def test_get_feature_statistics(self, sample_features: Any) -> None:
         """Test basic feature statistics computation."""
         from asf.analysis import get_feature_statistics
 
@@ -44,7 +46,7 @@ class TestFeatureCorrelation:
     """Tests for feature correlation functions."""
 
     @pytest.fixture
-    def sample_features(self):
+    def sample_features(self) -> Any:
         """Sample feature data for testing."""
         np.random.seed(42)
         return pd.DataFrame(
@@ -56,7 +58,7 @@ class TestFeatureCorrelation:
             index=[f"inst_{i}" for i in range(100)],
         )
 
-    def test_compute_feature_correlation(self, sample_features):
+    def test_compute_feature_correlation(self, sample_features: Any) -> None:
         """Test feature correlation matrix computation."""
         from asf.analysis import compute_feature_correlation
 
@@ -65,7 +67,7 @@ class TestFeatureCorrelation:
         assert len(feature_order) == 3
         assert corr_matrix.shape == (3, 3)
 
-    def test_plot_feature_correlation(self, sample_features):
+    def test_plot_feature_correlation(self, sample_features: Any) -> None:
         """Test feature correlation plot generation."""
         from asf.analysis import plot_feature_correlation
         import plotly.graph_objects as go
@@ -73,7 +75,7 @@ class TestFeatureCorrelation:
         fig = plot_feature_correlation(sample_features)
         assert isinstance(fig, go.Figure)
 
-    def test_plot_feature_correlation_return_data(self, sample_features):
+    def test_plot_feature_correlation_return_data(self, sample_features: Any) -> None:
         """Test feature correlation plot with return_data=True."""
         from asf.analysis import plot_feature_correlation
 
@@ -86,7 +88,7 @@ class TestFeatureBoxPlots:
     """Tests for feature box plot functions."""
 
     @pytest.fixture
-    def sample_features(self):
+    def sample_features(self) -> Any:
         """Sample feature data for testing."""
         np.random.seed(42)
         return pd.DataFrame(
@@ -97,7 +99,7 @@ class TestFeatureBoxPlots:
             index=[f"inst_{i}" for i in range(100)],
         )
 
-    def test_compute_box_plot_data(self, sample_features):
+    def test_compute_box_plot_data(self, sample_features: Any) -> None:
         """Test box plot data computation."""
         from asf.analysis import compute_box_plot_data
 
@@ -106,7 +108,7 @@ class TestFeatureBoxPlots:
         assert "median" in data
         assert "q1" in data or "q25" in data
 
-    def test_plot_feature_box_single(self, sample_features):
+    def test_plot_feature_box_single(self, sample_features: Any) -> None:
         """Test single feature box plot."""
         from asf.analysis import plot_feature_box
         import plotly.graph_objects as go
@@ -114,7 +116,7 @@ class TestFeatureBoxPlots:
         fig = plot_feature_box(sample_features, feature_name="feature1")
         assert isinstance(fig, go.Figure)
 
-    def test_plot_feature_box_all(self, sample_features):
+    def test_plot_feature_box_all(self, sample_features: Any) -> None:
         """Test all features box plot."""
         from asf.analysis import plot_feature_box
 
@@ -127,7 +129,7 @@ class TestFeatureImportance:
     """Tests for feature importance functions."""
 
     @pytest.fixture
-    def sample_data(self):
+    def sample_data(self) -> Any:
         """Sample feature and performance data for testing."""
         np.random.seed(42)
         features = pd.DataFrame(
@@ -147,7 +149,7 @@ class TestFeatureImportance:
         )
         return features, performance
 
-    def test_compute_feature_importance(self, sample_data):
+    def test_compute_feature_importance(self, sample_data: Any) -> None:
         """Test feature importance computation."""
         from asf.analysis import compute_feature_importance
 
@@ -158,7 +160,7 @@ class TestFeatureImportance:
         assert isinstance(importance, pd.DataFrame)
         assert len(importance) <= 3
 
-    def test_plot_feature_importance(self, sample_data):
+    def test_plot_feature_importance(self, sample_data: Any) -> None:
         """Test feature importance plot generation."""
         from asf.analysis import plot_feature_importance
         import plotly.graph_objects as go
@@ -172,7 +174,7 @@ class TestFeatureClustering:
     """Tests for feature clustering functions."""
 
     @pytest.fixture
-    def sample_features(self):
+    def sample_features(self) -> Any:
         """Sample feature data for testing."""
         np.random.seed(42)
         return pd.DataFrame(
@@ -184,7 +186,7 @@ class TestFeatureClustering:
             index=[f"inst_{i}" for i in range(100)],
         )
 
-    def test_compute_feature_clusters(self, sample_features):
+    def test_compute_feature_clusters(self, sample_features: Any) -> None:
         """Test feature clustering computation."""
         from asf.analysis import compute_feature_clusters
 
@@ -195,7 +197,7 @@ class TestFeatureClustering:
         assert "labels" in cluster_data
         assert "n_clusters" in cluster_data
 
-    def test_plot_feature_clusters(self, sample_features):
+    def test_plot_feature_clusters(self, sample_features: Any) -> None:
         """Test feature clustering plot generation."""
         from asf.analysis import plot_feature_clusters
         import plotly.graph_objects as go
@@ -210,7 +212,7 @@ class TestFeaturePCA:
     """Tests for feature PCA functions."""
 
     @pytest.fixture
-    def sample_features(self):
+    def sample_features(self) -> Any:
         """Sample feature data for testing."""
         np.random.seed(42)
         return pd.DataFrame(
@@ -222,14 +224,14 @@ class TestFeaturePCA:
             index=[f"inst_{i}" for i in range(100)],
         )
 
-    def test_compute_pca_features(self, sample_features):
+    def test_compute_pca_features(self, sample_features: Any) -> None:
         """Test PCA feature computation."""
         from asf.analysis import compute_pca_features
 
         features_2d, pca, scaler = compute_pca_features(sample_features, n_components=2)
         assert features_2d.shape == (100, 2)
 
-    def test_plot_feature_pca(self, sample_features):
+    def test_plot_feature_pca(self, sample_features: Any) -> None:
         """Test PCA feature plot generation."""
         from asf.analysis import plot_feature_pca
         import plotly.graph_objects as go
@@ -242,7 +244,7 @@ class TestSummarizeFeatures:
     """Tests for feature summary function."""
 
     @pytest.fixture
-    def sample_features(self):
+    def sample_features(self) -> Any:
         """Sample feature data for testing."""
         np.random.seed(42)
         return pd.DataFrame(
@@ -253,7 +255,7 @@ class TestSummarizeFeatures:
             index=[f"inst_{i}" for i in range(100)],
         )
 
-    def test_summarize_features(self, sample_features):
+    def test_summarize_features(self, sample_features: Any) -> None:
         """Test feature summary computation."""
         from asf.analysis import summarize_features
 
@@ -267,7 +269,7 @@ class TestPerformanceBaselines:
     """Tests for performance baseline functions."""
 
     @pytest.fixture
-    def sample_performance(self):
+    def sample_performance(self) -> Any:
         """Sample performance data for testing."""
         np.random.seed(42)
         return pd.DataFrame(
@@ -279,7 +281,7 @@ class TestPerformanceBaselines:
             index=[f"inst_{i}" for i in range(100)],
         )
 
-    def test_compute_baselines(self, sample_performance):
+    def test_compute_baselines(self, sample_performance: Any) -> None:
         """Test baseline computation."""
         from asf.analysis import compute_baselines
 
@@ -288,7 +290,7 @@ class TestPerformanceBaselines:
         assert "vbs_score" in baselines
         assert "bsa_score" in baselines
 
-    def test_compute_greedy_portfolio(self, sample_performance):
+    def test_compute_greedy_portfolio(self, sample_performance: Any) -> None:
         """Test greedy portfolio computation."""
         from asf.analysis import compute_greedy_portfolio
 
@@ -303,7 +305,7 @@ class TestAlgorithmCorrelation:
     """Tests for algorithm correlation functions."""
 
     @pytest.fixture
-    def sample_performance(self):
+    def sample_performance(self) -> Any:
         """Sample performance data for testing."""
         np.random.seed(42)
         return pd.DataFrame(
@@ -315,7 +317,7 @@ class TestAlgorithmCorrelation:
             index=[f"inst_{i}" for i in range(100)],
         )
 
-    def test_compute_algorithm_correlation(self, sample_performance):
+    def test_compute_algorithm_correlation(self, sample_performance: Any) -> None:
         """Test algorithm correlation computation."""
         from asf.analysis import compute_algorithm_correlation
 
@@ -324,7 +326,7 @@ class TestAlgorithmCorrelation:
         assert len(algo_order) == 3
         assert corr_matrix.shape == (3, 3)
 
-    def test_plot_algorithm_correlation(self, sample_performance):
+    def test_plot_algorithm_correlation(self, sample_performance: Any) -> None:
         """Test algorithm correlation plot generation."""
         from asf.analysis import plot_algorithm_correlation
         import plotly.graph_objects as go
@@ -337,7 +339,7 @@ class TestPerformanceCDF:
     """Tests for performance CDF functions."""
 
     @pytest.fixture
-    def sample_performance(self):
+    def sample_performance(self) -> Any:
         """Sample performance data for testing."""
         np.random.seed(42)
         return pd.DataFrame(
@@ -348,7 +350,7 @@ class TestPerformanceCDF:
             index=[f"inst_{i}" for i in range(100)],
         )
 
-    def test_compute_performance_cdf(self, sample_performance):
+    def test_compute_performance_cdf(self, sample_performance: Any) -> None:
         """Test performance CDF computation."""
         from asf.analysis import compute_performance_cdf
 
@@ -357,7 +359,7 @@ class TestPerformanceCDF:
         assert "algo1" in cdf_data
         assert "algo2" in cdf_data
 
-    def test_plot_performance_cdf(self, sample_performance):
+    def test_plot_performance_cdf(self, sample_performance: Any) -> None:
         """Test performance CDF plot generation."""
         from asf.analysis import plot_performance_cdf
         import plotly.graph_objects as go
@@ -370,7 +372,7 @@ class TestPerformanceBoxPlots:
     """Tests for performance box plot functions."""
 
     @pytest.fixture
-    def sample_performance(self):
+    def sample_performance(self) -> Any:
         """Sample performance data for testing."""
         np.random.seed(42)
         return pd.DataFrame(
@@ -381,7 +383,7 @@ class TestPerformanceBoxPlots:
             index=[f"inst_{i}" for i in range(100)],
         )
 
-    def test_compute_performance_box_plot_data(self, sample_performance):
+    def test_compute_performance_box_plot_data(self, sample_performance: Any) -> None:
         """Test performance box plot data computation."""
         from asf.analysis import compute_performance_box_plot_data
 
@@ -390,7 +392,7 @@ class TestPerformanceBoxPlots:
         assert "algo1" in data
         assert "algo2" in data
 
-    def test_plot_performance_box(self, sample_performance):
+    def test_plot_performance_box(self, sample_performance: Any) -> None:
         """Test performance box plot generation."""
         from asf.analysis import plot_performance_box
         import plotly.graph_objects as go
@@ -403,7 +405,7 @@ class TestScatterPlots:
     """Tests for scatter plot functions."""
 
     @pytest.fixture
-    def sample_performance(self):
+    def sample_performance(self) -> Any:
         """Sample performance data for testing."""
         np.random.seed(42)
         return pd.DataFrame(
@@ -415,7 +417,7 @@ class TestScatterPlots:
             index=[f"inst_{i}" for i in range(100)],
         )
 
-    def test_compute_scatter_data(self, sample_performance):
+    def test_compute_scatter_data(self, sample_performance: Any) -> None:
         """Test scatter data computation."""
         from asf.analysis import compute_scatter_data
 
@@ -424,7 +426,7 @@ class TestScatterPlots:
         assert "x" in data
         assert "y" in data
 
-    def test_plot_scatter(self, sample_performance):
+    def test_plot_scatter(self, sample_performance: Any) -> None:
         """Test scatter plot generation."""
         from asf.analysis import plot_scatter
         import plotly.graph_objects as go
@@ -432,7 +434,7 @@ class TestScatterPlots:
         fig = plot_scatter(sample_performance, "algo1", "algo2")
         assert isinstance(fig, go.Figure)
 
-    def test_plot_all_scatter(self, sample_performance):
+    def test_plot_all_scatter(self, sample_performance: Any) -> None:
         """Test all scatter plots generation."""
         from asf.analysis import plot_all_scatter
 
@@ -446,7 +448,7 @@ class TestContributionValues:
     """Tests for contribution value functions."""
 
     @pytest.fixture
-    def sample_performance(self):
+    def sample_performance(self) -> Any:
         """Sample performance data for testing (small for Shapley computation)."""
         np.random.seed(42)
         return pd.DataFrame(
@@ -458,7 +460,7 @@ class TestContributionValues:
             index=[f"inst_{i}" for i in range(20)],
         )
 
-    def test_compute_contribution_values(self, sample_performance):
+    def test_compute_contribution_values(self, sample_performance: Any) -> None:
         """Test contribution values computation."""
         from asf.analysis import compute_contribution_values
 
@@ -468,7 +470,7 @@ class TestContributionValues:
         assert "marginals" in values
         assert "shapleys" in values
 
-    def test_plot_contribution_pie(self, sample_performance):
+    def test_plot_contribution_pie(self, sample_performance: Any) -> None:
         """Test contribution pie chart generation."""
         from asf.analysis import plot_contribution_pie
         import plotly.graph_objects as go
@@ -481,7 +483,7 @@ class TestInstanceHardness:
     """Tests for instance hardness functions."""
 
     @pytest.fixture
-    def sample_data(self):
+    def sample_data(self) -> Any:
         """Sample performance and feature data for testing."""
         np.random.seed(42)
         performance = pd.DataFrame(
@@ -500,7 +502,7 @@ class TestInstanceHardness:
         )
         return performance, features
 
-    def test_compute_instance_hardness(self, sample_data):
+    def test_compute_instance_hardness(self, sample_data: Any) -> None:
         """Test instance hardness computation."""
         from asf.analysis import compute_instance_hardness
 
@@ -510,7 +512,7 @@ class TestInstanceHardness:
         )
         assert isinstance(hardness, dict)
 
-    def test_plot_instance_hardness(self, sample_data):
+    def test_plot_instance_hardness(self, sample_data: Any) -> None:
         """Test instance hardness plot generation."""
         from asf.analysis import plot_instance_hardness
         import plotly.graph_objects as go
@@ -524,7 +526,7 @@ class TestAlgorithmFootprint:
     """Tests for algorithm footprint functions."""
 
     @pytest.fixture
-    def sample_data(self):
+    def sample_data(self) -> Any:
         """Sample performance and feature data for testing."""
         np.random.seed(42)
         performance = pd.DataFrame(
@@ -543,7 +545,7 @@ class TestAlgorithmFootprint:
         )
         return performance, features
 
-    def test_compute_algorithm_footprint(self, sample_data):
+    def test_compute_algorithm_footprint(self, sample_data: Any) -> None:
         """Test algorithm footprint computation."""
         from asf.analysis import compute_algorithm_footprint
 
@@ -553,7 +555,7 @@ class TestAlgorithmFootprint:
         )
         assert isinstance(footprint, dict)
 
-    def test_plot_algorithm_footprint(self, sample_data):
+    def test_plot_algorithm_footprint(self, sample_data: Any) -> None:
         """Test algorithm footprint plot generation."""
         from asf.analysis import plot_algorithm_footprint
         import plotly.graph_objects as go
@@ -569,7 +571,7 @@ class TestSummarizePerformance:
     """Tests for performance summary function."""
 
     @pytest.fixture
-    def sample_performance(self):
+    def sample_performance(self) -> Any:
         """Sample performance data for testing."""
         np.random.seed(42)
         return pd.DataFrame(
@@ -580,7 +582,7 @@ class TestSummarizePerformance:
             index=[f"inst_{i}" for i in range(100)],
         )
 
-    def test_summarize_performance(self, sample_performance):
+    def test_summarize_performance(self, sample_performance: Any) -> None:
         """Test performance summary computation."""
         from asf.analysis import summarize_performance
 
@@ -594,7 +596,7 @@ class TestCriticalDistance:
     """Tests for critical distance functions."""
 
     @pytest.fixture
-    def sample_performance(self):
+    def sample_performance(self) -> Any:
         """Sample performance data for testing."""
         np.random.seed(42)
         return pd.DataFrame(
@@ -606,7 +608,7 @@ class TestCriticalDistance:
             index=[f"inst_{i}" for i in range(30)],
         )
 
-    def test_compute_critical_distance(self, sample_performance):
+    def test_compute_critical_distance(self, sample_performance: Any) -> None:
         """Test critical distance computation."""
         from asf.analysis import compute_critical_distance
 
@@ -617,7 +619,7 @@ class TestCriticalDistance:
         assert "critical_distance" in cd_result
         assert "average_ranks" in cd_result
 
-    def test_plot_critical_distance(self, sample_performance):
+    def test_plot_critical_distance(self, sample_performance: Any) -> None:
         """Test critical distance plot generation."""
         from asf.analysis import plot_critical_distance
         import plotly.graph_objects as go
@@ -630,7 +632,7 @@ class TestAlgorithmSimilarity:
     """Tests for algorithm similarity functions."""
 
     @pytest.fixture
-    def sample_performance(self):
+    def sample_performance(self) -> Any:
         """Sample performance data for testing."""
         np.random.seed(42)
         return pd.DataFrame(
@@ -642,14 +644,14 @@ class TestAlgorithmSimilarity:
             index=[f"inst_{i}" for i in range(50)],
         )
 
-    def test_compute_algorithm_similarity(self, sample_performance):
+    def test_compute_algorithm_similarity(self, sample_performance: Any) -> None:
         """Test algorithm similarity computation."""
         from asf.analysis import compute_algorithm_similarity
 
         similarity = compute_algorithm_similarity(sample_performance)
         assert isinstance(similarity, dict)
 
-    def test_plot_algorithm_similarity_heatmap(self, sample_performance):
+    def test_plot_algorithm_similarity_heatmap(self, sample_performance: Any) -> None:
         """Test algorithm similarity heatmap plot generation."""
         from asf.analysis import plot_algorithm_similarity_heatmap
         import plotly.graph_objects as go
@@ -657,7 +659,7 @@ class TestAlgorithmSimilarity:
         fig = plot_algorithm_similarity_heatmap(sample_performance)
         assert isinstance(fig, go.Figure)
 
-    def test_plot_algorithm_win_matrix(self, sample_performance):
+    def test_plot_algorithm_win_matrix(self, sample_performance: Any) -> None:
         """Test algorithm win matrix plot generation."""
         from asf.analysis import plot_algorithm_win_matrix
         import plotly.graph_objects as go
@@ -665,7 +667,7 @@ class TestAlgorithmSimilarity:
         fig = plot_algorithm_win_matrix(sample_performance)
         assert isinstance(fig, go.Figure)
 
-    def test_plot_algorithm_dendrogram(self, sample_performance):
+    def test_plot_algorithm_dendrogram(self, sample_performance: Any) -> None:
         """Test algorithm dendrogram plot generation."""
         from asf.analysis import plot_algorithm_dendrogram
         import plotly.graph_objects as go
@@ -678,7 +680,7 @@ class TestFeaturePerformanceCorrelation:
     """Tests for feature-performance correlation functions."""
 
     @pytest.fixture
-    def sample_data(self):
+    def sample_data(self) -> Any:
         """Sample feature and performance data for testing."""
         np.random.seed(42)
         features = pd.DataFrame(
@@ -697,7 +699,7 @@ class TestFeaturePerformanceCorrelation:
         )
         return features, performance
 
-    def test_compute_feature_performance_correlation(self, sample_data):
+    def test_compute_feature_performance_correlation(self, sample_data: Any) -> None:
         """Test feature-performance correlation computation."""
         from asf.analysis import compute_feature_performance_correlation
 
@@ -706,7 +708,9 @@ class TestFeaturePerformanceCorrelation:
         assert isinstance(corr, pd.DataFrame)
         assert corr.shape == (2, 2)  # 2 features x 2 algos
 
-    def test_compute_feature_performance_difference_correlation(self, sample_data):
+    def test_compute_feature_performance_difference_correlation(
+        self, sample_data: Any
+    ) -> None:
         """Test feature-performance difference correlation computation."""
         from asf.analysis import compute_feature_performance_difference_correlation
 
@@ -717,7 +721,7 @@ class TestFeaturePerformanceCorrelation:
         )
         assert isinstance(corr, pd.DataFrame)
 
-    def test_plot_feature_performance_correlation(self, sample_data):
+    def test_plot_feature_performance_correlation(self, sample_data: Any) -> None:
         """Test feature-performance correlation plot generation."""
         from asf.analysis import plot_feature_performance_correlation
         import plotly.graph_objects as go

@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 pytest.importorskip("ConfigSpace")
@@ -13,7 +14,7 @@ from asf.predictors.random_forest import (
     "wrapper_cls",
     [RandomForestClassifierWrapper, RandomForestRegressorWrapper],
 )
-def test_random_forest_configuration_space(wrapper_cls):
+def test_random_forest_configuration_space(wrapper_cls: Any) -> None:
     cs = wrapper_cls.get_configuration_space()
 
     assert isinstance(cs, ConfigurationSpace)
@@ -36,7 +37,7 @@ def test_random_forest_configuration_space(wrapper_cls):
     "wrapper_cls",
     [RandomForestClassifierWrapper, RandomForestRegressorWrapper],
 )
-def test_random_forest_get_from_configuration(wrapper_cls):
+def test_random_forest_get_from_configuration(wrapper_cls: Any) -> None:
     cs = wrapper_cls.get_configuration_space()
     configuration = cs.get_default_configuration()
 

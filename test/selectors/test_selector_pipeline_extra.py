@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import pandas as pd
 
@@ -6,7 +7,7 @@ from asf.selectors.multi_class import MultiClassClassifier
 from asf.predictors.random_forest import RandomForestClassifierWrapper
 
 
-def small_dataframes():
+def small_dataframes() -> Any:
     X = pd.DataFrame(
         {
             "f1": [1.0, np.nan, 3.0, 4.0],
@@ -24,7 +25,7 @@ def small_dataframes():
     return X, Y
 
 
-def test_selector_pipeline_fit_predict_and_config(tmp_path):
+def test_selector_pipeline_fit_predict_and_config(tmp_path: Any) -> None:
     X, Y = small_dataframes()
 
     selector = MultiClassClassifier(
@@ -47,7 +48,8 @@ def test_selector_pipeline_fit_predict_and_config(tmp_path):
     cfg = pipe.get_config()
     assert cfg["selector"] == "MultiClassClassifier"
     assert cfg["selector_model"] in ("RandomForestClassifierWrapper",)
-    # assert cfg["preprocessor"] == "Pipeline"  # Removed as get_config does not return this key
+    # assert cfg["preprocessor"] == "Pipeline"  # Removed as get_config does not return
+    # this key
     assert "SimpleImputer" in cfg["preprocessor_steps"][0]
 
     # Save/load round-trip

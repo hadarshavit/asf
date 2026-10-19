@@ -61,7 +61,6 @@ performance = np.array(
     ]
 )
 performance = pd.DataFrame(data, columns=["algo1", "algo2", "algo3"])
-
 ```
 
 We can then define a selector:

@@ -1,9 +1,10 @@
+from typing import Any
 from asf.selectors import CollaborativeFilteringSelector
 
 
 def test_collaborative_filtering_selector(
-    dummy_performance, dummy_features, validate_predictions
-):
+    dummy_performance: Any, dummy_features: Any, validate_predictions: Any
+) -> None:
     selector = CollaborativeFilteringSelector()
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)

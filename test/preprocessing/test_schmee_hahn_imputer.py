@@ -1,18 +1,19 @@
+from typing import Any
 import numpy as np
 
 from asf.preprocessing.schmee_hahn_imputer import schmee_hahn_impute
 
 
 class SimpleConstantModel:
-    def fit(self, X, y):
+    def fit(self, X: Any, y: Any) -> None:
         # store mean of provided targets
         self.mean_ = float(np.nanmean(y))
 
-    def predict(self, X):
+    def predict(self, X: Any) -> Any:
         return np.full(len(X), self.mean_)
 
 
-def test_schmee_hahn_impute_handles_all_observed():
+def test_schmee_hahn_impute_handles_all_observed() -> None:
     # No censored values; imputer should leave values as-is and train model
     y_raw = np.array([10.0, 20.0, 30.0])
     X = np.eye(3)
@@ -23,7 +24,7 @@ def test_schmee_hahn_impute_handles_all_observed():
     assert model is not None
 
 
-def test_schmee_hahn_impute_imputes_censored_values():
+def test_schmee_hahn_impute_imputes_censored_values() -> None:
     # Some values censored at budget; should be imputed above budget via EM
     rng = np.random.RandomState(0)
     X = rng.randn(6, 2)
@@ -51,7 +52,7 @@ def test_schmee_hahn_impute_imputes_censored_values():
     assert model is not None
 
 
-def test_schmee_hahn_impute_all_censored_converges():
+def test_schmee_hahn_impute_all_censored_converges() -> None:
     X = np.eye(4)
     budget = 100.0
     y_raw = np.array(

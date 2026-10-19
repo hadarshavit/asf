@@ -1,9 +1,10 @@
+from typing import Any
 from asf.epm import EPM
 from sklearn.ensemble import RandomForestRegressor
 import numpy as np
 
 
-def get_data():
+def get_data() -> Any:
     performance = np.array(
         [
             120,

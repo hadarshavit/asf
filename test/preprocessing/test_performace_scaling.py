@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 
 from asf.preprocessing.performance_scaling import (
@@ -12,7 +13,7 @@ from asf.preprocessing.performance_scaling import (
 )
 
 
-def assert_roundtrip(norm, data):
+def assert_roundtrip(norm: Any, data: Any) -> None:
     norm.fit(data)
     transformed = norm.transform(data)
     inverted = norm.inverse_transform(transformed)
@@ -20,19 +21,19 @@ def assert_roundtrip(norm, data):
     assert np.allclose(data, inverted, atol=1e-6, rtol=1e-6)
 
 
-def test_minmax_roundtrip():
+def test_minmax_roundtrip() -> None:
     data = np.array([0.0, 5.0, 10.0])
     norm = MinMaxNormalization(feature_range=(0, 1))
     assert_roundtrip(norm, data)
 
 
-def test_zscore_roundtrip():
+def test_zscore_roundtrip() -> None:
     data = np.array([1.0, 2.0, 3.0, 4.0])
     norm = ZScoreNormalization()
     assert_roundtrip(norm, data)
 
 
-def test_log_negative_and_zero():
+def test_log_negative_and_zero() -> None:
     data = np.array([-5.0, 0.0, 5.0])
     norm = LogNormalization(base=10, eps=1e-6)
     # Fit should set min_val when negatives exist
@@ -43,7 +44,7 @@ def test_log_negative_and_zero():
     assert np.allclose(data, inverted, atol=1e-5)
 
 
-def test_sqrt_negative():
+def test_sqrt_negative() -> None:
     data = np.array([-4.0, 0.0, 9.0])
     norm = SqrtNormalization(eps=1e-6)
     norm.fit(data)
@@ -52,7 +53,7 @@ def test_sqrt_negative():
     assert np.allclose(data, inverted, atol=1e-5)
 
 
-def test_inv_sigmoid_and_negexp():
+def test_inv_sigmoid_and_negexp() -> None:
     data = np.array([0.1, 0.5, 0.9])
     inv = InvSigmoidNormalization()
     # sklearn scalers expect 2D arrays for fitting, so provide column vector
@@ -67,7 +68,7 @@ def test_inv_sigmoid_and_negexp():
     assert np.allclose(data, back2, atol=1e-6)
 
 
-def test_dummy_normalization_identity():
+def test_dummy_normalization_identity() -> None:
     data = np.array([-3.5, 0.0, 7.2])
     dummy = DummyNormalization()
     dummy.fit(data)
@@ -77,7 +78,7 @@ def test_dummy_normalization_identity():
     assert np.allclose(dummy.inverse_transform(transformed), data)
 
 
-def test_boxcox_roundtrip():
+def test_boxcox_roundtrip() -> None:
     data = np.array([-2.5, -0.5, 0.0, 1.5, 3.0])
     norm = BoxCoxNormalization()
     norm.fit(data)
@@ -87,7 +88,7 @@ def test_boxcox_roundtrip():
     assert np.allclose(data, inverted, atol=1e-6)
 
 
-def test_log_fit_sets_eps_for_positive_data():
+def test_log_fit_sets_eps_for_positive_data() -> None:
     data = np.array([1.0, 2.0, 4.0])
     norm = LogNormalization(base=2, eps=1e-3)
     norm.fit(data)
@@ -99,7 +100,7 @@ def test_log_fit_sets_eps_for_positive_data():
     assert np.allclose(data, inverted, atol=1e-6)
 
 
-def test_log_refit_nonpositive_data_restores_offset():
+def test_log_refit_nonpositive_data_restores_offset() -> None:
     norm = LogNormalization(base=10, eps=1e-6)
     norm.fit(np.array([1.0, 2.0]))
     norm.fit(np.array([-1.0, 0.0]))

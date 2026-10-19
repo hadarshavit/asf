@@ -28,7 +28,8 @@ class MultiClassClassifier(ConfigurableMixin, AbstractModelBasedSelector):
     References
     ----------
     Xu, L., et al. (2013).
-    "SATzilla2012: Improved Algorithm Selection Based on Cost-sensitive Classification Models."
+    "SATzilla2012: Improved Algorithm Selection Based on Cost-sensitive Classification
+    Models."
     https://arxiv.org/abs/1306.1031
 
     Attributes

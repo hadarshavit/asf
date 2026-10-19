@@ -46,9 +46,11 @@ def get_algorithm_features_from_aslib(scenario_dir: str) -> pd.DataFrame:
 
     Assumptions / behavior:
       - scenario_dir must be a directory containing 'algorithm_feature_values.arff'.
-      - The ARFF must contain a column naming the algorithm (exactly 'algorithm' or a column
+      - The ARFF must contain a column naming the algorithm (exactly 'algorithm' or a
+      column
         whose name contains 'algo' or 'name'). Otherwise an error is raised.
-      - Non-numeric columns are dropped; if multiple repetitions exist rows are averaged per algorithm.
+      - Non-numeric columns are dropped; if multiple repetitions exist rows are averaged
+      per algorithm.
 
     Parameters
     ----------

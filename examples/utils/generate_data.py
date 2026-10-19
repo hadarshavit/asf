@@ -1,3 +1,5 @@
+from typing import Any
+
 # Python
 import numpy as np
 import pandas as pd
@@ -7,7 +9,9 @@ OUT_DIR = Path("asf/examples/data")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def generate_and_save(n_instances=200, n_algorithms=6, seed=42, budget=60.0):
+def generate_and_save(
+    n_instances: Any = 200, n_algorithms: Any = 6, seed: Any = 42, budget: Any = 60.0
+) -> None:
     rng = np.random.RandomState(seed)
     # features correlated structure
     X = rng.normal(loc=[5.0, 3.0, 7.0], scale=[2.5, 1.5, 3.0], size=(n_instances, 3))

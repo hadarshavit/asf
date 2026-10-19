@@ -6,7 +6,7 @@ from asf.metrics.baselines import (
 )
 
 
-def test_running_time_selector_performance_with_budgeted_feature_groups():
+def test_running_time_selector_performance_with_budgeted_feature_groups() -> None:
     """Test that the metric handles budgeted feature groups correctly."""
     # Create simple test data
     performance = pd.DataFrame(
@@ -38,7 +38,8 @@ def test_running_time_selector_performance_with_budgeted_feature_groups():
         schedules_unbounded, performance, budget, feature_time, par=10
     )
 
-    # With budgets: capped at 60 per group (inst1: min(100,60)+min(50,60)=110, inst2: min(200,60)+min(100,60)=120)
+    # With budgets: capped at 60 per group (inst1: min(100,60)+min(50,60)=110, inst2:
+    # min(200,60)+min(100,60)=120)
     score_budgeted = running_time_selector_performance(
         schedules_budgeted, performance, budget, feature_time, par=10
     )
@@ -48,11 +49,12 @@ def test_running_time_selector_performance_with_budgeted_feature_groups():
 
     # Score with budgets should be lower (less feature time)
     assert score_budgeted < score_unbounded
-    # Expected: algo times (10 + 20 = 30) + budgeted feature times (110 + 120 = 230) = 260
+    # Expected: algo times (10 + 20 = 30) + budgeted feature times (110 + 120 = 230) =
+    # 260
     assert abs(score_budgeted - 260.0) < 1.0
 
 
-def test_running_time_closed_gap_with_budgeted_feature_groups():
+def test_running_time_closed_gap_with_budgeted_feature_groups() -> None:
     """Test that closed gap metric handles budgeted feature groups correctly."""
     # Create test data where selector is better than SBS
     performance = pd.DataFrame(
@@ -91,12 +93,16 @@ def test_running_time_closed_gap_with_budgeted_feature_groups():
         schedules_budgeted, performance, budget, feature_time, par=10
     )
 
-    # Gap with budgets should be better (higher closed gap) since feature time penalty is lower
+    # Gap with budgets should be better (higher closed gap) since feature time penalty
+    # is lower
     assert gap_budgeted > gap_unbounded
 
 
-def test_pipeline_outputs_budgeted_feature_groups():
-    """Test that SelectorPipeline outputs feature groups with budgets when max_feature_time is set."""
+def test_pipeline_outputs_budgeted_feature_groups() -> None:
+    """
+    Test that SelectorPipeline outputs feature groups with budgets when max_feature_time
+    is set.
+    """
     # Mock a simple test without heavy imports
 
     # Simulate feature groups list

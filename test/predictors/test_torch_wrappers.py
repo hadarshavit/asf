@@ -11,19 +11,19 @@ TORCH_AVAILABLE = importlib.util.find_spec("torch") is not None
 
 
 @pytest.mark.skipif(TORCH_AVAILABLE, reason="Dependency available; fallback not active")
-def test_ranking_mlp_requires_torch():
+def test_ranking_mlp_requires_torch() -> None:
     with pytest.raises(ImportError):
         RankingMLP()
 
 
 @pytest.mark.skipif(TORCH_AVAILABLE, reason="Dependency available; fallback not active")
-def test_regression_mlp_requires_torch():
+def test_regression_mlp_requires_torch() -> None:
     with pytest.raises(ImportError):
         RegressionMLP()
 
 
 @pytest.mark.skipif(not TORCH_AVAILABLE, reason="Requires torch optional dependency")
-def test_regression_mlp_fit_predict():
+def test_regression_mlp_fit_predict() -> None:
     import torch
 
     features = pd.DataFrame(
@@ -50,7 +50,7 @@ def test_regression_mlp_fit_predict():
 
 
 @pytest.mark.skipif(True, reason="Requires torch optional dependency")
-def test_ranking_mlp_fit_predict():
+def test_ranking_mlp_fit_predict() -> None:
     import torch
 
     features = pd.DataFrame(

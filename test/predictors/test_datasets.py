@@ -12,7 +12,7 @@ torch = pytest.importorskip("torch")
 class TestRegressionDataset:
     """Tests for RegressionDataset."""
 
-    def test_init_with_dataframes(self):
+    def test_init_with_dataframes(self) -> None:
         """Test initialization with DataFrames."""
         features = pd.DataFrame({"f1": [1.0, 2.0, 3.0], "f2": [4.0, 5.0, 6.0]})
         performance = pd.DataFrame({"algo1": [10.0, 20.0, 30.0]})
@@ -23,7 +23,7 @@ class TestRegressionDataset:
         assert dataset.features.shape == (3, 2)
         assert dataset.performance.shape == (3, 1)
 
-    def test_init_with_numpy(self):
+    def test_init_with_numpy(self) -> None:
         """Test initialization with numpy arrays."""
         features = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
         performance = np.array([[10.0], [20.0], [30.0]])
@@ -33,7 +33,7 @@ class TestRegressionDataset:
         assert len(dataset) == 3
         assert dataset.features.shape == (3, 2)
 
-    def test_getitem(self):
+    def test_getitem(self) -> None:
         """Test __getitem__ returns correct data."""
         features = pd.DataFrame({"f1": [1.0, 2.0, 3.0]})
         performance = pd.DataFrame({"algo1": [10.0, 20.0, 30.0]})
@@ -46,7 +46,7 @@ class TestRegressionDataset:
         assert feat[0].item() == 1.0
         assert perf[0].item() == 10.0
 
-    def test_len(self):
+    def test_len(self) -> None:
         """Test __len__ returns correct length."""
         features = pd.DataFrame({"f1": [1.0, 2.0, 3.0, 4.0, 5.0]})
         performance = pd.DataFrame({"algo1": [10.0, 20.0, 30.0, 40.0, 50.0]})
@@ -55,7 +55,7 @@ class TestRegressionDataset:
 
         assert len(dataset) == 5
 
-    def test_custom_dtype(self):
+    def test_custom_dtype(self) -> None:
         """Test with custom dtype."""
         features = pd.DataFrame({"f1": [1.0, 2.0]})
         performance = pd.DataFrame({"algo1": [10.0, 20.0]})
@@ -65,7 +65,7 @@ class TestRegressionDataset:
         assert dataset.features.dtype == torch.float64
         assert dataset.performance.dtype == torch.float64
 
-    def test_sorts_by_index(self):
+    def test_sorts_by_index(self) -> None:
         """Test that data is sorted by index."""
         features = pd.DataFrame({"f1": [3.0, 1.0, 2.0]}, index=[2, 0, 1])
         performance = pd.DataFrame({"algo1": [30.0, 10.0, 20.0]}, index=[2, 0, 1])
@@ -81,7 +81,7 @@ class TestRegressionDataset:
 class TestRankingDataset:
     """Tests for RankingDataset."""
 
-    def test_init(self):
+    def test_init(self) -> None:
         """Test initialization."""
         features = pd.DataFrame(
             {"f1": [1.0, 2.0, 3.0], "f2": [4.0, 5.0, 6.0]}, index=["i1", "i2", "i3"]
@@ -98,7 +98,7 @@ class TestRankingDataset:
         assert dataset.features_cols == ["f1", "f2"]
         assert dataset.algorithm_features_cols == ["af1"]
 
-    def test_len(self):
+    def test_len(self) -> None:
         """Test __len__ returns number of unique instances."""
         features = pd.DataFrame({"f1": [1.0, 2.0]}, index=["i1", "i2"])
         performance = pd.DataFrame(
@@ -110,7 +110,7 @@ class TestRankingDataset:
 
         assert len(dataset) == 2
 
-    def test_getitem_returns_triplets(self):
+    def test_getitem_returns_triplets(self) -> None:
         """Test __getitem__ returns triplets for ranking."""
         features = pd.DataFrame({"f1": [1.0, 2.0]}, index=["i1", "i2"])
         performance = pd.DataFrame(
@@ -131,7 +131,7 @@ class TestRankingDataset:
         assert torch.is_tensor(smaller_feats)
         assert torch.is_tensor(larger_feats)
 
-    def test_custom_dtype(self):
+    def test_custom_dtype(self) -> None:
         """Test with custom dtype."""
         features = pd.DataFrame({"f1": [1.0, 2.0]}, index=["i1", "i2"])
         performance = pd.DataFrame(

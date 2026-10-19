@@ -1,8 +1,10 @@
 """
 Performance analysis functions for ASF.
 
-This module provides functions for analyzing algorithm performance in algorithm selection scenarios,
-including baseline computation, correlation analysis, CDF plots, box plots, and contribution analysis.
+This module provides functions for analyzing algorithm performance in algorithm
+selection scenarios,
+including baseline computation, correlation analysis, CDF plots, box plots, and
+contribution analysis.
 All plotting functions use Plotly and provide an option to return data without plotting.
 """
 
@@ -51,7 +53,8 @@ def compute_baselines(
     Returns
     -------
     dict
-        Dictionary with baseline metrics including VBS score, BSA score, and best algorithm name.
+        Dictionary with baseline metrics including VBS score, BSA score, and best
+        algorithm name.
     """
     if maximize:
         vbs_score = float(performance.max(axis=1).mean())
@@ -678,7 +681,8 @@ def plot_scatter(
             mode="markers",
             marker=dict(color="blue", opacity=0.5),
             text=scatter_data["instances"],
-            hovertemplate=f"Instance: %{{text}}<br>{algo1}: %{{x:.3f}}<br>{algo2}: %{{y:.3f}}<extra></extra>",
+            hovertemplate=f"Instance: %{{text}}<br>{algo1}: %{{x:.3f}}<br>{algo2}: "
+            f"%{{y:.3f}}<extra></extra>",
             showlegend=False,
         )
     )
@@ -940,7 +944,8 @@ def plot_contribution_pie(
     }
 
     fig.update_layout(
-        title=f"Algorithm Contribution ({titles.get(contribution_type, contribution_type)})",
+        title=f"Algorithm Contribution "
+        f"({titles.get(contribution_type, contribution_type)})",
         width=800,
         height=600,
     )
@@ -1083,7 +1088,8 @@ def plot_instance_hardness(
                 colorbar=dict(title="# Algorithms<br>within ε%"),
             ),
             text=instances,
-            hovertemplate="Instance: %{text}<br>Hardness: %{marker.color}<br>PC1: %{x:.3f}<br>PC2: %{y:.3f}<extra></extra>",
+            hovertemplate="Instance: %{text}<br>Hardness: %{marker.color}<br>PC1:"
+            " %{x:.3f}<br>PC2: %{y:.3f}<extra></extra>",
         )
     )
 
@@ -1228,7 +1234,8 @@ def plot_algorithm_footprint(
                 marker=dict(color="black", opacity=0.5, size=8),
                 name="Outside footprint",
                 text=not_ok_instances,
-                hovertemplate="Instance: %{text}<br>PC1: %{x:.3f}<br>PC2: %{y:.3f}<extra></extra>",
+                hovertemplate="Instance: %{text}<br>PC1: %{x:.3f}<br>PC2: "
+                "%{y:.3f}<extra></extra>",
             )
         )
 
@@ -1243,7 +1250,8 @@ def plot_algorithm_footprint(
                 marker=dict(color="red", opacity=0.7, size=8),
                 name="Within footprint",
                 text=ok_instances,
-                hovertemplate="Instance: %{text}<br>PC1: %{x:.3f}<br>PC2: %{y:.3f}<extra></extra>",
+                hovertemplate="Instance: %{text}<br>PC1: %{x:.3f}<br>PC2: "
+                "%{y:.3f}<extra></extra>",
             )
         )
 
@@ -1366,7 +1374,8 @@ def compute_critical_distance(
 
     # Critical values for Nemenyi test (q_alpha values)
     # These are from the studentized range distribution
-    # Source: Demsar (2006) - Statistical Comparisons of Classifiers over Multiple Data Sets
+    # Source: Demsar (2006) - Statistical Comparisons of Classifiers over Multiple Data
+    # Sets
     q_alpha_table = {
         0.05: {
             2: 1.960,
@@ -2318,7 +2327,8 @@ def plot_feature_selection_predictors(
     )
 
     fig.update_layout(
-        title=f"Feature Correlation with Best Algorithm Selection ({method.capitalize()})",
+        title=f"Feature Correlation with Best Algorithm Selection "
+        f"({method.capitalize()})",
         xaxis=dict(title="Algorithm", tickangle=45, tickfont=dict(size=10)),
         yaxis=dict(title="Feature", tickfont=dict(size=10)),
         width=900,

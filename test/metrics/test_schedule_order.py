@@ -1,3 +1,4 @@
+from typing import Any
 import pandas as pd
 import pytest
 
@@ -7,7 +8,7 @@ from asf.metrics.baselines import running_time_selector_performance
 @pytest.mark.parametrize(
     "feature", ["features", ("features", 50.0), ("features", None)]
 )
-def test_feature_cost_is_only_paid_if_step_is_reached(feature):
+def test_feature_cost_is_only_paid_if_step_is_reached(feature: Any) -> None:
     performance = pd.DataFrame({"a": [1.0], "b": [9.0]}, index=["i"])
     times = pd.DataFrame({"features": [50.0]}, index=["i"])
     early = {"i": [("a", 2.0), feature, ("b", 100.0)]}
@@ -17,7 +18,7 @@ def test_feature_cost_is_only_paid_if_step_is_reached(feature):
 
 
 @pytest.mark.parametrize("runtime,expected", [(40.0, 100.0), (60.0, 1000.0)])
-def test_sequential_runtime_enforces_total_budget(runtime, expected):
+def test_sequential_runtime_enforces_total_budget(runtime: Any, expected: Any) -> None:
     performance = pd.DataFrame({"a": [200.0], "b": [runtime]}, index=["i"])
     schedule = {"i": [("a", 60.0), ("b", 60.0)]}
     assert running_time_selector_performance(schedule, performance, 100) == expected
@@ -27,7 +28,9 @@ def test_sequential_runtime_enforces_total_budget(runtime, expected):
 @pytest.mark.parametrize(
     "feature_time,expected", [(40.0, 100.0), (41.0, 1000.0), (101.0, 1000.0)]
 )
-def test_feature_time_counts_toward_global_cutoff(parallel, feature_time, expected):
+def test_feature_time_counts_toward_global_cutoff(
+    parallel: Any, feature_time: Any, expected: Any
+) -> None:
     performance = pd.DataFrame({"a": [60.0], "b": [80.0]}, index=["i"])
     times = pd.DataFrame({"features": [feature_time]}, index=["i"])
     algorithms = [("a", 100.0), ("b", 100.0)] if parallel else [("a", 100.0)]
@@ -39,7 +42,7 @@ def test_feature_time_counts_toward_global_cutoff(parallel, feature_time, expect
     )
 
 
-def test_failed_presolver_then_capped_features_then_solver():
+def test_failed_presolver_then_capped_features_then_solver() -> None:
     performance = pd.DataFrame({"a": [200.0], "b": [10.0]}, index=["i"])
     times = pd.DataFrame({"features": [50.0]}, index=["i"])
     schedule = {"i": [("a", 5.0), ("features", 2.0), ("b", 100.0)]}

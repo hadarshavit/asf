@@ -24,18 +24,21 @@ def read_epmbench_scenario(
 
     Args:
         path (str): Path to the EPMBench scenario directory.
-        load_subsample (bool, optional): Whether to load subsample data. Defaults to False.
+        load_subsample (bool, optional): Whether to load subsample data. Defaults to
+        False.
 
     Returns:
     tuple[pd.DataFrame, list[str], list[str], pd.DataFrame | None, dict[str, Any]]
-    | tuple[pd.DataFrame, list[str], list[str], pd.DataFrame | None, dict[str, Any], dict[str, Any]]:
+    | tuple[pd.DataFrame, list[str], list[str], pd.DataFrame | None, dict[str, Any],
+    dict[str, Any]]:
               If `load_subsample` is False, returns a tuple containing:
                 - data (pd.DataFrame): The main dataset.
         - features (list[str]): List of feature names.
         - targets (list[str]): List of target names.
         - groups (pd.DataFrame | None): Group information if available, otherwise None.
         - metadata (dict[str, Any]): Metadata dictionary.
-              If `load_subsample` is True, an additional subsample dictionary is included in the tuple.
+              If `load_subsample` is True, an additional subsample dictionary is
+              included in the tuple.
     """
     with open(os.path.join(path, "metadata.json"), "r") as f:
         metadata = json.load(f)
@@ -90,17 +93,21 @@ def get_cv_fold(
         fold (int): The fold number.
     features (list[str]): List of feature names.
     target (list[str]): List of target names.
-    groups (pd.DataFrame | None, optional): Group information if available. Defaults to None.
+    groups (pd.DataFrame | None, optional): Group information if available. Defaults to
+    None.
 
     Returns:
-    tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None]:
+    tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame | None,
+    pd.DataFrame | None]:
         A tuple containing:
             - X_train (pd.DataFrame): Training features.
             - y_train (pd.DataFrame): Training targets.
             - X_test (pd.DataFrame): Testing features.
             - y_test (pd.DataFrame): Testing targets.
-            - groups_train (Optional[pd.DataFrame]): Training groups if available, otherwise None.
-            - groups_test (Optional[pd.DataFrame]): Testing groups if available, otherwise None.
+            - groups_train (Optional[pd.DataFrame]): Training groups if available,
+            otherwise None.
+            - groups_test (Optional[pd.DataFrame]): Testing groups if available,
+            otherwise None.
     """
     train_idx = data["cv"] != fold
     test_idx = data["cv"] == fold
@@ -140,7 +147,8 @@ def get_subsample(
     pd.DataFrame | None,
 ]:
     """
-    Splits the data into training and testing sets based on the specified subsample iteration.
+    Splits the data into training and testing sets based on the specified subsample
+    iteration.
 
     Args:
         data (pd.DataFrame): The dataset.
@@ -149,17 +157,21 @@ def get_subsample(
     features (list[str]): List of feature names.
     target (list[str]): List of target names.
     subsample_dict (dict[str, Any]): Dictionary containing subsample indices.
-    groups (pd.DataFrame | None, optional): Group information if available. Defaults to None.
+    groups (pd.DataFrame | None, optional): Group information if available. Defaults to
+    None.
 
     Returns:
-    tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame | None, pd.DataFrame | None]:
+    tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame | None,
+    pd.DataFrame | None]:
         A tuple containing:
             - X_train (pd.DataFrame): Training features.
             - y_train (pd.DataFrame): Training targets.
             - X_test (pd.DataFrame): Testing features.
             - y_test (pd.DataFrame): Testing targets.
-            - groups_train (Optional[pd.DataFrame]): Training groups if available, otherwise None.
-            - groups_test (Optional[pd.DataFrame]): Testing groups if available, otherwise None.
+            - groups_train (Optional[pd.DataFrame]): Training groups if available,
+            otherwise None.
+            - groups_test (Optional[pd.DataFrame]): Testing groups if available,
+            otherwise None.
     """
     train_idx = subsample_dict["subsamples"][subsample_size][iter]
     test_idx = subsample_dict["test"]

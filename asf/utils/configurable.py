@@ -3,7 +3,8 @@ ConfigurableMixin: Simplify configuration space management for configurable clas
 
 This module provides:
 - ClassChoice: A Categorical hyperparameter that stores actual class references
-- ConfigurableMixin: A mixin that automates get_configuration_space and get_from_configuration
+- ConfigurableMixin: A mixin that automates get_configuration_space and
+get_from_configuration
 """
 
 from __future__ import annotations
@@ -48,7 +49,7 @@ try:
             choices: list[type | bool],
             default: type | bool | None = None,
             weights: Sequence[float] | None = None,
-        ):
+        ) -> None:
             """
             Initialize a ClassChoice hyperparameter.
 
@@ -58,7 +59,8 @@ try:
                 Name of the hyperparameter (will be prefixed by the mixin).
             choices : list[type | bool]
                 List of classes that can be chosen. Each class should implement
-                ConfigurableMixin if it has its own hyperparameters. Can also include False.
+                ConfigurableMixin if it has its own hyperparameters. Can also include
+                False.
             default : type, bool, or None, optional
                 Default choice. If None, the first choice is used.
             weights : Sequence[float] or None, optional
@@ -169,7 +171,8 @@ try:
             weights = None
             if hasattr(self, "probabilities") and self.probabilities is not None:
                 weights = tuple(self.probabilities)
-            # Retrieve the default value object from the map using the string representation
+            # Retrieve the default value object from the map using the string
+            # representation
             default_obj = self._choice_map.get(self.default_value)
 
             cloned = ClassChoice(
@@ -192,9 +195,10 @@ except ImportError:
         choices: tuple[Any, ...]
         _choice_map: dict[str, Any]
 
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             raise RuntimeError(
-                "ConfigSpace is not installed. Install with: pip install 'asf[configspace]'"
+                "ConfigSpace is not installed. Install with: pip install "
+                "'asf[configspace]'"
             )
 
         def get_class(self, name: str) -> Any:
@@ -208,7 +212,8 @@ except ImportError:
 
 def convert_class_choices_to_categorical(cs: ConfigurationSpace) -> ConfigurationSpace:
     """
-    Convert all ClassChoice hyperparameters in a ConfigurationSpace to regular Categorical.
+    Convert all ClassChoice hyperparameters in a ConfigurationSpace to regular
+    Categorical.
 
     This is needed for SMAC serialization compatibility.
 
@@ -448,7 +453,8 @@ class ConfigurableMixin:
 
     Classes using this mixin should:
     1. Define a class attribute `PREFIX` (str)
-    2. Implement `_define_hyperparameters()` returning (hyperparameters, conditions, forbiddens)
+    2. Implement `_define_hyperparameters()` returning (hyperparameters, conditions,
+    forbiddens)
 
     The mixin provides default implementations of:
     - get_configuration_space(): Builds ConfigSpace with proper prefixes
@@ -480,8 +486,10 @@ class ConfigurableMixin:
         -------
         tuple
             (hyperparameters, conditions, forbiddens) where:
-            - hyperparameters: list of ConfigSpace hyperparameters (including ClassChoice)
-            - conditions: list of ConfigSpace conditions (using unprefixed hyperparameters)
+            - hyperparameters: list of ConfigSpace hyperparameters (including
+            ClassChoice)
+            - conditions: list of ConfigSpace conditions (using unprefixed
+            hyperparameters)
             - forbiddens: list of ConfigSpace forbidden clauses
         """
         return [], [], []
@@ -525,7 +533,8 @@ class ConfigurableMixin:
                         except (ImportError, AttributeError):
                             pass
                     # Fallback to search in subclasses or registry if needed
-                    # For now, if it matches name and we can't import, we might be in trouble
+                    # For now, if it matches name and we can't import, we might be in
+                    # trouble
                     # unless it's already in the global namespace or something.
         return None
 
@@ -591,7 +600,8 @@ class ConfigurableMixin:
         """
         if not CONFIGSPACE_AVAILABLE:
             raise RuntimeError(
-                "ConfigSpace is not installed. Install with: pip install 'asf[configspace]'"
+                "ConfigSpace is not installed. Install with: pip install "
+                "'asf[configspace]'"
             )
 
         if cs is None:
@@ -709,11 +719,13 @@ class ConfigurableMixin:
         Returns
         -------
         partial
-            A partial function that will instantiate the class with configured parameters.
+            A partial function that will instantiate the class with configured
+            parameters.
         """
         if not CONFIGSPACE_AVAILABLE:
             raise RuntimeError(
-                "ConfigSpace is not installed. Install with: pip install 'asf[configspace]'"
+                "ConfigSpace is not installed. Install with: pip install "
+                "'asf[configspace]'"
             )
 
         # Compute prefix

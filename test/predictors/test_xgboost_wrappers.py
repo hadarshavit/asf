@@ -1,3 +1,4 @@
+from typing import Any
 import importlib.util
 
 import numpy as np
@@ -17,7 +18,7 @@ XGB_AVAILABLE = importlib.util.find_spec("xgboost") is not None
 
 
 @pytest.mark.skipif(XGB_AVAILABLE, reason="Only meaningful when xgboost is missing")
-def test_xgboost_wrappers_require_dependency():
+def test_xgboost_wrappers_require_dependency() -> None:
     with pytest.raises(ImportError):
         XGBoostClassifierWrapper()
 
@@ -27,7 +28,7 @@ def test_xgboost_wrappers_require_dependency():
     "wrapper_cls",
     [XGBoostClassifierWrapper, XGBoostRegressorWrapper, XGBoostRankerWrapper],
 )
-def test_xgboost_configuration_space(wrapper_cls):
+def test_xgboost_configuration_space(wrapper_cls: Any) -> None:
     cs = wrapper_cls.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
 
@@ -44,7 +45,9 @@ def test_xgboost_configuration_space(wrapper_cls):
         (XGBoostRegressorWrapper, "regression_data", "rmse"),
     ],
 )
-def test_xgboost_fit_predict(wrapper_cls, data_fixture, eval_metric, request):
+def test_xgboost_fit_predict(
+    wrapper_cls: Any, data_fixture: Any, eval_metric: Any, request: Any
+) -> None:
     X, y = request.getfixturevalue(data_fixture)
 
     if wrapper_cls is XGBoostClassifierWrapper:

@@ -77,7 +77,8 @@ class PerformanceModel(
         use_multi_target : bool, default=False
             Indicates whether to use multi-target regression.
         normalize : AbstractNormalization or None, default=None
-            Method to normalize performance data. If None, defaults to LogNormalization().
+            Method to normalize performance data. If None, defaults to
+            LogNormalization().
         init_params : dict[str, Any] or None, default=None
             Initialization parameters from configuration.
         estimator : object or None, default=None
@@ -131,7 +132,8 @@ class PerformanceModel(
                     if norm_array.size != performance.size:
                         raise ValueError(
                             "Normalization changed performance size unexpectedly: "
-                            f"got {norm_array.shape}, expected compatible with {performance.shape}."
+                            f"got {norm_array.shape}, expected compatible with "
+                            f"{performance.shape}."
                         )
                     norm_array = norm_array.reshape(performance.shape)
                 performance = pd.DataFrame(
@@ -143,7 +145,8 @@ class PerformanceModel(
                 performance = normalized
 
         regressor_init_args: dict[str, Any] = {}
-        # Safely check for input_size if it's a type (standard wrapper classes usually have it)
+        # Safely check for input_size if it's a type (standard wrapper classes usually
+        # have it)
         try:
             sig = inspect.signature(self.model_class)
             if "input_size" in sig.parameters:
@@ -154,7 +157,8 @@ class PerformanceModel(
         if self.use_multi_target:
             if self.algorithm_features is not None:
                 raise ValueError(
-                    "PerformanceModel does not use algorithm features for multi-target regression."
+                    "PerformanceModel does not use algorithm features for "
+                    "multi-target regression."
                 )
             self.regressors = self._make_model(**regressor_init_args)
             self.regressors.fit(features, performance)

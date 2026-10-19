@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import pandas as pd
 import pytest
@@ -15,7 +16,7 @@ from asf.epm import EPM
         KNeighborsRegressor(n_neighbors=1),
     ],
 )
-def test_epm_clones_configured_estimator_on_every_fit(estimator):
+def test_epm_clones_configured_estimator_on_every_fit(estimator: Any) -> None:
     X = pd.DataFrame({"f": [0.0, 1.0, 2.0]})
     y = np.array([1.0, 2.0, 3.0])
     epm = EPM(estimator=estimator)
@@ -28,7 +29,7 @@ def test_epm_clones_configured_estimator_on_every_fit(estimator):
     assert epm.predictor is not fitted
 
 
-def test_epm_accepts_legacy_sklearn_class():
+def test_epm_accepts_legacy_sklearn_class() -> None:
     X = np.array([[0.0], [1.0], [2.0]])
     epm = EPM(
         predictor_class=RandomForestRegressor,
@@ -46,6 +47,6 @@ def test_epm_accepts_legacy_sklearn_class():
         {"predictor_config": {}},
     ],
 )
-def test_epm_rejects_ambiguous_estimator_parameters(kwargs):
+def test_epm_rejects_ambiguous_estimator_parameters(kwargs: Any) -> None:
     with pytest.raises(ValueError, match="Configure estimator directly"):
         EPM(estimator=DecisionTreeRegressor(), **kwargs)

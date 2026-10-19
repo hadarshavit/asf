@@ -1,5 +1,7 @@
 """Tests for FeatureGroupSelector and prerequisite validation."""
 
+from typing import Any
+
 import pytest
 import pandas as pd
 
@@ -15,7 +17,7 @@ from asf.preprocessing.feature_group_selector import (
 
 
 @pytest.fixture
-def feature_groups_with_prereqs():
+def feature_groups_with_prereqs() -> Any:
     """Feature groups with prerequisite dependencies (like SAT12-INDU)."""
     return {
         "Pre": {"provides": ["nvars", "nclauses", "reducedVars"]},
@@ -30,7 +32,7 @@ def feature_groups_with_prereqs():
 
 
 @pytest.fixture
-def feature_groups_no_prereqs():
+def feature_groups_no_prereqs() -> Any:
     """Feature groups without prerequisites."""
     return {
         "basic": {"provides": ["f1", "f2"]},
@@ -39,7 +41,7 @@ def feature_groups_no_prereqs():
 
 
 @pytest.fixture
-def sample_features_df():
+def sample_features_df() -> Any:
     """Sample feature DataFrame."""
     return pd.DataFrame(
         {
@@ -66,7 +68,9 @@ def sample_features_df():
 class TestFeatureGroupSelectorPrerequisites:
     """Tests for prerequisite validation in FeatureGroupSelector."""
 
-    def test_valid_selection_with_prereqs(self, feature_groups_with_prereqs):
+    def test_valid_selection_with_prereqs(
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
         """Selecting groups with all prerequisites should work."""
         # Pre has no prereqs
         selector = FeatureGroupSelector(
@@ -86,7 +90,9 @@ class TestFeatureGroupSelectorPrerequisites:
         )
         assert "Pre" in selector.selected_groups  # type: ignore[operator]
 
-    def test_invalid_selection_missing_prereq(self, feature_groups_with_prereqs):
+    def test_invalid_selection_missing_prereq(
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
         """Selecting a group without its prerequisite should raise error."""
         with pytest.raises(MissingPrerequisiteGroupError) as exc_info:
             FeatureGroupSelector(feature_groups_with_prereqs, selected_groups=["Basic"])
@@ -95,9 +101,12 @@ class TestFeatureGroupSelectorPrerequisites:
         assert "Pre" in str(exc_info.value)
 
     def test_invalid_selection_missing_chained_prereq(
-        self, feature_groups_with_prereqs
-    ):
-        """Selecting Advanced without Basic should raise error (Advanced requires Pre and Basic)."""
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
+        """
+        Selecting Advanced without Basic should raise error (Advanced requires Pre and
+        Basic).
+        """
         with pytest.raises(MissingPrerequisiteGroupError) as exc_info:
             FeatureGroupSelector(
                 feature_groups_with_prereqs, selected_groups=["Pre", "Advanced"]
@@ -106,14 +115,14 @@ class TestFeatureGroupSelectorPrerequisites:
         assert "Advanced" in str(exc_info.value)
         assert "Basic" in str(exc_info.value)
 
-    def test_valid_full_chain(self, feature_groups_with_prereqs):
+    def test_valid_full_chain(self, feature_groups_with_prereqs: Any) -> None:
         """Selecting Advanced with all prerequisites should work."""
         selector = FeatureGroupSelector(
             feature_groups_with_prereqs, selected_groups=["Pre", "Basic", "Advanced"]
         )
         assert "Advanced" in selector.selected_groups  # type: ignore[operator]
 
-    def test_validation_disabled(self, feature_groups_with_prereqs):
+    def test_validation_disabled(self, feature_groups_with_prereqs: Any) -> None:
         """When validation is disabled, invalid selections should be allowed."""
         # This should NOT raise even though Basic requires Pre
         selector = FeatureGroupSelector(
@@ -123,7 +132,9 @@ class TestFeatureGroupSelectorPrerequisites:
         )
         assert selector.selected_groups == ["Basic"]
 
-    def test_none_selected_groups_no_validation(self, feature_groups_with_prereqs):
+    def test_none_selected_groups_no_validation(
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
         """When selected_groups is None, no validation should occur."""
         # Should not raise - None means all groups
         selector = FeatureGroupSelector(
@@ -131,7 +142,9 @@ class TestFeatureGroupSelectorPrerequisites:
         )
         assert selector.selected_groups is None
 
-    def test_no_prereqs_any_selection_valid(self, feature_groups_no_prereqs):
+    def test_no_prereqs_any_selection_valid(
+        self, feature_groups_no_prereqs: Any
+    ) -> None:
         """Groups without prerequisites can be selected in any combination."""
         selector = FeatureGroupSelector(
             feature_groups_no_prereqs, selected_groups=["advanced"]
@@ -141,7 +154,8 @@ class TestFeatureGroupSelectorPrerequisites:
         selector = FeatureGroupSelector(
             feature_groups_no_prereqs, selected_groups=["basic", "advanced"]
         )
-        assert set(selector.selected_groups) == {"basic", "advanced"}  # type: ignore[arg-type]
+        # type: ignore[arg-type]
+        assert set(selector.selected_groups) == {"basic", "advanced"}
 
 
 # ============================================================================
@@ -153,8 +167,8 @@ class TestFeatureGroupSelectorTransform:
     """Tests for feature selection transform functionality."""
 
     def test_fit_transform_selects_correct_features(
-        self, feature_groups_with_prereqs, sample_features_df
-    ):
+        self, feature_groups_with_prereqs: Any, sample_features_df: Any
+    ) -> None:
         """fit_transform should select only features from selected groups."""
         selector = FeatureGroupSelector(
             feature_groups_with_prereqs, selected_groups=["Pre"]
@@ -165,8 +179,8 @@ class TestFeatureGroupSelectorTransform:
         assert len(result) == 2
 
     def test_fit_transform_multiple_groups(
-        self, feature_groups_with_prereqs, sample_features_df
-    ):
+        self, feature_groups_with_prereqs: Any, sample_features_df: Any
+    ) -> None:
         """fit_transform with multiple groups should include all their features."""
         selector = FeatureGroupSelector(
             feature_groups_with_prereqs, selected_groups=["Pre", "Basic"]
@@ -183,8 +197,8 @@ class TestFeatureGroupSelectorTransform:
         assert list(result.columns) == expected_features
 
     def test_fit_transform_none_selects_all(
-        self, feature_groups_with_prereqs, sample_features_df
-    ):
+        self, feature_groups_with_prereqs: Any, sample_features_df: Any
+    ) -> None:
         """When selected_groups is None, all group features should be selected."""
         selector = FeatureGroupSelector(
             feature_groups_with_prereqs, selected_groups=None
@@ -200,7 +214,9 @@ class TestFeatureGroupSelectorTransform:
         expected = [f for f in all_provided if f in sample_features_df.columns]
         assert list(result.columns) == expected
 
-    def test_transform_handles_missing_features(self, feature_groups_with_prereqs):
+    def test_transform_handles_missing_features(
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
         """Transform should handle DataFrames missing some expected features."""
         selector = FeatureGroupSelector(
             feature_groups_with_prereqs, selected_groups=["Pre"]
@@ -219,8 +235,8 @@ class TestFeatureGroupSelectorTransform:
         assert list(result.columns) == ["nvars", "nclauses"]
 
     def test_get_feature_names_out(
-        self, feature_groups_with_prereqs, sample_features_df
-    ):
+        self, feature_groups_with_prereqs: Any, sample_features_df: Any
+    ) -> None:
         """get_feature_names_out should return selected feature names."""
         selector = FeatureGroupSelector(
             feature_groups_with_prereqs, selected_groups=["Pre", "Basic"]
@@ -246,7 +262,9 @@ class TestFeatureGroupSelectorTransform:
 class TestStaticValidation:
     """Tests for the static validation method."""
 
-    def test_validate_feature_group_selection_valid(self, feature_groups_with_prereqs):
+    def test_validate_feature_group_selection_valid(
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
         """Static validation should pass for valid selections."""
         # Should not raise
         FeatureGroupSelector.validate_feature_group_selection(
@@ -254,8 +272,8 @@ class TestStaticValidation:
         )
 
     def test_validate_feature_group_selection_invalid(
-        self, feature_groups_with_prereqs
-    ):
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
         """Static validation should raise for invalid selections."""
         with pytest.raises(MissingPrerequisiteGroupError):
             FeatureGroupSelector.validate_feature_group_selection(
@@ -263,7 +281,9 @@ class TestStaticValidation:
                 ["Basic", "KLB"],  # Missing Pre
             )
 
-    def test_get_selected_groups_from_config(self, feature_groups_with_prereqs):
+    def test_get_selected_groups_from_config(
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
         """get_selected_groups_from_config should extract enabled groups."""
         config = {
             "feature_group_Pre": True,
@@ -280,8 +300,8 @@ class TestStaticValidation:
         assert set(selected) == {"Pre", "Basic", "CG"}  # type: ignore[arg-type]
 
     def test_get_selected_groups_from_config_all_false(
-        self, feature_groups_with_prereqs
-    ):
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
         """When all groups are disabled, should return None."""
         config = {
             "feature_group_Pre": False,
@@ -298,8 +318,8 @@ class TestStaticValidation:
         assert selected is None
 
     def test_get_selected_groups_from_config_default_true(
-        self, feature_groups_with_prereqs
-    ):
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
         """Missing config entries should default to True."""
         config = {
             "feature_group_Pre": False,
@@ -323,14 +343,14 @@ class TestStaticValidation:
 class TestEdgeCases:
     """Tests for edge cases and boundary conditions."""
 
-    def test_empty_feature_groups(self):
+    def test_empty_feature_groups(self) -> None:
         """Empty feature_groups dict should work."""
         selector = FeatureGroupSelector({}, selected_groups=None)
         X = pd.DataFrame({"f1": [1, 2]})
         result = selector.fit_transform(X)
         assert list(result.columns) == ["f1"]  # Falls back to all columns
 
-    def test_unknown_group_in_selection(self, feature_groups_with_prereqs):
+    def test_unknown_group_in_selection(self, feature_groups_with_prereqs: Any) -> None:
         """Unknown groups in selection should be ignored gracefully."""
         selector = FeatureGroupSelector(
             feature_groups_with_prereqs,
@@ -343,7 +363,7 @@ class TestEdgeCases:
         # Should only include features from Pre (UnknownGroup is ignored)
         assert list(result.columns) == ["nvars", "nclauses", "reducedVars"]
 
-    def test_group_with_empty_provides(self, feature_groups_with_prereqs):
+    def test_group_with_empty_provides(self, feature_groups_with_prereqs: Any) -> None:
         """Groups with empty provides list should be handled."""
         feature_groups = {
             "Pre": {"provides": []},
@@ -356,8 +376,11 @@ class TestEdgeCases:
         result = selector.fit_transform(X)
         assert list(result.columns) == ["f1"]
 
-    def test_circular_dependency_detection(self):
-        """Currently circular dependencies aren't explicitly checked, but shouldn't cause infinite loop."""
+    def test_circular_dependency_detection(self) -> None:
+        """
+        Currently circular dependencies aren't explicitly checked, but shouldn't cause
+        infinite loop.
+        """
         feature_groups = {
             "A": {"provides": ["f1"], "requires": ["B"]},
             "B": {"provides": ["f2"], "requires": ["A"]},

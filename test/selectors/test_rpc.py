@@ -1,7 +1,10 @@
+from typing import Any
 from asf.selectors.rpc_selector import RPCSelector
 
 
-def test_rpc_selector_basic(dummy_performance, dummy_features, validate_predictions):
+def test_rpc_selector_basic(
+    dummy_performance: Any, dummy_features: Any, validate_predictions: Any
+) -> None:
     """Test basic RPC functionality: fit and predict with pairwise voting."""
     from sklearn.ensemble import RandomForestClassifier
 
@@ -17,8 +20,8 @@ def test_rpc_selector_basic(dummy_performance, dummy_features, validate_predicti
 
 
 def test_rpc_selector_decision_tree(
-    dummy_performance, dummy_features, validate_predictions
-):
+    dummy_performance: Any, dummy_features: Any, validate_predictions: Any
+) -> None:
     """Test RPC with DecisionTreeClassifier instead of RandomForest."""
     from sklearn.tree import DecisionTreeClassifier
 
@@ -32,7 +35,9 @@ def test_rpc_selector_decision_tree(
     validate_predictions(predictions)
 
 
-def test_rpc_selector_pairwise_structure(dummy_performance, dummy_features):
+def test_rpc_selector_pairwise_structure(
+    dummy_performance: Any, dummy_features: Any
+) -> None:
     """Test that RPC creates correct number of pairwise classifiers."""
     from sklearn.ensemble import RandomForestClassifier
 

@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import pytest
 
@@ -9,7 +10,9 @@ from asf.predictors.epm_extra_trees import EPMExtraTrees as ExtraTreesWrapper
     "wrapper_cls",
     [ForestRegressorWrapper, ExtraTreesWrapper],
 )
-def test_epm_random_forest_rejects_sample_weight(wrapper_cls, regression_data):
+def test_epm_random_forest_rejects_sample_weight(
+    wrapper_cls: Any, regression_data: Any
+) -> None:
     X, y = regression_data
     model = wrapper_cls(n_estimators=4, random_state=0)
 
@@ -21,7 +24,9 @@ def test_epm_random_forest_rejects_sample_weight(wrapper_cls, regression_data):
     "wrapper_cls",
     [ForestRegressorWrapper, ExtraTreesWrapper],
 )
-def test_epm_random_forest_predict_shapes(wrapper_cls, regression_data):
+def test_epm_random_forest_predict_shapes(
+    wrapper_cls: Any, regression_data: Any
+) -> None:
     X, y = regression_data
     model = wrapper_cls(n_estimators=8, random_state=0)
     model.fit(X, y)
@@ -42,7 +47,7 @@ def test_epm_random_forest_predict_shapes(wrapper_cls, regression_data):
         assert np.all(vars >= 0)
 
 
-def test_epm_random_forest_return_var(regression_data):
+def test_epm_random_forest_return_var(regression_data: Any) -> None:
     X, y = regression_data
     model = ForestRegressorWrapper(n_estimators=6, random_state=0, return_var=True)
     model.fit(X, y)

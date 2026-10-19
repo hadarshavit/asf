@@ -1,3 +1,4 @@
+from typing import Any
 from typing import cast
 
 import numpy as np
@@ -28,7 +29,7 @@ def _parallel_metric(frame: pd.DataFrame) -> float:
     return _PARALLEL_METRIC_VALUES[frame.shape[1]]
 
 
-def test_brute_force_selects_lowest_sum_dataframe():
+def test_brute_force_selects_lowest_sum_dataframe() -> None:
     performance = pd.DataFrame(
         {
             "a": [1.0, 1.0, 1.0],
@@ -46,7 +47,7 @@ def test_brute_force_selects_lowest_sum_dataframe():
     assert list(selected_df.columns) == ["a", "c"]
 
 
-def test_brute_force_returns_numpy_for_array_input():
+def test_brute_force_returns_numpy_for_array_input() -> None:
     performance = np.array(
         [
             [1.0, 5.0, 2.0],
@@ -63,7 +64,7 @@ def test_brute_force_returns_numpy_for_array_input():
     assert selected.shape == (3, 2)
 
 
-def test_beam_search_respects_metric_minimize():
+def test_beam_search_respects_metric_minimize() -> None:
     performance = pd.DataFrame(
         {
             "A": [1.0, 1.0],
@@ -87,7 +88,7 @@ def test_beam_search_respects_metric_minimize():
     assert set(selected_df.columns) == {"A", "B"}
 
 
-def test_marginal_contribution_based_maximize_selects_largest_column():
+def test_marginal_contribution_based_maximize_selects_largest_column() -> None:
     performance = pd.DataFrame(
         {
             "A": [1.0, 1.0],
@@ -109,7 +110,7 @@ def test_marginal_contribution_based_maximize_selects_largest_column():
     assert list(selected_df.columns) == ["C"]
 
 
-def test_sbs_pre_selector_handles_numpy_input():
+def test_sbs_pre_selector_handles_numpy_input() -> None:
     performance = np.array(
         [
             [1.0, 3.0, 5.0],
@@ -125,7 +126,7 @@ def test_sbs_pre_selector_handles_numpy_input():
     assert selected.shape == (2, 2)
 
 
-def test_sbs_pre_selector_selects_top_k_by_metric():
+def test_sbs_pre_selector_selects_top_k_by_metric() -> None:
     performance = pd.DataFrame(
         {
             "A": [1.0, 100.0, 100.0],
@@ -151,11 +152,13 @@ def test_sbs_pre_selector_selects_top_k_by_metric():
 
 
 class _RecordingOptimizer:
-    def __init__(self, values):
+    def __init__(self, values: Any) -> None:
         self.values = np.array(values, dtype=float)
         self.called_with = None
 
-    def __call__(self, objective_function, x0=None, bounds=None, **kwargs):
+    def __call__(
+        self, objective_function: Any, x0: Any = None, bounds: Any = None, **kwargs: Any
+    ) -> Any:
         self.called_with = {
             "bounds": bounds,
             "x0": x0,
@@ -165,13 +168,13 @@ class _RecordingOptimizer:
         objective_function(self.values)
 
         class Result:
-            def __init__(self, x):
+            def __init__(self, x: Any) -> None:
                 self.x = x
 
         return Result(self.values)
 
 
-def test_optimize_pre_selection_uses_custom_optimizer():
+def test_optimize_pre_selection_uses_custom_optimizer() -> None:
     performance = pd.DataFrame(
         {
             "A": [1.0, 2.0],
@@ -199,17 +202,19 @@ def test_optimize_pre_selection_uses_custom_optimizer():
 
 
 class _DummyBasePreSelector(AbstractPreSelector):
-    def __init__(self, metric, n_algorithms, maximize=False, **kwargs):
+    def __init__(
+        self, metric: Any, n_algorithms: Any, maximize: Any = False, **kwargs: Any
+    ) -> None:
         super().__init__(n_algorithms=n_algorithms)
         self.metric = metric
         self.n_algorithms = n_algorithms
         self.maximize = maximize
 
-    def fit_transform(self, performance):
+    def fit_transform(self, performance: Any) -> Any:
         return performance.iloc[:, : self.n_algorithms]
 
 
-def test_knee_of_curve_pre_selector_detects_knee():
+def test_knee_of_curve_pre_selector_detects_knee() -> None:
     performance = pd.DataFrame(
         {
             "A": [1.0, 2.0, 3.0],
@@ -237,7 +242,7 @@ def test_knee_of_curve_pre_selector_detects_knee():
     assert list(selected_df.columns) == ["A", "B"]
 
 
-def test_knee_of_curve_pre_selector_returns_original_when_no_knee():
+def test_knee_of_curve_pre_selector_returns_original_when_no_knee() -> None:
     performance = pd.DataFrame(
         {
             "A": [1.0, 1.0, 1.0],
@@ -257,7 +262,7 @@ def test_knee_of_curve_pre_selector_returns_original_when_no_knee():
     pd.testing.assert_frame_equal(selected, performance)
 
 
-def test_knee_of_curve_pre_selector_parallel_numpy_detects_knee():
+def test_knee_of_curve_pre_selector_parallel_numpy_detects_knee() -> None:
     pytest.importorskip("joblib")
 
     performance = np.array(
@@ -281,7 +286,7 @@ def test_knee_of_curve_pre_selector_parallel_numpy_detects_knee():
     np.testing.assert_allclose(selected, performance[:, :2])
 
 
-def test_optimize_pre_selection_raises_with_insufficient_algorithms():
+def test_optimize_pre_selection_raises_with_insufficient_algorithms() -> None:
     performance = pd.DataFrame(
         {
             "A": [1.0, 2.0],
@@ -303,7 +308,7 @@ def test_optimize_pre_selection_raises_with_insufficient_algorithms():
         selector.fit_transform(performance)
 
 
-def test_optimize_pre_selection_zero_algorithms_raises():
+def test_optimize_pre_selection_zero_algorithms_raises() -> None:
     performance = pd.DataFrame(
         {
             "A": [1.0, 2.0],
@@ -324,7 +329,7 @@ def test_optimize_pre_selection_zero_algorithms_raises():
         selector.fit_transform(performance)
 
 
-def test_brute_force_maximize_returns_best_columns():
+def test_brute_force_maximize_returns_best_columns() -> None:
     performance = pd.DataFrame(
         {
             "A": [1.0, 2.0],
@@ -342,7 +347,7 @@ def test_brute_force_maximize_returns_best_columns():
     assert list(selected_df.columns) == ["B"]
 
 
-def test_sbs_pre_selector_dataframe_minimize_orders_correctly():
+def test_sbs_pre_selector_dataframe_minimize_orders_correctly() -> None:
     performance = pd.DataFrame(
         {
             "A": [1.0, 1.0, 1.0],

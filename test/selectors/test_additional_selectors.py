@@ -7,14 +7,14 @@ import pytest
 class TestStatic3SPresolver:
     """Tests for Static3S presolver."""
 
-    def test_init(self):
+    def test_init(self) -> None:
         """Test initialization."""
         from asf.presolving.static_3s import Static3S
 
         presolver = Static3S(presolver_budget=30.0)
         assert presolver.presolver_budget == 30.0
 
-    def test_fit_with_simple_data(self):
+    def test_fit_with_simple_data(self) -> None:
         """Test fit with simple performance data."""
         from asf.presolving.static_3s import Static3S
 
@@ -31,7 +31,7 @@ class TestStatic3SPresolver:
 
         assert hasattr(presolver, "schedule")
 
-    def test_predict_without_features(self):
+    def test_predict_without_features(self) -> None:
         """Test predict returns schedule."""
         from asf.presolving.static_3s import Static3S
 
@@ -48,7 +48,7 @@ class TestStatic3SPresolver:
 
         assert isinstance(result, list)
 
-    def test_predict_with_features(self):
+    def test_predict_with_features(self) -> None:
         """Test predict with features returns dict."""
         from asf.presolving.static_3s import Static3S
 
@@ -67,7 +67,7 @@ class TestStatic3SPresolver:
         assert isinstance(result, dict)
         assert len(result) == 2
 
-    def test_fit_requires_performance(self):
+    def test_fit_requires_performance(self) -> None:
         """Test that fit requires performance data."""
         from asf.presolving.static_3s import Static3S
 
@@ -75,7 +75,7 @@ class TestStatic3SPresolver:
         with pytest.raises(ValueError):
             presolver.fit(features=None, performance=None)
 
-    def test_get_preschedule_config(self):
+    def test_get_preschedule_config(self) -> None:
         """Test getting preschedule config."""
         from asf.presolving.static_3s import Static3S
 
@@ -87,7 +87,7 @@ class TestStatic3SPresolver:
 
         assert config is not None
 
-    def test_get_configuration(self):
+    def test_get_configuration(self) -> None:
         """Test getting configuration."""
         from asf.presolving.static_3s import Static3S
 

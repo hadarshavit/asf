@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import pandas as pd
 from typing import cast
@@ -13,7 +14,7 @@ from asf.metrics import (
 )
 
 
-def generate_data(n_instances=120, n_algorithms=5, seed=0):
+def generate_data(n_instances: Any = 120, n_algorithms: Any = 5, seed: Any = 0) -> Any:
     """
     Synthetic dataset.
     """
@@ -62,7 +63,7 @@ def generate_data(n_instances=120, n_algorithms=5, seed=0):
     return features, perf
 
 
-def print_sample(predictions, true_perf, n=8):
+def print_sample(predictions: Any, true_perf: Any, n: Any = 8) -> None:
     print("\nSample predictions:")
     for inst in list(true_perf.index)[:n]:
         rec = predictions.get(inst, [(None, 0.0)])

@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import pandas as pd
 
@@ -5,23 +6,23 @@ from asf.selectors.abstract_selector import AbstractSelector
 from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelector
 
 
-def tiny_ctor():
+def tiny_ctor() -> None:
     # Simple picklable callable for model_class
     return None
 
 
 class TinySelector(AbstractSelector):
-    def _fit(self, features, performance, **kwargs):
+    def _fit(self, features: Any, performance: Any, **kwargs: Any) -> None:
         # Remember shapes
         self._fshape = features.shape
         self._pshape = performance.shape
 
-    def _predict(self, features, performance=None):
+    def _predict(self, features: Any, performance: Any = None) -> Any:
         # Return a trivial schedule choosing the first algorithm
         return {idx: [(self.algorithms[0], 1.0)] for idx in features.index}
 
 
-def test_abstract_selector_numpy_to_dataframe_conversion():
+def test_abstract_selector_numpy_to_dataframe_conversion() -> None:
     X = np.array([[1.0, 2.0], [3.0, 4.0]])
     Y = np.array([[5.0, 1.0], [2.0, 3.0]])
     sel = TinySelector()
@@ -35,7 +36,7 @@ def test_abstract_selector_numpy_to_dataframe_conversion():
     assert list(preds.keys())[0] in (0, "i0")  # type: ignore[attr-defined]
 
 
-def test_abstract_selector_rejects_mixed_types():
+def test_abstract_selector_rejects_mixed_types() -> None:
     sel = TinySelector()
     # features DataFrame, performance numpy should raise
     X = pd.DataFrame([[1.0, 2.0]], columns=pd.Index(["a", "b"]))
@@ -48,18 +49,18 @@ def test_abstract_selector_rejects_mixed_types():
 
 
 class TinyModelBased(AbstractModelBasedSelector):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(model_class=tiny_ctor, **kwargs)
         self._saved = False
 
-    def _fit(self, features, performance, **kwargs):
+    def _fit(self, features: Any, performance: Any, **kwargs: Any) -> None:
         return None
 
-    def _predict(self, features, performance=None):
+    def _predict(self, features: Any, performance: Any = None) -> Any:
         return {idx: [(self.algorithms[0], 2.0)] for idx in features.index}
 
 
-def test_model_based_selector_save_and_load(tmp_path):
+def test_model_based_selector_save_and_load(tmp_path: Any) -> None:
     X = pd.DataFrame({"x": [1, 2]}, index=pd.Index(["i1", "i2"]))
     Y = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 0.1]}, index=pd.Index(X.index))
     sel = TinyModelBased(budget=2.0)

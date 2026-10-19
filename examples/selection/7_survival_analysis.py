@@ -1,3 +1,4 @@
+from typing import Any
 import pandas as pd
 import numpy as np
 from typing import cast
@@ -11,7 +12,9 @@ from asf.metrics import (
 )
 
 
-def generate_complex_data(n_instances=100, n_algorithms=6, budget=150.0, seed=42):
+def generate_complex_data(
+    n_instances: Any = 100, n_algorithms: Any = 6, budget: Any = 150.0, seed: Any = 42
+) -> Any:
     """
     Generates synthetic data to demonstrate the value of survival analysis.
 

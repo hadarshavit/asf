@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 from asf.selectors.hybrid_decision_tree import HARRIS
 
@@ -11,9 +12,15 @@ from asf.selectors.hybrid_decision_tree import HARRIS
     ],
 )
 def test_harris_selector_basic(
-    dummy_performance, dummy_features, validate_predictions, lambda_param, max_features
-):
-    """Test HARRIS with 3 cases: lambda in {0,0.5,1} and max_features in {sqrt,log2,3}."""
+    dummy_performance: Any,
+    dummy_features: Any,
+    validate_predictions: Any,
+    lambda_param: Any,
+    max_features: Any,
+) -> None:
+    """
+    Test HARRIS with 3 cases: lambda in {0,0.5,1} and max_features in {sqrt,log2,3}.
+    """
     selector = HARRIS(
         n_estimators=10,
         max_depth=5,
@@ -29,7 +36,9 @@ def test_harris_selector_basic(
     validate_predictions(predictions)
 
 
-def test_harris_selector_refit_resets_forest(dummy_performance, dummy_features):
+def test_harris_selector_refit_resets_forest(
+    dummy_performance: Any, dummy_features: Any
+) -> None:
     selector = HARRIS(n_estimators=3, max_thresholds=5)
     selector.fit(dummy_features, dummy_performance)
     selector.fit(dummy_features, dummy_performance)

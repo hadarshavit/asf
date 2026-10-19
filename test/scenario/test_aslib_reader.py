@@ -1,5 +1,7 @@
 """Tests for ASlib scenario reader."""
 
+from typing import Any
+
 import os
 import pytest
 import pandas as pd
@@ -10,7 +12,7 @@ from asf.selectors.baselines import SingleBestSolver
 
 
 @pytest.fixture
-def aslib_scenario(tmp_path):
+def aslib_scenario(tmp_path: Any) -> Any:
     """Create a dummy ASlib scenario."""
     scenario_path = tmp_path / "test_scenario"
     scenario_path.mkdir()
@@ -110,7 +112,7 @@ def aslib_scenario(tmp_path):
     return str(scenario_path)
 
 
-def test_read_aslib_scenario(aslib_scenario):
+def test_read_aslib_scenario(aslib_scenario: Any) -> None:
     """Test reading basic scenario files."""
     (
         features,
@@ -141,7 +143,7 @@ def test_read_aslib_scenario(aslib_scenario):
     assert budget == 100.0
 
 
-def test_read_aslib_with_algorithm_features(aslib_scenario):
+def test_read_aslib_with_algorithm_features(aslib_scenario: Any) -> None:
     """Test reading scenario with algorithm features."""
     path = aslib_scenario
 
@@ -169,7 +171,7 @@ def test_read_aslib_with_algorithm_features(aslib_scenario):
     assert "algo1" in algorithm_features.index
 
 
-def test_evaluate_selector_basic(aslib_scenario):
+def test_evaluate_selector_basic(aslib_scenario: Any) -> None:
     """Test evaluate_selector function."""
 
     # 3 instances: i1 (fold 1), i2 (fold 1), i3 (fold 2)
@@ -185,7 +187,7 @@ def test_evaluate_selector_basic(aslib_scenario):
     assert selector is not None
 
 
-def test_evaluate_selector_per_instance(aslib_scenario):
+def test_evaluate_selector_per_instance(aslib_scenario: Any) -> None:
     """Test evaluate_selector with per-instance return."""
 
     result = evaluate_selector(

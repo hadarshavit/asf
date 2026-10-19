@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import pandas as pd
 import os
@@ -17,11 +18,11 @@ from asf.utils.configurable import (
 class DummySelector(ConfigurableMixin):
     PREFIX = "dummy_sel"
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         self.budget = 10.0
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(**kwargs: Any) -> Any:
         return [], [], []
 
 
@@ -35,7 +36,7 @@ class DummyPreprocessor2(ConfigurableMixin):
     pass
 
 
-def small_dataframes():
+def small_dataframes() -> Any:
     X = pd.DataFrame(
         {
             "f1": [1.0, np.nan, 3.0, 4.0],
@@ -56,7 +57,7 @@ def small_dataframes():
 class TestSelectorPipeline:
     """Consolidated tests for SelectorPipeline."""
 
-    def test_basic_pipeline(self):
+    def test_basic_pipeline(self) -> None:
         """Test basic pipeline with just a selector."""
         features = pd.DataFrame({"f1": [1.0, 2.0, 3.0]}, index=["i1", "i2", "i3"])
         performance = pd.DataFrame(
@@ -71,7 +72,7 @@ class TestSelectorPipeline:
         assert isinstance(predictions, dict)
         assert len(predictions) == 3
 
-    def test_selector_pipeline_fit_predict_and_config(self, tmp_path):
+    def test_selector_pipeline_fit_predict_and_config(self, tmp_path: Any) -> None:
         """Test pipeline with multi-class classifier and preprocessing."""
         X, Y = small_dataframes()
 
@@ -104,7 +105,7 @@ class TestSelectorPipeline:
         preds2 = loaded.predict(X)
         assert set(preds2.keys()) == set(X.index)
 
-    def test_save_load(self, tmp_path):
+    def test_save_load(self, tmp_path: Any) -> None:
         """Test pipeline save and load logic."""
         features = pd.DataFrame({"f1": [1.0, 2.0, 3.0]}, index=["i1", "i2", "i3"])
         performance = pd.DataFrame(
@@ -128,7 +129,7 @@ class TestSelectorPipeline:
 class TestSelectorPipelineConfig:
     """Tests for SelectorPipeline configuration and auto-discovery."""
 
-    def test_config_space_refactor(self):
+    def test_config_space_refactor(self) -> None:
         # Define space
         cs = SelectorPipeline.get_configuration_space(
             selector_class=[DummySelector],
@@ -173,7 +174,7 @@ class TestSelectorPipelineConfig:
         cfg = pipeline.get_config()
         assert "DummyPreprocessor1" in cfg["preprocessor_steps"]
 
-    def test_none_preprocessing(self):
+    def test_none_preprocessing(self) -> None:
         # Test with no preprocessors active
         cs = SelectorPipeline.get_configuration_space(
             selector_class=[DummySelector], preprocessing_class=[DummyPreprocessor1]
@@ -192,15 +193,18 @@ class TestSelectorPipelineConfig:
         assert len(steps) == 1
         assert steps[0][0] == "SimpleImputer"
 
-    def test_auto_discovery(self):
-        # Test that we can recover classes from the space without passing them explicitly
+    def test_auto_discovery(self) -> None:
+        # Test that we can recover classes from the space without passing them
+        # explicitly
         cs = SelectorPipeline.get_configuration_space(
             selector_class=[DummySelector],
             preprocessing_class=[DummyPreprocessor1, DummyPreprocessor2],
         )
 
         config_dict = {
-            f"{SelectorPipeline.PREFIX}:preprocessor:DummyPreprocessor1": "DummyPreprocessor1",
+            (
+                f"{SelectorPipeline.PREFIX}:preprocessor:DummyPreprocessor1"
+            ): "DummyPreprocessor1",
             f"{SelectorPipeline.PREFIX}:preprocessor:DummyPreprocessor2": "False",
             f"{SelectorPipeline.PREFIX}:selector": "DummySelector",
         }

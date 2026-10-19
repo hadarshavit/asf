@@ -1,3 +1,5 @@
+from typing import Any
+
 #!/usr/bin/env python3
 import argparse
 import re
@@ -6,7 +8,7 @@ import sys
 from pathlib import Path
 
 
-def update_file(path, pattern, replacement):
+def update_file(path: Any, pattern: Any, replacement: Any) -> None:
     path = Path(path)
     if not path.exists():
         print(f"Error: File {path} not found.")
@@ -22,7 +24,7 @@ def update_file(path, pattern, replacement):
         print(f"Updated {path}")
 
 
-def run_command(cmd, cwd=None):
+def run_command(cmd: Any, cwd: Any = None) -> Any:
     print(f"Running: {' '.join(cmd)}")
     result = subprocess.run(cmd, cwd=cwd, text=True, capture_output=True)
     if result.returncode != 0:
@@ -32,7 +34,7 @@ def run_command(cmd, cwd=None):
     return result.stdout.strip()
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Bump version and create release tag")
     parser.add_argument("version", help="New version number (e.g., 0.1.4)")
     parser.add_argument(
@@ -74,7 +76,8 @@ def main():
         # Check if git is clean
         status = run_command(["git", "status", "--porcelain"], cwd=root_dir)
         if status:
-            # We only want to commit the specific files we changed, but if there are other changes, maybe warn?
+            # We only want to commit the specific files we changed, but if there are
+            # other changes, maybe warn?
             # Ideally we only stage our files.
             pass
 

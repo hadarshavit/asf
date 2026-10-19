@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import pandas as pd
 import pytest
@@ -6,7 +7,7 @@ from asf.presolving.static_3s import Static3S
 
 
 @pytest.fixture
-def dummy_data():
+def dummy_data() -> Any:
     rng = np.random.RandomState(0)
     features = pd.DataFrame(rng.randn(20, 3), columns=pd.Index(["f1", "f2", "f3"]))
     performance = pd.DataFrame(
@@ -16,7 +17,7 @@ def dummy_data():
     return features, performance
 
 
-def _validate_predictions(preds, n):
+def _validate_predictions(preds: Any, n: Any) -> None:
     assert isinstance(preds, dict) and len(preds) == n
     for sched in preds.values():
         assert isinstance(sched, list)
@@ -26,7 +27,7 @@ def _validate_predictions(preds, n):
             assert isinstance(entry[1], (int, float, np.floating))
 
 
-def test_static3s_basic_flow_and_predict(dummy_data):
+def test_static3s_basic_flow_and_predict(dummy_data: Any) -> None:
     X, Y = dummy_data
     s = Static3S(runcount_limit=5, presolver_budget=30.0, max_candidates_per_solver=8)
     s.fit(X, Y)
@@ -37,14 +38,14 @@ def test_static3s_basic_flow_and_predict(dummy_data):
     assert preds == s.schedule
 
 
-def test_predict_before_fit_raises(dummy_data):
+def test_predict_before_fit_raises(dummy_data: Any) -> None:
     X, _ = dummy_data
     s = Static3S(presolver_budget=30.0)
     with pytest.raises(ValueError, match="Static3S has not been fitted yet"):
         s.predict()
 
 
-def test_schedule_time_and_ordering(dummy_data):
+def test_schedule_time_and_ordering(dummy_data: Any) -> None:
     X, Y = dummy_data
     budget = 40.0
     s = Static3S(runcount_limit=5, presolver_budget=budget, max_candidates_per_solver=8)
@@ -56,7 +57,7 @@ def test_schedule_time_and_ordering(dummy_data):
     assert sum(times) == pytest.approx(budget, rel=1e-6)
 
 
-def test_configuration_and_algorithms(dummy_data):
+def test_configuration_and_algorithms(dummy_data: Any) -> None:
     X, Y = dummy_data
     s = Static3S(presolver_budget=30.0)
     s.fit(X, Y)

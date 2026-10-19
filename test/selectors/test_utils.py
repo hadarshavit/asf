@@ -1,4 +1,7 @@
-def validate_predictions(predictions):
+from typing import Any
+
+
+def validate_predictions(predictions: Any) -> None:
     """
     Validates that predictions have the expected structure:
     - Length of predictions is 20.

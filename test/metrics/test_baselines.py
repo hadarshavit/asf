@@ -1,3 +1,4 @@
+from typing import Any
 import math
 import warnings
 
@@ -8,7 +9,7 @@ from asf.metrics import baselines as m
 from asf.preprocessing.feature_group_selector import MissingPrerequisiteGroupError
 
 
-def test_single_best_solver_minimize_and_maximize():
+def test_single_best_solver_minimize_and_maximize() -> None:
     perf = pd.DataFrame(
         {
             "A": [1, 3],  # sum = 4
@@ -24,7 +25,7 @@ def test_single_best_solver_minimize_and_maximize():
     assert m.single_best_solver(perf, maximize=True) == 7
 
 
-def test_virtual_best_solver_minimize_and_maximize():
+def test_virtual_best_solver_minimize_and_maximize() -> None:
     perf = pd.DataFrame(
         {
             "A": [1, 7],
@@ -40,7 +41,7 @@ def test_virtual_best_solver_minimize_and_maximize():
     assert m.virtual_best_solver(perf, maximize=True) == 9
 
 
-def test_running_time_selector_performance_solved_and_unsolved():
+def test_running_time_selector_performance_solved_and_unsolved() -> None:
     perf = pd.DataFrame(
         {
             "algA": [5],
@@ -66,7 +67,7 @@ def test_running_time_selector_performance_solved_and_unsolved():
     assert total_unsolved == 20.0
 
 
-def test_running_time_closed_gap_basic():
+def test_running_time_closed_gap_basic() -> None:
     perf = pd.DataFrame(
         {
             "algA": [5, 9],
@@ -99,7 +100,7 @@ def test_running_time_closed_gap_basic():
     assert math.isclose(val, 1.0, rel_tol=1e-9)
 
 
-def test_precision_regret_behaviors():
+def test_precision_regret_behaviors() -> None:
     perf = pd.DataFrame(
         {
             "A": [0.1, 0.9],
@@ -128,7 +129,8 @@ def test_precision_regret_behaviors():
         == precision.loc["x", "B"] + precision.loc["y", "A"]
     )
 
-    # Unknown algorithm and missing instance should be ignored; if all invalid -> warn and return inf
+    # Unknown algorithm and missing instance should be ignored; if all invalid -> warn
+    # and return inf
     with warnings.catch_warnings(record=True) as wlist:
         warnings.simplefilter("always")
         res = m.precision_regret({"z": [("C", 1.0)]}, perf)
@@ -145,7 +147,7 @@ class TestSchedulePrerequisiteValidation:
     """Tests for feature group prerequisite validation in schedules."""
 
     @pytest.fixture
-    def feature_groups_with_prereqs(self):
+    def feature_groups_with_prereqs(self) -> Any:
         """Feature groups with prerequisite dependencies."""
         return {
             "Pre": {"provides": ["f1", "f2"]},
@@ -155,7 +157,7 @@ class TestSchedulePrerequisiteValidation:
         }
 
     @pytest.fixture
-    def performance(self):
+    def performance(self) -> Any:
         """Sample performance data."""
         return pd.DataFrame(
             {
@@ -166,7 +168,7 @@ class TestSchedulePrerequisiteValidation:
         )
 
     @pytest.fixture
-    def feature_time(self):
+    def feature_time(self) -> Any:
         """Sample feature time data."""
         return pd.DataFrame(
             {
@@ -177,7 +179,9 @@ class TestSchedulePrerequisiteValidation:
             index=pd.Index(["inst1", "inst2"]),
         )
 
-    def test_validate_schedule_valid_prereqs_first(self, feature_groups_with_prereqs):
+    def test_validate_schedule_valid_prereqs_first(
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
         """Valid schedule with prerequisites computed first."""
         schedules = {
             "inst1": ["Pre", "Basic", ("algo1", 100)],
@@ -186,7 +190,9 @@ class TestSchedulePrerequisiteValidation:
         # Should not raise
         m._validate_schedule_prerequisites(schedules, feature_groups_with_prereqs)
 
-    def test_validate_schedule_missing_prereq(self, feature_groups_with_prereqs):
+    def test_validate_schedule_missing_prereq(
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
         """Schedule with missing prerequisite should raise error."""
         schedules = {
             "inst1": ["Basic", ("algo1", 100)],  # Basic requires Pre
@@ -199,8 +205,8 @@ class TestSchedulePrerequisiteValidation:
         assert "inst1" in str(exc_info.value)
 
     def test_validate_schedule_prereq_after_dependent(
-        self, feature_groups_with_prereqs
-    ):
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
         """Schedule with prerequisite appearing after dependent should raise."""
         schedules = {
             "inst1": ["Basic", "Pre", ("algo1", 100)],  # Pre must come before Basic
@@ -211,7 +217,9 @@ class TestSchedulePrerequisiteValidation:
         assert "Basic" in str(exc_info.value)
         assert "Pre" in str(exc_info.value)
 
-    def test_validate_schedule_no_feature_groups(self, feature_groups_with_prereqs):
+    def test_validate_schedule_no_feature_groups(
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
         """Schedule without feature groups should pass validation."""
         schedules = {
             "inst1": [("algo1", 100)],
@@ -220,7 +228,9 @@ class TestSchedulePrerequisiteValidation:
         # Should not raise
         m._validate_schedule_prerequisites(schedules, feature_groups_with_prereqs)
 
-    def test_validate_schedule_chained_prereqs(self, feature_groups_with_prereqs):
+    def test_validate_schedule_chained_prereqs(
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
         """Schedule with chained prerequisites should validate correctly."""
         # Advanced requires both Pre and Basic
 
@@ -239,7 +249,9 @@ class TestSchedulePrerequisiteValidation:
                 invalid_schedules, feature_groups_with_prereqs
             )
 
-    def test_validate_schedule_unknown_group(self, feature_groups_with_prereqs):
+    def test_validate_schedule_unknown_group(
+        self, feature_groups_with_prereqs: Any
+    ) -> None:
         """Unknown feature groups in schedule should be handled gracefully."""
         schedules = {
             "inst1": ["UnknownGroup", "Pre", ("algo1", 100)],
@@ -252,14 +264,14 @@ class TestClosedGapPrerequisiteValidation:
     """Tests for prerequisite validation in running_time_closed_gap."""
 
     @pytest.fixture
-    def feature_groups_with_prereqs(self):
+    def feature_groups_with_prereqs(self) -> Any:
         return {
             "Pre": {"provides": ["f1"]},
             "Basic": {"provides": ["f2"], "requires": ["Pre"]},
         }
 
     @pytest.fixture
-    def performance(self):
+    def performance(self) -> Any:
         return pd.DataFrame(
             {
                 "algo1": [10.0, 20.0],
@@ -269,7 +281,7 @@ class TestClosedGapPrerequisiteValidation:
         )
 
     @pytest.fixture
-    def feature_time(self):
+    def feature_time(self) -> Any:
         return pd.DataFrame(
             {
                 "Pre": [1.0, 1.0],
@@ -279,8 +291,8 @@ class TestClosedGapPrerequisiteValidation:
         )
 
     def test_closed_gap_valid_schedule(
-        self, feature_groups_with_prereqs, performance, feature_time
-    ):
+        self, feature_groups_with_prereqs: Any, performance: Any, feature_time: Any
+    ) -> None:
         """closed_gap with valid schedule should compute result."""
         schedules = {
             "inst1": ["Pre", "Basic", ("algo1", 100)],
@@ -296,8 +308,8 @@ class TestClosedGapPrerequisiteValidation:
         assert isinstance(result, float)
 
     def test_closed_gap_invalid_schedule(
-        self, feature_groups_with_prereqs, performance, feature_time
-    ):
+        self, feature_groups_with_prereqs: Any, performance: Any, feature_time: Any
+    ) -> None:
         """closed_gap with invalid schedule should raise error."""
         schedules = {
             "inst1": ["Basic", ("algo1", 100)],  # Missing Pre
@@ -313,8 +325,8 @@ class TestClosedGapPrerequisiteValidation:
             )
 
     def test_closed_gap_no_feature_groups_no_validation(
-        self, performance, feature_time
-    ):
+        self, performance: Any, feature_time: Any
+    ) -> None:
         """closed_gap without feature_groups should skip validation."""
         # Invalid schedule that would fail validation
         schedules = {
@@ -331,7 +343,9 @@ class TestClosedGapPrerequisiteValidation:
         )
         assert isinstance(result, float)
 
-    def test_closed_gap_backward_compatible(self, performance, feature_time):
+    def test_closed_gap_backward_compatible(
+        self, performance: Any, feature_time: Any
+    ) -> None:
         """closed_gap should work without feature_groups parameter (backward compat)."""
         schedules = {
             "inst1": [("algo1", 100)],

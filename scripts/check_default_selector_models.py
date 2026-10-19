@@ -141,8 +141,10 @@ def main() -> int:
             module = violation.resolved_module or "<unknown>"
             print(
                 f"{rel}:{lineno}: "
-                f"{violation.class_name}.__init__ parameter '{violation.parameter}' has default "
-                f"'{violation.default_name}' from module '{module}', expected '{TARGET_PREFIX}*'.",
+                f"{violation.class_name}.__init__ parameter "
+                f"'{violation.parameter}' has default "
+                f"'{violation.default_name}' from module '{module}', "
+                f"expected '{TARGET_PREFIX}*'.",
                 file=sys.stderr,
             )
         return 1

@@ -1,5 +1,7 @@
 """Additional tests for selector pipeline to improve coverage."""
 
+from typing import Any
+
 import pandas as pd
 
 from asf.selectors.selector_pipeline import SelectorPipeline
@@ -9,7 +11,7 @@ from asf.selectors.baselines import SingleBestSolver
 class TestSelectorPipelineExtended:
     """Extended tests for SelectorPipeline."""
 
-    def test_basic_pipeline(self):
+    def test_basic_pipeline(self) -> None:
         """Test basic pipeline with just a selector."""
         features = pd.DataFrame({"f1": [1.0, 2.0, 3.0]}, index=["i1", "i2", "i3"])
         performance = pd.DataFrame(
@@ -28,7 +30,7 @@ class TestSelectorPipelineExtended:
 class TestSelectorPipelineSaveLoad:
     """Tests for pipeline save/load functionality."""
 
-    def test_save(self, tmp_path):
+    def test_save(self, tmp_path: Any) -> None:
         """Test saving a pipeline."""
         features = pd.DataFrame({"f1": [1.0, 2.0, 3.0]}, index=["i1", "i2", "i3"])
         performance = pd.DataFrame(
@@ -46,7 +48,7 @@ class TestSelectorPipelineSaveLoad:
 
         assert os.path.exists(save_path)
 
-    def test_load(self, tmp_path):
+    def test_load(self, tmp_path: Any) -> None:
         """Test loading a pipeline."""
         features = pd.DataFrame({"f1": [1.0, 2.0, 3.0]}, index=["i1", "i2", "i3"])
         performance = pd.DataFrame(

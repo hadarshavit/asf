@@ -14,12 +14,15 @@ def get_default_preprocessor(
 
     Args:
         categorical_features (list[str] | Callable | None):
-            List of categorical feature names or a callable selector. Defaults to selecting object dtype columns.
+            List of categorical feature names or a callable selector. Defaults to
+            selecting object dtype columns.
         numerical_features (list[str] | Callable | None):
-            List of numerical feature names or a callable selector. Defaults to selecting numeric dtype columns.
+            List of numerical feature names or a callable selector. Defaults to
+            selecting numeric dtype columns.
 
     Returns:
-        ColumnTransformer: A transformer that applies preprocessing pipelines to categorical and numerical features.
+        ColumnTransformer: A transformer that applies preprocessing pipelines to
+        categorical and numerical features.
     """
     if categorical_features is None:
         categorical_features = make_column_selector(dtype_include=object)

@@ -25,20 +25,23 @@ from asf.utils.configurable import ConfigurableMixin
 
 class LinearClassifierWrapper(ConfigurableMixin, SklearnWrapper):
     """
-    A wrapper for the SGDClassifier from scikit-learn, providing additional functionality
+    A wrapper for the SGDClassifier from scikit-learn, providing additional
+    functionality
     for configuration space generation and parameter extraction.
     """
 
     PREFIX = "linear_classifier"
 
-    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
+    def __init__(
+        self, init_params: dict[str, Any] | None = None, **kwargs: Any
+    ) -> None:
         """
         Initialize the LinearClassifierWrapper.
         """
         super().__init__(SGDClassifier, init_params=init_params, **kwargs)
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(**kwargs: Any) -> Any:
         """
         Define hyperparameters for the Linear Classifier.
         """
@@ -74,14 +77,16 @@ class LinearRegressorWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX = "linear_regressor"
 
-    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
+    def __init__(
+        self, init_params: dict[str, Any] | None = None, **kwargs: Any
+    ) -> None:
         """
         Initialize the LinearRegressorWrapper.
         """
         super().__init__(SGDRegressor, init_params=init_params, **kwargs)
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(**kwargs: Any) -> Any:
         """
         Define hyperparameters for the Linear Regressor.
         """
@@ -110,11 +115,13 @@ class RidgeRegressorWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX = "ridge_regressor"
 
-    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
+    def __init__(
+        self, init_params: dict[str, Any] | None = None, **kwargs: Any
+    ) -> None:
         super().__init__(Ridge, init_params=init_params, **kwargs)
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(**kwargs: Any) -> Any:
         """
         Define hyperparameters for the Ridge Regressor.
         """
