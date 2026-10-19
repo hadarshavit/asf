@@ -32,7 +32,8 @@ class EPMRandomForest(ForestRegressor, AbstractPredictor, ConfigurableMixin):
     Implementation of Random Forest as an Empirical Performance Model (EPM).
 
     This model follows the approach described in the paper:
-    "Algorithm runtime prediction: Methods & evaluation" by Hutter, Xu, Hoos, and Leyton-Brown (2014).
+    "Algorithm runtime prediction: Methods & evaluation" by Hutter, Xu, Hoos, and
+    Leyton-Brown (2014).
 
     Parameters
     ----------
@@ -53,7 +54,8 @@ class EPMRandomForest(ForestRegressor, AbstractPredictor, ConfigurableMixin):
     min_samples_leaf : int, default=1
         The minimum number of samples required to be at a leaf node.
     min_weight_fraction_leaf : float, default=0.0
-        The minimum weighted fraction of the sum total of weights required to be at a leaf node.
+        The minimum weighted fraction of the sum total of weights required to be at a
+        leaf node.
     max_features : float, default=1.0
         The number of features to consider when looking for the best split.
     max_leaf_nodes : int or None, default=None
@@ -141,6 +143,7 @@ class EPMRandomForest(ForestRegressor, AbstractPredictor, ConfigurableMixin):
                 "random_state",
                 "ccp_alpha",
                 "monotonic_cst",
+                "splitter",
             ),
             bootstrap=bootstrap,
             oob_score=oob_score,
