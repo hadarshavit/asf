@@ -25,7 +25,8 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
     SNNAP (Solver-based Nearest Neighbor for Algorithm Portfolio) selector.
 
     Uses per-algorithm performance prediction models and Jaccard distance on predicted
-    top algorithms to find similar instances, then selects from neighbors' best algorithms.
+    top algorithms to find similar instances, then selects from neighbors' best
+    algorithms.
 
     References
     ----------
@@ -75,7 +76,7 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
         **kwargs : Any
             Additional keyword arguments.
         """
-        super().__init__(**kwargs)
+        super().__init__(random_state=random_state, **kwargs)
         self.k = int(k)
         self.top_n = int(top_n)
         self.random_state = random_state
@@ -126,7 +127,8 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
         self.training_top_n_sets = []
         for train_idx in range(len(self.scaled_performance_df)):
             train_scaled_perf = self.scaled_performance_df.iloc[train_idx]
-            # For minimize: lowest scaled runtime is best. For maximize: highest is best.
+            # For minimize: lowest scaled runtime is best. For maximize: highest is
+            # best.
             ascending = not self.maximize
             train_sorted = train_scaled_perf.sort_values(ascending=ascending)
             train_top_n = set(str(algo) for algo in train_sorted.index[: self.top_n])
@@ -191,7 +193,8 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
         predictions: dict[str, list[tuple[str, float]]] = {}
 
         for instance_name in features.index:
-            # Step 1: Use per-algorithm models to predict scaled runtimes for query instance
+            # Step 1: Use per-algorithm models to predict scaled runtimes for query
+            # instance
             query_features = features.loc[[instance_name]]
             predicted_scaled_runtimes = {}
             for algo in self.algorithms:
@@ -199,11 +202,13 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
                 pred = model.predict(query_features.values)[0]
                 predicted_scaled_runtimes[algo] = pred
 
-            # Step 2: Identify query's predicted top-n algorithms (respecting maximize flag)
+            # Step 2: Identify query's predicted top-n algorithms (respecting maximize
+            # flag)
             sorted_algos = sorted(
                 predicted_scaled_runtimes.items(),
                 key=lambda x: x[1],
-                reverse=self.maximize,  # If maximize, sort descending; if minimize, ascending
+                # If maximize, sort descending; if minimize, ascending
+                reverse=self.maximize,
             )
             query_top_n = set(str(algo) for algo, _ in sorted_algos[: self.top_n])
 
@@ -222,7 +227,8 @@ class SNNAP(ConfigurableMixin, AbstractSelector):
             k_actual = min(self.k, len(self.features_df))
             neighbor_idxs = [idx for idx, _ in jaccard_distances[:k_actual]]
 
-            # Step 5: Compute mean runtime for ALL algorithms across neighbors, then select best
+            # Step 5: Compute mean runtime for ALL algorithms across neighbors, then
+            # select best
             # This differs from selecting best-per-neighbor and averaging only winners
             runtimes_by_algo: dict[str, list[float]] = {}
             for ni in neighbor_idxs:

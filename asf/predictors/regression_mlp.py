@@ -50,13 +50,13 @@ class RegressionMLP(AbstractPredictor, ConfigurableMixin):
         optimizer: type[torch.optim.Optimizer] | None = None,
         batch_size: int = 128,
         epochs: int = 2000,
-        seed: int = 42,
+        random_state: int | None = 42,
         device: str = "cpu",
         compile_model: bool = True,
         learning_rate: float = 1e-3,
         weight_decay: float = 0.0,
         **kwargs: Any,
-    ):
+    ) -> None:
         params = dict(init_params) if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
@@ -66,7 +66,7 @@ class RegressionMLP(AbstractPredictor, ConfigurableMixin):
         optimizer = params.pop("optimizer", optimizer)
         batch_size = params.pop("batch_size", batch_size)
         epochs = params.pop("epochs", epochs)
-        seed = params.pop("seed", seed)
+        random_state = params.pop("random_state", random_state)
         device = params.pop("device", device)
         compile_model = params.pop("compile_model", compile_model)
         learning_rate = params.pop("learning_rate", learning_rate)
@@ -78,20 +78,21 @@ class RegressionMLP(AbstractPredictor, ConfigurableMixin):
             optimizer=optimizer,
             batch_size=batch_size,
             epochs=epochs,
-            seed=seed,
+            random_state=random_state,
             device=device,
             compile_model=compile_model,
             learning_rate=learning_rate,
             weight_decay=weight_decay,
         )
 
-        super().__init__(**params)
+        super().__init__(random_state=random_state, **params)
         if not TORCH_AVAILABLE:
             raise RuntimeError(
                 "PyTorch is not installed. Install it with: pip install torch"
             )
 
-        torch.manual_seed(seed)
+        if random_state is not None:
+            torch.manual_seed(random_state)
 
         self.model = deepcopy(model)
         self.device = device
@@ -150,6 +151,8 @@ class RegressionMLP(AbstractPredictor, ConfigurableMixin):
         sample_weight = kwargs.get("sample_weight")
         assert sample_weight is None, "Sample weights are not supported."
 
+        if self.random_state is not None:
+            torch.manual_seed(self.random_state)
         if self.model is None:
             input_size = X.shape[1] if hasattr(X, "shape") else len(X.columns)
             self.model = get_mlp(input_size=input_size, output_size=1)

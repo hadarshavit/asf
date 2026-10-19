@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from asf.predictors import RandomForestClassifierWrapper
 from asf.selectors.abstract_selector import AbstractSelector
+from asf.utils.random_state import random_state_kwargs
 
 
 class RPCSelector(AbstractSelector):
@@ -30,10 +31,10 @@ class RPCSelector(AbstractSelector):
         classifier_class: Type = RandomForestClassifierWrapper,
         n_estimators: int = 100,
         classifier_kwargs: dict[str, Any] | None = None,
-        random_state: int = 42,
+        random_state: int | None = 42,
         top_n: int = 1,
         **kwargs: Any,
-    ):
+    ) -> None:
         """
         Initialize RPC selector.
 
@@ -47,10 +48,13 @@ class RPCSelector(AbstractSelector):
                     a single (algorithm, budget) tuple.
             **kwargs: Additional arguments for parent class.
         """
-        super().__init__(**kwargs)
+        super().__init__(random_state=random_state, **kwargs)
         self.classifier_class = classifier_class
         self.n_estimators = int(n_estimators)
-        self.classifier_kwargs = dict(classifier_kwargs or {})
+        self.classifier_kwargs = {
+            **random_state_kwargs(classifier_class, random_state),
+            **(classifier_kwargs or {}),
+        }
 
         # Only set defaults if the classifier accepts these parameters
         sig_params = set(inspect.signature(classifier_class).parameters.keys())
@@ -60,13 +64,7 @@ class RPCSelector(AbstractSelector):
         ):
             self.classifier_kwargs["n_estimators"] = int(n_estimators)
 
-        if (
-            "random_state" in sig_params
-            and "random_state" not in self.classifier_kwargs
-        ):
-            self.classifier_kwargs["random_state"] = int(random_state)
-
-        self.random_state = int(random_state)
+        self.random_state = random_state
         self.top_n = max(1, int(top_n))
 
         # Set return type dynamically based on top_n
@@ -103,7 +101,9 @@ class RPCSelector(AbstractSelector):
         # 1 if algo_i is better (lower runtime), 0 otherwise
         return (perf_i < perf_j).astype(int)
 
-    def _fit(self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs) -> None:
+    def _fit(
+        self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
+    ) -> None:
         """
         Train binary classifiers for all algorithm pairs.
 
@@ -162,7 +162,8 @@ class RPCSelector(AbstractSelector):
             features: Instance features
 
         Returns:
-            If top_n == 1: dict[str, list[tuple[str, float]]] with single (algo, budget).
+            If top_n == 1: dict[str, list[tuple[str, float]]] with single (algo,
+            budget).
             If top_n > 1: dict[str, list[tuple[str, float]]] with equal time slices.
         """
         if not self.classifiers:

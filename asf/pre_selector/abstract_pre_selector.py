@@ -32,7 +32,9 @@ class AbstractPreSelector:
         The number of algorithms to pre-select.
     """
 
-    def __init__(self, n_algorithms: int | None = None) -> None:
+    def __init__(
+        self, n_algorithms: int | None = None, random_state: int | None = None
+    ) -> None:
         """
         Initialize the pre-selector.
 
@@ -41,6 +43,7 @@ class AbstractPreSelector:
         n_algorithms : int or None, default=None
             The number of algorithms to pre-select.
         """
+        self.random_state = random_state
         self.n_algorithms = n_algorithms
 
     def fit_transform(
@@ -108,7 +111,8 @@ class AbstractPreSelector:
         """
         if not CONFIGSPACE_AVAILABLE:
             raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
+                "ConfigSpace is not installed. Install optional extra with: pip "
+                "install 'asf[configspace]'"
             )
 
         if cs is None:
@@ -141,7 +145,8 @@ class AbstractPreSelector:
         """
         Create a pre-selector instance from a configuration.
 
-        In the abstract class, this method extracts `n_algorithms` from the configuration.
+        In the abstract class, this method extracts `n_algorithms` from the
+        configuration.
 
         Parameters
         ----------
@@ -168,7 +173,8 @@ class AbstractPreSelector:
         """
         if not CONFIGSPACE_AVAILABLE:
             raise RuntimeError(
-                "ConfigSpace is not installed. Install optional extra with: pip install 'asf[configspace]'"
+                "ConfigSpace is not installed. Install optional extra with: pip "
+                "install 'asf[configspace]'"
             )
 
         n_algorithms = None

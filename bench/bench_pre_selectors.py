@@ -6,8 +6,11 @@ This script benchmarks all available pre-selectors by measuring:
 2. The time taken to perform pre-selection
 
 Usage:
-    python bench_pre_selectors.py [--scenarios SCENARIO1 SCENARIO2 ...] [--output results.csv]
+    python bench_pre_selectors.py [--scenarios SCENARIO1 SCENARIO2 ...] [--output
+    results.csv]
 """
+
+from typing import Any
 
 import argparse
 import logging
@@ -35,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 # Define all pre-selectors to benchmark
-def get_pre_selectors(n_algorithms: int, metric, maximize: bool = False) -> dict:
+def get_pre_selectors(n_algorithms: int, metric: Any, maximize: bool = False) -> dict:
     """
     Returns a dictionary of pre-selector configurations to benchmark.
 
@@ -87,7 +90,7 @@ def get_pre_selectors(n_algorithms: int, metric, maximize: bool = False) -> dict
             maximize=maximize,
             n_restarts=5,
             max_iterations=50,
-            seed=42,
+            random_state=42,
         ),
         "RandomLocalSearch_r10": RandomLocalSearchPreSelector(
             metric=metric,
@@ -95,7 +98,7 @@ def get_pre_selectors(n_algorithms: int, metric, maximize: bool = False) -> dict
             maximize=maximize,
             n_restarts=10,
             max_iterations=100,
-            seed=42,
+            random_state=42,
         ),
         # Genetic algorithm
         "GeneticAlgorithm_small": GeneticAlgorithmPreSelector(
@@ -104,7 +107,7 @@ def get_pre_selectors(n_algorithms: int, metric, maximize: bool = False) -> dict
             maximize=maximize,
             population_size=20,
             n_generations=50,
-            seed=42,
+            random_state=42,
         ),
         "GeneticAlgorithm_large": GeneticAlgorithmPreSelector(
             metric=metric,
@@ -112,7 +115,7 @@ def get_pre_selectors(n_algorithms: int, metric, maximize: bool = False) -> dict
             maximize=maximize,
             population_size=50,
             n_generations=100,
-            seed=42,
+            random_state=42,
         ),
         # Optimization-based
         "OptimizeDE": OptimizePreSelection(
@@ -126,9 +129,9 @@ def get_pre_selectors(n_algorithms: int, metric, maximize: bool = False) -> dict
 
 
 def benchmark_pre_selector(
-    pre_selector,
+    pre_selector: Any,
     performance: pd.DataFrame,
-    metric,
+    metric: Any,
 ) -> tuple[float, float, float, list]:
     """
     Benchmark a single pre-selector on performance data.
@@ -220,7 +223,7 @@ def run_fold_benchmark(
         train_performance = performance.loc[train_instance_ids]
 
         # Define metric (VBS on training data)
-        def vbs_metric(perf):
+        def vbs_metric(perf: Any) -> Any:
             return virtual_best_solver(
                 perf, maximize=maximize, budget=budget, par=par_factor
             )

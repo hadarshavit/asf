@@ -6,8 +6,11 @@ This script benchmarks all available presolvers by measuring:
 2. The time taken to compute the schedule
 
 Usage:
-    python bench_presolvers.py [--scenarios SCENARIO1 SCENARIO2 ...] [--output results.csv]
+    python bench_presolvers.py [--scenarios SCENARIO1 SCENARIO2 ...] [--output
+    results.csv]
 """
+
+from typing import Any
 
 import argparse
 import logging
@@ -101,21 +104,21 @@ def get_presolvers(budget: float, maximize: bool = False) -> dict:
             budget=budget,
             maximize=maximize,
             de_popsize=10,
-            seed=42,
+            random_state=42,
         ),
         "ASAPv2_medium": ASAPv2(
             runcount_limit=500.0,
             budget=budget,
             maximize=maximize,
             de_popsize=15,
-            seed=42,
+            random_state=42,
         ),
         "ASAPv2_large": ASAPv2(
             runcount_limit=1000.0,
             budget=budget,
             maximize=maximize,
             de_popsize=20,
-            seed=42,
+            random_state=42,
         ),
         # Static3S (requires pulp)
         "Static3S_default": Static3S(
@@ -210,7 +213,7 @@ def evaluate_schedule(
 
 
 def benchmark_presolver(
-    presolver,
+    presolver: Any,
     features: pd.DataFrame,
     performance: pd.DataFrame,
     budget: float,

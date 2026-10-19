@@ -36,6 +36,7 @@ class AbstractEPMBasedSelector(AbstractSelector):
             del kwargs[k]
 
         super().__init__(**kwargs)
+        self.epm_kwargs["random_state"] = self.random_state
 
     def save(self, path: str | Path) -> None:
         """

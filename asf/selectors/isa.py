@@ -69,7 +69,7 @@ class ISA(ConfigurableMixin, AbstractSelector):
         k_candidates: list[int] | None = None,
         aspeed_cutoff: int = 5,
         cores: int = 1,
-        random_state: int = 42,
+        random_state: int | None = 42,
         **kwargs: Any,
     ) -> None:
         """
@@ -96,7 +96,7 @@ class ISA(ConfigurableMixin, AbstractSelector):
         """
         if not CLINGO_AVAIL:
             raise ImportError("clingo is not installed. Please install it to use ISA.")
-        super().__init__(**kwargs)
+        super().__init__(random_state=random_state, **kwargs)
         self.k = int(k)
         self.use_k_tuning = bool(use_k_tuning)
         self.n_folds = int(n_folds)
@@ -113,7 +113,7 @@ class ISA(ConfigurableMixin, AbstractSelector):
 
         self.aspeed_cutoff = int(aspeed_cutoff)
         self.cores = int(cores)
-        self.random_state = int(random_state)
+        self.random_state = random_state
 
         self.reduced_features: pd.DataFrame | None = None
         self.reduced_performance: pd.DataFrame | None = None

@@ -11,11 +11,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import differential_evolution, minimize_scalar
 
-from asf.presolving.presolver import (
-    DEFAULT_BUDGET,
-    AbstractPresolver,
-    resolve_presolver_budget,
-)
+from asf.presolving.presolver import AbstractPresolver
 
 try:
     from ConfigSpace import Configuration  # noqa: F401
@@ -54,7 +50,7 @@ class ASAPv2(AbstractPresolver):
         Weight for variance penalty in objective function.
     de_popsize : int, default=15
         Population size for differential evolution.
-    seed : int, default=42
+    random_state : int, default=42
         Random seed for reproducibility.
     verbosity : int, default=0
         Verbosity level (0=silent, 1=basic, 2=detailed).
@@ -66,14 +62,14 @@ class ASAPv2(AbstractPresolver):
         self,
         init_params: dict[str, Any] | None = None,
         runcount_limit: float = 100.0,
-        presolver_budget: float | object = DEFAULT_BUDGET,
+        presolver_budget: float = 30.0,
         maximize: bool = False,
         size_preschedule: int = 3,
         max_runtime_preschedule: float = -1,
         regularization_weight: float = 0.0,
         variance_weight: float = 0.0,
         de_popsize: int = 15,
-        seed: int = 42,
+        random_state: int | None = 42,
         verbosity: int = 0,
         **kwargs: Any,
     ) -> None:
@@ -83,7 +79,7 @@ class ASAPv2(AbstractPresolver):
         params = dict(init_params) if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
-        presolver_budget = resolve_presolver_budget(presolver_budget, params, 30.0)
+        presolver_budget = params.pop("presolver_budget", presolver_budget)
         maximize = params.pop("maximize", maximize)
         runcount_limit = params.pop("runcount_limit", runcount_limit)
         size_preschedule = params.pop("size_preschedule", size_preschedule)
@@ -95,19 +91,24 @@ class ASAPv2(AbstractPresolver):
         )
         variance_weight = params.pop("variance_weight", variance_weight)
         de_popsize = params.pop("de_popsize", de_popsize)
-        seed = params.pop("seed", seed)
+        random_state = params.pop("random_state", random_state)
         verbosity = params.pop("verbosity", verbosity)
 
-        super().__init__(presolver_budget=presolver_budget, maximize=maximize, **params)
+        super().__init__(
+            presolver_budget=presolver_budget,
+            maximize=maximize,
+            random_state=random_state,
+            **params,
+        )
 
         self.size_preschedule = int(size_preschedule)
         self.regularization_weight = float(regularization_weight)
         self.variance_weight = float(variance_weight)
         self.de_popsize = int(de_popsize)
         self.de_maxiter = int(runcount_limit)
-        self.seed = int(seed)
+        self.random_state = random_state
         self.verbosity = int(verbosity)
-        self.rand_st = np.random.RandomState(self.seed)
+        self.rand_st = np.random.RandomState(self.random_state)
 
         # Set max runtime for preschedule
         if max_runtime_preschedule < 0:
@@ -215,7 +216,8 @@ class ASAPv2(AbstractPresolver):
         self.feature_train = features_frame.values
         self.performance_train = performance_frame.values.copy()
 
-        # PAR10: instances with runtime >= presolver_budget are penalized with 10x budget
+        # PAR10: instances with runtime >= presolver_budget are penalized with 10x
+        # budget
         self.performance_train[self.performance_train >= self.presolver_budget] = (
             10 * self.presolver_budget
         )
@@ -352,7 +354,8 @@ class ASAPv2(AbstractPresolver):
         # Total time allocated to preschedule (selector gets remaining time)
         total_runtime_preschedule = np.sum(self.runtimes_preschedule)
 
-        # For the original ASAP v2, the selector is the oracle (best algorithm per instance)
+        # For the original ASAP v2, the selector is the oracle (best algorithm per
+        # instance)
         # This simulates having a perfect predictor
         best_algorithm_per_instance = np.argmin(self.performance_train, axis=1)
 
@@ -459,7 +462,7 @@ class ASAPv2(AbstractPresolver):
                 result = differential_evolution(
                     objective_function,
                     bounds,
-                    seed=self.seed,
+                    seed=self.random_state,
                     popsize=self.de_popsize,
                     maxiter=self.de_maxiter,
                     disp=self.verbosity > 0,

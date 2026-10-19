@@ -71,7 +71,7 @@ class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelect
         n_iter: int = 100,
         lr: float = 0.001,
         reg: float = 0.1,
-        random_state: int = 42,
+        random_state: int | None = 42,
         **kwargs: Any,
     ) -> None:
         """
@@ -94,12 +94,12 @@ class CollaborativeFilteringSelector(ConfigurableMixin, AbstractModelBasedSelect
         **kwargs : Any
             Additional keyword arguments for the parent classes.
         """
-        super().__init__(model_class=model_class, **kwargs)
+        super().__init__(model_class=model_class, random_state=random_state, **kwargs)
         self.n_components = int(n_components)
         self.n_iter = int(n_iter)
         self.lr = float(lr)
         self.reg = float(reg)
-        self.random_state = int(random_state)
+        self.random_state = random_state
         self.U: np.ndarray | None = None
         self.V: np.ndarray | None = None
         self.performance_matrix: pd.DataFrame | None = None

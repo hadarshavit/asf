@@ -27,15 +27,18 @@ class HybridDecisionTree:
         lambda_param: float = 0.5,
         max_thresholds: int = 32,
         random_state: Optional[int] = None,
-    ):
+    ) -> None:
         """
         Initialize the Hybrid Decision Tree.
 
         Args:
             max_depth: Maximum depth of the tree.
-            min_samples_split: Minimum number of samples required to split an internal node.
-            lambda_param: Weighting parameter for combining regression and ranking losses (0 <= lambda_param <= 1).
-            max_thresholds: Maximum number of thresholds to consider per feature when searching for splits.
+            min_samples_split: Minimum number of samples required to split an internal
+            node.
+            lambda_param: Weighting parameter for combining regression and ranking
+            losses (0 <= lambda_param <= 1).
+            max_thresholds: Maximum number of thresholds to consider per feature when
+            searching for splits.
             random_state: Seed for the random number generator.
         """
         self.max_depth = max_depth
@@ -64,7 +67,8 @@ class HybridDecisionTree:
         """Compute average Spearman correlation using vectorized operations.
 
         Args:
-            y_ranks: Pre-computed ranks of performance values (n_instances, n_algorithms)
+            y_ranks: Pre-computed ranks of performance values (n_instances,
+            n_algorithms)
             y_pred: Predicted performance values (n_algorithms,)
 
         Returns:
@@ -103,7 +107,8 @@ class HybridDecisionTree:
         Vectorized Spearman correlation loss using pre-computed ranks.
 
         Args:
-            y_ranks: Pre-computed ranks of performance values (n_instances, n_algorithms)
+            y_ranks: Pre-computed ranks of performance values (n_instances,
+            n_algorithms)
             y_pred: Predicted performance values (regression label)
 
         Returns:
@@ -138,14 +143,16 @@ class HybridDecisionTree:
         self, X: np.ndarray, y: np.ndarray
     ) -> Tuple[Optional[int], Optional[float]]:
         """
-        Find the best feature and threshold to split the data to minimize the hybrid loss.
+        Find the best feature and threshold to split the data to minimize the hybrid
+        loss.
 
         Args:
             X (np.ndarray): Feature matrix of shape (n_instances, n_features).
             y (np.ndarray): Target values of shape (n_instances, n_algorithms).
 
         Returns:
-            Tuple[Optional[int], Optional[float]]: The index of the best feature to split on and the threshold value.
+            Tuple[Optional[int], Optional[float]]: The index of the best feature to
+            split on and the threshold value.
                 Returns (None, None) if no valid split is found.
         """
         n_instances, n_features = X.shape
@@ -322,9 +329,9 @@ class HARRIS(ConfigurableMixin, AbstractSelector):
         lambda_param: float = 0.5,
         max_features: Optional[str] = "sqrt",
         max_thresholds: int = 32,
-        random_state: int = 42,
+        random_state: int | None = 42,
         **kwargs: Any,
-    ):
+    ) -> None:
         """
         Initialize HARRIS selector.
 
@@ -343,14 +350,14 @@ class HARRIS(ConfigurableMixin, AbstractSelector):
             random_state: Random seed.
             **kwargs: Additional arguments for parent class.
         """
-        super().__init__(**kwargs)
+        super().__init__(random_state=random_state, **kwargs)
         self.n_estimators = int(n_estimators)
         self.max_depth = int(max_depth)
         self.min_samples_split = int(min_samples_split)
         self.lambda_param = float(lambda_param)
         self.max_features = max_features
         self.max_thresholds = int(max_thresholds)
-        self.random_state = int(random_state)
+        self.random_state = random_state
 
         self.trees: List[HybridDecisionTree] = []
         self.algorithms: List[str] = []
@@ -408,7 +415,9 @@ class HARRIS(ConfigurableMixin, AbstractSelector):
         else:
             return n_total_features
 
-    def _fit(self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs) -> None:
+    def _fit(
+        self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
+    ) -> None:
         """
         Train the HARRIS forest.
 
@@ -460,10 +469,12 @@ class HARRIS(ConfigurableMixin, AbstractSelector):
         Predict the best algorithm for each instance.
 
         Args:
-            features (pd.DataFrame): Feature matrix with instances as rows and features as columns.
+            features (pd.DataFrame): Feature matrix with instances as rows and features
+            as columns.
 
         Returns:
-            Dict[str, List[Tuple[str, float]]]: A dictionary mapping each instance name to a list containing
+            Dict[str, List[Tuple[str, float]]]: A dictionary mapping each instance name
+            to a list containing
                 a tuple of the best algorithm (str) and the budget (float).
         """
         budget = getattr(self, "budget", None)

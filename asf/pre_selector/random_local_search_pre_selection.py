@@ -29,7 +29,8 @@ class RandomLocalSearchPreSelector(AbstractPreSelector):
     Parameters
     ----------
     metric : Callable
-        A function that takes a DataFrame of performance values and returns a single value.
+        A function that takes a DataFrame of performance values and returns a single
+        value.
     n_algorithms : int
         The number of algorithms to select.
     maximize : bool, default=False
@@ -38,7 +39,7 @@ class RandomLocalSearchPreSelector(AbstractPreSelector):
         Number of random restarts.
     max_iterations : int, default=100
         Maximum number of local search iterations per restart.
-    seed : int or None, default=None
+    random_state : int or None, default=None
         Random seed for reproducibility.
     **kwargs : Any
         Additional arguments passed to the parent class.
@@ -51,16 +52,16 @@ class RandomLocalSearchPreSelector(AbstractPreSelector):
         maximize: bool = False,
         n_restarts: int = 10,
         max_iterations: int = 100,
-        seed: int | None = None,
+        random_state: int | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(**kwargs)
+        super().__init__(random_state=random_state, **kwargs)
         self.metric = metric
         self.n_algorithms = n_algorithms
         self.maximize = maximize
         self.n_restarts = n_restarts
         self.max_iterations = max_iterations
-        self.seed = seed
+        self.random_state = random_state
 
     def _is_better(self, new_score: float, old_score: float) -> bool:
         """Check if new_score is better than old_score."""
@@ -149,7 +150,7 @@ class RandomLocalSearchPreSelector(AbstractPreSelector):
                 return performance_frame.values
             return performance_frame.reset_index(drop=True)
 
-        rng = np.random.default_rng(self.seed)
+        rng = np.random.default_rng(self.random_state)
 
         best_overall_subset = None
         best_overall_score = float("-inf") if self.maximize else float("inf")

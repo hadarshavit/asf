@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import pandas as pd
 import pytest
@@ -18,7 +19,7 @@ from asf.predictors import SVMClassifierWrapper, SVMRegressorWrapper
 
 
 @pytest.fixture
-def dummy_data():
+def dummy_data() -> Any:
     features = pd.DataFrame(np.random.randn(10, 3), columns=["f1", "f2", "f3"])
     performance = pd.DataFrame(
         np.random.exponential(15, (10, 3)),
@@ -32,7 +33,7 @@ def dummy_data():
     return features, performance, features_running_time
 
 
-def test_tune_selector_with_preprocessing(dummy_data):
+def test_tune_selector_with_preprocessing(dummy_data: Any) -> None:
     """Test tune_selector with preprocessors."""
     features, performance, features_running_time = dummy_data
     preprocessors = [StandardScaler, MinMaxScaler]
@@ -52,7 +53,7 @@ def test_tune_selector_with_preprocessing(dummy_data):
             runcount_limit=2,
             preprocessing_class=preprocessors,
             cv=2,
-            seed=42,
+            random_state=42,
             output_dir=output_dir,
         )
 
@@ -70,7 +71,9 @@ def test_tune_selector_with_preprocessing(dummy_data):
         shutil.rmtree(output_dir, ignore_errors=True)
 
 
-def test_selector_tuner(dummy_performance, dummy_features, validate_predictions):
+def test_selector_tuner(
+    dummy_performance: Any, dummy_features: Any, validate_predictions: Any
+) -> None:
     """Test selector tuner with basic dummy data."""
     # Create dummy feature running time
     features_running_time = pd.DataFrame(
@@ -88,7 +91,7 @@ def test_selector_tuner(dummy_performance, dummy_features, validate_predictions)
             selector_class=[PairwiseClassifier, PairwiseRegressor],
             runcount_limit=2,
             cv=2,
-            seed=42,
+            random_state=42,
             output_dir=output_dir,
             budget=450.0,
         )

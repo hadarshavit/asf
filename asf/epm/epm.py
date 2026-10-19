@@ -1,5 +1,6 @@
 """
-EPM (Empirical Performance Model) - A wrapper for machine learning models with preprocessing.
+EPM (Empirical Performance Model) - A wrapper for machine learning models with
+preprocessing.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from sklearn.base import RegressorMixin, TransformerMixin
 from asf.predictors import SklearnWrapper
 from asf.predictors.abstract_predictor import AbstractPredictor
 from asf.predictors.estimator import clone_estimator
+from asf.utils.random_state import random_state_kwargs
 from asf.predictors.random_forest import RandomForestRegressorWrapper
 from asf.preprocessing.performance_scaling import (
     AbstractNormalization,
@@ -27,11 +29,13 @@ class EPM:
     Empirical Performance Model wrapper.
 
     The EPM (Empirical Performance Model) class is a wrapper for machine learning models
-    that includes preprocessing, normalization, and optional inverse transformation of predictions.
+    that includes preprocessing, normalization, and optional inverse transformation of
+    predictions.
 
     Parameters
     ----------
-    predictor_class : type[AbstractPredictor] or type[RegressorMixin], default=RandomForestRegressorWrapper
+    predictor_class : type[AbstractPredictor] or type[RegressorMixin],
+    default=RandomForestRegressorWrapper
         The class of the predictor to use.
     normalization_class : type[AbstractNormalization], default=LogNormalization
         The normalization class to apply to the target variable.
@@ -53,6 +57,8 @@ class EPM:
         Configured estimator supporting sklearn.base.clone. Takes precedence over
         predictor_class. Incompatible with predictor_config or predictor_kwargs;
         configure the estimator instance directly instead.
+    random_state : int or None, default=None
+        Seed for constructed predictors and unset states on estimator clones.
     """
 
     def __init__(
@@ -69,12 +75,14 @@ class EPM:
         imputer: Callable[[pd.Series, pd.DataFrame], pd.Series] | None = None,
         *,
         estimator: Any | None = None,
+        random_state: int | None = None,
     ) -> None:
         if estimator is not None and (predictor_config is not None or predictor_kwargs):
             raise ValueError(
                 "Configure estimator directly instead of passing predictor_config "
                 "or predictor_kwargs."
             )
+        self.random_state = random_state
         self.estimator = estimator
         if isinstance(predictor_class, type) and issubclass(
             predictor_class, RegressorMixin
@@ -172,13 +180,17 @@ class EPM:
     def _get_predictor(self) -> Any:
         """Get the predictor instance."""
         if getattr(self, "estimator", None) is not None:
-            return clone_estimator(self.estimator)
+            return clone_estimator(self.estimator, self.random_state)
+        predictor_kwargs = {
+            **random_state_kwargs(self.model_class, self.random_state),
+            **self.predictor_kwargs,
+        }
         if self.predictor_config is None:
-            predictor = self.model_class(**self.predictor_kwargs)
+            predictor = self.model_class(**predictor_kwargs)
         else:
             # Assume get_from_configuration returns a partial or a class
             predictor_factory = self.predictor_class.get_from_configuration(
-                self.predictor_config, **self.predictor_kwargs
+                self.predictor_config, **predictor_kwargs
             )
             if callable(predictor_factory):
                 predictor = predictor_factory()

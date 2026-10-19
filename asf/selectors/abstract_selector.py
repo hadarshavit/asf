@@ -19,7 +19,8 @@ class AbstractSelector(ABC):
     Attributes
     ----------
     maximize : bool
-        Indicates whether the objective is to maximize or minimize the performance metric.
+        Indicates whether the objective is to maximize or minimize the performance
+        metric.
     budget : float or None
         The budget for the selector, if applicable.
     feature_groups : list[str] or None
@@ -43,6 +44,7 @@ class AbstractSelector(ABC):
         feature_groups: list[str] | None = None,
         hierarchical_generator: AbstractFeatureGenerator | None = None,
         prediction_mode: str = "aslib",
+        random_state: int | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -60,9 +62,12 @@ class AbstractSelector(ABC):
             A generator for hierarchical features, if applicable.
         prediction_mode : str, default="aslib"
             Mode for predictions ('aslib', 'pandas', 'numpy').
+        random_state : int or None, default=None
+            Seed forwarded to models constructed by the selector.
         **kwargs : Any
             Additional keyword arguments.
         """
+        self.random_state = random_state
         self.maximize = bool(maximize)
         self.budget = float(budget) if budget is not None else None
         self.feature_groups = feature_groups

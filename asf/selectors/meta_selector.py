@@ -9,6 +9,7 @@ import pandas as pd
 from sklearn.model_selection import KFold
 
 from asf.selectors.abstract_selector import AbstractSelector
+from asf.utils.random_state import random_state_kwargs
 from asf.utils.configurable import ClassChoice, ConfigurableMixin
 
 try:
@@ -66,7 +67,7 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
         candidate_selectors: list[type] | None = None,
         par_factor: int = 10,
         n_folds: int = 5,
-        random_state: int = 42,
+        random_state: int | None = 42,
         **kwargs: Any,
     ) -> None:
         """
@@ -93,25 +94,31 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
         **kwargs : Any
             Additional keyword arguments passed to parent class.
         """
-        super().__init__(**kwargs)
+        super().__init__(random_state=random_state, **kwargs)
 
         if base_selectors is None and candidate_selectors is not None:
             base_selectors = []
             for sel_cls in candidate_selectors:
                 try:
-                    base_selectors.append(sel_cls())
+                    base_selectors.append(
+                        sel_cls(**random_state_kwargs(sel_cls, random_state))
+                    )
                 except Exception:
                     pass
 
         if callable(base_selectors):
-            self.base_selectors = cast(Any, base_selectors)()
+            self.base_selectors = cast(Any, base_selectors)(
+                **random_state_kwargs(base_selectors, random_state)
+            )
         else:
             self.base_selectors = (
                 list(base_selectors) if base_selectors is not None else []
             )
 
         if callable(meta_selector):
-            self.meta_selector = cast(Any, meta_selector)()
+            self.meta_selector = cast(Any, meta_selector)(
+                **random_state_kwargs(meta_selector, random_state)
+            )
         else:
             self.meta_selector = cast(AbstractSelector, meta_selector)
 
@@ -123,14 +130,15 @@ class MetaSelector(ConfigurableMixin, AbstractSelector):
         for sel in self.base_selectors:
             if getattr(sel, "RETURN_TYPE", None) != "single":
                 raise ValueError(
-                    f"Base selector {sel.__class__.__name__} must have RETURN_TYPE 'single'."
+                    f"Base selector {sel.__class__.__name__} "
+                    "must have RETURN_TYPE 'single'."
                 )
         if getattr(self.meta_selector, "RETURN_TYPE", None) != "single":
             raise ValueError("Meta selector must have RETURN_TYPE 'single'.")
 
         self.par_factor = int(par_factor)
         self.n_folds = int(n_folds)
-        self.random_state = int(random_state)
+        self.random_state = random_state
 
         self.selector_names = [
             f"{s.__class__.__name__}_{i}" for i, s in enumerate(self.base_selectors)

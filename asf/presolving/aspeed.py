@@ -10,11 +10,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from asf.presolving.presolver import (
-    DEFAULT_BUDGET,
-    AbstractPresolver,
-    resolve_presolver_budget,
-)
+from asf.presolving.presolver import AbstractPresolver
 
 try:
     import clingo
@@ -50,28 +46,32 @@ class Aspeed(AbstractPresolver):
 
     def __init__(
         self,
-        presolver_budget: float | object = DEFAULT_BUDGET,
+        presolver_budget: float = 30.0,
         aspeed_cutoff: int = 60,
         maximize: bool = False,
         cores: int = 1,
         data_threshold: int = 300,
         data_fraction: float = 0.3,
-        seed: int = 0,
+        random_state: int | None = 0,
         **kwargs: Any,
     ) -> None:
         if not CLINGO_AVAIL:
             raise ImportError(
-                "clingo is not installed. Please install it to use the Aspeed presolver."
+                "clingo is not installed. Please install it to use the Aspeed "
+                "presolver."
             )
 
-        actual_budget = resolve_presolver_budget(presolver_budget, kwargs, 30.0)
-
-        super().__init__(presolver_budget=actual_budget, maximize=maximize, **kwargs)
+        super().__init__(
+            presolver_budget=presolver_budget,
+            maximize=maximize,
+            random_state=random_state,
+            **kwargs,
+        )
 
         self.cores = int(cores)
         self.data_threshold = int(data_threshold)
         self.data_fraction = float(data_fraction)
-        self.seed = int(seed)
+        self.random_state = random_state
         self.aspeed_cutoff = int(aspeed_cutoff)
         self.schedule: list[tuple[str, float]] = []
         self.algorithms: list[str] = []
@@ -206,7 +206,7 @@ solved(I)   :- solved(I,_).
 
         # Subsample if needed
         if perf_frame.shape[0] > self.data_threshold:
-            random_indx = np.random.default_rng(self.seed).choice(
+            random_indx = np.random.default_rng(self.random_state).choice(
                 range(perf_frame.shape[0]),
                 size=min(
                     perf_frame.shape[0],
