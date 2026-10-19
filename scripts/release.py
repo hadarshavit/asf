@@ -1,6 +1,5 @@
-from typing import Any
-
 #!/usr/bin/env python3
+from typing import Any
 import argparse
 import re
 import subprocess
