@@ -1,5 +1,7 @@
 """Configured estimators must remain templates across independent training tasks."""
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -10,6 +12,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+from sklearn.svm import SVC
 
 from asf.predictors import RandomForestRegressorWrapper, SklearnWrapper
 from asf.selectors import (
@@ -27,7 +30,7 @@ from asf.selectors.feature_generator import AbstractFeatureGenerator
 
 
 @pytest.fixture
-def training_data():
+def training_data() -> Any:
     X = pd.DataFrame({"f": [0.0, 1.0, 2.0, 3.0]})
     y = pd.DataFrame(
         {
@@ -55,8 +58,13 @@ def training_data():
     ],
 )
 def test_estimators_are_cloned_for_each_task_and_refit(
-    training_data, selector_cls, estimator, attribute, kwargs, tmp_path
-):
+    training_data: Any,
+    selector_cls: Any,
+    estimator: Any,
+    attribute: Any,
+    kwargs: Any,
+    tmp_path: Any,
+) -> None:
     X, y = training_data
     selector = selector_cls(estimator=estimator, budget=100, **kwargs)
     selector.fit(X, y)
@@ -82,7 +90,7 @@ def test_estimators_are_cloned_for_each_task_and_refit(
 
 
 @pytest.mark.parametrize("jackknife", [True, False])
-def test_apps_clones_each_ensemble_member(training_data, jackknife):
+def test_apps_clones_each_ensemble_member(training_data: Any, jackknife: Any) -> None:
     X, y = training_data
     estimator = DecisionTreeRegressor(max_depth=2)
     selector = APPS(
@@ -105,7 +113,9 @@ def test_apps_clones_each_ensemble_member(training_data, jackknife):
     assert len(selector.predictors) == 3
 
 
-def test_unweighted_selector_accepts_pipeline_without_sample_weight(training_data):
+def test_unweighted_selector_accepts_pipeline_without_sample_weight(
+    training_data: Any,
+) -> None:
     X, y = training_data
     estimator = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=1))
     selector = PairwiseClassifier(estimator=estimator, use_weights=False)
@@ -121,7 +131,9 @@ def test_unweighted_selector_accepts_pipeline_without_sample_weight(training_dat
         RandomForestRegressorWrapper(n_estimators=2, random_state=7),
     ],
 )
-def test_wrappers_clone_parameters_without_fitted_state(training_data, wrapper):
+def test_wrappers_clone_parameters_without_fitted_state(
+    training_data: Any, wrapper: Any
+) -> None:
     X, y = training_data
     wrapper.fit(X, y["a"])
     copied = clone(wrapper)
@@ -133,7 +145,7 @@ def test_wrappers_clone_parameters_without_fitted_state(training_data, wrapper):
     assert all(model is not wrapper for model in selector.regressors)
 
 
-def test_prefitted_estimator_is_not_retrained(training_data):
+def test_prefitted_estimator_is_not_retrained(training_data: Any) -> None:
     X, y = training_data
     estimator = DecisionTreeRegressor().fit(X, np.full(len(X), 123.0))
     original_tree = estimator.tree_
@@ -144,7 +156,9 @@ def test_prefitted_estimator_is_not_retrained(training_data):
     assert all(model.tree_ is not original_tree for model in selector.regressors)
 
 
-def test_joint_performance_model_clones_with_algorithm_features(training_data):
+def test_joint_performance_model_clones_with_algorithm_features(
+    training_data: Any,
+) -> None:
     X, y = training_data
     estimator = DecisionTreeRegressor()
     selector = PerformanceModel(estimator=estimator)
@@ -155,7 +169,7 @@ def test_joint_performance_model_clones_with_algorithm_features(training_data):
     assert not hasattr(estimator, "tree_")
 
 
-def test_collaborative_filtering_clones_estimator(training_data):
+def test_collaborative_filtering_clones_estimator(training_data: Any) -> None:
     X, y = training_data
     estimator = DecisionTreeRegressor(max_depth=2)
     selector = CollaborativeFilteringSelector(
@@ -168,7 +182,7 @@ def test_collaborative_filtering_clones_estimator(training_data):
     assert len(selector.predict(X)) == len(X)
 
 
-def test_satzilla_clones_label_and_per_algorithm_models(training_data):
+def test_satzilla_clones_label_and_per_algorithm_models(training_data: Any) -> None:
     X, y = training_data
     classifier = DecisionTreeClassifier()
     regressor = DecisionTreeRegressor()
@@ -187,7 +201,7 @@ def test_satzilla_clones_label_and_per_algorithm_models(training_data):
     assert len(selector.predict(X)) == len(X)
 
 
-def test_satzilla_uses_probabilities_from_configured_classifier():
+def test_satzilla_uses_probabilities_from_configured_classifier() -> None:
     X = pd.DataFrame({"f": [0.0, 1.0, 2.0, 3.0]})
     y = pd.DataFrame({"a": [1.0, 1.0, 1.0, 100.0], "b": [10.0, 10.0, 10.0, 1.0]})
     selector = SATzilla(
@@ -201,14 +215,25 @@ def test_satzilla_uses_probabilities_from_configured_classifier():
     assert all(schedule[0][0] == "b" for schedule in selector.predict(X).values())
 
 
+def test_satzilla_requires_label_probabilities(training_data: Any) -> None:
+    X, y = training_data
+    selector = SATzilla(estimator=SVC(), epm_estimator=DummyRegressor(), budget=100)
+    selector.fit(X, y, labels=["sat", "unsat", "sat", "unsat"])
+
+    with pytest.raises(TypeError, match="must implement predict_proba"):
+        selector.predict(X)
+
+
 class RankingTree(DecisionTreeRegressor):
-    def fit(self, X, y, qid):
+    def fit(self, X: Any, y: Any, qid: Any) -> Any:
         self.qid_ = np.asarray(qid)
         return super().fit(X, y)
 
 
 @pytest.mark.parametrize("selector_cls", [SimpleRanking, DyadRanking])
-def test_ranking_selectors_clone_and_pass_query_groups(training_data, selector_cls):
+def test_ranking_selectors_clone_and_pass_query_groups(
+    training_data: Any, selector_cls: Any
+) -> None:
     X, y = training_data
     estimator = RankingTree(max_depth=2)
     selector = selector_cls(estimator=estimator)
@@ -221,14 +246,14 @@ def test_ranking_selectors_clone_and_pass_query_groups(training_data, selector_c
 
 
 class NonCloneablePredictor:
-    def fit(self, X, y):
+    def fit(self, X: Any, y: Any) -> None:
         pass
 
-    def predict(self, X):
+    def predict(self, X: Any) -> Any:
         return np.zeros(len(X))
 
 
-def test_non_cloneable_estimator_has_actionable_error(training_data):
+def test_non_cloneable_estimator_has_actionable_error(training_data: Any) -> None:
     X, y = training_data
     selector = MultiClassClassifier(estimator=NonCloneablePredictor())
     with pytest.raises(TypeError, match="must support sklearn.base.clone"):
@@ -236,7 +261,9 @@ def test_non_cloneable_estimator_has_actionable_error(training_data):
 
 
 @pytest.mark.parametrize("maximize,expected", [(False, "low"), (True, "high")])
-def test_multiclass_respects_optimization_direction(maximize, expected):
+def test_multiclass_respects_optimization_direction(
+    maximize: Any, expected: Any
+) -> None:
     X = pd.DataFrame({"f": [0.0, 1.0, 2.0]})
     y = pd.DataFrame({"low": [1.0, 1.0, 1.0], "high": [10.0, 10.0, 10.0]})
     selector = MultiClassClassifier(
@@ -249,14 +276,16 @@ def test_multiclass_respects_optimization_direction(maximize, expected):
 
 
 class ExtraFeature(AbstractFeatureGenerator):
-    def generate_features(self, base_features):
+    def generate_features(self, base_features: Any) -> Any:
         return pd.DataFrame(
             {"extra": np.ones(len(base_features))}, index=base_features.index
         )
 
 
 @pytest.mark.parametrize("numpy_training", [True, False])
-def test_numpy_prediction_uses_raw_feature_names(training_data, numpy_training):
+def test_numpy_prediction_uses_raw_feature_names(
+    training_data: Any, numpy_training: Any
+) -> None:
     X, y = training_data
     selector = MultiClassClassifier(
         estimator=DecisionTreeClassifier(), hierarchical_generator=ExtraFeature()
@@ -272,7 +301,7 @@ def test_numpy_prediction_uses_raw_feature_names(training_data, numpy_training):
     assert selector.predict(X.to_numpy()) == expected
 
 
-def test_ensemble_clone_preserves_selector_configuration(training_data):
+def test_ensemble_clone_preserves_selector_configuration(training_data: Any) -> None:
     from asf.selectors.ensembles import _clone_selector
 
     selector = PairwiseRegressor(

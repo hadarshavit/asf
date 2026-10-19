@@ -29,7 +29,8 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
     """
     SATzilla-like selector using iterative imputation for censored runtimes.
 
-    Uses per-algorithm ridge models on expanded features with optional instance label conditioning.
+    Uses per-algorithm ridge models on expanded features with optional instance label
+    conditioning.
 
     References
     ----------
@@ -42,9 +43,11 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
     epms : dict[str, dict[str, EPM]]
         Mapping from algorithm name to another mapping of label to EPM.
     label_classifier_model : type or Callable
-        The classifier class used for the label classifier (only used when labels are provided).
+        The classifier class used for the label classifier (only used when labels are
+        provided).
     epm_regressor_model : type or Callable
-        The regressor class used internally by EPM for per-algorithm performance prediction.
+        The regressor class used internally by EPM for per-algorithm performance
+        prediction.
     """
 
     PREFIX = "satzilla"
@@ -65,7 +68,8 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
         label_classifier_model : type, default=RandomForestClassifierWrapper
             The classifier class for predicting instance labels (e.g., SAT/UNSAT).
         epm_regressor_model : type, default=RidgeRegressorWrapper
-            The regressor class used internally by EPM for per-algorithm runtime prediction.
+            The regressor class used internally by EPM for per-algorithm runtime
+            prediction.
         epm_estimator : object or None, default=None
             Configured, cloneable regressor for the per-algorithm EPMs. The
             inherited estimator parameter configures the label classifier.
@@ -175,9 +179,7 @@ class SATzilla(ConfigurableMixin, AbstractEPMBasedSelector, AbstractModelBasedSe
                 features.values
             )
         else:
-            hard_preds = np.asarray(self.label_classifier.predict(features.values))
-            classes = np.asarray(self.labels)
-            label_probs = (hard_preds[:, None] == classes[None, :]).astype(float)
+            raise TypeError("SATzilla label classifier must implement predict_proba.")
 
         for j, algo in enumerate(self.algorithms):
             for k, label in enumerate(self.labels):
