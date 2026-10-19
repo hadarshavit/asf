@@ -20,6 +20,7 @@ from asf.selectors import (
     tune_selector,
 )
 from asf.selectors.selector_pipeline import SelectorPipeline
+from asf.utils.random_state import random_state_kwargs
 
 
 # Mapping of file extensions to pandas read functions
@@ -133,7 +134,8 @@ def parser_function() -> argparse.ArgumentParser:
         "--aslib-scenario",
         type=Path,
         default=None,
-        help="Path to ASlib scenario directory (uses algorithm_runs.arff and feature_values.arff)",
+        help="Path to ASlib scenario directory (uses algorithm_runs.arff and "
+        "feature_values.arff)",
     )
     parser.add_argument(
         "--feature-data",
@@ -171,13 +173,15 @@ def parser_function() -> argparse.ArgumentParser:
         "--presolver-budget",
         type=_fraction_type,
         default=0.0,
-        help="Fraction of total budget to allocate to presolving (float between 0 and 1).",
+        help="Fraction of total budget to allocate to presolving (float between 0"
+        " and 1).",
     )
     parser.add_argument(
         "--runcount-limit",
         type=int,
         default=100,
-        help="Maximum number of SMAC evaluations when tuning is enabled (default: 100).",
+        help="Maximum number of SMAC evaluations when tuning is enabled (default:"
+        " 100).",
     )
     parser.add_argument(
         "--random-state",
@@ -360,7 +364,8 @@ if __name__ == "__main__":
 
     if not args.tuning and args.presolvers and len(args.presolvers) > 1:
         parser.error(
-            "When --tuning is not set, --presolvers can only contain maximum one presolver"
+            "When --tuning is not set, --presolvers can only contain maximum one "
+            "presolver"
         )
 
     selector_names = args.selectors
@@ -421,11 +426,17 @@ if __name__ == "__main__":
         if presolver_names:
             presolver_per_budget = presolver_budget / len(presolver_names)
             presolver_classes = [
-                getattr(presolving, name)(budget=presolver_per_budget)
+                getattr(presolving, name)(
+                    presolver_budget=presolver_per_budget,
+                    random_state=args.random_state,
+                )
                 for name in presolver_names
             ]
         preprocessing_steps = [
-            getattr(preprocessing, name)() for name in preprocessor_names
+            getattr(preprocessing, name)(
+                **random_state_kwargs(getattr(preprocessing, name), args.random_state)
+            )
+            for name in preprocessor_names
         ]
 
     print("Presolver classes:", presolver_classes)
@@ -436,7 +447,8 @@ if __name__ == "__main__":
         common_index = features.index.intersection(performance.index)
         if common_index.empty:
             parser.error(
-                "features and performance indices do not overlap; check your input files"
+                "features and performance indices do not overlap; check your "
+                "input files"
             )
         print(
             "[WARN] Aligning features/performance indices to shared instances;"
@@ -452,21 +464,25 @@ if __name__ == "__main__":
                 model_class,
                 maximize=maximize,
                 budget=selector_budget,
+                random_state=args.random_state,
             )
         elif issubclass(selector_class, AbstractSelector):
             selector = selector_class(
                 maximize=maximize,
                 budget=selector_budget,
+                random_state=args.random_state,
             )
         else:
             raise TypeError(
-                "Selector must be a subclass of AbstractSelector or AbstractModelBasedSelector"
+                "Selector must be a subclass of AbstractSelector or "
+                "AbstractModelBasedSelector"
             )
 
         presolver = presolver_classes[0] if len(presolver_classes) > 0 else None
 
         pipeline = SelectorPipeline(
             selector,
+            random_state=args.random_state,
             pre_solving=presolver,
             preprocessor=preprocessing_steps if len(preprocessing_steps) > 0 else None,
         )
@@ -489,7 +505,7 @@ if __name__ == "__main__":
             features_running_time=features_running_time,
             budget=budget,
             maximize=maximize,
-            seed=args.random_state,
+            random_state=args.random_state,
             runcount_limit=args.runcount_limit,
             preprocessing_class=preprocessing_steps
             if len(preprocessing_steps) > 0

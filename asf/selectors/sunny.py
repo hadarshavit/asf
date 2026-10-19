@@ -70,7 +70,7 @@ class SUNNY(ConfigurableMixin, AbstractSelector):
         use_v2: bool = False,
         n_folds: int = 5,
         k_candidates: list[int] | None = None,
-        random_state: int = 42,
+        random_state: int | None = 42,
         use_tsunny: bool = False,
         algorithm_limit: int | None = None,
         **kwargs: Any,
@@ -97,7 +97,7 @@ class SUNNY(ConfigurableMixin, AbstractSelector):
         **kwargs : Any
             Additional keyword arguments.
         """
-        super().__init__(**kwargs)
+        super().__init__(random_state=random_state, **kwargs)
         self.k = int(k)
         self.use_v2 = bool(use_v2)
         self.n_folds = int(n_folds)
@@ -112,7 +112,7 @@ class SUNNY(ConfigurableMixin, AbstractSelector):
         else:
             self.k_candidates = k_candidates or [3, 5, 7, 10, 20, 50]
 
-        self.random_state = int(random_state)
+        self.random_state = random_state
         self.use_tsunny = bool(use_tsunny)
         self.algorithm_limit = algorithm_limit
         self.tuned_algorithm_limit: int | None = None

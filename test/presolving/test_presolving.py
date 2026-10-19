@@ -1,5 +1,7 @@
 """Tests for presolving module."""
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -13,7 +15,7 @@ from asf.presolving.asap_v2 import ASAPv2
 class TestGreedyPresolver:
     """Tests for GreedyPresolver."""
 
-    def test_fit_with_simple_performance_data(self):
+    def test_fit_with_simple_performance_data(self) -> None:
         """Test basic fit with simple performance data."""
         performance = pd.DataFrame(
             {
@@ -36,13 +38,13 @@ class TestGreedyPresolver:
             isinstance(item, tuple) and len(item) == 2 for item in presolver.schedule
         )
 
-    def test_fit_requires_performance_data(self):
+    def test_fit_requires_performance_data(self) -> None:
         """Test that fit raises error without performance data."""
         presolver = GreedyPresolver(presolver_budget=10.0)
         with pytest.raises(ValueError, match="requires performance data"):
             presolver.fit(features=None, performance=None)
 
-    def test_predict_without_features(self):
+    def test_predict_without_features(self) -> None:
         """Test predict returns schedule without features."""
         performance = pd.DataFrame(
             {
@@ -57,7 +59,7 @@ class TestGreedyPresolver:
 
         assert isinstance(result, list)
 
-    def test_predict_with_features_returns_dict(self):
+    def test_predict_with_features_returns_dict(self) -> None:
         """Test predict with features returns dict per instance."""
         performance = pd.DataFrame(
             {
@@ -76,7 +78,7 @@ class TestGreedyPresolver:
         assert isinstance(result, dict)
         assert len(result) == 3
 
-    def test_predict_with_numpy_features(self):
+    def test_predict_with_numpy_features(self) -> None:
         """Test predict with numpy features."""
         performance = pd.DataFrame(
             {
@@ -92,7 +94,7 @@ class TestGreedyPresolver:
 
         assert isinstance(result, dict)
 
-    def test_maximize_mode(self):
+    def test_maximize_mode(self) -> None:
         """Test presolver in maximize mode."""
         performance = pd.DataFrame(
             {
@@ -108,7 +110,7 @@ class TestGreedyPresolver:
 
         assert len(presolver.schedule) >= 0
 
-    def test_fit_with_numpy_performance(self):
+    def test_fit_with_numpy_performance(self) -> None:
         """Test fit with numpy array performance data."""
         # Convert to DataFrame since GreedyPresolver needs column access
         performance = pd.DataFrame(
@@ -127,7 +129,7 @@ class TestGreedyPresolver:
 
         assert len(presolver.schedule) >= 0
 
-    def test_budget_exhaustion(self):
+    def test_budget_exhaustion(self) -> None:
         """Test that schedule respects budget constraint."""
         performance = pd.DataFrame(
             {
@@ -144,7 +146,7 @@ class TestGreedyPresolver:
         total_time = sum(t for _, t in presolver.schedule)
         assert total_time <= 5.0
 
-    def test_min_coverage_threshold(self):
+    def test_min_coverage_threshold(self) -> None:
         """Test that min_coverage filters out low-coverage algorithms."""
         performance = pd.DataFrame(
             {
@@ -172,7 +174,7 @@ class TestGreedyPresolver:
 class TestSubmodularPresolver:
     """Tests for SubmodularPresolver."""
 
-    def test_fit_with_simple_performance(self):
+    def test_fit_with_simple_performance(self) -> None:
         """Test basic fit with simple performance data."""
         performance = pd.DataFrame(
             {
@@ -189,7 +191,7 @@ class TestSubmodularPresolver:
 
         assert hasattr(presolver, "schedule")
 
-    def test_fit_with_default_discretization(self):
+    def test_fit_with_default_discretization(self) -> None:
         """Test fit with default time discretization."""
         performance = pd.DataFrame(
             {
@@ -203,7 +205,7 @@ class TestSubmodularPresolver:
 
         assert hasattr(presolver, "schedule")
 
-    def test_predict_returns_schedule(self):
+    def test_predict_returns_schedule(self) -> None:
         """Test predict returns the computed schedule."""
         performance = pd.DataFrame(
             {
@@ -220,7 +222,7 @@ class TestSubmodularPresolver:
 
         assert isinstance(result, list)
 
-    def test_predict_with_features_returns_dict(self):
+    def test_predict_with_features_returns_dict(self) -> None:
         """Test predict with features returns per-instance schedule."""
         performance = pd.DataFrame(
             {
@@ -239,7 +241,7 @@ class TestSubmodularPresolver:
         assert isinstance(result, dict)
         assert len(result) == 2
 
-    def test_get_schedule_cost(self):
+    def test_get_schedule_cost(self) -> None:
         """Test computing schedule cost."""
         performance = pd.DataFrame(
             {
@@ -257,7 +259,7 @@ class TestSubmodularPresolver:
         assert isinstance(cost, float)
         assert cost >= 0
 
-    def test_fit_with_numpy_performance(self):
+    def test_fit_with_numpy_performance(self) -> None:
         """Test fit with numpy array."""
         performance = np.array(
             [
@@ -274,7 +276,7 @@ class TestSubmodularPresolver:
 
         assert hasattr(presolver, "schedule")
 
-    def test_maximize_mode(self):
+    def test_maximize_mode(self) -> None:
         """Test in maximize mode."""
         performance = pd.DataFrame(
             {
@@ -294,7 +296,7 @@ class TestSubmodularPresolver:
 class TestConfigurablePresolver:
     """Tests for ConfigurablePresolver."""
 
-    def test_init_with_algorithm_config(self):
+    def test_init_with_algorithm_config(self) -> None:
         """Test initialization with algorithm config."""
         config = {
             "algo1": (True, 5.0),
@@ -307,7 +309,7 @@ class TestConfigurablePresolver:
         )
         assert presolver.algorithm_config == config
 
-    def test_fit_builds_schedule_from_config(self):
+    def test_fit_builds_schedule_from_config(self) -> None:
         """Test that fit builds schedule from algorithm_config."""
         performance = pd.DataFrame({"algo1": [1.0, 2.0], "algo2": [3.0, 4.0]})
         config = {
@@ -324,7 +326,7 @@ class TestConfigurablePresolver:
         assert ("algo1", 5.0) in presolver.schedule
         assert ("algo2", 3.0) in presolver.schedule
 
-    def test_fit_filters_disabled_algorithms(self):
+    def test_fit_filters_disabled_algorithms(self) -> None:
         """Test that disabled algorithms are excluded from schedule."""
         performance = pd.DataFrame({"algo1": [1.0, 2.0], "algo2": [3.0, 4.0]})
         config = {
@@ -341,7 +343,7 @@ class TestConfigurablePresolver:
         assert "algo1" in algos
         assert "algo2" not in algos
 
-    def test_predict_returns_schedule(self):
+    def test_predict_returns_schedule(self) -> None:
         """Test predict returns the schedule."""
         performance = pd.DataFrame({"algo1": [1.0, 2.0]})
         config = {"algo1": (True, 5.0)}
@@ -354,7 +356,7 @@ class TestConfigurablePresolver:
 
         assert isinstance(result, list)
 
-    def test_predict_with_features_returns_dict(self):
+    def test_predict_with_features_returns_dict(self) -> None:
         """Test predict with features returns per-instance dict."""
         performance = pd.DataFrame({"algo1": [1.0, 2.0]})
         config = {"algo1": (True, 5.0)}
@@ -369,7 +371,7 @@ class TestConfigurablePresolver:
         assert isinstance(result, dict)
         assert len(result) == 2
 
-    def test_repr(self):
+    def test_repr(self) -> None:
         """Test string representation."""
         performance = pd.DataFrame({"algo1": [1.0, 2.0]})
         config = {"algo1": (True, 5.0)}
@@ -382,7 +384,7 @@ class TestConfigurablePresolver:
         repr_str = repr(presolver)
         assert "ConfigurablePresolver" in repr_str
 
-    def test_fit_with_empty_config(self):
+    def test_fit_with_empty_config(self) -> None:
         """Test fit with empty/None config."""
         performance = pd.DataFrame({"algo1": [1.0, 2.0]})
         presolver = ConfigurablePresolver(presolver_budget=10.0, algorithm_config=None)
@@ -390,7 +392,7 @@ class TestConfigurablePresolver:
 
         assert presolver.schedule == []
 
-    def test_get_configuration_space(self):
+    def test_get_configuration_space(self) -> None:
         """Test configuration space generation."""
         pytest.importorskip("ConfigSpace")
 
@@ -403,7 +405,7 @@ class TestConfigurablePresolver:
         assert "configurable_presolver:use_algo1" in cs
         assert "configurable_presolver:time_algo1" in cs
 
-    def test_get_from_configuration(self):
+    def test_get_from_configuration(self) -> None:
         """Test creating presolver from configuration."""
         pytest.importorskip("ConfigSpace")
 
@@ -430,20 +432,21 @@ class TestConfigurablePresolver:
 class TestAbstractPresolver:
     """Tests for AbstractPresolver base functionality."""
 
-    def test_presolver_get_configuration_space(self):
+    def test_presolver_get_configuration_space(self) -> None:
         """Test configuration space generation."""
         pytest.importorskip("ConfigSpace")
 
         from asf.presolving.presolver import AbstractPresolver
 
-        # We need a concrete subclass with PREFIX for this to work through ConfigurableMixin
+        # We need a concrete subclass with PREFIX for this to work through
+        # ConfigurableMixin
         class ConcretePresolver(AbstractPresolver):
             PREFIX = "concrete"
 
-            def fit(self, *args, **kwargs):
+            def fit(self, *args: Any, **kwargs: Any) -> None:
                 pass
 
-            def predict(self, *args, **kwargs):
+            def predict(self, *args: Any, **kwargs: Any) -> None:
                 pass
 
         cs = ConcretePresolver.get_configuration_space(total_budget=100.0)
@@ -451,7 +454,7 @@ class TestAbstractPresolver:
         assert cs is not None
         assert "concrete:presolver_budget" in cs
 
-    def test_presolver_get_from_configuration_not_implemented(self):
+    def test_presolver_get_from_configuration_not_implemented(self) -> None:
         """Test that get_from_configuration raises exception or behaves correctly."""
         pytest.importorskip("ConfigSpace")
 
@@ -462,10 +465,10 @@ class TestAbstractPresolver:
         class ConcretePresolver(AbstractPresolver):
             PREFIX = "concrete"
 
-            def fit(self, *args, **kwargs):
+            def fit(self, *args: Any, **kwargs: Any) -> None:
                 pass
 
-            def predict(self, *args, **kwargs):
+            def predict(self, *args: Any, **kwargs: Any) -> None:
                 pass
 
         partial_inst = ConcretePresolver.get_from_configuration(configuration={})
@@ -474,7 +477,7 @@ class TestAbstractPresolver:
         assert inst.presolver_budget == 10.0
 
 
-def test_configurable_presolver_rejects_oversized_schedule():
+def test_configurable_presolver_rejects_oversized_schedule() -> None:
     with pytest.raises(ValueError, match="exceeds presolver_budget"):
         ConfigurablePresolver(
             presolver_budget=3,
@@ -482,7 +485,7 @@ def test_configurable_presolver_rejects_oversized_schedule():
         )
 
 
-def test_asap_small_budget_never_emits_larger_step():
+def test_asap_small_budget_never_emits_larger_step() -> None:
     presolver = ASAPv2(
         presolver_budget=1,
         max_runtime_preschedule=0.1,
@@ -494,18 +497,18 @@ def test_asap_small_budget_never_emits_larger_step():
     assert sum(t for _, t in presolver.schedule) <= 1.0
 
 
-def test_presolver_budget_precedence_and_init_params_copy():
-    init_params = {"presolver_budget": 40.0, "budget": 50.0}
+def test_presolver_budget_init_params_override_and_copy() -> None:
+    init_params = {"presolver_budget": 40.0}
     presolver = GreedyPresolver(
         init_params=init_params,
         presolver_budget=30.0,
     )
 
-    assert presolver.presolver_budget == 30.0
-    assert init_params == {"presolver_budget": 40.0, "budget": 50.0}
+    assert presolver.presolver_budget == 40.0
+    assert init_params == {"presolver_budget": 40.0}
 
 
-def test_presolver_budget_uses_init_params_when_argument_omitted():
-    presolver = GreedyPresolver(init_params={"budget": 40.0})
+def test_presolver_budget_uses_init_params_when_argument_omitted() -> None:
+    presolver = GreedyPresolver(init_params={"presolver_budget": 40.0})
 
     assert presolver.presolver_budget == 40.0

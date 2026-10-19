@@ -17,6 +17,7 @@ from sklearn.model_selection import KFold
 from sklearn.preprocessing import OneHotEncoder
 
 from asf.selectors.abstract_selector import AbstractSelector
+from asf.utils.random_state import random_state_kwargs
 from asf.selectors.feature_generator import AbstractFeatureGenerator
 from asf.utils.configurable import ClassChoice, ConfigurableMixin
 
@@ -116,10 +117,12 @@ class BaggingSelector(ConfigurableMixin, AbstractSelector):
         **kwargs : Any
             Additional keyword arguments passed to AbstractSelector.
         """
-        super().__init__(**kwargs)
+        super().__init__(random_state=random_state, **kwargs)
 
         if callable(base_selector) and not isinstance(base_selector, AbstractSelector):
-            self.base_selector = base_selector()
+            self.base_selector = base_selector(
+                **random_state_kwargs(base_selector, random_state)
+            )
         else:
             self.base_selector = base_selector
 
@@ -283,6 +286,7 @@ class VotingSelector(ConfigurableMixin, AbstractSelector):
             list[AbstractSelector] | Callable[[], list[AbstractSelector]] | None
         ) = None,
         weights: list[float] | None = None,
+        random_state: int | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the VotingSelector.
@@ -297,10 +301,10 @@ class VotingSelector(ConfigurableMixin, AbstractSelector):
         **kwargs : Any
             Additional keyword arguments passed to AbstractSelector.
         """
-        super().__init__(**kwargs)
+        super().__init__(random_state=random_state, **kwargs)
 
         if callable(selectors) and not isinstance(selectors, list):
-            self.selectors = selectors()
+            self.selectors = selectors(**random_state_kwargs(selectors, random_state))
         else:
             self.selectors = list(selectors) if selectors is not None else []
 
@@ -476,17 +480,21 @@ class StackingSelector(ConfigurableMixin, AbstractSelector):
         **kwargs : Any
             Additional keyword arguments passed to AbstractSelector.
         """
-        super().__init__(**kwargs)
+        super().__init__(random_state=random_state, **kwargs)
 
         if callable(base_selectors) and not isinstance(base_selectors, list):
-            self.base_selectors = base_selectors()
+            self.base_selectors = base_selectors(
+                **random_state_kwargs(base_selectors, random_state)
+            )
         else:
             self.base_selectors = (
                 list(base_selectors) if base_selectors is not None else []
             )
 
         if callable(meta_selector) and not isinstance(meta_selector, AbstractSelector):
-            self.meta_selector = meta_selector()
+            self.meta_selector = meta_selector(
+                **random_state_kwargs(meta_selector, random_state)
+            )
         else:
             self.meta_selector = meta_selector
 
@@ -525,7 +533,8 @@ class StackingSelector(ConfigurableMixin, AbstractSelector):
         """
         if self.use_generated_features and _has_generate_features(selector):
             # Use generate_features output
-            gen_features = selector.generate_features(features)  # type: ignore[attr-defined]
+            # type: ignore[attr-defined]
+            gen_features = selector.generate_features(features)
             if isinstance(gen_features, pd.DataFrame):
                 return gen_features
             return pd.DataFrame(gen_features, index=features.index)

@@ -76,7 +76,7 @@ class ISAC(ConfigurableMixin, AbstractSelector):
         **kwargs : Any
             Additional keyword arguments.
         """
-        super().__init__(**kwargs)
+        super().__init__(random_state=random_state, **kwargs)
         self.clusterer = clusterer
         self.clusterer_kwargs = clusterer_kwargs or {}
         self.random_state = random_state

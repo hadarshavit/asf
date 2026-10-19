@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
 import numpy as np
 
@@ -13,7 +15,7 @@ except ImportError:
 if TORCH_AVAILABLE:
 
     class RegressionDataset(torch.utils.data.Dataset):
-        def __init__(self, features, performance, dtype=None):
+        def __init__(self, features: Any, performance: Any, dtype: Any = None) -> None:
             if dtype is None:
                 dtype = torch.float32
             if hasattr(features, "sort_index"):
@@ -35,10 +37,10 @@ if TORCH_AVAILABLE:
             self.features = torch.from_numpy(features_np).to(dtype)
             self.performance = torch.from_numpy(performance_np).to(dtype)
 
-        def __len__(self):
+        def __len__(self) -> int:
             return len(self.features)
 
-        def __getitem__(self, index):
+        def __getitem__(self, index: Any) -> Any:
             return self.features[index], self.performance[index]
 
     class RankingDataset(torch.utils.data.Dataset):
@@ -47,8 +49,9 @@ if TORCH_AVAILABLE:
             features: pd.DataFrame,
             performance: pd.DataFrame,
             algorithm_features: pd.DataFrame,
-            dtype=None,
-        ):
+            dtype: Any = None,
+            random_state: int | None = None,
+        ) -> None:
             if dtype is None:
                 dtype = torch.float32
             performance = performance.melt(
@@ -57,32 +60,33 @@ if TORCH_AVAILABLE:
             all_df = features.merge(performance, left_index=True, right_index=True)
             all_df = all_df.merge(algorithm_features, left_on="algo", right_index=True)
             all_df = all_df.sort_index()
+            self.rng = np.random.default_rng(random_state)
             self.all = all_df
 
             self.features_cols = features.columns.to_list()
             self.algorithm_features_cols = algorithm_features.columns.to_list()
             self._dtype = dtype
 
-        def __len__(self):
+        def __len__(self) -> int:
             return len(self.all.index.unique())
 
-        def __getitem__(self, index):
+        def __getitem__(self, index: Any) -> Any:
             iid = self.all.index.unique()[index]
             data = self.all.loc[iid]
 
-            main = np.random.randint(0, len(data))
+            main = self.rng.integers(0, len(data))
 
             main_point = data.iloc[main]
             smaller = data[data["performance"] < main_point["performance"]]
             if len(smaller) == 0:
                 smaller = main_point
             else:
-                smaller = smaller.sample(1).iloc[0]
+                smaller = smaller.sample(1, random_state=self.rng).iloc[0]
             larger = data[data["performance"] > main_point["performance"]]
             if len(larger) == 0:
                 larger = main_point
             else:
-                larger = larger.sample(1).iloc[0]
+                larger = larger.sample(1, random_state=self.rng).iloc[0]
 
             main_feats = (
                 main_point[self.algorithm_features_cols + self.features_cols]
@@ -114,13 +118,13 @@ else:
     from typing import Any
 
     class RegressionDataset(Any):
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             raise RuntimeError(
                 "PyTorch is not installed. Install it with: pip install torch"
             )
 
     class RankingDataset(Any):
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             raise RuntimeError(
                 "PyTorch is not installed. Install it with: pip install torch"
             )

@@ -9,6 +9,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
 
 from asf.selectors.abstract_selector import AbstractSelector
+from asf.utils.random_state import random_state_kwargs
 from asf.utils.configurable import ClassChoice, ConfigurableMixin
 
 try:
@@ -70,29 +71,33 @@ class CSHCSelector(ConfigurableMixin, AbstractSelector):
         guardian_kwargs: dict[str, Any] | None = None,
         n_folds: int = 5,
         threshold_grid: np.ndarray | None = None,
-        random_state: int = 42,
+        random_state: int | None = 42,
         **kwargs: Any,
     ) -> None:
         """
         Initialize the CSHCSelector.
         """
-        super().__init__(**kwargs)
+        super().__init__(random_state=random_state, **kwargs)
 
         if callable(primary_selector):
-            self.primary_selector = cast(Any, primary_selector)()
+            self.primary_selector = cast(Any, primary_selector)(
+                **random_state_kwargs(primary_selector, random_state)
+            )
         else:
             self.primary_selector = primary_selector
 
         if callable(backup_selector):
-            self.backup_selector = cast(Any, backup_selector)()
+            self.backup_selector = cast(Any, backup_selector)(
+                **random_state_kwargs(backup_selector, random_state)
+            )
         else:
             self.backup_selector = backup_selector
 
         self.n_folds = int(n_folds)
-        self.random_state = int(random_state)
+        self.random_state = random_state
         self.guardian_kwargs = dict(guardian_kwargs or {})
         self.guardian_kwargs.setdefault("n_estimators", int(n_estimators))
-        self.guardian_kwargs.setdefault("random_state", int(random_state))
+        self.guardian_kwargs.setdefault("random_state", random_state)
         self.threshold_grid = (
             threshold_grid
             if threshold_grid is not None

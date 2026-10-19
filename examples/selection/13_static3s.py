@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import pandas as pd
 from typing import cast
@@ -12,7 +13,9 @@ from asf.metrics import (
 )
 
 
-def generate_simple_data(n_instances=100, n_algorithms=6, seed=1, budget=500.0):
+def generate_simple_data(
+    n_instances: Any = 100, n_algorithms: Any = 6, seed: Any = 1, budget: Any = 500.0
+) -> Any:
     rng = np.random.RandomState(seed)
     features = pd.DataFrame(
         rng.uniform(0, 10, size=(n_instances, 4)),
@@ -32,7 +35,7 @@ def generate_simple_data(n_instances=100, n_algorithms=6, seed=1, budget=500.0):
     return features, perf
 
 
-def main():
+def main() -> None:
     budget = 400.0
     presolve_budget = 150.0
     features, performance = generate_simple_data(
@@ -51,7 +54,7 @@ def main():
     vbs_score = virtual_best_solver(test_Y, maximize=False, budget=budget, par=10.0)
 
     # 1) compute static preschedule
-    presolver = Static3S(budget=presolve_budget, max_candidates_per_solver=10)
+    presolver = Static3S(presolver_budget=presolve_budget, max_candidates_per_solver=10)
     presolver.fit(train_X, train_Y)
 
     preschedule_map = presolver.predict(test_X)

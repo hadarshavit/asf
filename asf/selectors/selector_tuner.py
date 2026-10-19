@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-from functools import partial
 from pathlib import Path
 import logging
 from typing import Any, Callable, cast
@@ -16,6 +15,7 @@ from asf.selectors.abstract_selector import AbstractSelector
 from asf.selectors.selector_pipeline import SelectorPipeline
 from asf.utils.configurable import convert_class_choices_to_categorical
 from asf.utils.groupkfoldshuffle import GroupKFoldShuffle
+from asf.utils.random_state import clone_with_random_state
 
 try:
     from ConfigSpace import Configuration
@@ -38,38 +38,6 @@ except ImportError:
     SMAC_AVAILABLE = False
 
 
-def _seed_component(component: Any, seed: int) -> None:
-    """Seed known unset parameters on a configured component in place."""
-    if component is None:
-        return
-    if hasattr(component, "get_params") and hasattr(component, "set_params"):
-        params = component.get_params(deep=False)
-        updates = {
-            name: seed
-            for name in ("random_state", "seed")
-            if name in params and params[name] is None
-        }
-        if updates:
-            component.set_params(**updates)
-    factory = getattr(component, "model_class", None)
-    if callable(factory):
-        try:
-            params = factory().get_params(deep=False)
-        except (AttributeError, TypeError, ValueError):
-            params = {}
-        updates = {
-            name: seed
-            for name in ("random_state", "seed")
-            if name in params and params[name] is None
-        }
-        if updates:
-            component.model_class = partial(factory, **updates)
-    for name in ("estimator", "classifier", "regressor", "model"):
-        child = getattr(component, name, None)
-        if child is not None and child is not component:
-            _seed_component(child, seed)
-
-
 def _create_pipeline(
     config: Configuration | dict[str, Any],
     budget: float | None,
@@ -78,13 +46,14 @@ def _create_pipeline(
     feature_groups: dict[str, Any] | None,
     max_feature_time: float | None = None,
     feature_selector: Any | None = None,
-    seed: int | None = None,
+    random_state: int | None = None,
 ) -> SelectorPipeline:
     """
     Helper function to create a SelectorPipeline from a configuration.
     """
     # Cast to accepted type for get_from_configuration
     config_dict: dict[str, Any] | Configuration = cast(Any, config)
+    selector_kwargs = {"random_state": random_state, **selector_kwargs}
     pipeline_partial = SelectorPipeline.get_from_configuration(
         configuration=config_dict,
         feature_groups=feature_groups,
@@ -94,16 +63,12 @@ def _create_pipeline(
         **selector_kwargs,
     )
     pipeline = pipeline_partial()
-    if seed is not None:
-        _seed_component(pipeline.selector, seed)
-        _seed_component(pipeline.pre_solving, seed)
-        for _, step in pipeline.preprocessor.steps:
-            _seed_component(step, seed)
     if feature_selector is not None:
-        pipeline.feature_selector = copy.deepcopy(feature_selector)
-    if seed is not None:
-        _seed_component(pipeline.feature_selector, seed)
-        _seed_component(pipeline.algorithm_pre_selector, seed)
+        pipeline.feature_selector = (
+            clone_with_random_state(feature_selector, random_state)
+            if hasattr(feature_selector, "get_params")
+            else copy.deepcopy(feature_selector)
+        )
     return pipeline
 
 
@@ -133,7 +98,7 @@ def tune_selector(
     smac_scenario_kwargs: dict[str, Any] | None = None,
     runcount_limit: int = 100,
     timeout: float = float("inf"),
-    seed: int = 0,
+    random_state: int = 0,
     cv: int = 10,
     groups: np.ndarray | None = None,
     max_feature_time: float | None = None,
@@ -186,7 +151,7 @@ def tune_selector(
         Limit for trials.
     timeout : float, default=inf
         Wall-clock time limit.
-    seed : int, default=0
+    random_state : int, default=0
         Random seed.
     cv : int, default=10
         Number of cross-validation folds.
@@ -239,12 +204,11 @@ def tune_selector(
         cv_groups = groups.iloc[:, 0].to_numpy()
 
     splitter = (
-        GroupKFoldShuffle(n_splits=cv, shuffle=True, random_state=seed)
+        GroupKFoldShuffle(n_splits=cv, shuffle=True, random_state=random_state)
         if cv_groups is not None
-        else KFold(n_splits=cv, shuffle=True, random_state=seed)
+        else KFold(n_splits=cv, shuffle=True, random_state=random_state)
     )
     folds = list(splitter.split(X, y, cv_groups))
-    tuning_seed = seed
 
     scenario = Scenario(
         configspace=cs,
@@ -252,7 +216,7 @@ def tune_selector(
         walltime_limit=timeout,
         deterministic=True,
         output_directory=Path(output_dir),
-        seed=tuning_seed,
+        seed=random_state,
         **sc_kwargs,
     )
 
@@ -272,7 +236,7 @@ def tune_selector(
                     feature_groups,
                     max_feature_time=max_feature_time,
                     feature_selector=feature_selector,
-                    seed=tuning_seed,
+                    random_state=random_state,
                 )
                 pipeline.fit(X_train, y_train, algorithm_features=algorithm_features)
             except ValueError as exc:
@@ -308,5 +272,5 @@ def tune_selector(
         feature_groups,
         max_feature_time=max_feature_time,
         feature_selector=feature_selector,
-        seed=tuning_seed,
+        random_state=random_state,
     )

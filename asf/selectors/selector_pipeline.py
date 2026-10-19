@@ -4,7 +4,7 @@ import logging
 import time
 from functools import partial
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Callable, cast
 
 import pandas as pd
 from sklearn.impute import SimpleImputer
@@ -13,6 +13,7 @@ from sklearn.pipeline import Pipeline
 from asf.presolving.presolver import AbstractPresolver
 from asf.selectors.abstract_selector import AbstractSelector
 from asf.utils.configurable import ClassChoice, ConfigurableMixin
+from asf.utils.random_state import random_state_kwargs
 
 try:
     from ConfigSpace import (  # noqa: F401
@@ -55,21 +56,22 @@ class SelectorPipeline(ConfigurableMixin):
 
     def __init__(
         self,
-        selector: AbstractSelector,
+        selector: AbstractSelector | Callable[..., AbstractSelector],
         preprocessor: Any | list[Any] | None = None,
-        pre_solving: AbstractPresolver | None = None,
+        pre_solving: AbstractPresolver | Callable[..., AbstractPresolver] | None = None,
         feature_selector: Any | None = None,
         algorithm_pre_selector: Any | None = None,
         feature_groups: dict[str, Any] | list[str] | None = None,
         max_feature_time: float | None = None,
+        random_state: int | None = None,
     ) -> None:
         """
         Initialize the SelectorPipeline.
 
         Parameters
         ----------
-        selector : AbstractSelector
-            The main selector model to be used.
+        selector : AbstractSelector or callable
+            The main selector instance or a factory that constructs it.
         preprocessor : Any or list or None, default=None
             Preprocessing steps. SimpleImputer(strategy="mean") is always added first.
         pre_solving : AbstractPresolver or None, default=None
@@ -82,11 +84,21 @@ class SelectorPipeline(ConfigurableMixin):
             Feature groups configuration.
         max_feature_time : float or None, default=None
             Budget (seconds) per feature group.
+        random_state : int or None, default=None
+            Seed passed to component factories. Supplied instances retain
+            their own configuration.
         """
-        self.selector = selector
-        self.pre_solving = pre_solving
-        self.feature_selector = feature_selector
-        self.algorithm_pre_selector = algorithm_pre_selector
+        self.random_state = random_state
+
+        def construct(component: Any) -> Any:
+            if callable(component):
+                return component(**random_state_kwargs(component, random_state))
+            return component
+
+        self.selector = construct(selector)
+        self.pre_solving = construct(pre_solving)
+        self.feature_selector = construct(feature_selector)
+        self.algorithm_pre_selector = construct(algorithm_pre_selector)
         self.feature_groups = feature_groups
         self.max_feature_time = (
             float(max_feature_time) if max_feature_time is not None else None
@@ -102,6 +114,7 @@ class SelectorPipeline(ConfigurableMixin):
         # Always include SimpleImputer as the first step
         steps = [("SimpleImputer", SimpleImputer(strategy="mean"))]
         for p in preproc_list:
+            p = construct(p)
             steps.append((type(p).__name__, p))
 
         self.preprocessor = Pipeline(steps)
@@ -243,7 +256,8 @@ class SelectorPipeline(ConfigurableMixin):
 
         scheds: list[Any] = []
         if self.pre_solving:
-            # Presolver prediction returns a single schedule applied to all test instances
+            # Presolver prediction returns a single schedule applied to all test
+            # instances
             scheds = list(self.pre_solving.predict())
 
         if self.feature_selector:
@@ -521,21 +535,21 @@ class SelectorPipeline(ConfigurableMixin):
         partial
             Partial function for SelectorPipeline.
         """
-        init_kwargs: dict[str, Any] = {}
+        init_kwargs: dict[str, Any] = {"random_state": kwargs.get("random_state")}
         prefix = f"{pre_prefix}:{cls.PREFIX}:" if pre_prefix else f"{cls.PREFIX}:"
 
         if "selector" in clean_config:
             val = clean_config["selector"]
-            init_kwargs["selector"] = val() if callable(val) else val
+            init_kwargs["selector"] = val
 
         if clean_config.get("use_presolver") and "presolver" in clean_config:
             val = clean_config["presolver"]
-            init_kwargs["pre_solving"] = val() if callable(val) else val
+            init_kwargs["pre_solving"] = val
 
         preprocs = []
         for k, v in clean_config.items():
             if k.startswith("preprocessor:") and v and v != "False":
-                preprocs.append(v() if callable(v) else v)
+                preprocs.append(v)
         if preprocs:
             init_kwargs["preprocessor"] = preprocs
 
@@ -553,7 +567,7 @@ class SelectorPipeline(ConfigurableMixin):
 
         if "algorithm_pre_selector" in clean_config:
             val = clean_config["algorithm_pre_selector"]
-            init_kwargs["algorithm_pre_selector"] = val() if callable(val) else val
+            init_kwargs["algorithm_pre_selector"] = val
 
         init_kwargs["max_feature_time"] = clean_config.get(
             "max_feature_time", max_feature_time
@@ -625,14 +639,18 @@ class SelectorPipeline(ConfigurableMixin):
                     total_budget=budget,
                     **kwargs,
                 )
-                # Try to extract the budget from the configuration to subtract it from the selector budget
-                # The parameter name is f"{prefix}presolver:{ps_cls.PREFIX}:presolver_budget"
+                # Try to extract the budget from the configuration to subtract it from
+                # the selector budget
+                # The parameter name is
+                # f"{prefix}presolver:{ps_cls.PREFIX}:presolver_budget"
                 ps_prefix = f"{prefix}presolver:{ps_cls.PREFIX}:"
                 presolver_budget = configuration.get(
                     f"{ps_prefix}presolver_budget", 0.0
                 )
             else:
-                clean_config["presolver"] = ps_cls()
+                clean_config["presolver"] = ps_cls(
+                    **random_state_kwargs(ps_cls, kwargs.get("random_state"))
+                )
 
         # 2. Selector
         s_val = configuration.get(f"{prefix}selector")
@@ -651,8 +669,9 @@ class SelectorPipeline(ConfigurableMixin):
                     **kwargs,
                 )
             else:
-                clean_config["selector"] = (
-                    s_cls(budget=selector_budget) if selector_budget else s_cls()
+                clean_config["selector"] = s_cls(
+                    budget=selector_budget,
+                    **random_state_kwargs(s_cls, kwargs.get("random_state")),
                 )
 
         # 3. Preprocessors
@@ -665,13 +684,20 @@ class SelectorPipeline(ConfigurableMixin):
                         if res:
                             key = hp.name[len(prefix) :]
                             if hasattr(res, "get_from_configuration"):
-                                clean_config[key] = res.get_from_configuration(  # type: ignore[misc]
+                                # type: ignore[misc]
+                                clean_config[key] = res.get_from_configuration(
                                     configuration, pre_prefix=hp.name, **kwargs
                                 )
                             else:
                                 res_any: Any = res
                                 clean_config[key] = (
-                                    res_any() if callable(res_any) else res_any
+                                    res_any(
+                                        **random_state_kwargs(
+                                            res_any, kwargs.get("random_state")
+                                        )
+                                    )
+                                    if callable(res_any)
+                                    else res_any
                                 )
                     else:
                         clean_config[hp.name[len(prefix) :]] = False
@@ -687,7 +713,9 @@ class SelectorPipeline(ConfigurableMixin):
                     **kwargs,
                 )
             else:
-                clean_config["algorithm_pre_selector"] = aps_cls()
+                clean_config["algorithm_pre_selector"] = aps_cls(
+                    **random_state_kwargs(aps_cls, kwargs.get("random_state"))
+                )
 
         # 5. Max feature time
         mft = configuration.get(f"{prefix}max_feature_time")

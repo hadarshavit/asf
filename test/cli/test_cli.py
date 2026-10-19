@@ -1,3 +1,4 @@
+from typing import Any
 import csv
 import subprocess
 from pathlib import Path
@@ -14,14 +15,14 @@ from asf.selectors.satzilla import SATzilla
 from asf.presolving.asap_v2 import ASAPv2
 
 
-def _write_dummy_csv(path: Path):
+def _write_dummy_csv(path: Path) -> None:
     rows = [["idx", "f1", "f2"], ["inst_1", "1.0", "2.0"], ["inst_2", "3.0", "4.0"]]
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as fh:
         csv.writer(fh).writerows(rows)
 
 
-def _write_data(feat_path: Path, perf_path: Path, n_instances: int = 20):
+def _write_data(feat_path: Path, perf_path: Path, n_instances: int = 20) -> Any:
     """Write realistic dummy data with proper structure for validation."""
     feat_data = {
         "idx": [f"inst_{i}" for i in range(n_instances)],
@@ -46,7 +47,7 @@ def _write_data(feat_path: Path, perf_path: Path, n_instances: int = 20):
     return feat_df, perf_df
 
 
-def test_build_cli_command(tmp_path: Path):
+def test_build_cli_command(tmp_path: Path) -> None:
     """Unit test: verify build_cli_command produces correct arguments."""
     feats = tmp_path / "features.csv"
     perf = tmp_path / "performance.csv"
@@ -88,11 +89,15 @@ def _validate_pipeline_extensive(
     expected_presolver_type: type | None = None,
     presolver_budget_fraction: float = 0.0,
     tuning: bool = False,
-):
+) -> None:
     """Extensive validation of a trained SelectorPipeline."""
     assert isinstance(pipeline, SelectorPipeline)
     assert hasattr(pipeline, "selector") and pipeline.selector is not None
     assert hasattr(pipeline, "predict") and hasattr(pipeline, "fit")
+    assert pipeline.random_state == 0
+    assert pipeline.selector.random_state == 0
+    if pipeline.pre_solving is not None:
+        assert pipeline.pre_solving.random_state == 0
 
     # Validate budget
     selector_budget = getattr(pipeline.selector, "budget", None)
@@ -104,7 +109,8 @@ def _validate_pipeline_extensive(
 
     total_budget = selector_budget + presolver_budget
     assert pytest.approx(total_budget, rel=1e-3, abs=1e-6) == expected_budget, (
-        f"Total budget mismatch: selector={selector_budget} + presolver={presolver_budget} "
+        f"Total budget mismatch: selector={selector_budget} "
+        f"+ presolver={presolver_budget} "
         f"= {total_budget}, expected {expected_budget}"
     )
 
@@ -133,8 +139,10 @@ def _validate_pipeline_extensive(
         if tuning:
             for actual_type in actual_types:
                 assert actual_type in expected_preprocessor_types, (
-                    f"Unexpected preprocessor {actual_type.__name__} not in candidates. "
-                    f"Expected subset of: {[t.__name__ for t in expected_preprocessor_types]}"
+                    f"Unexpected preprocessor {actual_type.__name__} "
+                    "not in candidates. "
+                    "Expected subset of: "
+                    f"{[t.__name__ for t in expected_preprocessor_types]}"
                 )
         else:
             for expected_type in expected_preprocessor_types:
@@ -144,10 +152,12 @@ def _validate_pipeline_extensive(
                 )
     else:
         assert len(pipeline.preprocessor.steps) == 1, (
-            f"Expected only SimpleImputer, found {len(pipeline.preprocessor.steps)} steps"
+            "Expected only SimpleImputer, "
+            f"found {len(pipeline.preprocessor.steps)} steps"
         )
         assert isinstance(pipeline.preprocessor.steps[0][1], SimpleImputer), (
-            f"Expected only SimpleImputer, found {type(pipeline.preprocessor.steps[0][1]).__name__}"
+            "Expected only SimpleImputer, "
+            f"found {type(pipeline.preprocessor.steps[0][1]).__name__}"
         )
 
     # Validate presolver
@@ -163,7 +173,8 @@ def _validate_pipeline_extensive(
             )
 
         if tuning:
-            # During tuning: presolver budget can be any value, just check it's reasonable
+            # During tuning: presolver budget can be any value, just check it's
+            # reasonable
             assert 0 <= presolver_budget <= expected_budget, (
                 f"Presolver budget {presolver_budget} outside [0, {expected_budget}]"
             )
@@ -176,7 +187,8 @@ def _validate_pipeline_extensive(
                 pytest.approx(presolver_budget, rel=1e-3, abs=1e-6)
                 == expected_presolver_budget
             ), (
-                f"Presolver budget mismatch: got {presolver_budget}, expected {expected_presolver_budget}"
+                f"Presolver budget mismatch: got {presolver_budget}, "
+                f"expected {expected_presolver_budget}"
             )
     else:
         assert pipeline.pre_solving is None, "Unexpected presolver present"
@@ -205,7 +217,7 @@ def _run_cli_and_validate(
     presolver_budget: float = 0.0,
     budget: int = 450,
     runcount_limit: int | None = None,
-):
+) -> None:
     """Run CLI subprocess and validate resulting pipeline."""
     feats = tmp_path / "features.csv"
     perf = tmp_path / "performance.csv"
@@ -261,19 +273,19 @@ def _run_cli_and_validate(
     )
 
 
-def test_cli_basic(tmp_path: Path):
+def test_cli_basic(tmp_path: Path) -> None:
     """Test basic CLI: single selector, no preprocessing or presolving."""
     _run_cli_and_validate(tmp_path, selector=[SATzilla])
 
 
-def test_cli_with_preprocessing(tmp_path: Path):
+def test_cli_with_preprocessing(tmp_path: Path) -> None:
     """Test CLI with preprocessing."""
     _run_cli_and_validate(
         tmp_path, selector=[SATzilla], preprocessors=[StandardScaler()]
     )
 
 
-def test_cli_with_presolver(tmp_path: Path):
+def test_cli_with_presolver(tmp_path: Path) -> None:
     """Test CLI with presolver."""
     _run_cli_and_validate(
         tmp_path,
@@ -284,7 +296,7 @@ def test_cli_with_presolver(tmp_path: Path):
     )
 
 
-def test_cli_tuning(tmp_path: Path):
+def test_cli_tuning(tmp_path: Path) -> None:
     """Test CLI with tuning: multiple selectors, preprocessing and presolving."""
     _run_cli_and_validate(
         tmp_path,

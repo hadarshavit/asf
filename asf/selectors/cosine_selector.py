@@ -64,7 +64,7 @@ if TORCH_AVAILABLE:
             output_dim: int = 10,
             alpha: float = 0.9,
             beta: float = 0.1,
-        ):
+        ) -> None:
             super().__init__()
             self.num_algorithms = num_algorithms
             self.num_user_features = num_user_features
@@ -180,22 +180,22 @@ if TORCH_AVAILABLE:
 else:
 
     class _ASLLMRecommendationModel:
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             pass
 
-        def to(self, *args, **kwargs):
+        def to(self, *args: Any, **kwargs: Any) -> Any:
             return self
 
-        def __call__(self, *args, **kwargs):
+        def __call__(self, *args: Any, **kwargs: Any) -> None:
             pass
 
-        def train(self):
+        def train(self) -> None:
             pass
 
-        def eval(self):
+        def eval(self) -> None:
             pass
 
-        def parameters(self):
+        def parameters(self) -> Any:
             return []
 
 
@@ -206,7 +206,8 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
     Uses cosine similarity in a learned latent space to match instances to algorithms.
     This implementation follows the AS-LLM paper (arXiv:2311.13184) architecture:
     - Instance features → MLP → instance embedding
-    - Algorithm index → Embedding → LSTM → fused with algorithm_features → algorithm embedding
+    - Algorithm index → Embedding → LSTM → fused with algorithm_features → algorithm
+    embedding
     - Cosine similarity + MLP for final compatibility prediction
 
     References
@@ -252,7 +253,7 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
     lr: float
     num_epochs: int
     batch_size: int
-    random_state: int
+    random_state: int | None
     _device: torch.device
     _model: nn.Module | None
     _scaler: StandardScaler | None
@@ -272,7 +273,7 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
         num_epochs: int = 100,
         batch_size: int = 128,
         device: str | None = None,
-        random_state: int = 42,
+        random_state: int | None = 42,
         **kwargs: Any,
     ) -> None:
         """
@@ -310,7 +311,7 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
                 "CosineSelector requires PyTorch. Install with: pip install torch"
             )
 
-        super().__init__(**kwargs)
+        super().__init__(random_state=random_state, **kwargs)
         self.normalize_features = bool(normalize_features)
         self.embed_size = int(embed_size)
         self.num_hiddens = int(num_hiddens)
@@ -320,7 +321,7 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
         self.lr = float(lr)
         self.num_epochs = int(num_epochs)
         self.batch_size = int(batch_size)
-        self.random_state = int(random_state)
+        self.random_state = random_state
 
         if device is None:
             self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -382,14 +383,15 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
         **kwargs : Any
             Additional keyword arguments.
         """
-        torch.manual_seed(self.random_state)
-        np.random.seed(self.random_state)
+        if self.random_state is not None:
+            torch.manual_seed(self.random_state)
 
         # Get algorithm features
         alg_df = getattr(self, "algorithm_features", None)
         if alg_df is None or not isinstance(alg_df, pd.DataFrame):
             raise ValueError(
-                "Set selector.algorithm_features (pd.DataFrame indexed by algorithm names) before fit()"
+                "Set selector.algorithm_features (pd.DataFrame indexed by "
+                "algorithm names) before fit()"
             )
 
         self.algorithms = [str(a) for a in performance.columns]
@@ -409,7 +411,8 @@ class CosineSelector(ConfigurableMixin, AbstractSelector):
         if missing:
             avail = list(alg_df.index)[:10]
             raise ValueError(
-                f"Algorithm feature rows do not match performance columns. Missing: {missing}. Available sample: {avail}"
+                "Algorithm feature rows do not match performance columns. "
+                f"Missing: {missing}. Available sample: {avail}"
             )
 
         alg_df = alg_df.loc[mapped].copy()

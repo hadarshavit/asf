@@ -2,10 +2,10 @@
 
 from typing import Any
 
-from sklearn.base import clone
+from asf.utils.random_state import clone_with_random_state
 
 
-def clone_estimator(estimator: Any) -> Any:
+def clone_estimator(estimator: Any, random_state: int | None = None) -> Any:
     """Clone a configured predictor without retaining its fitted state."""
     if isinstance(estimator, type):
         raise TypeError(
@@ -16,7 +16,7 @@ def clone_estimator(estimator: Any) -> Any:
     ):
         raise TypeError("estimator must implement fit and predict.")
     try:
-        return clone(estimator)
+        return clone_with_random_state(estimator, random_state)
     except (TypeError, RuntimeError) as exc:
         raise TypeError(
             "estimator must support sklearn.base.clone. Use a scikit-learn "

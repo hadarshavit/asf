@@ -51,13 +51,13 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         optimizer: Callable[..., Any] | None = None,
         batch_size: int = 128,
         epochs: int = 500,
-        seed: int = 42,
+        random_state: int | None = 42,
         device: str = "cpu",
         compile: bool = True,
         learning_rate: float = 1e-3,
         weight_decay: float = 0.0,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         params = dict(init_params) if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
@@ -68,7 +68,7 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         optimizer = params.pop("optimizer", optimizer)
         batch_size = params.pop("batch_size", batch_size)
         epochs = params.pop("epochs", epochs)
-        seed = params.pop("seed", seed)
+        random_state = params.pop("random_state", random_state)
         device = params.pop("device", device)
         compile = params.pop("compile", compile)
         learning_rate = params.pop("learning_rate", learning_rate)
@@ -81,20 +81,21 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
             optimizer=optimizer,
             batch_size=batch_size,
             epochs=epochs,
-            seed=seed,
+            random_state=random_state,
             device=device,
             compile=compile,
             learning_rate=learning_rate,
             weight_decay=weight_decay,
         )
 
-        super().__init__(**params)
+        super().__init__(random_state=random_state, **params)
         if not TORCH_AVAILABLE:
             raise RuntimeError(
                 "PyTorch is not installed. Install it with: pip install torch"
             )
 
-        torch.manual_seed(seed)
+        if random_state is not None:
+            torch.manual_seed(random_state)
 
         if model is None and input_size is not None:
             self.model = get_mlp(input_size=input_size, output_size=1)
@@ -126,7 +127,9 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         performance: pd.DataFrame,
         algorithm_features: pd.DataFrame,
     ) -> Any:
-        dataset = RankingDataset(features, performance, algorithm_features)
+        dataset = RankingDataset(
+            features, performance, algorithm_features, random_state=self.random_state
+        )
         return torch.utils.data.DataLoader(
             dataset, batch_size=self.batch_size, shuffle=True, num_workers=0
         )
@@ -137,6 +140,8 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
         Y: Any,
         **kwargs: Any,
     ) -> None:
+        if self.random_state is not None:
+            torch.manual_seed(self.random_state)
         # Extract algorithm_features from kwargs
         algorithm_features = kwargs.get("algorithm_features")
         if algorithm_features is None:
@@ -213,7 +218,7 @@ class RankingMLP(ConfigurableMixin, AbstractPredictor):
     PREFIX = "ranking_mlp"
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(**kwargs: Any) -> Any:
         """Define hyperparameters for RankingMLP."""
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []

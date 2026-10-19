@@ -1,5 +1,7 @@
 """Audit all concrete predictor classes, including non-exported implementations."""
 
+from typing import Any
+
 import importlib
 import inspect
 from pathlib import Path
@@ -14,7 +16,7 @@ from asf.predictors.epm_random_forest import EPMRandomForest
 from asf.predictors.epm_extra_trees import EPMExtraTrees
 
 
-def wrapper_classes():
+def wrapper_classes() -> Any:
     classes = []
     for path in sorted(Path("asf/predictors").glob("*.py")):
         module = importlib.import_module(f"asf.predictors.{path.stem}")
@@ -28,7 +30,9 @@ def wrapper_classes():
 @pytest.mark.parametrize(
     "cls", wrapper_classes(), ids=lambda cls: f"{cls.__module__}.{cls.__name__}"
 )
-def test_all_sklearn_wrappers_preserve_nondefault_parameters_and_reset_fit(cls):
+def test_all_sklearn_wrappers_preserve_nondefault_parameters_and_reset_fit(
+    cls: Any,
+) -> None:
     if cls.__module__.endswith("xgboost"):
         pytest.importorskip("xgboost")
     model = cls()
@@ -68,7 +72,7 @@ def test_all_sklearn_wrappers_preserve_nondefault_parameters_and_reset_fit(cls):
 
 
 @pytest.mark.parametrize("cls", [EPMRandomForest, EPMExtraTrees])
-def test_epm_forests_clone_all_settings_and_discard_trees(cls):
+def test_epm_forests_clone_all_settings_and_discard_trees(cls: Any) -> None:
     kwargs = dict(
         n_estimators=3,
         max_depth=2,
@@ -93,7 +97,7 @@ def test_epm_forests_clone_all_settings_and_discard_trees(cls):
     np.testing.assert_allclose(copied.predict(X), model.predict(X))
 
 
-def test_survival_wrapper_clones_configuration_and_resets_forest():
+def test_survival_wrapper_clones_configuration_and_resets_forest() -> None:
     pytest.importorskip("sksurv")
     from sksurv.util import Surv
     from asf.predictors.survival import RandomSurvivalForestWrapper
@@ -116,8 +120,8 @@ def test_survival_wrapper_clones_configuration_and_resets_forest():
 @pytest.mark.parametrize("ranking", [False, True])
 @pytest.mark.parametrize("custom_network", [False, True])
 def test_torch_clones_reset_training_state_and_preserve_configuration(
-    ranking, custom_network
-):
+    ranking: Any, custom_network: Any
+) -> None:
     torch = pytest.importorskip("torch")
     from asf.predictors import RankingMLP, RegressionMLP
     from asf.selectors import JointRanking, PairwiseRegressor
@@ -134,7 +138,7 @@ def test_torch_clones_reset_training_state_and_preserve_configuration(
     settings = dict(
         model=network,
         epochs=1,
-        seed=7,
+        random_state=7,
         batch_size=2,
         optimizer=torch.optim.SGD,
         learning_rate=0.01,
@@ -153,7 +157,7 @@ def test_torch_clones_reset_training_state_and_preserve_configuration(
     copied = clone(estimator)
     for key in [
         "epochs",
-        "seed",
+        "random_state",
         "batch_size",
         "optimizer",
         "learning_rate",
@@ -184,7 +188,7 @@ def test_torch_clones_reset_training_state_and_preserve_configuration(
         torch.testing.assert_close(estimator.model.state_dict()[key], value)
 
 
-def test_epm_random_forest_instance_preserves_settings_in_selector():
+def test_epm_random_forest_instance_preserves_settings_in_selector() -> None:
     from asf.selectors import PairwiseRegressor
 
     X = pd.DataFrame({"f": [0.0, 1.0, 2.0]})

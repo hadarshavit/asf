@@ -45,7 +45,7 @@ class GeneticAlgorithmPreSelector(AbstractPreSelector):
         Number of individuals in tournament selection.
     elitism : int, default=2
         Number of best individuals to preserve each generation.
-    seed : int or None, default=None
+    random_state : int or None, default=None
         Random seed for reproducibility.
     **kwargs : Any
         Additional arguments passed to the parent class.
@@ -62,10 +62,10 @@ class GeneticAlgorithmPreSelector(AbstractPreSelector):
         mutation_rate: float = 0.1,
         tournament_size: int = 3,
         elitism: int = 2,
-        seed: int | None = None,
+        random_state: int | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(**kwargs)
+        super().__init__(random_state=random_state, **kwargs)
         self.metric = metric
         self.n_algorithms = n_algorithms
         self.maximize = maximize
@@ -75,7 +75,7 @@ class GeneticAlgorithmPreSelector(AbstractPreSelector):
         self.mutation_rate = mutation_rate
         self.tournament_size = tournament_size
         self.elitism = elitism
-        self.seed = seed
+        self.random_state = random_state
 
     def _create_individual(self, n_total: int, rng: np.random.Generator) -> np.ndarray:
         """Create a random individual."""
@@ -209,7 +209,7 @@ class GeneticAlgorithmPreSelector(AbstractPreSelector):
                 return performance_frame.values
             return performance_frame.reset_index(drop=True)
 
-        rng = np.random.default_rng(self.seed)
+        rng = np.random.default_rng(self.random_state)
 
         # Initialize population
         population = [

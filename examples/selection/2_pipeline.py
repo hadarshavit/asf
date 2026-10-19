@@ -1,3 +1,4 @@
+from typing import Any
 from asf.selectors import (
     PairwiseClassifier,
     SelectorPipeline,
@@ -13,7 +14,7 @@ import pandas as pd
 import numpy as np
 
 
-def get_data():
+def get_data() -> Any:
     data = np.array(
         [
             [120, 100, 110],
@@ -81,7 +82,7 @@ if __name__ == "__main__":
         algorithm_pre_selector=MarginalContributionBasedPreSelector(
             metric=virtual_best_solver, n_algorithms=2
         ),
-        pre_solving=Aspeed(budget=10),
+        pre_solving=Aspeed(presolver_budget=10),
     )
 
     # Fit the selector to the data

@@ -48,7 +48,7 @@ class DyadRanking(ConfigurableMixin, AbstractModelBasedSelector):
         model_class: type[AbstractPredictor] = XGBoostRankerWrapper,
         algorithm_features: pd.DataFrame | None = None,
         n_pairs_per_instance: int = 10,
-        random_state: int = 42,
+        random_state: int | None = 42,
         **kwargs: Any,
     ) -> None:
         """
@@ -70,10 +70,12 @@ class DyadRanking(ConfigurableMixin, AbstractModelBasedSelector):
         **kwargs : Any
             Additional keyword arguments.
         """
-        AbstractModelBasedSelector.__init__(self, model_class, **kwargs)
+        AbstractModelBasedSelector.__init__(
+            self, model_class, random_state=random_state, **kwargs
+        )
         self.classifier: AbstractPredictor | None = None
         self.n_pairs_per_instance = n_pairs_per_instance
-        self.random_state = int(random_state)
+        self.random_state = random_state
         # Store user-provided algorithm features separately to avoid being overwritten
         # by parent class fit() method
         self._init_algorithm_features = algorithm_features
@@ -107,9 +109,12 @@ class DyadRanking(ConfigurableMixin, AbstractModelBasedSelector):
             import warnings
 
             warnings.warn(
-                "Using one-hot algorithm features (fallback). Per Tornede et al. (2019), "
-                "algorithm features should represent parameters and structural components. "
-                "Consider providing meaningful algorithm_features for better performance.",
+                "Using one-hot algorithm features (fallback). Per Tornede et al. "
+                "(2019), "
+                "algorithm features should represent parameters and structural "
+                "components. "
+                "Consider providing meaningful algorithm_features for better "
+                "performance.",
                 UserWarning,
                 stacklevel=2,
             )
@@ -120,7 +125,8 @@ class DyadRanking(ConfigurableMixin, AbstractModelBasedSelector):
                 algo in self.algorithm_features.index for algo in self.algorithms
             ):
                 raise ValueError(
-                    "Provided algorithm_features must include all algorithms in the dataset"
+                    "Provided algorithm_features must include all algorithms in "
+                    "the dataset"
                 )
             # Reorder to match self.algorithms and make a copy
             self.algorithm_features = self.algorithm_features.loc[

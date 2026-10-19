@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from asf.predictors.abstract_predictor import AbstractPredictor
+from asf.utils.random_state import random_state_kwargs
 
 
 class SklearnWrapper(AbstractPredictor):
@@ -31,9 +32,10 @@ class SklearnWrapper(AbstractPredictor):
         self,
         model_class: Any,
         init_params: dict[str, Any] | None = None,
+        random_state: int | None = None,
         **kwargs: Any,
-    ):
-        super().__init__()
+    ) -> None:
+        super().__init__(random_state=random_state)
         params = dict(init_params) if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
@@ -44,6 +46,10 @@ class SklearnWrapper(AbstractPredictor):
             if k not in ["budget", "maximize", "n_algorithms"]
         }
 
+        model_params = {
+            **random_state_kwargs(model_class, random_state),
+            **model_params,
+        }
         self.model_class: Any = model_class(**model_params)
 
     def get_params(self, deep: bool = True) -> dict[str, Any]:
@@ -52,6 +58,14 @@ class SklearnWrapper(AbstractPredictor):
         if type(self) is SklearnWrapper:
             params = {"model_class": type(self.model_class), **params}
         return params
+
+    def set_params(self, **params: Any) -> SklearnWrapper:
+        """Update the wrapped estimator through sklearn's parameter API."""
+        if type(self) is SklearnWrapper and "model_class" in params:
+            self.model_class = params.pop("model_class")()
+        self.model_class.set_params(**params)
+        self.random_state = getattr(self.model_class, "random_state", self.random_state)
+        return self
 
     def fit(
         self,

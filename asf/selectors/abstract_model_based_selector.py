@@ -11,6 +11,7 @@ from asf.predictors import SklearnWrapper
 from asf.predictors.abstract_predictor import AbstractPredictor
 from asf.predictors.estimator import clone_estimator
 from asf.selectors.abstract_selector import AbstractSelector
+from asf.utils.random_state import random_state_kwargs
 
 
 class AbstractModelBasedSelector(AbstractSelector):
@@ -39,7 +40,8 @@ class AbstractModelBasedSelector(AbstractSelector):
         ----------
         model_class : type[AbstractPredictor] or Callable
             The model class or a callable that returns a model instance.
-            If a scikit-learn compatible class is provided, it's wrapped with SklearnWrapper.
+            If a scikit-learn compatible class is provided, it's wrapped with
+            SklearnWrapper.
         estimator : object or None, default=None
             Configured estimator supporting sklearn.base.clone. Each fit uses
             fresh clones; the supplied instance is never fitted. When provided,
@@ -60,8 +62,9 @@ class AbstractModelBasedSelector(AbstractSelector):
     def _make_model(self, **kwargs: Any) -> Any:
         """Create an independent model for one training task."""
         if getattr(self, "estimator", None) is not None:
-            return clone_estimator(self.estimator)
-        return self.model_class(**kwargs)
+            return clone_estimator(self.estimator, self.random_state)
+        params = {**random_state_kwargs(self.model_class, self.random_state), **kwargs}
+        return self.model_class(**params)
 
     def save(self, path: str | Path) -> None:
         """

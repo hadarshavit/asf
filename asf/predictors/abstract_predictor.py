@@ -23,11 +23,11 @@ class AbstractPredictor(ABC):
         Load the model from a file.
     """
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, random_state: int | None = None, **kwargs: Any) -> None:
         """
         Initialize the predictor.
         """
-        pass
+        self.random_state = random_state
 
     @abstractmethod
     def fit(self, X: Any, Y: Any, **kwargs: Any) -> None:

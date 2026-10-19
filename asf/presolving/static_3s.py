@@ -19,11 +19,7 @@ except ImportError:
 from scipy.optimize import Bounds, LinearConstraint, milp
 from scipy.sparse import lil_matrix
 
-from asf.presolving.presolver import (
-    DEFAULT_BUDGET,
-    AbstractPresolver,
-    resolve_presolver_budget,
-)
+from asf.presolving.presolver import AbstractPresolver
 
 
 class Static3S(AbstractPresolver):
@@ -51,14 +47,14 @@ class Static3S(AbstractPresolver):
         self,
         init_params: dict[str, Any] | None = None,
         runcount_limit: float = 0.0,
-        presolver_budget: float | object = DEFAULT_BUDGET,
+        presolver_budget: float = 200.0,
         max_candidates_per_solver: int = 20,
         **kwargs: Any,
     ) -> None:
         params = dict(init_params) if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
-        presolver_budget = resolve_presolver_budget(presolver_budget, params, 200.0)
+        presolver_budget = params.pop("presolver_budget", presolver_budget)
         runcount_limit = params.pop("runcount_limit", runcount_limit)
         max_candidates_per_solver = params.pop(
             "max_candidates_per_solver", max_candidates_per_solver

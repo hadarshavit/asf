@@ -12,11 +12,7 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
-from asf.presolving.presolver import (
-    DEFAULT_BUDGET,
-    AbstractPresolver,
-    resolve_presolver_budget,
-)
+from asf.presolving.presolver import AbstractPresolver
 
 try:
     import ConfigSpace  # noqa: F401
@@ -53,7 +49,7 @@ class ConfigurablePresolver(AbstractPresolver):
     def __init__(
         self,
         init_params: dict[str, Any] | None = None,
-        presolver_budget: float | object = DEFAULT_BUDGET,
+        presolver_budget: float = 30.0,
         maximize: bool = False,
         algorithm_config: dict[str, tuple[bool, float]] | None = None,
         **kwargs: Any,
@@ -61,13 +57,14 @@ class ConfigurablePresolver(AbstractPresolver):
         params = dict(init_params) if isinstance(init_params, dict) else {}
         params.update(kwargs)
 
-        presolver_budget = resolve_presolver_budget(presolver_budget, params, 30.0)
+        presolver_budget = params.pop("presolver_budget", presolver_budget)
         maximize = params.pop("maximize", maximize)
         algorithm_config = params.pop("algorithm_config", algorithm_config)
 
         # Special handling for reconstruction from configuration
         if algorithm_config is None:
-            # Try to build it from leftovers in params if they follow the naming convention
+            # Try to build it from leftovers in params if they follow the naming
+            # convention
             # from _define_hyperparameters
             algorithm_config = {}
             # We need the algorithm list to know which keys to look for
@@ -211,7 +208,8 @@ class ConfigurablePresolver(AbstractPresolver):
             )
             hps.append(use_algo_param)
 
-            # Float parameter: time budget for this algorithm (conditional on use_algo=True)
+            # Float parameter: time budget for this algorithm (conditional on
+            # use_algo=True)
             time_param = Float(
                 name=f"time_{safe_algo_name}",
                 bounds=(0.1, max_time_per_algo),

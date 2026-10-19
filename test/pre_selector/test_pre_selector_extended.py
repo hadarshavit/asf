@@ -25,7 +25,7 @@ def _min_metric(frame: pd.DataFrame) -> float:
 class TestGeneticAlgorithmPreSelector:
     """Tests for GeneticAlgorithmPreSelector."""
 
-    def test_basic_fit_transform(self):
+    def test_basic_fit_transform(self) -> None:
         """Test basic fit_transform with DataFrame."""
         performance = pd.DataFrame(
             {
@@ -42,7 +42,7 @@ class TestGeneticAlgorithmPreSelector:
             maximize=False,
             population_size=10,
             n_generations=5,
-            seed=42,
+            random_state=42,
         )
 
         selected = selector.fit_transform(performance)
@@ -50,7 +50,7 @@ class TestGeneticAlgorithmPreSelector:
         assert isinstance(selected, pd.DataFrame)
         assert selected.shape[1] == 2
 
-    def test_fit_transform_with_numpy(self):
+    def test_fit_transform_with_numpy(self) -> None:
         """Test fit_transform with numpy array."""
         performance = np.array(
             [
@@ -66,7 +66,7 @@ class TestGeneticAlgorithmPreSelector:
             maximize=False,
             population_size=10,
             n_generations=5,
-            seed=42,
+            random_state=42,
         )
 
         selected = selector.fit_transform(performance)
@@ -74,7 +74,7 @@ class TestGeneticAlgorithmPreSelector:
         assert isinstance(selected, np.ndarray)
         assert selected.shape == (3, 2)
 
-    def test_maximize_mode(self):
+    def test_maximize_mode(self) -> None:
         """Test with maximize=True."""
         performance = pd.DataFrame(
             {
@@ -90,7 +90,7 @@ class TestGeneticAlgorithmPreSelector:
             maximize=True,
             population_size=10,
             n_generations=5,
-            seed=42,
+            random_state=42,
         )
 
         selected = selector.fit_transform(performance)
@@ -98,7 +98,7 @@ class TestGeneticAlgorithmPreSelector:
         # Should select B (highest sum)
         assert selected.shape[1] == 1
 
-    def test_n_algorithms_exceeds_total(self):
+    def test_n_algorithms_exceeds_total(self) -> None:
         """Test when n_algorithms >= number of available algorithms."""
         performance = pd.DataFrame(
             {
@@ -111,7 +111,7 @@ class TestGeneticAlgorithmPreSelector:
             metric=_sum_metric,
             n_algorithms=5,  # More than available
             maximize=False,
-            seed=42,
+            random_state=42,
         )
 
         selected = selector.fit_transform(performance)
@@ -119,7 +119,7 @@ class TestGeneticAlgorithmPreSelector:
         # Should return all columns
         assert selected.shape[1] == 2
 
-    def test_elitism_preserves_best(self):
+    def test_elitism_preserves_best(self) -> None:
         """Test that elitism parameter works."""
         performance = pd.DataFrame(
             {
@@ -136,13 +136,13 @@ class TestGeneticAlgorithmPreSelector:
             population_size=10,
             n_generations=10,
             elitism=2,
-            seed=42,
+            random_state=42,
         )
 
         selected = selector.fit_transform(performance)
         assert selected.shape[1] == 1
 
-    def test_mutation_rate(self):
+    def test_mutation_rate(self) -> None:
         """Test with different mutation rates."""
         performance = pd.DataFrame(
             {
@@ -159,13 +159,13 @@ class TestGeneticAlgorithmPreSelector:
             population_size=10,
             n_generations=5,
             mutation_rate=0.5,
-            seed=42,
+            random_state=42,
         )
 
         selected = selector.fit_transform(performance)
         assert selected.shape[1] == 1
 
-    def test_crossover_rate(self):
+    def test_crossover_rate(self) -> None:
         """Test with different crossover rates."""
         performance = pd.DataFrame(
             {
@@ -182,13 +182,13 @@ class TestGeneticAlgorithmPreSelector:
             population_size=10,
             n_generations=5,
             crossover_rate=0.0,  # No crossover
-            seed=42,
+            random_state=42,
         )
 
         selected = selector.fit_transform(performance)
         assert selected.shape[1] == 1
 
-    def test_tournament_size(self):
+    def test_tournament_size(self) -> None:
         """Test with different tournament sizes."""
         performance = pd.DataFrame(
             {
@@ -205,7 +205,7 @@ class TestGeneticAlgorithmPreSelector:
             population_size=10,
             n_generations=5,
             tournament_size=2,
-            seed=42,
+            random_state=42,
         )
 
         selected = selector.fit_transform(performance)
@@ -215,7 +215,7 @@ class TestGeneticAlgorithmPreSelector:
 class TestRandomLocalSearchPreSelector:
     """Tests for RandomLocalSearchPreSelector."""
 
-    def test_basic_fit_transform(self):
+    def test_basic_fit_transform(self) -> None:
         """Test basic fit_transform."""
         performance = pd.DataFrame(
             {
@@ -232,7 +232,7 @@ class TestRandomLocalSearchPreSelector:
             maximize=False,
             n_restarts=3,
             max_iterations=10,
-            seed=42,
+            random_state=42,
         )
 
         selected = selector.fit_transform(performance)
@@ -240,7 +240,7 @@ class TestRandomLocalSearchPreSelector:
         assert isinstance(selected, pd.DataFrame)
         assert selected.shape[1] == 2
 
-    def test_fit_transform_with_numpy(self):
+    def test_fit_transform_with_numpy(self) -> None:
         """Test with numpy input."""
         performance = np.array(
             [
@@ -256,7 +256,7 @@ class TestRandomLocalSearchPreSelector:
             maximize=False,
             n_restarts=3,
             max_iterations=10,
-            seed=42,
+            random_state=42,
         )
 
         selected = selector.fit_transform(performance)
@@ -264,7 +264,7 @@ class TestRandomLocalSearchPreSelector:
         assert isinstance(selected, np.ndarray)
         assert selected.shape == (3, 2)
 
-    def test_maximize_mode(self):
+    def test_maximize_mode(self) -> None:
         """Test maximize mode."""
         performance = pd.DataFrame(
             {
@@ -280,14 +280,14 @@ class TestRandomLocalSearchPreSelector:
             maximize=True,
             n_restarts=3,
             max_iterations=10,
-            seed=42,
+            random_state=42,
         )
 
         selected = selector.fit_transform(performance)
 
         assert selected.shape[1] == 1
 
-    def test_n_algorithms_exceeds_total(self):
+    def test_n_algorithms_exceeds_total(self) -> None:
         """Test when n_algorithms exceeds available."""
         performance = pd.DataFrame(
             {
@@ -300,7 +300,7 @@ class TestRandomLocalSearchPreSelector:
             metric=_sum_metric,
             n_algorithms=5,
             maximize=False,
-            seed=42,
+            random_state=42,
         )
 
         selected = selector.fit_transform(performance)
@@ -308,7 +308,7 @@ class TestRandomLocalSearchPreSelector:
         # Should return all columns
         assert selected.shape[1] == 2
 
-    def test_multiple_restarts(self):
+    def test_multiple_restarts(self) -> None:
         """Test that multiple restarts work."""
         performance = pd.DataFrame(
             {
@@ -324,13 +324,13 @@ class TestRandomLocalSearchPreSelector:
             maximize=False,
             n_restarts=10,
             max_iterations=5,
-            seed=42,
+            random_state=42,
         )
 
         selected = selector.fit_transform(performance)
         assert selected.shape[1] == 2
 
-    def test_local_search_iterations(self):
+    def test_local_search_iterations(self) -> None:
         """Test with many iterations."""
         performance = pd.DataFrame(
             {
@@ -346,7 +346,7 @@ class TestRandomLocalSearchPreSelector:
             maximize=False,
             n_restarts=2,
             max_iterations=50,
-            seed=42,
+            random_state=42,
         )
 
         selected = selector.fit_transform(performance)
@@ -356,7 +356,7 @@ class TestRandomLocalSearchPreSelector:
 class TestMarginalContributionBasePreSelectorForward:
     """Additional tests for MarginalContributionBasedPreSelector."""
 
-    def test_forward_selection_mode(self):
+    def test_forward_selection_mode(self) -> None:
         """Test forward selection mode."""
         performance = pd.DataFrame(
             {
@@ -378,7 +378,7 @@ class TestMarginalContributionBasePreSelectorForward:
         # Should select A (lowest sum with forward greedy)
         assert list(selected.columns) == ["A"]  # type: ignore[attr-defined]
 
-    def test_forward_selection_multiple(self):
+    def test_forward_selection_multiple(self) -> None:
         """Test forward selection with multiple algorithms."""
         performance = pd.DataFrame(
             {
@@ -399,7 +399,7 @@ class TestMarginalContributionBasePreSelectorForward:
 
         assert selected.shape[1] == 2
 
-    def test_backward_selection_maximize(self):
+    def test_backward_selection_maximize(self) -> None:
         """Test backward selection with maximize."""
         performance = pd.DataFrame(
             {
@@ -421,7 +421,7 @@ class TestMarginalContributionBasePreSelectorForward:
         # Should select C (highest contribution)
         assert list(selected.columns) == ["C"]  # type: ignore[attr-defined]
 
-    def test_with_numpy_input(self):
+    def test_with_numpy_input(self) -> None:
         """Test with numpy array input."""
         performance = np.array(
             [
@@ -442,7 +442,7 @@ class TestMarginalContributionBasePreSelectorForward:
         assert isinstance(selected, np.ndarray)
         assert selected.shape == (2, 1)
 
-    def test_forward_maximize(self):
+    def test_forward_maximize(self) -> None:
         """Test forward selection with maximize."""
         performance = pd.DataFrame(
             {

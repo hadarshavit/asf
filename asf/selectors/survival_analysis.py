@@ -63,6 +63,7 @@ if SKSURV_AVAILABLE:
         def __init__(
             self,
             model_class: Any = RandomSurvivalForestWrapper,
+            random_state: int | None = 42,
             **kwargs: Any,
         ) -> None:
             """
@@ -70,19 +71,21 @@ if SKSURV_AVAILABLE:
 
             Parameters
             ----------
-            model_class : type[RandomSurvivalForestWrapper], default=RandomSurvivalForestWrapper
+            model_class : type[RandomSurvivalForestWrapper],
+            default=RandomSurvivalForestWrapper
                 Wrapper class for the survival model.
             **kwargs : Any
                 Additional keyword arguments.
             """
-            super().__init__(model_class=model_class, **kwargs)
+            super().__init__(
+                model_class=model_class, random_state=random_state, **kwargs
+            )
             self.use_schedule = False
             self.max_schedule_length: int | None = None
             self.popsize = 20
             self.maxiter = 150
             self.tol = 0.01
             self.dominance_resolution = 100
-            self.random_state: int | None = 42
 
             if not isinstance(self.budget, (int, float)) or self.budget <= 0:
                 raise ValueError(
@@ -93,7 +96,8 @@ if SKSURV_AVAILABLE:
             self.model: RandomSurvivalForestWrapper | None = None
 
         def _build_design_matrix(self, features: pd.DataFrame) -> np.ndarray:
-            """Build the instance-algorithm design matrix without object-heavy pandas expansion."""
+            "Build the instance-algorithm design matrix without object-heavy"
+            "pandas expansion."
             n_instances = features.shape[0]
             n_algorithms = len(self.algorithms)
             instance_features = features.to_numpy(dtype=np.float32, copy=False)
@@ -398,7 +402,9 @@ if SKSURV_AVAILABLE:
             random_state: int | None = 42,
             **kwargs: Any,
         ) -> None:
-            super().__init__(model_class=model_class, **kwargs)
+            super().__init__(
+                model_class=model_class, random_state=random_state, **kwargs
+            )
             self.use_schedule = True
             self.max_schedule_length = max_schedule_length
             self.popsize = int(popsize)

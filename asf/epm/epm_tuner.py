@@ -5,7 +5,6 @@ EPM tuning logic using SMAC.
 from __future__ import annotations
 
 import copy
-import inspect
 from typing import Any, Callable, cast
 from pathlib import Path
 
@@ -31,39 +30,6 @@ from asf.preprocessing.performance_scaling import (
 from asf.utils.groupkfoldshuffle import GroupKFoldShuffle
 
 
-def _seed_predictor_kwargs(
-    model_class: type[AbstractPredictor],
-    predictor_kwargs: dict[str, Any],
-    seed: int,
-) -> dict[str, Any]:
-    """Fill supported unset model seeds while preserving caller values."""
-    result = dict(predictor_kwargs)
-    signature_params = None
-    try:
-        model = model_class(**result)
-        params = model.get_params(deep=False)
-    except (AttributeError, TypeError, ValueError):
-        try:
-            signature_params = inspect.signature(model_class).parameters
-        except (TypeError, ValueError):
-            signature_params = {}
-        params = {}
-    if params:
-        for name in ("random_state", "seed"):
-            if name in params and params[name] is None:
-                result[name] = seed
-    elif signature_params is not None:
-        for name in ("random_state", "seed"):
-            if name in result and result[name] is not None:
-                continue
-            parameter = signature_params.get(name)
-            if parameter is not None and (
-                name in result or parameter.default in (None, inspect.Parameter.empty)
-            ):
-                result[name] = seed
-    return result
-
-
 def tune_epm(
     X: np.ndarray | pd.DataFrame,
     y: np.ndarray | pd.Series,
@@ -77,7 +43,7 @@ def tune_epm(
     timeout: int = 3600,
     runcount_limit: int = 100,
     output_dir: str = "./smac_output",
-    seed: int = 0,
+    random_state: int = 0,
     smac_metric: Callable[[np.ndarray, np.ndarray], float] = mean_squared_error,
     smac_scenario_kwargs: dict[str, Any] | None = None,
     smac_kwargs: dict[str, Any] | None = None,
@@ -112,7 +78,7 @@ def tune_epm(
         Maximum number of configurations to evaluate.
     output_dir : str, default="./smac_output"
         Directory to store SMAC output.
-    seed : int, default=0
+    random_state : int, default=0
         Random seed for reproducibility.
     smac_metric : Callable, default=mean_squared_error
         Metric function to evaluate model performance.
@@ -139,7 +105,6 @@ def tune_epm(
     smac_scenario_kwargs = smac_scenario_kwargs or {}
     smac_kwargs = smac_kwargs or {}
     predictor_kwargs = predictor_kwargs or {}
-    predictor_kwargs = _seed_predictor_kwargs(model_class, predictor_kwargs, seed)
 
     if isinstance(X, np.ndarray) and isinstance(y, np.ndarray):
         X_df = pd.DataFrame(
@@ -161,7 +126,7 @@ def tune_epm(
         walltime_limit=timeout,
         deterministic=True,
         output_directory=Path(output_dir),
-        seed=seed,
+        seed=random_state,
         **smac_scenario_kwargs,
     )
 
@@ -172,9 +137,9 @@ def tune_epm(
         cv_groups = groups.iloc[:, 0].to_numpy()
 
     splitter = (
-        GroupKFoldShuffle(n_splits=cv, shuffle=True, random_state=seed)
+        GroupKFoldShuffle(n_splits=cv, shuffle=True, random_state=random_state)
         if cv_groups is not None
-        else KFold(n_splits=cv, shuffle=True, random_state=seed)
+        else KFold(n_splits=cv, shuffle=True, random_state=random_state)
     )
     folds = list(splitter.split(X_df, y_ser, cv_groups))
 
@@ -186,6 +151,7 @@ def tune_epm(
 
             epm = EPM(
                 predictor_class=model_class,
+                random_state=random_state,
                 normalization_class=normalization_class,
                 transform_back=True,
                 predictor_config=config,
@@ -221,6 +187,7 @@ def tune_epm(
 
     return EPM(
         predictor_class=model_class,
+        random_state=random_state,
         normalization_class=normalization_class,
         transform_back=True,
         predictor_config=cast(dict[str, Any], config_dict),

@@ -10,7 +10,8 @@ from asf.predictors import AbstractPredictor, RandomForestRegressorWrapper
 
 class APPS(AbstractModelBasedSelector):
     """
-    Automatic Parallel Portfolio Selector based on the approach by Kashgarani and Kotthoff.
+    Automatic Parallel Portfolio Selector based on the approach by Kashgarani and
+    Kotthoff.
 
     This selector predicts performance distributions for each algorithm and selects
     a parallel portfolio based on the overlap of each algorithm's predicted runtime
@@ -34,11 +35,11 @@ class APPS(AbstractModelBasedSelector):
         model_class: type[AbstractPredictor] = RandomForestRegressorWrapper,
         p_intersection: float = 0.82,
         n_estimators_for_std: int = 10,
-        random_state: int = 42,
+        random_state: int | None = 42,
         use_jackknife: bool = True,
         n_jackknife_folds: int | None = None,
         **kwargs: Any,
-    ):
+    ) -> None:
         """
         Initialize the Parallel Portfolio Selector.
 
@@ -46,17 +47,20 @@ class APPS(AbstractModelBasedSelector):
             model_class: The predictor class to use for performance modeling.
             p_intersection: Threshold for distribution overlap.
                           Higher values -> smaller portfolios.
-            n_estimators_for_std: Number of Jackknife iterations (n_instances) or bootstrap samples.
+            n_estimators_for_std: Number of Jackknife iterations (n_instances) or
+            bootstrap samples.
             random_state: Random seed for reproducibility.
             use_jackknife: If True, use Jackknife method; if False, use bootstrap.
-            n_jackknife_folds: Number of folds for Jackknife. If None, uses leave-one-out.
-                              E.g., 10 means 10-fold cross-validation (10 models per algorithm).
+            n_jackknife_folds: Number of folds for Jackknife. If None, uses
+            leave-one-out.
+                              E.g., 10 means 10-fold cross-validation (10 models per
+                              algorithm).
             **kwargs: Additional arguments passed to parent class.
         """
-        super().__init__(model_class=model_class, **kwargs)
+        super().__init__(model_class=model_class, random_state=random_state, **kwargs)
         self.p_intersection = float(p_intersection)
         self.n_estimators_for_std = int(n_estimators_for_std)
-        self.random_state = int(random_state)
+        self.random_state = random_state
         self.use_jackknife = bool(use_jackknife)
         self.n_jackknife_folds = n_jackknife_folds
 
@@ -67,7 +71,9 @@ class APPS(AbstractModelBasedSelector):
         self.features_train: pd.DataFrame | None = None
         self.performance_train: pd.DataFrame | None = None
 
-    def _fit(self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs) -> None:
+    def _fit(
+        self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
+    ) -> None:
         """
         Train ensemble of performance models for each algorithm.
         Uses either Jackknife or bootstrap method based on use_jackknife flag.

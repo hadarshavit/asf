@@ -791,3 +791,26 @@ Here's a quick guide to choosing which selector fits your use case:
 ## API Reference
 
 For detailed API documentation on each selector, visit the [Selectors API Reference](../api/selectors.md).
+
+## Reproducibility
+
+Use `random_state` consistently for ASF selectors, predictors, EPMs, presolvers,
+algorithm preselectors, and tuning functions. An integer makes their random
+choices reproducible; `None` leaves them unseeded. Component defaults remain
+unchanged. The former `seed` argument on ASF components and tuners is now
+called `random_state`.
+
+Selectors and EPMs forward their state to the models they construct. Supplied
+estimator templates are cloned, and unset `random_state` parameters on those
+clones inherit the parent's state. Explicit estimator states are preserved.
+
+`SelectorPipeline.get_from_configuration(..., random_state=7)` forwards the
+state when constructing its components. Direct pipeline construction also
+accepts component factories, for example:
+
+```python
+pipeline = SelectorPipeline(selector=PerformanceModel, random_state=7)
+```
+
+Component instances supplied directly to a pipeline retain their own
+configuration; set their `random_state` when constructing them.

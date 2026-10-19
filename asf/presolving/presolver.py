@@ -12,30 +12,6 @@ import pandas as pd
 
 from asf.utils.configurable import ConfigurableMixin
 
-DEFAULT_BUDGET = object()
-
-
-def resolve_presolver_budget(
-    value: float | object, params: dict[str, Any], default: float
-) -> float:
-    """Resolve the legacy ``budget`` alias without overriding an explicit value."""
-    if "presolver_budget" in params:
-        configured = params.pop("presolver_budget")
-        params.pop("budget", None)
-        if value is DEFAULT_BUDGET:
-            value = configured
-    elif "budget" in params:
-        alias = params.pop("budget")
-        if value is DEFAULT_BUDGET:
-            value = alias
-    elif value is DEFAULT_BUDGET:
-        value = default
-    value = float(value)
-    if not np.isfinite(value) or value < 0:
-        raise ValueError("presolver_budget must be finite and non-negative")
-    return value
-
-
 try:
     import ConfigSpace  # noqa: F401
 
@@ -63,9 +39,13 @@ class AbstractPresolver(ABC, ConfigurableMixin):
         self,
         presolver_budget: float,
         maximize: bool = False,
+        random_state: int | None = None,
         **kwargs: Any,
     ) -> None:
+        self.random_state = random_state
         self.presolver_budget = float(presolver_budget)
+        if not np.isfinite(self.presolver_budget) or self.presolver_budget < 0:
+            raise ValueError("presolver_budget must be finite and non-negative")
         self.maximize = bool(maximize)
 
     @abstractmethod
@@ -111,7 +91,8 @@ class AbstractPresolver(ABC, ConfigurableMixin):
         Returns
         -------
         list of tuple or dict
-            A list of (algorithm_name, time_budget) pairs, OR a dict mapping instance names to such lists.
+            A list of (algorithm_name, time_budget) pairs, OR a dict mapping instance
+            names to such lists.
         """
         pass
 
