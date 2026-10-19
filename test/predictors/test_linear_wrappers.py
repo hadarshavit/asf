@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 pytest.importorskip("ConfigSpace")
@@ -13,7 +14,7 @@ from asf.predictors.linear_model import (
     "wrapper_cls",
     [LinearClassifierWrapper, LinearRegressorWrapper],
 )
-def test_linear_configuration_space(wrapper_cls):
+def test_linear_configuration_space(wrapper_cls: Any) -> None:
     cs = wrapper_cls.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
 
@@ -30,7 +31,7 @@ def test_linear_configuration_space(wrapper_cls):
         (LinearRegressorWrapper, {"penalty": "l2"}),
     ],
 )
-def test_linear_get_from_configuration(wrapper_cls, extra_params):
+def test_linear_get_from_configuration(wrapper_cls: Any, extra_params: Any) -> None:
     cs = wrapper_cls.get_configuration_space()
     configuration = cs.get_default_configuration()
 

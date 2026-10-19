@@ -1,3 +1,4 @@
+from typing import Any
 from asf.selectors.selector_pipeline import SelectorPipeline
 from asf.utils.configurable import ConfigurableMixin
 from ConfigSpace import Configuration
@@ -7,11 +8,11 @@ from ConfigSpace import Configuration
 class DummySelector(ConfigurableMixin):
     PREFIX = "dummy_sel"
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         self.budget = 10.0
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(**kwargs: Any) -> Any:
         return [], [], []
 
 
@@ -25,7 +26,7 @@ class DummyPreprocessor2(ConfigurableMixin):
     pass
 
 
-def test_selector_pipeline_config_space_refactor():
+def test_selector_pipeline_config_space_refactor() -> None:
     # Define space
     cs = SelectorPipeline.get_configuration_space(
         selector_class=[DummySelector],
@@ -41,7 +42,8 @@ def test_selector_pipeline_config_space_refactor():
     hp1 = hps[hp_name_1]
 
     # Check choices (ClassChoice converts to Categorical with strings for ConfigSpace)
-    # The internal logic maps "False" string to False boolean, but ConfigSpace sees "False"
+    # The internal logic maps "False" string to False boolean, but ConfigSpace sees
+    # "False"
     assert "DummyPreprocessor1" in hp1.choices  # type: ignore[attr-defined]
     assert "False" in hp1.choices  # type: ignore[attr-defined]
 
@@ -79,7 +81,7 @@ def test_selector_pipeline_config_space_refactor():
     assert "DummyPreprocessor1" in cfg["preprocessor_steps"]
 
 
-def test_selector_pipeline_none_preprocessing():
+def test_selector_pipeline_none_preprocessing() -> None:
     # Test with no preprocessors active
     cs = SelectorPipeline.get_configuration_space(
         selector_class=[DummySelector], preprocessing_class=[DummyPreprocessor1]
@@ -99,7 +101,7 @@ def test_selector_pipeline_none_preprocessing():
     assert steps[0][0] == "SimpleImputer"
 
 
-def test_selector_pipeline_auto_discovery():
+def test_selector_pipeline_auto_discovery() -> None:
     # Test that we can recover classes from the space without passing them explicitly
     cs = SelectorPipeline.get_configuration_space(
         selector_class=[DummySelector],
@@ -108,7 +110,9 @@ def test_selector_pipeline_auto_discovery():
 
     # 1. Test with original space (ClassChoice present)
     config_dict = {
-        f"{SelectorPipeline.PREFIX}:preprocessor:DummyPreprocessor1": "DummyPreprocessor1",
+        (
+            f"{SelectorPipeline.PREFIX}:preprocessor:DummyPreprocessor1"
+        ): "DummyPreprocessor1",
         f"{SelectorPipeline.PREFIX}:preprocessor:DummyPreprocessor2": "False",
         f"{SelectorPipeline.PREFIX}:selector": "DummySelector",
     }
@@ -134,7 +138,7 @@ def test_selector_pipeline_auto_discovery():
     assert isinstance(pipeline_recovered.selector, DummySelector)
 
 
-def test_isa_pipeline_config_space_has_only_parent_conditions():
+def test_isa_pipeline_config_space_has_only_parent_conditions() -> None:
     from asf.selectors.isa import ISA
 
     cs = SelectorPipeline.get_configuration_space(selector_class=[ISA])
@@ -148,7 +152,7 @@ def test_isa_pipeline_config_space_has_only_parent_conditions():
     assert len(conditions) == 0
 
 
-def test_sunny_pipeline_config_space_has_only_parent_conditions():
+def test_sunny_pipeline_config_space_has_only_parent_conditions() -> None:
     from asf.selectors.sunny import SUNNY
 
     cs = SelectorPipeline.get_configuration_space(selector_class=[SUNNY])
@@ -165,7 +169,7 @@ def test_sunny_pipeline_config_space_has_only_parent_conditions():
     )
 
 
-def test_survival_pipeline_config_space_has_no_schedule_parameters():
+def test_survival_pipeline_config_space_has_no_schedule_parameters() -> None:
     from asf.selectors.survival_analysis import SKSURV_AVAILABLE, SurvivalAnalysis
 
     if not SKSURV_AVAILABLE:
@@ -177,7 +181,7 @@ def test_survival_pipeline_config_space_has_no_schedule_parameters():
     assert "pipeline:selector:survival:random_state" not in set(cs)
 
 
-def test_survival_scheduler_pipeline_config_space_converts():
+def test_survival_scheduler_pipeline_config_space_converts() -> None:
     from asf.selectors.survival_analysis import (
         SKSURV_AVAILABLE,
         SurvivalAnalysisScheduler,

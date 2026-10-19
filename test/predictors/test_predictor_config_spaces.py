@@ -10,7 +10,7 @@ from ConfigSpace import ConfigurationSpace
 class TestPredictorConfigurationSpaces:
     """Test configuration spaces for all predictors that have them."""
 
-    def test_random_forest_classifier_config_space(self):
+    def test_random_forest_classifier_config_space(self) -> None:
         """Test RandomForestClassifierWrapper configuration space."""
         from asf.predictors.random_forest import RandomForestClassifierWrapper
 
@@ -28,7 +28,7 @@ class TestPredictorConfigurationSpaces:
         }
         assert expected.issubset(hp_names)
 
-    def test_random_forest_regressor_config_space(self):
+    def test_random_forest_regressor_config_space(self) -> None:
         """Test RandomForestRegressorWrapper configuration space."""
         from asf.predictors.random_forest import RandomForestRegressorWrapper
 
@@ -45,7 +45,7 @@ class TestPredictorConfigurationSpaces:
         }
         assert expected.issubset(hp_names)
 
-    def test_random_forest_classifier_get_from_configuration(self):
+    def test_random_forest_classifier_get_from_configuration(self) -> None:
         """Test RandomForestClassifierWrapper get_from_configuration."""
         from asf.predictors.random_forest import RandomForestClassifierWrapper
 
@@ -58,7 +58,7 @@ class TestPredictorConfigurationSpaces:
         instance = result()
         assert isinstance(instance, RandomForestClassifierWrapper)
 
-    def test_random_forest_regressor_get_from_configuration(self):
+    def test_random_forest_regressor_get_from_configuration(self) -> None:
         """Test RandomForestRegressorWrapper get_from_configuration."""
         from asf.predictors.random_forest import RandomForestRegressorWrapper
 
@@ -71,7 +71,7 @@ class TestPredictorConfigurationSpaces:
         instance = result()
         assert isinstance(instance, RandomForestRegressorWrapper)
 
-    def test_linear_classifier_config_space(self):
+    def test_linear_classifier_config_space(self) -> None:
         """Test LinearClassifierWrapper configuration space."""
         from asf.predictors.linear_model import LinearClassifierWrapper
 
@@ -82,7 +82,7 @@ class TestPredictorConfigurationSpaces:
         # LinearClassifier should have alpha
         assert any("alpha" in name for name in hp_names)
 
-    def test_linear_regressor_config_space(self):
+    def test_linear_regressor_config_space(self) -> None:
         """Test LinearRegressorWrapper configuration space."""
         from asf.predictors.linear_model import LinearRegressorWrapper
 
@@ -92,7 +92,7 @@ class TestPredictorConfigurationSpaces:
         hp_names = {hp.name for hp in cs.values()}
         assert len(hp_names) > 0
 
-    def test_svm_classifier_config_space(self):
+    def test_svm_classifier_config_space(self) -> None:
         """Test SVMClassifierWrapper configuration space."""
         from asf.predictors.svm import SVMClassifierWrapper
 
@@ -104,7 +104,7 @@ class TestPredictorConfigurationSpaces:
         assert any("C" in name for name in hp_names)
         assert any("gamma" in name for name in hp_names)
 
-    def test_svm_regressor_config_space(self):
+    def test_svm_regressor_config_space(self) -> None:
         """Test SVMRegressorWrapper configuration space."""
         from asf.predictors.svm import SVMRegressorWrapper
 
@@ -114,7 +114,7 @@ class TestPredictorConfigurationSpaces:
         hp_names = {hp.name for hp in cs.values()}
         assert len(hp_names) > 0
 
-    def test_mlp_classifier_config_space(self):
+    def test_mlp_classifier_config_space(self) -> None:
         """Test MLPClassifierWrapper configuration space."""
         from asf.predictors.mlp import MLPClassifierWrapper
 
@@ -125,7 +125,7 @@ class TestPredictorConfigurationSpaces:
         # MLP should have learning_rate_init and hidden layers
         assert any("learning_rate_init" in name for name in hp_names)
 
-    def test_mlp_regressor_config_space(self):
+    def test_mlp_regressor_config_space(self) -> None:
         """Test MLPRegressorWrapper configuration space."""
         from asf.predictors.mlp import MLPRegressorWrapper
 
@@ -135,7 +135,7 @@ class TestPredictorConfigurationSpaces:
         hp_names = {hp.name for hp in cs.values()}
         assert len(hp_names) > 0
 
-    def test_ridge_classifier_config_space(self):
+    def test_ridge_classifier_config_space(self) -> None:
         """Test RidgeClassifierWrapper configuration space."""
         from asf.predictors.ridge import RidgeClassifierWrapper
 
@@ -146,7 +146,7 @@ class TestPredictorConfigurationSpaces:
         # Ridge should have alpha
         assert any("alpha" in name for name in hp_names)
 
-    def test_ridge_regressor_config_space(self):
+    def test_ridge_regressor_config_space(self) -> None:
         """Test RidgeRegressorWrapper configuration space."""
         from asf.predictors.ridge import RidgeRegressorWrapper
 
@@ -160,7 +160,7 @@ class TestPredictorConfigurationSpaces:
 class TestConfigSpaceWithPrePrefix:
     """Test configuration space generation with pre_prefix."""
 
-    def test_random_forest_with_pre_prefix(self):
+    def test_random_forest_with_pre_prefix(self) -> None:
         """Test configuration space with a pre_prefix."""
         from asf.predictors.random_forest import RandomForestClassifierWrapper
 
@@ -170,7 +170,7 @@ class TestConfigSpaceWithPrePrefix:
         # All names should start with parent:
         assert all(name.startswith("parent:") for name in hp_names)
 
-    def test_random_forest_with_parent_param(self):
+    def test_random_forest_with_parent_param(self) -> None:
         """Test configuration space with parent parameter adds conditions."""
         from ConfigSpace import Categorical
         from asf.predictors.random_forest import RandomForestClassifierWrapper
@@ -193,7 +193,7 @@ class TestConfigSpaceWithPrePrefix:
 class TestConfigSpaceRoundTrip:
     """Test that configuration spaces work end-to-end."""
 
-    def test_random_forest_config_roundtrip(self):
+    def test_random_forest_config_roundtrip(self) -> None:
         """Test full configuration space round trip."""
         from asf.predictors.random_forest import RandomForestClassifierWrapper
 
@@ -215,7 +215,7 @@ class TestConfigSpaceRoundTrip:
 class TestPredictorDefaultConfigToInstance:
     """Test that each predictor can be instantiated from its default configuration."""
 
-    def test_random_forest_classifier_default_config(self):
+    def test_random_forest_classifier_default_config(self) -> None:
         """Test RandomForestClassifierWrapper instantiation from default config."""
         from asf.predictors.random_forest import RandomForestClassifierWrapper
 
@@ -226,7 +226,7 @@ class TestPredictorDefaultConfigToInstance:
         )
         assert callable(partial_fn)
 
-    def test_random_forest_regressor_default_config(self):
+    def test_random_forest_regressor_default_config(self) -> None:
         """Test RandomForestRegressorWrapper instantiation from default config."""
         from asf.predictors.random_forest import RandomForestRegressorWrapper
 
@@ -235,7 +235,7 @@ class TestPredictorDefaultConfigToInstance:
         partial_fn = RandomForestRegressorWrapper.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_linear_classifier_default_config(self):
+    def test_linear_classifier_default_config(self) -> None:
         """Test LinearClassifierWrapper instantiation from default config."""
         from asf.predictors.linear_model import LinearClassifierWrapper
 
@@ -244,7 +244,7 @@ class TestPredictorDefaultConfigToInstance:
         partial_fn = LinearClassifierWrapper.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_linear_regressor_default_config(self):
+    def test_linear_regressor_default_config(self) -> None:
         """Test LinearRegressorWrapper instantiation from default config."""
         from asf.predictors.linear_model import LinearRegressorWrapper
 
@@ -253,7 +253,7 @@ class TestPredictorDefaultConfigToInstance:
         partial_fn = LinearRegressorWrapper.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_svm_classifier_default_config(self):
+    def test_svm_classifier_default_config(self) -> None:
         """Test SVMClassifierWrapper instantiation from default config."""
         from asf.predictors.svm import SVMClassifierWrapper
 
@@ -262,7 +262,7 @@ class TestPredictorDefaultConfigToInstance:
         partial_fn = SVMClassifierWrapper.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_svm_regressor_default_config(self):
+    def test_svm_regressor_default_config(self) -> None:
         """Test SVMRegressorWrapper instantiation from default config."""
         from asf.predictors.svm import SVMRegressorWrapper
 
@@ -271,7 +271,7 @@ class TestPredictorDefaultConfigToInstance:
         partial_fn = SVMRegressorWrapper.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_mlp_classifier_default_config(self):
+    def test_mlp_classifier_default_config(self) -> None:
         """Test MLPClassifierWrapper instantiation from default config."""
         from asf.predictors.mlp import MLPClassifierWrapper
 
@@ -280,7 +280,7 @@ class TestPredictorDefaultConfigToInstance:
         partial_fn = MLPClassifierWrapper.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_mlp_regressor_default_config(self):
+    def test_mlp_regressor_default_config(self) -> None:
         """Test MLPRegressorWrapper instantiation from default config."""
         from asf.predictors.mlp import MLPRegressorWrapper
 
@@ -289,7 +289,7 @@ class TestPredictorDefaultConfigToInstance:
         partial_fn = MLPRegressorWrapper.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_ridge_classifier_default_config(self):
+    def test_ridge_classifier_default_config(self) -> None:
         """Test RidgeClassifierWrapper instantiation from default config."""
         from asf.predictors.ridge import RidgeClassifierWrapper
 
@@ -298,7 +298,7 @@ class TestPredictorDefaultConfigToInstance:
         partial_fn = RidgeClassifierWrapper.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_ridge_regressor_default_config(self):
+    def test_ridge_regressor_default_config(self) -> None:
         """Test RidgeRegressorWrapper instantiation from default config."""
         from asf.predictors.ridge import RidgeRegressorWrapper
 
@@ -307,7 +307,7 @@ class TestPredictorDefaultConfigToInstance:
         partial_fn = RidgeRegressorWrapper.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_xgboost_classifier_default_config(self):
+    def test_xgboost_classifier_default_config(self) -> None:
         """Test XGBoostClassifierWrapper instantiation from default config."""
         from asf.predictors.xgboost import XGBoostClassifierWrapper
 
@@ -316,7 +316,7 @@ class TestPredictorDefaultConfigToInstance:
         partial_fn = XGBoostClassifierWrapper.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_xgboost_regressor_default_config(self):
+    def test_xgboost_regressor_default_config(self) -> None:
         """Test XGBoostRegressorWrapper instantiation from default config."""
         from asf.predictors.xgboost import XGBoostRegressorWrapper
 
@@ -326,9 +326,11 @@ class TestPredictorDefaultConfigToInstance:
         assert callable(partial_fn)
 
     @pytest.mark.skip(
-        reason="EPMRandomForest has MRO issue: AbstractPredictor.get_configuration_space is called instead of ConfigurableMixin"
+        reason="EPMRandomForest has MRO issue: "
+        "AbstractPredictor.get_configuration_space is called instead of "
+        "ConfigurableMixin"
     )
-    def test_epm_random_forest_default_config(self):
+    def test_epm_random_forest_default_config(self) -> None:
         """Test EPMRandomForest instantiation from default config."""
         from asf.predictors.epm_random_forest import EPMRandomForest
 
@@ -338,9 +340,11 @@ class TestPredictorDefaultConfigToInstance:
         assert callable(partial_fn)
 
     @pytest.mark.skip(
-        reason="EPMExtraTrees has MRO issue: AbstractPredictor.get_configuration_space is called instead of ConfigurableMixin"
+        reason="EPMExtraTrees has MRO issue: "
+        "AbstractPredictor.get_configuration_space is called instead of "
+        "ConfigurableMixin"
     )
-    def test_epm_extra_trees_default_config(self):
+    def test_epm_extra_trees_default_config(self) -> None:
         """Test EPMExtraTrees instantiation from default config."""
         from asf.predictors.epm_extra_trees import EPMExtraTrees
 
@@ -349,7 +353,7 @@ class TestPredictorDefaultConfigToInstance:
         partial_fn = EPMExtraTrees.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_ranking_mlp_default_config(self):
+    def test_ranking_mlp_default_config(self) -> None:
         """Test RankingMLP instantiation from default config."""
         from asf.predictors.ranking_mlp import RankingMLP
 
@@ -359,9 +363,11 @@ class TestPredictorDefaultConfigToInstance:
         assert callable(partial_fn)
 
     @pytest.mark.skip(
-        reason="RegressionMLP has MRO issue: AbstractPredictor.get_configuration_space is called instead of ConfigurableMixin"
+        reason="RegressionMLP has MRO issue: "
+        "AbstractPredictor.get_configuration_space is called instead of "
+        "ConfigurableMixin"
     )
-    def test_regression_mlp_default_config(self):
+    def test_regression_mlp_default_config(self) -> None:
         """Test RegressionMLP instantiation from default config."""
         from asf.predictors.regression_mlp import RegressionMLP
 
@@ -370,7 +376,7 @@ class TestPredictorDefaultConfigToInstance:
         partial_fn = RegressionMLP.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_random_survival_forest_default_config(self):
+    def test_random_survival_forest_default_config(self) -> None:
         """Test RandomSurvivalForestWrapper instantiation from default config."""
         pytest.importorskip("sksurv")
         from asf.predictors.survival import RandomSurvivalForestWrapper
@@ -382,7 +388,7 @@ class TestPredictorDefaultConfigToInstance:
         partial_fn = RandomSurvivalForestWrapper.get_from_configuration(default_config)
         assert callable(partial_fn)
 
-    def test_random_survival_forest_ignores_selector_metadata_kwargs(self):
+    def test_random_survival_forest_ignores_selector_metadata_kwargs(self) -> None:
         """Selector-level kwargs should not leak into sksurv constructors."""
         pytest.importorskip("sksurv")
         from asf.predictors.survival import RandomSurvivalForestWrapper

@@ -118,7 +118,8 @@ class PairwiseClassifier(
                 unique_diffs = np.unique(diffs)
                 if unique_diffs.size == 1:
                     # Some folds/task groups can contain only one class for a pair.
-                    # Keep behavior deterministic instead of training a model that may fail.
+                    # Keep behavior deterministic instead of training a model that may
+                    # fail.
                     self.classifiers.append(
                         _ConstantBinaryPredictor(int(unique_diffs[0]))
                     )

@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import pandas as pd
 from typing import cast
@@ -11,7 +12,9 @@ from asf.metrics import (
 )
 
 
-def make_data(n_instances=200, n_algorithms=5, seed=1, budget=200.0):
+def make_data(
+    n_instances: Any = 200, n_algorithms: Any = 5, seed: Any = 1, budget: Any = 200.0
+) -> Any:
     rng = np.random.RandomState(seed)
     features = pd.DataFrame(
         rng.normal(size=(n_instances, 6)),
@@ -31,7 +34,7 @@ def make_data(n_instances=200, n_algorithms=5, seed=1, budget=200.0):
     return features, perf
 
 
-def main():
+def main() -> None:
     budget = 200.0
     X, Y = make_data(n_instances=300, n_algorithms=6, seed=2, budget=budget)
 

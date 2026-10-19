@@ -1,7 +1,10 @@
+from typing import Any
 from asf.selectors import SUNNY
 
 
-def test_sunny_selector(dummy_performance, dummy_features, validate_predictions):
+def test_sunny_selector(
+    dummy_performance: Any, dummy_features: Any, validate_predictions: Any
+) -> None:
     selector = SUNNY()
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)

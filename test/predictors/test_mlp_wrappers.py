@@ -1,3 +1,4 @@
+from typing import Any
 import warnings
 
 import numpy as np
@@ -14,7 +15,7 @@ from asf.predictors.mlp import MLPClassifierWrapper, MLPRegressorWrapper
     "wrapper_cls",
     [MLPClassifierWrapper, MLPRegressorWrapper],
 )
-def test_mlp_configuration_space(wrapper_cls):
+def test_mlp_configuration_space(wrapper_cls: Any) -> None:
     cs = wrapper_cls.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
 
@@ -27,7 +28,7 @@ def test_mlp_configuration_space(wrapper_cls):
     "wrapper_cls",
     [MLPClassifierWrapper, MLPRegressorWrapper],
 )
-def test_mlp_get_from_configuration(wrapper_cls):
+def test_mlp_get_from_configuration(wrapper_cls: Any) -> None:
     cs = wrapper_cls.get_configuration_space()
     configuration = cs.get_default_configuration()
 
@@ -43,7 +44,7 @@ def test_mlp_get_from_configuration(wrapper_cls):
     assert instance.model_class.max_iter == 32
 
 
-def test_mlp_classifier_fit_asserts_on_sample_weight(classification_data):
+def test_mlp_classifier_fit_asserts_on_sample_weight(classification_data: Any) -> None:
     X, y = classification_data
     wrapper = MLPClassifierWrapper({"hidden_layer_sizes": (4,), "max_iter": 32})
 
@@ -51,7 +52,7 @@ def test_mlp_classifier_fit_asserts_on_sample_weight(classification_data):
         wrapper.fit(X, y, sample_weight=np.ones(len(y)))
 
 
-def test_mlp_regressor_fit_asserts_on_sample_weight(regression_data):
+def test_mlp_regressor_fit_asserts_on_sample_weight(regression_data: Any) -> None:
     X, y = regression_data
     wrapper = MLPRegressorWrapper({"hidden_layer_sizes": (4,), "max_iter": 32})
 
@@ -66,7 +67,7 @@ def test_mlp_regressor_fit_asserts_on_sample_weight(regression_data):
         (MLPRegressorWrapper, "regression_data"),
     ],
 )
-def test_mlp_fit_predict(wrapper_cls, data_fixture, request):
+def test_mlp_fit_predict(wrapper_cls: Any, data_fixture: Any, request: Any) -> None:
     X, y = request.getfixturevalue(data_fixture)
     wrapper = wrapper_cls({"hidden_layer_sizes": (4,), "max_iter": 64})
 

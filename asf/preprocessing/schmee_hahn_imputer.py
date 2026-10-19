@@ -1,9 +1,10 @@
+from typing import Any
 import numpy as np
 from scipy.stats import norm
 
 
 def schmee_hahn_impute(
-    base_epm,
+    base_epm: Any,
     y_raw: np.ndarray,
     X_exp: np.ndarray,
     em_max_iter: int = 20,
@@ -19,7 +20,8 @@ def schmee_hahn_impute(
         X_exp: expanded feature matrix used for fitting.
 
     Returns:
-        (y_imputed, model): y_imputed is array of log-scale targets (NaN where input was NaN).
+        (y_imputed, model): y_imputed is array of log-scale targets (NaN where input was
+        NaN).
             model is the fitted model instance trained on the final imputed targets.
     """
     mask_not_nan = ~np.isnan(y_raw)

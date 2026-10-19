@@ -29,7 +29,8 @@ def get_feature_statistics(
     Returns
     -------
     pd.DataFrame
-        DataFrame with statistics (mean, std, min, max, median, missing count) for each feature.
+        DataFrame with statistics (mean, std, min, max, median, missing count) for each
+        feature.
     """
     stats = pd.DataFrame(
         {
@@ -50,7 +51,8 @@ def compute_feature_correlation(
     method: str = "pearson",
 ) -> tuple[pd.DataFrame, list[str]]:
     """
-    Compute correlation matrix between features using hierarchical clustering for ordering.
+    Compute correlation matrix between features using hierarchical clustering for
+    ordering.
 
     Parameters
     ----------
@@ -63,7 +65,8 @@ def compute_feature_correlation(
     -------
     tuple[pd.DataFrame, list[str]]
         Tuple of:
-            - Correlation matrix as DataFrame with features ordered by hierarchical clustering.
+            - Correlation matrix as DataFrame with features ordered by hierarchical
+            clustering.
             - List of feature names in clustered order.
     """
     feature_data = features.fillna(features.mean())
@@ -224,7 +227,8 @@ def plot_feature_box(
     -------
     go.Figure or list or tuple
         If feature_name is provided: Plotly Figure (or tuple with data).
-        If feature_name is None: List of (feature_name, Figure) tuples (or tuple with list of data dicts).
+        If feature_name is None: List of (feature_name, Figure) tuples (or tuple with
+        list of data dicts).
     """
     if feature_name is not None:
         data = compute_box_plot_data(features, feature_name)
@@ -297,7 +301,8 @@ def compute_feature_importance(
     Returns
     -------
     pd.DataFrame
-        DataFrame with feature importance statistics (median, q25, q75) for top features.
+        DataFrame with feature importance statistics (median, q25, q75) for top
+        features.
     """
     # Fill missing values
     features_filled = features.fillna(features.mean())
@@ -450,7 +455,8 @@ def compute_feature_clusters(
     Returns
     -------
     dict
-        Dictionary with clustering results including 2D PCA features, labels, and statistics.
+        Dictionary with clustering results including 2D PCA features, labels, and
+        statistics.
     """
     # Fill missing values
     features_filled = features.fillna(features.mean())
@@ -535,7 +541,8 @@ def plot_feature_clusters(
                 colorbar=dict(title="Cluster"),
             ),
             text=instances,
-            hovertemplate="Instance: %{text}<br>PC1: %{x:.3f}<br>PC2: %{y:.3f}<extra></extra>",
+            hovertemplate="Instance: %{text}<br>PC1: %{x:.3f}<br>PC2: "
+            "%{y:.3f}<extra></extra>",
         )
     )
 
@@ -802,7 +809,8 @@ def plot_feature_pca(
                     showscale=True,
                 ),
                 text=instances,
-                hovertemplate="Instance: %{text}<br>PC1: %{x:.3f}<br>PC2: %{y:.3f}<extra></extra>",
+                hovertemplate="Instance: %{text}<br>PC1: %{x:.3f}<br>PC2: "
+                "%{y:.3f}<extra></extra>",
             )
         )
     else:
@@ -812,7 +820,8 @@ def plot_feature_pca(
                 y=features_2d[:, 1],
                 mode="markers",
                 text=instances,
-                hovertemplate="Instance: %{text}<br>PC1: %{x:.3f}<br>PC2: %{y:.3f}<extra></extra>",
+                hovertemplate="Instance: %{text}<br>PC1: %{x:.3f}<br>PC2: "
+                "%{y:.3f}<extra></extra>",
             )
         )
 

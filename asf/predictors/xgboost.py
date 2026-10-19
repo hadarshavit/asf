@@ -36,20 +36,24 @@ class XGBoostClassifierWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "xgb_classifier"
 
-    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
+    def __init__(
+        self, init_params: dict[str, Any] | None = None, **kwargs: Any
+    ) -> None:
         """
         Initialize the XGBoostClassifierWrapper.
 
         Parameters
         ----------
         init_params : dict or None
-            Initialization parameters for the XGBoost classifier (backward compatibility).
+            Initialization parameters for the XGBoost classifier (backward
+            compatibility).
         **kwargs : Any
             Initialization parameters for the XGBoost classifier.
         """
         if not XGB_AVAILABLE:
             raise ImportError(
-                "XGBoost is not installed. Please install it using pip install asf-lib[xgb]."
+                "XGBoost is not installed. Please install it using pip install "
+                "asf-lib[xgb]."
             )
         super().__init__(XGBClassifier, init_params=init_params, **kwargs)
 
@@ -116,7 +120,7 @@ class XGBoostClassifierWrapper(ConfigurableMixin, SklearnWrapper):
         return self.model_class.predict(X_in, **kwargs)
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(**kwargs: Any) -> Any:
         """Define hyperparameters for XGBoost classifier."""
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
@@ -148,21 +152,24 @@ class XGBoostRegressorWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "xgb_regressor"
 
-    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
+    def __init__(
+        self, init_params: dict[str, Any] | None = None, **kwargs: Any
+    ) -> None:
         """
         Initialize the XGBoostRegressorWrapper.
 
         Parameters
         ----------
         init_params : dict or None
-            Initialization parameters for the XGBoost regressor (backward compatibility).
+            Initialization parameters for the XGBoost regressor (backward
+            compatibility).
         **kwargs : Any
             Initialization parameters for the XGBoost regressor.
         """
         super().__init__(XGBRegressor, init_params=init_params, **kwargs)
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(**kwargs: Any) -> Any:
         """Define hyperparameters for XGBoost regressor."""
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []
@@ -194,7 +201,9 @@ class XGBoostRankerWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "xgb_ranker"
 
-    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
+    def __init__(
+        self, init_params: dict[str, Any] | None = None, **kwargs: Any
+    ) -> None:
         """
         Initialize the XGBoostRankerWrapper.
 
@@ -208,7 +217,7 @@ class XGBoostRankerWrapper(ConfigurableMixin, SklearnWrapper):
         super().__init__(XGBRanker, init_params=init_params, **kwargs)
 
     @staticmethod
-    def _define_hyperparameters(**kwargs):
+    def _define_hyperparameters(**kwargs: Any) -> Any:
         """Define hyperparameters for XGBoost ranker."""
         if not CONFIGSPACE_AVAILABLE:
             return [], [], []

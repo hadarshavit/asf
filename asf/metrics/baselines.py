@@ -98,7 +98,8 @@ def single_best_solver(
     batch: bool = False,
 ) -> float | pd.Series:
     """
-    Selects the single best solver across all instances based on the aggregated performance.
+    Selects the single best solver across all instances based on the aggregated
+    performance.
 
     Parameters
     ----------
@@ -142,7 +143,8 @@ def virtual_best_solver(
     batch: bool = False,
 ) -> float | pd.Series:
     """
-    Selects the virtual best solver for each instance by choosing the best performance per instance.
+    Selects the virtual best solver for each instance by choosing the best performance
+    per instance.
 
     Parameters
     ----------
@@ -186,16 +188,20 @@ def running_time_selector_performance(
     return_per_instance: bool = False,
 ) -> dict[str, float] | float:
     """
-    Calculates the total running time for a selector based on the given schedules and performance data.
+    Calculates the total running time for a selector based on the given schedules and
+    performance data.
 
-    The schedule can contain both feature groups (strings) and algorithm selections (tuples).
-    Feature groups are evaluated in order, and their computation time is only added if the
+    The schedule can contain both feature groups (strings) and algorithm selections
+    (tuples).
+    Feature groups are evaluated in order, and their computation time is only added if
+    the
     instance is not yet solved when the feature group appears in the schedule.
 
     Parameters
     ----------
     schedules : dict[str, list[tuple[str, float] | str]]
-        The schedules to evaluate, where each key is an instance and the value is a list of items.
+        The schedules to evaluate, where each key is an instance and the value is a list
+        of items.
         Each item can be:
         - A string: the name of a feature group to compute (uses full actual time)
         - A tuple (feature_group, budget): a feature group with a time budget
@@ -257,7 +263,8 @@ def running_time_selector_performance(
         ]
         if sum(allocated for _, allocated in algorithm_items) <= 0.0:
             raise ValueError(
-                f"Instance {instance}: No algorithm time allocated in schedule {schedule}. "
+                f"Instance {instance}: No algorithm time allocated in schedule "
+                f"{schedule}. "
             )
 
         # Legacy schedules without explicit feature steps pay feature costs upfront.
@@ -358,7 +365,8 @@ def _validate_schedule_prerequisites(
                 if required_group not in computed_groups:
                     raise MissingPrerequisiteGroupError(
                         f"Feature group '{fg_name}' requires group '{required_group}' "
-                        f"to be computed first, but it was not found before '{fg_name}' "
+                        "to be computed first, but it was not found "
+                        f"before '{fg_name}' "
                         f"in the schedule for instance '{instance}'."
                     )
 

@@ -1,3 +1,4 @@
+from typing import Any
 from asf.selectors import (
     PairwiseClassifier,
     MultiClassClassifier,
@@ -22,7 +23,7 @@ import numpy as np
 import pandas as pd
 
 
-def validate_predictions(predictions):
+def validate_predictions(predictions: Any) -> None:
     """
     Validates that predictions have the expected structure:
     - Length of predictions is 20.
@@ -39,7 +40,7 @@ def validate_predictions(predictions):
 
 
 @pytest.fixture
-def dummy_performance():
+def dummy_performance() -> Any:
     data = np.array(
         [
             [120, 100, 110],
@@ -68,7 +69,7 @@ def dummy_performance():
 
 
 @pytest.fixture
-def dummy_features():
+def dummy_features() -> Any:
     data = np.array(
         [
             [10, 5, 1],
@@ -106,7 +107,9 @@ def dummy_features():
         MLPClassifierWrapper,
     ],
 )
-def test_pairwise_classifier(dummy_performance, dummy_features, model_class):
+def test_pairwise_classifier(
+    dummy_performance: Any, dummy_features: Any, model_class: Any
+) -> None:
     classifier = PairwiseClassifier(
         model_class=model_class, use_weights=model_class != MLPClassifierWrapper
     )
@@ -115,11 +118,14 @@ def test_pairwise_classifier(dummy_performance, dummy_features, model_class):
     validate_predictions(predictions)
 
 
-def test_pairwise_classifier_handles_numpy_input(dummy_performance, dummy_features):
+def test_pairwise_classifier_handles_numpy_input(
+    dummy_performance: Any, dummy_features: Any
+) -> None:
     # Ensure predict() and fit() handle numpy array inputs as expected
     from sklearn.ensemble import RandomForestClassifier
 
-    clf = PairwiseClassifier(model_class=RandomForestClassifier)  # type: ignore[arg-type]
+    # type: ignore[arg-type]
+    clf = PairwiseClassifier(model_class=RandomForestClassifier)
     # Fit with numpy arrays
     clf.fit(dummy_features.to_numpy(), dummy_performance.to_numpy())
     # Predict with numpy array inputs
@@ -137,7 +143,9 @@ def test_pairwise_classifier_handles_numpy_input(dummy_performance, dummy_featur
         MLPClassifierWrapper,
     ],
 )
-def test_multi_class_classifier(dummy_performance, dummy_features, model_class):
+def test_multi_class_classifier(
+    dummy_performance: Any, dummy_features: Any, model_class: Any
+) -> None:
     classifier = MultiClassClassifier(model_class=model_class)
     classifier.fit(dummy_features, dummy_performance)
     predictions = classifier.predict(dummy_features)
@@ -154,7 +162,9 @@ def test_multi_class_classifier(dummy_performance, dummy_features, model_class):
         MLPRegressorWrapper,
     ],
 )
-def test_pairwise_regressor(dummy_performance, dummy_features, model_class):
+def test_pairwise_regressor(
+    dummy_performance: Any, dummy_features: Any, model_class: Any
+) -> None:
     regressor = PairwiseRegressor(model_class=model_class)
     regressor.fit(dummy_features, dummy_performance)
     predictions = regressor.predict(dummy_features)
@@ -171,7 +181,9 @@ def test_pairwise_regressor(dummy_performance, dummy_features, model_class):
         MLPRegressorWrapper,
     ],
 )
-def test_performance_model(dummy_performance, dummy_features, model_class):
+def test_performance_model(
+    dummy_performance: Any, dummy_features: Any, model_class: Any
+) -> None:
     model = PerformanceModel(model_class=model_class)
     model.fit(dummy_features, dummy_performance)
     predictions = model.predict(dummy_features)
@@ -189,16 +201,17 @@ def test_performance_model(dummy_performance, dummy_features, model_class):
     ],
 )
 def test_performance_model_with_multi_target(
-    dummy_performance, dummy_features, model_class
-):
+    dummy_performance: Any, dummy_features: Any, model_class: Any
+) -> None:
     model = PerformanceModel(model_class=model_class, multi_target=True)
     model.fit(dummy_features, dummy_performance)
     predictions = model.predict(dummy_features)
     validate_predictions(predictions)
 
 
-def save_load(dummy_performance, dummy_features):
-    model = PerformanceModel(model_class=RandomForestRegressor)  # type: ignore[arg-type]
+def save_load(dummy_performance: Any, dummy_features: Any) -> None:
+    # type: ignore[arg-type]
+    model = PerformanceModel(model_class=RandomForestRegressor)
     model.fit(dummy_features, dummy_performance)
     model.save("model.pkl")
     loaded_model = PerformanceModel.load("model.pkl")

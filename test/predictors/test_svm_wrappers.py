@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 pytest.importorskip("ConfigSpace")
@@ -10,7 +11,7 @@ from asf.predictors.svm import SVMClassifierWrapper, SVMRegressorWrapper
     "wrapper_cls",
     [SVMClassifierWrapper, SVMRegressorWrapper],
 )
-def test_svm_configuration_space(wrapper_cls):
+def test_svm_configuration_space(wrapper_cls: Any) -> None:
     cs = wrapper_cls.get_configuration_space()
     assert isinstance(cs, ConfigurationSpace)
 
@@ -26,7 +27,7 @@ def test_svm_configuration_space(wrapper_cls):
         (SVMRegressorWrapper, {"epsilon": 0.2}),
     ],
 )
-def test_svm_get_from_configuration(wrapper_cls, extra):
+def test_svm_get_from_configuration(wrapper_cls: Any, extra: Any) -> None:
     cs = wrapper_cls.get_configuration_space()
     configuration = cs.get_default_configuration()
 
@@ -49,7 +50,7 @@ def test_svm_get_from_configuration(wrapper_cls, extra):
         (SVMRegressorWrapper, "regression_data"),
     ],
 )
-def test_svm_fit_predict(wrapper_cls, data_fixture, request):
+def test_svm_fit_predict(wrapper_cls: Any, data_fixture: Any, request: Any) -> None:
     X, y = request.getfixturevalue(data_fixture)
     cs = wrapper_cls.get_configuration_space()
     configuration = cs.get_default_configuration()

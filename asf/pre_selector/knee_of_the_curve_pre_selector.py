@@ -22,7 +22,8 @@ class KneeOfCurvePreSelector(AbstractPreSelector):
     Parameters
     ----------
     metric : Callable
-        A function that takes a DataFrame of performance values and returns a single value.
+        A function that takes a DataFrame of performance values and returns a single
+        value.
     base_pre_selector : type[AbstractPreSelector]
         The base pre-selector class to use for evaluating different subset sizes.
     maximize : bool, default=False
@@ -87,7 +88,8 @@ class KneeOfCurvePreSelector(AbstractPreSelector):
         dfs: list[pd.DataFrame] = []
 
         def process(i: int) -> tuple[int, float, pd.DataFrame]:
-            # Cast to Any to allow passing metric/maximize parameters that subclasses accept
+            # Cast to Any to allow passing metric/maximize parameters that subclasses
+            # accept
             base_selector = cast(Any, self.base_pre_selector)(
                 metric=self.metric,
                 n_algorithms=i + 1,

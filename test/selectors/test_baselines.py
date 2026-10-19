@@ -8,7 +8,7 @@ from asf.selectors.baselines import SingleBestSolver, VirtualBestSolver
 class TestSingleBestSolver:
     """Tests for SingleBestSolver."""
 
-    def test_fit_finds_best_algorithm(self):
+    def test_fit_finds_best_algorithm(self) -> None:
         """Test that fit identifies the algorithm with best average performance."""
         features = pd.DataFrame(
             {"f1": [1.0, 2.0, 3.0]}, index=["inst1", "inst2", "inst3"]
@@ -27,7 +27,7 @@ class TestSingleBestSolver:
 
         assert selector.best_algorithm == "algo2"
 
-    def test_fit_maximize_mode(self):
+    def test_fit_maximize_mode(self) -> None:
         """Test fit in maximize mode."""
         features = pd.DataFrame({"f1": [1.0, 2.0, 3.0]}, index=["i1", "i2", "i3"])
         performance = pd.DataFrame(
@@ -44,7 +44,7 @@ class TestSingleBestSolver:
 
         assert selector.best_algorithm == "algo3"
 
-    def test_predict_returns_dictionary(self):
+    def test_predict_returns_dictionary(self) -> None:
         """Test that predict returns a dictionary mapping instances to schedules."""
         features = pd.DataFrame({"f1": [1.0, 2.0, 3.0]}, index=["i1", "i2", "i3"])
         performance = pd.DataFrame(
@@ -70,7 +70,7 @@ class TestSingleBestSolver:
             algo, _ = first_item
             assert isinstance(algo, str)
 
-    def test_predict_with_new_features(self):
+    def test_predict_with_new_features(self) -> None:
         """Test predict with new features."""
         train_features = pd.DataFrame({"f1": [1.0, 2.0, 3.0]}, index=["i1", "i2", "i3"])
         train_performance = pd.DataFrame(
@@ -88,7 +88,7 @@ class TestSingleBestSolver:
         assert "t1" in predictions
         assert "t2" in predictions
 
-    def test_define_hyperparameters(self):
+    def test_define_hyperparameters(self) -> None:
         """Test hyperparameter definition."""
         hyperparams, conditions, forbiddens = SingleBestSolver._define_hyperparameters()
 
@@ -96,7 +96,7 @@ class TestSingleBestSolver:
         assert conditions == []
         assert forbiddens == []
 
-    def test_with_budget(self):
+    def test_with_budget(self) -> None:
         """Test with budget parameter."""
         features = pd.DataFrame({"f1": [1.0, 2.0, 3.0]}, index=["i1", "i2", "i3"])
         performance = pd.DataFrame(
@@ -116,7 +116,7 @@ class TestSingleBestSolver:
 class TestVirtualBestSolver:
     """Tests for VirtualBestSolver (Oracle)."""
 
-    def test_fit_stores_performance(self):
+    def test_fit_stores_performance(self) -> None:
         """Test that fit stores the performance data."""
         features = pd.DataFrame({"f1": [1.0, 2.0, 3.0]}, index=["i1", "i2", "i3"])
         performance = pd.DataFrame(
@@ -132,7 +132,7 @@ class TestVirtualBestSolver:
 
         assert selector._performance is not None
 
-    def test_predict_returns_dict_of_schedules(self):
+    def test_predict_returns_dict_of_schedules(self) -> None:
         """Test that predict returns dictionary of schedules."""
         features = pd.DataFrame({"f1": [1.0, 2.0, 3.0]}, index=["i1", "i2", "i3"])
         performance = pd.DataFrame(
@@ -154,7 +154,7 @@ class TestVirtualBestSolver:
         assert predictions["i2"][0][0] == "algo2"
         assert predictions["i3"][0][0] == "algo3"
 
-    def test_predict_maximize_mode(self):
+    def test_predict_maximize_mode(self) -> None:
         """Test predict in maximize mode."""
         features = pd.DataFrame({"f1": [1.0, 2.0, 3.0]}, index=["i1", "i2", "i3"])
         performance = pd.DataFrame(
@@ -174,8 +174,10 @@ class TestVirtualBestSolver:
         assert predictions["i2"][0][0] == "algo2"
         assert predictions["i3"][0][0] == "algo3"
 
-    def test_predict_uses_train_performance_as_fallback(self):
-        """Test that predict uses training performance if test performance not provided."""
+    def test_predict_uses_train_performance_as_fallback(self) -> None:
+        """
+        Test that predict uses training performance if test performance not provided.
+        """
         train_features = pd.DataFrame({"f1": [1.0, 2.0, 3.0]}, index=["i1", "i2", "i3"])
         train_performance = pd.DataFrame(
             {
@@ -194,7 +196,7 @@ class TestVirtualBestSolver:
         assert isinstance(predictions, dict)
         assert len(predictions) == 3
 
-    def test_define_hyperparameters(self):
+    def test_define_hyperparameters(self) -> None:
         """Test hyperparameter definition."""
         hyperparams, conditions, forbiddens = (
             VirtualBestSolver._define_hyperparameters()

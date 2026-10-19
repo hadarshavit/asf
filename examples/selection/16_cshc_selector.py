@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import pandas as pd
 from typing import cast
@@ -13,7 +14,13 @@ from asf.metrics import (
 )
 
 
-def make_data(n_instances=300, n_algorithms=5, n_inst_feats=10, seed=42, budget=500.0):
+def make_data(
+    n_instances: Any = 300,
+    n_algorithms: Any = 5,
+    n_inst_feats: Any = 10,
+    seed: Any = 42,
+    budget: Any = 500.0,
+) -> Any:
     """Generates synthetic data for the example."""
     rng = np.random.RandomState(seed)
 
@@ -43,7 +50,7 @@ def make_data(n_instances=300, n_algorithms=5, n_inst_feats=10, seed=42, budget=
     return features, perf
 
 
-def main():
+def main() -> Any:
     """
     Main function to run the CSHCSelector example with synthetic data.
     """
@@ -171,7 +178,8 @@ def main():
     print(f"Train / Test: {len(X_train)} / {len(X_test)} | Budget: {budget}")
     print(f"Primary Selector: {primary_selector.__class__.__name__}")
     print(
-        f"Backup Selector: {backup_selector.__class__.__name__ if backup_selector else 'None'}"
+        f"Backup Selector: "
+        f"{backup_selector.__class__.__name__ if backup_selector else 'None'}"
     )
     print(f"Learned Confidence Threshold: {sel.threshold:.4f}")
     print()
@@ -186,15 +194,18 @@ def main():
     print("--- CSHC Decision Breakdown ---")
     if primary_used > 0:
         print(
-            f"Primary selector trusted: {primary_used} times ({primary_success / primary_used:.2%} success)"
+            f"Primary selector trusted: {primary_used} times "
+            f"({primary_success / primary_used:.2%} success)"
         )
     if backup_used > 0:
         print(
-            f"Backup selector used:     {backup_used} times ({backup_success / backup_used:.2%} success)"
+            f"Backup selector used:     {backup_used} times "
+            f"({backup_success / backup_used:.2%} success)"
         )
     if guardian_override_used > 0:
         print(
-            f"Guardian override used:   {guardian_override_used} times ({guardian_override_success / guardian_override_used:.2%} success)"
+            f"Guardian override used:   {guardian_override_used} times "
+            f"({guardian_override_success / guardian_override_used:.2%} success)"
         )
     print()
     print("Sample decisions (first 12):")

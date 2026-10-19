@@ -12,7 +12,7 @@ from asf.preprocessing.performance_scaling import AbstractNormalization
 class DummyPredictor(AbstractPredictor):
     """A tiny predictor that stores mean of y and predicts it for any X."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._mean = None
 
@@ -34,17 +34,17 @@ class DummyPredictor(AbstractPredictor):
 
 
 class IdentityNorm(AbstractNormalization):
-    def fit(self, X, y=None, sample_weight=None):
+    def fit(self, X: Any, y: Any = None, sample_weight: Any = None) -> Any:
         return self
 
-    def transform(self, X):
+    def transform(self, X: Any) -> Any:
         return np.asarray(X)
 
-    def inverse_transform(self, X):
+    def inverse_transform(self, X: Any) -> Any:
         return np.asarray(X)
 
 
-def test_epm_with_dummy_predictor_numpy_input():
+def test_epm_with_dummy_predictor_numpy_input() -> None:
     # Create X as numpy array and y as numpy array
     X = np.array([[1.0, 2.0], [3.0, 4.0]])
     y = np.array([10.0, 20.0])
@@ -60,7 +60,7 @@ def test_epm_with_dummy_predictor_numpy_input():
     assert np.allclose(preds, np.array([15.0, 15.0]))
 
 
-def test_epm_transform_back_uses_normalization():
+def test_epm_transform_back_uses_normalization() -> None:
     # Ensure that when transform_back is True, inverse_transform is applied
     X = pd.DataFrame({"a": [1.0, 2.0]})
     y = pd.Series([100.0, 400.0])

@@ -19,7 +19,9 @@ except ImportError:
 
 
 class MissingPrerequisiteGroupError(ValueError):
-    """Raised when a feature group is selected without its required prerequisite groups."""
+    """
+    Raised when a feature group is selected without its required prerequisite groups.
+    """
 
     pass
 
@@ -75,7 +77,7 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
         feature_groups: dict[str, Any],
         selected_groups: list[str] | None = None,
         validate_requirements: bool = True,
-    ):
+    ) -> None:
         self.feature_groups = feature_groups
         self.selected_groups = selected_groups
         self.validate_requirements = validate_requirements
@@ -113,8 +115,10 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
             for required_group in required_groups:
                 if required_group not in selected_set:
                     raise MissingPrerequisiteGroupError(
-                        f"Feature group '{group_name}' requires group '{required_group}' "
-                        f"to be selected, but it is not included in the selected groups. "
+                        f"Feature group '{group_name}' requires "
+                        f"group '{required_group}' "
+                        "to be selected, but it is not included in the "
+                        "selected groups. "
                         f"Selected groups: {selected_groups}"
                     )
 
@@ -153,8 +157,10 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
             for required_group in required_groups:
                 if required_group not in selected_set:
                     raise MissingPrerequisiteGroupError(
-                        f"Feature group '{group_name}' requires group '{required_group}' "
-                        f"to be selected, but it is not included in the selected groups. "
+                        f"Feature group '{group_name}' requires "
+                        f"group '{required_group}' "
+                        "to be selected, but it is not included in the "
+                        "selected groups. "
                         f"Selected groups: {list(selected_groups)}"
                     )
 
@@ -195,7 +201,8 @@ class FeatureGroupSelector(BaseEstimator, TransformerMixin):
             import warnings
 
             warnings.warn(
-                "No features selected by FeatureGroupSelector from the provided groups. "
+                "No features selected by FeatureGroupSelector from the provided "
+                "groups. "
                 "Defaulting to using all columns in X.",
                 UserWarning,
             )

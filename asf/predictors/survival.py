@@ -56,7 +56,8 @@ if SKSURV_AVAILABLE:
             """
             if not SKSURV_AVAILABLE:
                 raise ImportError(
-                    "sksurv is not installed. Install scikit-survival to use RandomSurvivalForestWrapper."
+                    "sksurv is not installed. Install scikit-survival to use "
+                    "RandomSurvivalForestWrapper."
                 )
             kwargs = _filter_constructor_kwargs(RandomSurvivalForest, kwargs)
             self.model = RandomSurvivalForest(**kwargs)

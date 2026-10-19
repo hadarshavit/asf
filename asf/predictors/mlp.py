@@ -30,7 +30,9 @@ class MLPClassifierWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "mlp_classifier"
 
-    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
+    def __init__(
+        self, init_params: dict[str, Any] | None = None, **kwargs: Any
+    ) -> None:
         """
         Initialize the MLPClassifierWrapper.
         """
@@ -132,7 +134,9 @@ class MLPRegressorWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "mlp_regressor"
 
-    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
+    def __init__(
+        self, init_params: dict[str, Any] | None = None, **kwargs: Any
+    ) -> None:
         """
         Initialize the MLPRegressorWrapper.
         """
@@ -231,7 +235,8 @@ class MLPRegressorWrapper(ConfigurableMixin, SklearnWrapper):
             )
         else:
             raise ValueError(
-                f"Invalid dataset_size: {dataset_size}. Choose from 'small', 'medium', 'large'."
+                f"Invalid dataset_size: {dataset_size}. Choose from 'small', "
+                f"'medium', 'large'."
             )
 
         alpha = Float(

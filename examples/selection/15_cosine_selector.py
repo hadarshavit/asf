@@ -1,3 +1,4 @@
+from typing import Any
 import os
 from typing import cast
 
@@ -12,7 +13,7 @@ from asf.metrics import (
 )
 
 
-def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
+def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO") -> Any:
     if not os.path.isdir(aslib_scenario_dir):
         raise FileNotFoundError(
             f"ASLib scenario directory not found: {aslib_scenario_dir}"
@@ -74,7 +75,8 @@ def main(aslib_scenario_dir: str = "aslib_data/SAT11-INDU-ALGO"):
     print("=" * 60)
     print(f"Scenario: {aslib_scenario_dir}")
     print(
-        f"Algorithms (sample): {list(alg_df.index)[:8]}{'...' if len(alg_df.index) > 8 else ''}"
+        f"Algorithms (sample): "
+        f"{list(alg_df.index)[:8]}{'...' if len(alg_df.index) > 8 else ''}"
     )
     print(f"Train / Test: {len(X_train)} / {len(X_test)}  Budget: {budget}")
     print()

@@ -1,6 +1,7 @@
 """Analysis module for ASF.
 
-Provides functions for analyzing features and performance in algorithm selection scenarios.
+Provides functions for analyzing features and performance in algorithm selection
+scenarios.
 """
 
 from __future__ import annotations

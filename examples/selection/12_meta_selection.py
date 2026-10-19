@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import pandas as pd
 from typing import cast
@@ -18,7 +19,9 @@ from asf.metrics import (
 )
 
 
-def make_challenging_data(n_instances=200, n_algorithms=6, seed=42, budget=200.0):
+def make_challenging_data(
+    n_instances: Any = 200, n_algorithms: Any = 6, seed: Any = 42, budget: Any = 200.0
+) -> Any:
     rng = np.random.RandomState(seed)
     features = pd.DataFrame(
         rng.uniform(0, 10, size=(n_instances, 4)),
@@ -38,7 +41,14 @@ def make_challenging_data(n_instances=200, n_algorithms=6, seed=42, budget=200.0
     return features, perf
 
 
-def run_base_selectors(base_selectors, train_X, train_Y, test_X, test_Y, budget):
+def run_base_selectors(
+    base_selectors: Any,
+    train_X: Any,
+    train_Y: Any,
+    test_X: Any,
+    test_Y: Any,
+    budget: Any,
+) -> Any:
     results = []
     for sel in base_selectors:
         name = sel.__class__.__name__
@@ -68,7 +78,7 @@ def run_base_selectors(base_selectors, train_X, train_Y, test_X, test_Y, budget)
     return results
 
 
-def main():
+def main() -> None:
     budget = 200.0
     features, performance = make_challenging_data(
         n_instances=200, n_algorithms=6, seed=1, budget=budget

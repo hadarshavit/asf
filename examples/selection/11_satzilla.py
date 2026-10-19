@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import pandas as pd
 from typing import cast
@@ -12,7 +13,7 @@ from asf.metrics import (
 )
 
 
-def generate_data(n_instances=80, seed=0):
+def generate_data(n_instances: Any = 80, seed: Any = 0) -> Any:
     np.random.seed(seed)
     features = pd.DataFrame(
         np.random.uniform(0, 10, size=(n_instances, 2)),
@@ -45,7 +46,7 @@ def generate_data(n_instances=80, seed=0):
     return features, performance
 
 
-def print_sample(preds, true_perf, n=10):
+def print_sample(preds: Any, true_perf: Any, n: Any = 10) -> None:
     print("\nSample predictions:")
     for inst in list(true_perf.index)[:n]:
         rec = preds.get(inst, [(None, float("inf"))])

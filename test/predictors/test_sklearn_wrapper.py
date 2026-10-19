@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 
 from sklearn.ensemble import RandomForestClassifier
@@ -5,7 +6,7 @@ from sklearn.ensemble import RandomForestClassifier
 from asf.predictors.sklearn_wrapper import SklearnWrapper
 
 
-def test_sklearn_wrapper_fit_predict(classification_data):
+def test_sklearn_wrapper_fit_predict(classification_data: Any) -> None:
     X, y = classification_data
     wrapper = SklearnWrapper(RandomForestClassifier, {"n_estimators": 16})
 
@@ -15,7 +16,7 @@ def test_sklearn_wrapper_fit_predict(classification_data):
     assert predictions.shape == y.shape
 
 
-def test_sklearn_wrapper_save_load(tmp_path, classification_data):
+def test_sklearn_wrapper_save_load(tmp_path: Any, classification_data: Any) -> None:
     X, y = classification_data
     wrapper = SklearnWrapper(RandomForestClassifier, {"n_estimators": 8})
     wrapper.fit(X, y)

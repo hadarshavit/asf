@@ -2,7 +2,7 @@ import numpy as np
 from asf.utils.groupkfoldshuffle import GroupKFoldShuffle
 
 
-def test_groupkfoldshuffle_no_shuffle():
+def test_groupkfoldshuffle_no_shuffle() -> None:
     # 10 samples, 5 groups (each group appears twice)
     groups = np.repeat(np.arange(5), 2)
     X = np.arange(len(groups))
@@ -19,7 +19,7 @@ def test_groupkfoldshuffle_no_shuffle():
         assert set(train_idx).isdisjoint(set(test_idx))
 
 
-def test_groupkfoldshuffle_shuffle_deterministic():
+def test_groupkfoldshuffle_shuffle_deterministic() -> None:
     groups = np.repeat(np.arange(6), 3)  # 18 samples, 6 groups
     X = np.arange(len(groups))
 

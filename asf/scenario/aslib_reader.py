@@ -306,7 +306,8 @@ def evaluate_selector(
     return_per_instance: bool = False,
 ) -> tuple[float, Any] | tuple[float, Any, dict[str, float]]:
     """
-    Runs HPO for a selector on a given ASlib scenario and fold, returns test performance.
+    Runs HPO for a selector on a given ASlib scenario and fold, returns test
+    performance.
 
     Parameters
     ----------
@@ -334,7 +335,8 @@ def evaluate_selector(
     selector : Any
         The fitted selector (returned if return_per_instance is False or True).
     per_instance_scores : dict[str, float]
-        Dictionary mapping instance IDs to performance (returned if return_per_instance=True).
+        Dictionary mapping instance IDs to performance (returned if
+        return_per_instance=True).
     """
     hpo_kwargs = hpo_kwargs or {}
 

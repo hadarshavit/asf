@@ -1,3 +1,4 @@
+from typing import Any
 import pandas as pd
 import numpy as np
 from typing import cast
@@ -11,7 +12,7 @@ from asf.metrics import (
 )
 
 
-def generate_simple_data(n_instances=100, seed=0):
+def generate_simple_data(n_instances: Any = 100, seed: Any = 0) -> Any:
     """Generate more challenging data with timeouts and varying algorithm behavior."""
     np.random.seed(seed)
 
@@ -75,7 +76,9 @@ def generate_simple_data(n_instances=100, seed=0):
     return features, performance
 
 
-def print_sunny_schedules(predictions, true_performance, budget, n=10):
+def print_sunny_schedules(
+    predictions: Any, true_performance: Any, budget: Any, n: Any = 10
+) -> None:
     print("\nSample SUNNY schedules:")
     for instance in list(true_performance.index)[:n]:
         schedule = predictions[instance]
@@ -262,14 +265,18 @@ if __name__ == "__main__":
         f"{'Basic SUNNY':<30} {sr:>11.1%} {par10:>12.2f} {selector.k:>5} {'None':>12}"
     )
     print(
-        f"{'SUNNY-AS2':<30} {sr_v2:>11.1%} {par10_v2:>12.2f} {selector_v2.k:>5} {'None':>12}"
+        f"{'SUNNY-AS2':<30} {sr_v2:>11.1%} {par10_v2:>12.2f} {selector_v2.k:>5} "
+        f"{'None':>12}"
     )
     print(
-        f"{'TSunny':<30} {sr_tsunny:>11.1%} {par10_tsunny:>12.2f} {selector_tsunny.k:>5} {selector_tsunny.tuned_algorithm_limit:>12}"
+        f"{'TSunny':<30} {sr_tsunny:>11.1%} {par10_tsunny:>12.2f} "
+        f"{selector_tsunny.k:>5} {selector_tsunny.tuned_algorithm_limit:>12}"
     )
     print(
-        f"{'Hardcoded limit=2':<30} {sr_hardcoded:>11.1%} {par10_hardcoded:>12.2f} {selector_hardcoded.k:>5} {selector_hardcoded.algorithm_limit:>12}"
+        f"{'Hardcoded limit=2':<30} {sr_hardcoded:>11.1%} {par10_hardcoded:>12.2f} "
+        f"{selector_hardcoded.k:>5} {selector_hardcoded.algorithm_limit:>12}"
     )
     print(
-        f"{'Combined tuning':<30} {sr_combined:>11.1%} {par10_combined:>12.2f} {selector_combined.k:>5} {selector_combined.tuned_algorithm_limit:>12}"
+        f"{'Combined tuning':<30} {sr_combined:>11.1%} {par10_combined:>12.2f} "
+        f"{selector_combined.k:>5} {selector_combined.tuned_algorithm_limit:>12}"
     )

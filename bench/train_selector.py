@@ -1,3 +1,4 @@
+from typing import Any
 import logging
 import os
 import pandas as pd
@@ -17,7 +18,9 @@ from functools import partial
 logging.basicConfig(level=logging.INFO, force=True)
 
 
-def run(selector, scenario, fold, base_path, use_HPO=False):
+def run(
+    selector: Any, scenario: Any, fold: Any, base_path: Any, use_HPO: Any = False
+) -> None:
     if hasattr(selector, "__name__"):
         selector_name = selector.__name__
     elif hasattr(selector, "func"):  # for functools.partial
@@ -56,7 +59,8 @@ def run(selector, scenario, fold, base_path, use_HPO=False):
                     "overwrite": True,
                     "logging_level": False,
                 },
-                "output_dir": f"{os.path.dirname(__file__)}/results/smac_selectors/{scenario}_{selector_name}_fold{fold}_selector_tuning",
+                "output_dir": f"{os.path.dirname(__file__)}/results/smac_selectors/"
+                f"{scenario}_{selector_name}_fold{fold}_selector_tuning",
                 "max_algorithm_pre_selector": 10,
                 "pre_solving_class": Static3S
                 if scenario != "OPENML-WEKA-2017"
@@ -69,7 +73,8 @@ def run(selector, scenario, fold, base_path, use_HPO=False):
     if not is_baseline:
         print(f"Selector: {result_selector} Test score: {score}")
 
-    # Save per-instance results with columns: scenario, fold, selector, instance, test_score
+    # Save per-instance results with columns: scenario, fold, selector, instance,
+    # test_score
     results = [
         {
             "scenario": scenario,
@@ -90,7 +95,7 @@ def run(selector, scenario, fold, base_path, use_HPO=False):
         pd.DataFrame(results).to_csv(path, header=True, index=False)
 
 
-def run_baseline(selector, scenario, fold, base_path):
+def run_baseline(selector: Any, scenario: Any, fold: Any, base_path: Any) -> None:
     """Run baseline selectors (SBS, VBS) without HPO."""
     selector_name = selector.__name__
 
@@ -131,7 +136,7 @@ def run_baseline(selector, scenario, fold, base_path):
         pd.DataFrame(results).to_csv(path, header=True, index=False)
 
 
-def report_results(scenario, results_dir=None):
+def report_results(scenario: Any, results_dir: Any = None) -> None:
     """Read and report results with gap analysis.
 
     Parameters
@@ -207,10 +212,12 @@ def report_results(scenario, results_dir=None):
     gap_denominator = sbs_mean - vbs_mean
 
     print(
-        f"{'SingleBestSolver':<25} | {sbs_mean:<15.2f} | {'0.00%':<15} | {np.std(sbs_par10_values):<15.2f}"
+        f"{'SingleBestSolver':<25} | {sbs_mean:<15.2f} | {'0.00%':<15} | "
+        f"{np.std(sbs_par10_values):<15.2f}"
     )
     print(
-        f"{'VirtualBestSolver':<25} | {vbs_mean:<15.2f} | {'100.00%':<15} | {np.std(vbs_par10_values):<15.2f}"
+        f"{'VirtualBestSolver':<25} | {vbs_mean:<15.2f} | {'100.00%':<15} | "
+        f"{np.std(vbs_par10_values):<15.2f}"
     )
     print(f"{'-' * 80}")
 
@@ -235,7 +242,8 @@ def report_results(scenario, results_dir=None):
             gap_closed = 0.0
 
         print(
-            f"{selector:<25} | {sel_mean_par10:<15.2f} | {gap_closed:<14.2f}% | {sel_std_par10:<15.2f}"
+            f"{selector:<25} | {sel_mean_par10:<15.2f} | {gap_closed:<14.2f}% | "
+            f"{sel_std_par10:<15.2f}"
         )
 
     print(f"{'=' * 80}\n")
@@ -295,7 +303,8 @@ if __name__ == "__main__":
 
             if selector == SingleBestSolver or selector == VirtualBestSolver:
                 print(
-                    f"Completed baseline selector: {selector_name} for scenario: {scenario}\n"
+                    f"Completed baseline selector: {selector_name} for scenario: "
+                    f"{scenario}\n"
                 )
             else:
                 print(f"Completed selector: {selector_name} for scenario: {scenario}\n")

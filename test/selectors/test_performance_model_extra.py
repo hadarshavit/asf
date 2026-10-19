@@ -9,7 +9,7 @@ from asf.predictors.abstract_predictor import AbstractPredictor
 
 
 class DummyRegressor(AbstractPredictor):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         self._y = None
         self._X_cols = None
 
@@ -38,7 +38,7 @@ class DummyRegressor(AbstractPredictor):
         return cls()
 
 
-def small_df():
+def small_df() -> Any:
     X = pd.DataFrame({"f1": [1.0, 2.0, 3.0]}, index=pd.Index(["i1", "i2", "i3"]))
     Y = pd.DataFrame(
         {"a": [3.0, 1.0, 2.0], "b": [2.0, 3.0, 1.0]}, index=pd.Index(X.index)
@@ -46,12 +46,13 @@ def small_df():
     return X, Y
 
 
-def test_performance_model_single_target_branch():
+def test_performance_model_single_target_branch() -> None:
     X, Y = small_df()
     pm = PerformanceModel(model_class=DummyRegressor, budget=5.0, normalize=None)
     pm.fit(X, Y)
     preds = pm.predict(X)
-    # Should choose algorithm with min predicted mean per-row; Dummy predicts per-algo means -> tie-breaking by argmin
+    # Should choose algorithm with min predicted mean per-row; Dummy predicts per-algo
+    # means -> tie-breaking by argmin
     assert set(preds.keys()) == set(X.index)  # type: ignore[attr-defined]
     for lst in preds.values():  # type: ignore[attr-defined]
         algo, bud = lst[0]
@@ -59,7 +60,7 @@ def test_performance_model_single_target_branch():
         assert bud == 5.0
 
 
-def test_performance_model_multi_target_only():
+def test_performance_model_multi_target_only() -> None:
     X, Y = small_df()
 
     # Case 1: use_multi_target=True -> fit single model that outputs 2 targets

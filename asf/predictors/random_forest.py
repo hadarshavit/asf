@@ -31,7 +31,7 @@ class RandomForestClassifierWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "rf_classifier"
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self, **kwargs: Any) -> None:
         """
         Initialize the RandomForestClassifierWrapper.
 
@@ -79,7 +79,7 @@ class RandomForestRegressorWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "rf_regressor"
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self, **kwargs: Any) -> None:
         """
         Initialize the RandomForestRegressorWrapper.
 

@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import pandas as pd
 from typing import cast
@@ -13,13 +14,13 @@ from asf.metrics import (
 
 
 def generate_synthetic_data(
-    n_instances=400,
-    n_algorithms=8,
-    n_inst_features=10,
-    n_algo_features=6,
-    seed=42,
-    budget=300.0,
-):
+    n_instances: Any = 400,
+    n_algorithms: Any = 8,
+    n_inst_features: Any = 10,
+    n_algo_features: Any = 6,
+    seed: Any = 42,
+    budget: Any = 300.0,
+) -> Any:
     """
     Generate synthetic algorithm selection data where performance depends on
     the interaction between instance features and algorithm features.
@@ -90,7 +91,8 @@ def generate_synthetic_data(
         columns=algo_features.index,
     )
 
-    # Create interaction weights: which instance features matter for which algorithm features
+    # Create interaction weights: which instance features matter for which algorithm
+    # features
     # This simulates that different algorithms excel at different problem types
     interaction_matrix = rng.randn(n_inst_features, n_algo_features)
 
@@ -126,7 +128,7 @@ def generate_synthetic_data(
     return instance_features, performance, algo_features
 
 
-def main():
+def main() -> None:
     """
     Demonstrate DyadRanking on synthetic data where performance is a function
     of instance and algorithm features.
@@ -159,7 +161,8 @@ def main():
     )
 
     print(
-        f"Dataset size: {len(features)} instances, {len(performance.columns)} algorithms"
+        f"Dataset size: {len(features)} instances, {len(performance.columns)} "
+        f"algorithms"
     )
     print(f"Instance features: {features.shape[1]} dimensions")
     print(f"Algorithm features: {algo_features.shape[1]} dimensions")
@@ -321,7 +324,8 @@ def main():
     print()
     print(f"  Gap to VBS:          {par10_default_float - vbs_float:.2f}")
     print(
-        f"  Improvement over SBS: {((sbs_float - par10_default_float) / sbs_float * 100):.1f}%"
+        f"  Improvement over SBS: "
+        f"{((sbs_float - par10_default_float) / sbs_float * 100):.1f}%"
     )
     print("=" * 70)
 

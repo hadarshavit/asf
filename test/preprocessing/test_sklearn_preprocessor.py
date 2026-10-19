@@ -4,7 +4,7 @@ import pandas as pd
 from asf.preprocessing.sklearn_preprocessor import get_default_preprocessor
 
 
-def test_get_default_preprocessor_imputes_and_encodes():
+def test_get_default_preprocessor_imputes_and_encodes() -> None:
     df = pd.DataFrame(
         {
             "color": ["red", np.nan, "blue"],
@@ -33,7 +33,7 @@ def test_get_default_preprocessor_imputes_and_encodes():
     assert np.allclose(transformed.to_numpy(), expected_values, atol=1e-6)
 
 
-def test_get_default_preprocessor_with_explicit_selectors():
+def test_get_default_preprocessor_with_explicit_selectors() -> None:
     df = pd.DataFrame(
         {
             "color": ["red", "blue"],

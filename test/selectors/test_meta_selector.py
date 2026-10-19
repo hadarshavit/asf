@@ -1,3 +1,4 @@
+from typing import Any
 from typing import cast
 
 import pytest
@@ -7,16 +8,18 @@ from asf.selectors import MetaSelector, SingleBestSolver, SurvivalAnalysisSchedu
 class _ConfiguredSingleBestSolver(SingleBestSolver):
     seen_markers: list[int] = []
 
-    def __init__(self, marker: int = 0, **kwargs):
+    def __init__(self, marker: int = 0, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.marker = marker
 
-    def _fit(self, features, performance, **kwargs):
+    def _fit(self, features: Any, performance: Any, **kwargs: Any) -> None:
         type(self).seen_markers.append(self.marker)
         super()._fit(features, performance, **kwargs)
 
 
-def test_meta_selector(dummy_performance, dummy_features, validate_predictions):
+def test_meta_selector(
+    dummy_performance: Any, dummy_features: Any, validate_predictions: Any
+) -> None:
     # Test MetaSelector with base selectors and a meta_selector
     base_selectors = [SingleBestSolver(budget=3.0), SingleBestSolver(budget=3.0)]
     meta = SingleBestSolver(budget=3.0)
@@ -28,8 +31,8 @@ def test_meta_selector(dummy_performance, dummy_features, validate_predictions):
 
 
 def test_meta_selector_preserves_base_selector_configuration(
-    dummy_performance, dummy_features
-):
+    dummy_performance: Any, dummy_features: Any
+) -> None:
     _ConfiguredSingleBestSolver.seen_markers = []
 
     base_selectors = [_ConfiguredSingleBestSolver(marker=7, budget=3.0)]
@@ -46,7 +49,9 @@ def test_meta_selector_preserves_base_selector_configuration(
     assert all(marker == 7 for marker in _ConfiguredSingleBestSolver.seen_markers)
 
 
-def test_meta_selector_rejects_schedule_base(dummy_performance, dummy_features):
+def test_meta_selector_rejects_schedule_base(
+    dummy_performance: Any, dummy_features: Any
+) -> None:
     # MetaSelector currently only supports base selectors that return a single algorithm
     base_selectors = [SurvivalAnalysisScheduler(budget=3.0)]
     meta = SingleBestSolver(budget=3.0)

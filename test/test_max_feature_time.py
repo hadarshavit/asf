@@ -1,3 +1,4 @@
+from typing import Any
 import os
 import shutil
 
@@ -17,7 +18,7 @@ except ImportError:
 
 
 @pytest.fixture(autouse=True)
-def cleanup_smac_output():
+def cleanup_smac_output() -> Any:
     """Clean up smac_output directory after each test."""
     yield
     smac_output_dir = os.path.join(os.getcwd(), "smac_output")
@@ -26,7 +27,7 @@ def cleanup_smac_output():
 
 
 @pytest.fixture()
-def scenario_data():
+def scenario_data() -> Any:
     aslib_path = os.environ.get("ASLIB_PATH")
     if aslib_path is None:
         pytest.skip("ASLIB_PATH environment variable not set")
@@ -36,7 +37,7 @@ def scenario_data():
 
 
 @pytest.mark.skipif(not SMAC_AVAILABLE, reason="SMAC is not installed")
-def test_max_feature_time_is_tunable_and_applied(scenario_data):
+def test_max_feature_time_is_tunable_and_applied(scenario_data: Any) -> None:
     (
         features,
         performance,
@@ -70,7 +71,7 @@ def test_max_feature_time_is_tunable_and_applied(scenario_data):
 
 
 @pytest.mark.skipif(not SMAC_AVAILABLE, reason="SMAC is not installed")
-def test_fixed_max_feature_time_is_respected(scenario_data):
+def test_fixed_max_feature_time_is_respected(scenario_data: Any) -> None:
     (
         features,
         performance,
@@ -99,13 +100,13 @@ def test_fixed_max_feature_time_is_respected(scenario_data):
     assert sel.max_feature_time == fixed
 
 
-def test__create_pipeline_prefers_config_value():
+def test__create_pipeline_prefers_config_value() -> None:
     # This test does not require ConfigSpace or scenario data.
     from asf.selectors.selector_tuner import _create_pipeline
 
     class DummySelector:
         @staticmethod
-        def get_from_configuration(configuration, **kwargs):
+        def get_from_configuration(configuration: Any, **kwargs: Any) -> Any:
             class Inst:
                 pass
 

@@ -9,7 +9,7 @@ from asf.metrics.par10 import apply_par, apply_par10
 class TestApplyPar:
     """Tests for apply_par function."""
 
-    def test_apply_par_dataframe(self):
+    def test_apply_par_dataframe(self) -> None:
         """Test PAR transformation on DataFrame."""
         performance = pd.DataFrame(
             {
@@ -27,7 +27,7 @@ class TestApplyPar:
         assert result.loc[0, "algo2"] == 200.0
         assert result.loc[2, "algo2"] == 12000.0  # Penalized
 
-    def test_apply_par_numpy(self):
+    def test_apply_par_numpy(self) -> None:
         """Test PAR transformation on numpy array."""
         performance = np.array(
             [
@@ -45,7 +45,7 @@ class TestApplyPar:
         assert result[1, 0] == 12000.0  # Penalized
         assert result[2, 1] == 12000.0  # Penalized
 
-    def test_apply_par_no_timeouts(self):
+    def test_apply_par_no_timeouts(self) -> None:
         """Test when there are no timeouts."""
         performance = pd.DataFrame(
             {
@@ -59,7 +59,7 @@ class TestApplyPar:
 
         pd.testing.assert_frame_equal(result, performance)
 
-    def test_apply_par_all_timeouts(self):
+    def test_apply_par_all_timeouts(self) -> None:
         """Test when all values are timeouts."""
         performance = np.array([[1300.0, 1400.0], [1500.0, 1600.0]])
         budget = 1200.0
@@ -69,7 +69,7 @@ class TestApplyPar:
         expected = np.array([[12000.0, 12000.0], [12000.0, 12000.0]])
         np.testing.assert_array_equal(result, expected)
 
-    def test_apply_par_different_factors(self):
+    def test_apply_par_different_factors(self) -> None:
         """Test with different PAR factors."""
         performance = np.array([[100.0, 1201.0]])
         budget = 1200.0
@@ -80,7 +80,7 @@ class TestApplyPar:
         assert result_par2[0, 1] == 2400.0
         assert result_par10[0, 1] == 12000.0
 
-    def test_apply_par_boundary_values(self):
+    def test_apply_par_boundary_values(self) -> None:
         """Test values exactly at the boundary."""
         performance = np.array([[1200.0, 1200.001]])
         budget = 1200.0
@@ -94,7 +94,7 @@ class TestApplyPar:
 class TestApplyPar10:
     """Tests for apply_par10 convenience function."""
 
-    def test_apply_par10_dataframe(self):
+    def test_apply_par10_dataframe(self) -> None:
         """Test PAR10 on DataFrame."""
         performance = pd.DataFrame({"algo1": [100.0, 1201.0]})
         budget = 1200.0
@@ -105,7 +105,7 @@ class TestApplyPar10:
         assert result.loc[0, "algo1"] == 100.0
         assert result.loc[1, "algo1"] == 12000.0
 
-    def test_apply_par10_numpy(self):
+    def test_apply_par10_numpy(self) -> None:
         """Test PAR10 on numpy array."""
         performance = np.array([[100.0, 1201.0]])
         budget = 1200.0

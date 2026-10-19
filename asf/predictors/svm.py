@@ -36,7 +36,9 @@ class SVMClassifierWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX = "svm_classifier"
 
-    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
+    def __init__(
+        self, init_params: dict[str, Any] | None = None, **kwargs: Any
+    ) -> None:
         """
         Initialize the SVMClassifierWrapper.
 
@@ -127,7 +129,9 @@ class SVMRegressorWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX = "svm_regressor"
 
-    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
+    def __init__(
+        self, init_params: dict[str, Any] | None = None, **kwargs: Any
+    ) -> None:
         """
         Initialize the SVMRegressorWrapper.
 

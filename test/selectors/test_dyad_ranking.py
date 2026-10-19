@@ -1,3 +1,4 @@
+from typing import Any
 import pandas as pd
 import pytest
 
@@ -7,7 +8,7 @@ from asf.selectors.dyad_ranking import DyadRanking
 
 
 @pytest.fixture
-def algo_features(dummy_performance):
+def algo_features(dummy_performance: Any) -> Any:
     """Algorithm features fixture for testing."""
     return pd.DataFrame(
         [[1.0, 0.5, 0.2], [0.2, 1.0, 0.8]],
@@ -21,13 +22,13 @@ def algo_features(dummy_performance):
     [(10, None), (5, "use_fixture"), (10, "use_fixture")],
 )
 def test_dyad_ranking_basic(
-    dummy_performance,
-    dummy_features,
-    validate_predictions,
-    algo_features,
-    n_pairs,
-    algo_feats,
-):
+    dummy_performance: Any,
+    dummy_features: Any,
+    validate_predictions: Any,
+    algo_features: Any,
+    n_pairs: Any,
+    algo_feats: Any,
+) -> None:
     """Test DyadRanking with various configurations."""
     af = algo_features if algo_feats == "use_fixture" else None
     selector = DyadRanking(
@@ -38,7 +39,7 @@ def test_dyad_ranking_basic(
     validate_predictions(predictions)
 
 
-def test_dyad_ranking_multiple_algorithms():
+def test_dyad_ranking_multiple_algorithms() -> None:
     """Test with 3+ algorithms and verify algorithm feature preservation."""
     performance = pd.DataFrame(
         {
@@ -71,7 +72,7 @@ def test_dyad_ranking_multiple_algorithms():
 
 
 @pytest.mark.parametrize("n_pairs", [25, 5])
-def test_dyad_ranking_parameters(n_pairs):
+def test_dyad_ranking_parameters(n_pairs: Any) -> None:
     """Test parameter storage and identical performance handling."""
     selector = DyadRanking(n_pairs_per_instance=n_pairs)
     assert selector.n_pairs_per_instance == n_pairs

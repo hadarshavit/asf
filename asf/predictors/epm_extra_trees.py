@@ -31,7 +31,8 @@ class EPMExtraTrees(ExtraTreesRegressor, AbstractPredictor, ConfigurableMixin):
     Implementation of Extra Trees as an Empirical Performance Model (EPM).
 
     This model follows the approach described in the paper:
-    "Algorithm runtime prediction: Methods & evaluation" by Hutter, Xu, Hoos, and Leyton-Brown (2014).
+    "Algorithm runtime prediction: Methods & evaluation" by Hutter, Xu, Hoos, and
+    Leyton-Brown (2014).
 
     Parameters
     ----------

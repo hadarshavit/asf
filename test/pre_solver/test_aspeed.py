@@ -1,8 +1,9 @@
+from typing import Any
 import pandas as pd
 from asf.presolving.aspeed import Aspeed
 
 
-def get_small_data():
+def get_small_data() -> Any:
     # create a tiny deterministic performance table with 5 instances and 3 algorithms
     perf = pd.DataFrame(
         [
@@ -18,7 +19,7 @@ def get_small_data():
     return features, perf
 
 
-def test_aspeed_returns_schedule_non_empty():
+def test_aspeed_returns_schedule_non_empty() -> None:
     features, performance = get_small_data()
     presolver = Aspeed(cores=1, aspeed_cutoff=10, presolver_budget=30)
     # run fit and assert schedule is non-empty list
@@ -27,7 +28,7 @@ def test_aspeed_returns_schedule_non_empty():
     assert len(presolver.schedule) > 0
 
 
-def test_aspeed_schedule_entries_well_formed():
+def test_aspeed_schedule_entries_well_formed() -> None:
     _, performance = get_small_data()
     presolver = Aspeed(cores=1, aspeed_cutoff=10, presolver_budget=30)
     presolver.fit(None, performance)

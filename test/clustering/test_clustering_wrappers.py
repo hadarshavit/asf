@@ -1,5 +1,7 @@
 """Tests for clustering wrappers."""
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -16,7 +18,7 @@ from asf.clustering.wrappers import (
 class TestGMeansWrapper:
     """Tests for GMeansWrapper."""
 
-    def test_fit_with_numpy(self):
+    def test_fit_with_numpy(self) -> None:
         """Test fit with numpy array."""
         X = np.array(
             [
@@ -35,7 +37,7 @@ class TestGMeansWrapper:
         assert hasattr(wrapper, "model")
         assert result is wrapper  # Should return self
 
-    def test_fit_with_dataframe(self):
+    def test_fit_with_dataframe(self) -> None:
         """Test fit with DataFrame."""
         X = pd.DataFrame(
             {
@@ -49,7 +51,7 @@ class TestGMeansWrapper:
 
         assert hasattr(wrapper, "model")
 
-    def test_predict_with_numpy(self):
+    def test_predict_with_numpy(self) -> None:
         """Test predict method."""
         X = np.array(
             [
@@ -67,7 +69,7 @@ class TestGMeansWrapper:
         assert isinstance(labels, np.ndarray)
         assert len(labels) == 4
 
-    def test_predict_with_dataframe(self):
+    def test_predict_with_dataframe(self) -> None:
         """Test predict with DataFrame."""
         X = pd.DataFrame({"f1": [1.0, 1.5, 5.0, 8.0], "f2": [2.0, 1.8, 8.0, 8.0]})
 
@@ -78,7 +80,7 @@ class TestGMeansWrapper:
         assert isinstance(labels, np.ndarray)
         assert len(labels) == 4
 
-    def test_keeps_split_model_after_non_gaussian_test(self, monkeypatch):
+    def test_keeps_split_model_after_non_gaussian_test(self, monkeypatch: Any) -> None:
         """Accepted GMeans splits must leave usable centers for prediction."""
 
         class FakeAndersonResult:
@@ -107,7 +109,7 @@ class TestGMeansWrapper:
 class TestKMeansWrapper:
     """Tests for KMeansWrapper."""
 
-    def test_fit_with_numpy(self):
+    def test_fit_with_numpy(self) -> None:
         """Test fit with numpy array."""
         X = np.array(
             [
@@ -124,7 +126,7 @@ class TestKMeansWrapper:
         assert hasattr(wrapper, "model")
         assert result is wrapper
 
-    def test_fit_with_dataframe(self):
+    def test_fit_with_dataframe(self) -> None:
         """Test fit with DataFrame."""
         X = pd.DataFrame(
             {
@@ -138,7 +140,7 @@ class TestKMeansWrapper:
 
         assert hasattr(wrapper, "model")
 
-    def test_predict(self):
+    def test_predict(self) -> None:
         """Test predict method."""
         X = np.array(
             [
@@ -157,7 +159,7 @@ class TestKMeansWrapper:
         assert len(labels) == 4
         assert len(set(labels)) <= 2
 
-    def test_predict_with_dataframe(self):
+    def test_predict_with_dataframe(self) -> None:
         """Test predict with DataFrame input."""
         X = pd.DataFrame({"f1": [1.0, 1.5, 5.0, 8.0], "f2": [2.0, 1.8, 8.0, 8.0]})
 
@@ -168,7 +170,7 @@ class TestKMeansWrapper:
         assert isinstance(labels, np.ndarray)
         assert len(labels) == 4
 
-    def test_ignores_selector_metadata_kwargs(self):
+    def test_ignores_selector_metadata_kwargs(self) -> None:
         """Selector-level configuration kwargs should not leak into sklearn."""
         wrapper = KMeansWrapper(
             n_clusters=2,
@@ -183,7 +185,7 @@ class TestKMeansWrapper:
 class TestAgglomerativeClusteringWrapper:
     """Tests for AgglomerativeClusteringWrapper."""
 
-    def test_fit_with_numpy(self):
+    def test_fit_with_numpy(self) -> None:
         """Test fit with numpy array."""
         X = np.array(
             [
@@ -200,7 +202,7 @@ class TestAgglomerativeClusteringWrapper:
         assert hasattr(wrapper, "model")
         assert result is wrapper
 
-    def test_fit_with_dataframe(self):
+    def test_fit_with_dataframe(self) -> None:
         """Test fit with DataFrame."""
         X = pd.DataFrame(
             {
@@ -214,7 +216,7 @@ class TestAgglomerativeClusteringWrapper:
 
         assert hasattr(wrapper, "model")
 
-    def test_predict_raises_not_implemented(self):
+    def test_predict_raises_not_implemented(self) -> None:
         """Test that predict raises NotImplementedError."""
         X = np.array([[1.0, 2.0], [1.5, 1.8], [5.0, 8.0], [8.0, 8.0]])
 
@@ -224,7 +226,7 @@ class TestAgglomerativeClusteringWrapper:
         with pytest.raises(NotImplementedError):
             wrapper.predict(X)
 
-    def test_model_has_labels(self):
+    def test_model_has_labels(self) -> None:
         """Test that underlying model has labels_ after fit."""
         X = np.array([[1.0, 2.0], [1.5, 1.8], [5.0, 8.0], [8.0, 8.0]])
 
@@ -235,7 +237,7 @@ class TestAgglomerativeClusteringWrapper:
         assert hasattr(wrapper.model, "labels_")
         assert len(wrapper.model.labels_) == 4
 
-    def test_ignores_unsupported_isac_kwargs(self):
+    def test_ignores_unsupported_isac_kwargs(self) -> None:
         """ISAC may pass random_state; selector config may pass budget."""
         wrapper = AgglomerativeClusteringWrapper(
             n_clusters=2,
@@ -249,7 +251,7 @@ class TestAgglomerativeClusteringWrapper:
 class TestDBSCANWrapper:
     """Tests for DBSCANWrapper."""
 
-    def test_fit_with_numpy(self):
+    def test_fit_with_numpy(self) -> None:
         """Test fit with numpy array."""
         X = np.array(
             [
@@ -266,7 +268,7 @@ class TestDBSCANWrapper:
         assert hasattr(wrapper, "model")
         assert result is wrapper
 
-    def test_fit_with_dataframe(self):
+    def test_fit_with_dataframe(self) -> None:
         """Test fit with DataFrame."""
         X = pd.DataFrame(
             {
@@ -280,7 +282,7 @@ class TestDBSCANWrapper:
 
         assert hasattr(wrapper, "model")
 
-    def test_model_has_labels(self):
+    def test_model_has_labels(self) -> None:
         """Test that underlying model has labels_ after fit."""
         X = np.array([[1.0, 2.0], [1.1, 2.1], [5.0, 8.0], [5.1, 8.1]])
 
@@ -291,7 +293,7 @@ class TestDBSCANWrapper:
         assert hasattr(wrapper.model, "labels_")
         assert len(wrapper.model.labels_) == 4
 
-    def test_predict_raises_not_implemented(self):
+    def test_predict_raises_not_implemented(self) -> None:
         """Test that predict raises NotImplementedError (DBSCAN doesn't support it)."""
         X = np.array(
             [

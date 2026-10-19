@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 import numpy as np
 import pandas as pd
@@ -9,14 +10,14 @@ from asf.predictors.abstract_predictor import AbstractPredictor
 class ContiguousClassChecker(AbstractPredictor):
     """Test predictor that fails when labels are not contiguous from zero."""
 
-    def fit(self, X, Y, **kwargs):
+    def fit(self, X: Any, Y: Any, **kwargs: Any) -> None:
         labels = np.asarray(Y)
         unique = np.unique(labels)
         expected = np.arange(unique.size)
         if not np.array_equal(unique, expected):
             raise ValueError("labels must be contiguous")
 
-    def predict(self, X, **kwargs):
+    def predict(self, X: Any, **kwargs: Any) -> Any:
         return np.zeros(len(X), dtype=int)
 
     def save(self, file_path: str) -> None:
@@ -29,15 +30,18 @@ class ContiguousClassChecker(AbstractPredictor):
 
 @pytest.mark.parametrize("model_class", [RegressionMLP, XGBoostClassifierWrapper])
 def test_multi_class_classifier(
-    dummy_performance, dummy_features, model_class, validate_predictions
-):
+    dummy_performance: Any,
+    dummy_features: Any,
+    model_class: Any,
+    validate_predictions: Any,
+) -> None:
     selector = MultiClassClassifier(model_class=model_class)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)
     validate_predictions(predictions)
 
 
-def test_multi_class_classifier_handles_non_contiguous_classes():
+def test_multi_class_classifier_handles_non_contiguous_classes() -> None:
     X = pd.DataFrame({"f1": [0.0, 1.0, 2.0, 3.0]})
     # Argmin targets become [0, 2, 0, 2], i.e. classes {0, 2} (non-contiguous).
     Y = pd.DataFrame(

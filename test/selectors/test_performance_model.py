@@ -9,7 +9,7 @@ from asf.preprocessing.performance_scaling import MinMaxNormalization
 
 
 class DummyRegressor(AbstractPredictor):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         self._y = None
         self._X_cols = None
 
@@ -37,7 +37,7 @@ class DummyRegressor(AbstractPredictor):
         return cls()
 
 
-def small_df():
+def small_df() -> Any:
     X = pd.DataFrame({"f1": [1.0, 2.0, 3.0]}, index=pd.Index(["i1", "i2", "i3"]))
     Y = pd.DataFrame(
         {"a": [3.0, 1.0, 2.0], "b": [2.0, 3.0, 1.0]}, index=pd.Index(X.index)
@@ -45,7 +45,7 @@ def small_df():
     return X, Y
 
 
-def test_performance_model_single_target_branch():
+def test_performance_model_single_target_branch() -> None:
     X, Y = small_df()
     pm = PerformanceModel(model_class=DummyRegressor, budget=5.0, normalize=None)
     pm.fit(X, Y)
@@ -60,7 +60,7 @@ def test_performance_model_single_target_branch():
         assert bud == 5.0
 
 
-def test_performance_model_multi_target_only():
+def test_performance_model_multi_target_only() -> None:
     X, Y = small_df()
     pm_mt = PerformanceModel(
         model_class=DummyRegressor, use_multi_target=True, normalize=None, budget=7.0
@@ -71,7 +71,7 @@ def test_performance_model_multi_target_only():
     assert set(preds_mt.keys()) == set(X.index)
 
 
-def test_performance_model_normalization_preserves_matrix_shape():
+def test_performance_model_normalization_preserves_matrix_shape() -> None:
     X, Y = small_df()
     selector = PerformanceModel(
         model_class=DummyRegressor,
@@ -85,8 +85,11 @@ def test_performance_model_normalization_preserves_matrix_shape():
 
 @pytest.mark.parametrize("model_class", [RegressionMLP, XGBoostRegressorWrapper])
 def test_performance_model(
-    dummy_performance, dummy_features, model_class, validate_predictions
-):
+    dummy_performance: Any,
+    dummy_features: Any,
+    model_class: Any,
+    validate_predictions: Any,
+) -> None:
     selector = PerformanceModel(model_class=model_class)
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)

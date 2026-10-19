@@ -1,3 +1,4 @@
+from typing import Any
 from asf.selectors import PairwiseClassifier
 from asf.predictors.random_forest import (
     RandomForestClassifierWrapper as RandomForestClassifier,
@@ -6,7 +7,7 @@ import pandas as pd
 import numpy as np
 
 
-def get_data():
+def get_data() -> Any:
     data = np.array(
         [
             [120, 100, 110],

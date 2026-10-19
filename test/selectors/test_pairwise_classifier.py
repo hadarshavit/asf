@@ -1,3 +1,4 @@
+from typing import Any
 import pandas as pd
 import pytest
 import numpy as np
@@ -6,13 +7,13 @@ from asf.predictors.xgboost import XGBoostClassifierWrapper
 from asf.predictors import RegressionMLP, XGBoostRegressorWrapper
 
 
-def tiny_data():
+def tiny_data() -> Any:
     X = pd.DataFrame({"f": [0.0, 1.0, 2.0]})
     Y = pd.DataFrame({"a": [1.0, 2.0, 0.5], "b": [0.9, 1.5, 2.0]}, index=X.index)
     return X, Y
 
 
-def test_pairwise_generate_features_and_predict():
+def test_pairwise_generate_features_and_predict() -> None:
     X, Y = tiny_data()
     sel = PairwiseClassifier(model_class=XGBoostClassifierWrapper, budget=3.0)
     sel.fit(X, Y)
@@ -25,7 +26,7 @@ def test_pairwise_generate_features_and_predict():
         assert isinstance(v, list) and len(v) == 1
 
 
-def test_pairwise_config_space_roundtrip():
+def test_pairwise_config_space_roundtrip() -> None:
     try:
         import ConfigSpace  # noqa: F401
     except ImportError:
@@ -40,8 +41,11 @@ def test_pairwise_config_space_roundtrip():
     "model_class", [RegressionMLP, XGBoostRegressorWrapper, XGBoostClassifierWrapper]
 )
 def test_pairwise_classifier(
-    dummy_performance, dummy_features, model_class, validate_predictions
-):
+    dummy_performance: Any,
+    dummy_features: Any,
+    model_class: Any,
+    validate_predictions: Any,
+) -> None:
     # RegressionMLP does not support sample weights, so we disable use_weights
     use_weights = model_class != RegressionMLP
     selector = PairwiseClassifier(model_class=model_class, use_weights=use_weights)
@@ -50,7 +54,9 @@ def test_pairwise_classifier(
     validate_predictions(predictions)
 
 
-def test_pairwise_classifier_numpy_output(dummy_performance, dummy_features):
+def test_pairwise_classifier_numpy_output(
+    dummy_performance: Any, dummy_features: Any
+) -> None:
     selector = PairwiseClassifier(prediction_mode="numpy")
     selector.fit(dummy_features, dummy_performance)
     predictions = selector.predict(dummy_features)

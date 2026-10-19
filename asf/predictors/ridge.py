@@ -30,7 +30,9 @@ class RidgeRegressorWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "ridge_regressor"
 
-    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
+    def __init__(
+        self, init_params: dict[str, Any] | None = None, **kwargs: Any
+    ) -> None:
         """
         Initialize the RidgeRegressorWrapper.
 
@@ -91,7 +93,9 @@ class RidgeClassifierWrapper(ConfigurableMixin, SklearnWrapper):
 
     PREFIX: str = "ridge_classifier"
 
-    def __init__(self, init_params: dict[str, Any] | None = None, **kwargs: Any):
+    def __init__(
+        self, init_params: dict[str, Any] | None = None, **kwargs: Any
+    ) -> None:
         """
         Initialize the RidgeClassifierWrapper.
 

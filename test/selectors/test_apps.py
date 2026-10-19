@@ -1,3 +1,4 @@
+from typing import Any
 from typing import cast
 
 from asf.selectors.parallel_portfolio_selector import APPS
@@ -5,7 +6,7 @@ from asf.predictors.random_forest import RandomForestRegressorWrapper
 import numpy as np
 
 
-def test_apps_selector(dummy_performance, dummy_features):
+def test_apps_selector(dummy_performance: Any, dummy_features: Any) -> None:
     """Test the APPS (Automatic Parallel Portfolio Selector)."""
     selector = APPS(
         model_class=RandomForestRegressorWrapper,
@@ -39,7 +40,9 @@ def test_apps_selector(dummy_performance, dummy_features):
         )
 
 
-def test_apps_selector_different_thresholds(dummy_performance, dummy_features):
+def test_apps_selector_different_thresholds(
+    dummy_performance: Any, dummy_features: Any
+) -> None:
     """Test that different p_intersection values produce different portfolio sizes."""
     portfolios_by_p = {}
 

@@ -1,3 +1,4 @@
+from typing import Any
 import pandas as pd
 import numpy as np
 from typing import cast
@@ -13,7 +14,9 @@ from asf.metrics import (
 )
 
 
-def generate_correlated_data(n_instances=100, n_algorithms=6, seed=42):
+def generate_correlated_data(
+    n_instances: Any = 100, n_algorithms: Any = 6, seed: Any = 42
+) -> Any:
     """
     Generates synthetic performance data for collaborative filtering,
     with algorithm performances correlated to features and more balanced optima.
@@ -54,7 +57,9 @@ def generate_correlated_data(n_instances=100, n_algorithms=6, seed=42):
     return features, performance
 
 
-def print_sample_predictions(predictions, true_performance, label, n=10):
+def print_sample_predictions(
+    predictions: Any, true_performance: Any, label: Any, n: Any = 10
+) -> None:
     print(f"\nSample predictions for test set ({label}):")
     for instance in list(true_performance.index)[:n]:
         if instance not in predictions:
@@ -66,7 +71,8 @@ def print_sample_predictions(predictions, true_performance, label, n=10):
         real_pred_score = true_row[algo]
         emoji = "✅" if algo == true_best_algo else "❌"
         print(
-            f"{instance}: {algo} (predicted: {pred_score:.2f}, real: {real_pred_score:.2f}) "
+            f"{instance}: {algo} (predicted: {pred_score:.2f}, "
+            f"real: {real_pred_score:.2f}) "
             f"| True best: {true_best_algo} ({true_best_score:.2f}) {emoji}"
         )
     print("\n\n")
@@ -157,7 +163,8 @@ if __name__ == "__main__":
         return_per_instance=False,
     )
     print(
-        f"[TEST - Sparse Perf] Solve-rate: {sr_test_perf:.2%}, PAR10: {par10_test_perf:.2f}"
+        f"[TEST - Sparse Perf] Solve-rate: {sr_test_perf:.2%}, PAR10: "
+        f"{par10_test_perf:.2f}"
     )
     print_sample_predictions(
         predictions_test_perf, test_performance_full, label="test (sparse perf)", n=10
@@ -181,7 +188,8 @@ if __name__ == "__main__":
         return_per_instance=False,
     )
     print(
-        f"[TEST - Cold Start] Solve-rate: {sr_test_feat:.2%}, PAR10: {par10_test_feat:.2f}"
+        f"[TEST - Cold Start] Solve-rate: {sr_test_feat:.2%}, PAR10: "
+        f"{par10_test_feat:.2f}"
     )
     print_sample_predictions(
         predictions_test_feat, test_performance_full, label="test (cold start)", n=10

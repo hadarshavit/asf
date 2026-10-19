@@ -1,5 +1,7 @@
 """Tests for quadratic expansion / schmee_hahn_impute."""
 
+from typing import Any
+
 import numpy as np
 
 from asf.preprocessing.quadratic_expansion import schmee_hahn_impute
@@ -8,10 +10,10 @@ from asf.preprocessing.quadratic_expansion import schmee_hahn_impute
 class MockEPM:
     """Mock EPM model for testing."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.fitted = False
 
-    def fit(self, X, y):
+    def fit(self, X: Any, y: Any) -> Any:
         """Fit the mock model."""
         self.fitted = True
         self.X_ = X
@@ -20,7 +22,7 @@ class MockEPM:
         self.mean_ = np.mean(y)
         return self
 
-    def predict(self, X):
+    def predict(self, X: Any) -> Any:
         """Return predictions."""
         # Return the mean value for all predictions
         return np.full(len(X), self.mean_)
@@ -29,7 +31,7 @@ class MockEPM:
 class TestSchmeeHahnImpute:
     """Tests for schmee_hahn_impute function."""
 
-    def test_basic_imputation(self):
+    def test_basic_imputation(self) -> None:
         """Test basic imputation with some censored values."""
         # Create some test data
         y_raw = np.array([10.0, 20.0, 300.0, 50.0, 300.0])  # 300 = timeout
@@ -49,7 +51,7 @@ class TestSchmeeHahnImpute:
         # Model should be fitted
         assert model is not None
 
-    def test_no_censored_values(self):
+    def test_no_censored_values(self) -> None:
         """Test when there are no censored values."""
         y_raw = np.array([10.0, 20.0, 30.0, 50.0])
         X_exp = np.array([[1.0], [2.0], [3.0], [4.0]])
@@ -62,7 +64,7 @@ class TestSchmeeHahnImpute:
         # With no censored values, output should match input
         np.testing.assert_array_equal(y_imputed, y_raw)
 
-    def test_all_censored_values(self):
+    def test_all_censored_values(self) -> None:
         """Test when all values are censored."""
         y_raw = np.array([300.0, 300.0, 300.0])
         X_exp = np.array([[1.0], [2.0], [3.0]])
@@ -75,7 +77,7 @@ class TestSchmeeHahnImpute:
         assert y_imputed is not None
         assert len(y_imputed) == len(y_raw)
 
-    def test_all_nan_returns_nan_and_none(self):
+    def test_all_nan_returns_nan_and_none(self) -> None:
         """Test when all values are NaN."""
         y_raw = np.array([np.nan, np.nan, np.nan])
         X_exp = np.array([[1.0], [2.0], [3.0]])
@@ -88,7 +90,7 @@ class TestSchmeeHahnImpute:
         assert np.all(np.isnan(y_imputed))
         assert model is None
 
-    def test_convergence_parameters(self):
+    def test_convergence_parameters(self) -> None:
         """Test with different EM parameters."""
         y_raw = np.array([10.0, 20.0, 300.0, 50.0])
         X_exp = np.array([[1.0], [2.0], [3.0], [4.0]])
@@ -107,7 +109,7 @@ class TestSchmeeHahnImpute:
         assert y_imputed is not None
         assert model is not None
 
-    def test_mixed_nan_and_censored(self):
+    def test_mixed_nan_and_censored(self) -> None:
         """Test with mix of NaN and censored values."""
         y_raw = np.array([10.0, np.nan, 300.0, 50.0, np.nan])
         X_exp = np.array([[1.0], [2.0], [3.0], [4.0], [5.0]])

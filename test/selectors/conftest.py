@@ -1,10 +1,11 @@
+from typing import Any
 import numpy as np
 import pandas as pd
 import pytest
 
 
 @pytest.fixture
-def dummy_performance():
+def dummy_performance() -> Any:
     data = np.array(
         [
             [1.0, 5.0],
@@ -33,7 +34,7 @@ def dummy_performance():
 
 
 @pytest.fixture
-def dummy_features():
+def dummy_features() -> Any:
     data = np.array(
         [
             [1.0],
@@ -62,8 +63,8 @@ def dummy_features():
 
 
 @pytest.fixture
-def validate_predictions():
-    def _validate(predictions):
+def validate_predictions() -> Any:
+    def _validate(predictions: Any) -> None:
         """
         Validates that predictions have the expected structure:
         - Length of predictions is 20.

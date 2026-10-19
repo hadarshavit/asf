@@ -32,7 +32,8 @@ class MarginalContributionBasedPreSelector(AbstractPreSelector):
     Parameters
     ----------
     metric : Callable
-        A function that takes a DataFrame of performance values and returns a single value.
+        A function that takes a DataFrame of performance values and returns a single
+        value.
     n_algorithms : int
         The number of algorithms to select.
     maximize : bool, default=False

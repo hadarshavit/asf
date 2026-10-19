@@ -1,5 +1,7 @@
 """Tests for EPMBench scenario reader."""
 
+from typing import Any
+
 import json
 import pickle
 
@@ -21,7 +23,7 @@ def require_parquet_engine() -> None:
 class TestGetCVFold:
     """Tests for get_cv_fold function."""
 
-    def test_basic_split(self):
+    def test_basic_split(self) -> None:
         """Test basic CV fold splitting."""
         from asf.scenario.epmbench_reader import get_cv_fold
 
@@ -48,7 +50,7 @@ class TestGetCVFold:
         assert groups_train is None
         assert groups_test is None
 
-    def test_with_groups(self):
+    def test_with_groups(self) -> None:
         """Test CV fold splitting with groups."""
         from asf.scenario.epmbench_reader import get_cv_fold
 
@@ -74,7 +76,7 @@ class TestGetCVFold:
 class TestGetSubsample:
     """Tests for get_subsample function."""
 
-    def test_subsample_extraction(self):
+    def test_subsample_extraction(self) -> None:
         """Test subsample extraction."""
         from asf.scenario.epmbench_reader import get_subsample
 
@@ -107,7 +109,7 @@ class TestGetSubsample:
         assert list(X_train.index) == [0, 1]
         assert list(X_test.index) == [4]
 
-    def test_subsample_with_groups(self):
+    def test_subsample_with_groups(self) -> None:
         """Test subsample extraction with groups."""
         from asf.scenario.epmbench_reader import get_subsample
 
@@ -139,7 +141,7 @@ class TestGetSubsample:
 class TestReadEPMBenchScenario:
     """Tests for read_epmbench_scenario function."""
 
-    def test_read_scenario_without_groups(self, tmp_path):
+    def test_read_scenario_without_groups(self, tmp_path: Any) -> None:
         """Test reading a scenario without groups."""
         require_parquet_engine()
         from asf.scenario.epmbench_reader import read_epmbench_scenario
@@ -170,7 +172,7 @@ class TestReadEPMBenchScenario:
         assert targets == ["t1"]
         assert groups is None
 
-    def test_read_scenario_with_groups(self, tmp_path):
+    def test_read_scenario_with_groups(self, tmp_path: Any) -> None:
         """Test reading a scenario with groups."""
         require_parquet_engine()
         from asf.scenario.epmbench_reader import read_epmbench_scenario
@@ -196,7 +198,7 @@ class TestReadEPMBenchScenario:
         assert groups is not None
         assert "group_col" not in loaded_data.columns
 
-    def test_read_scenario_with_subsample(self, tmp_path):
+    def test_read_scenario_with_subsample(self, tmp_path: Any) -> None:
         """Test reading a scenario with subsample data."""
         require_parquet_engine()
         from asf.scenario.epmbench_reader import read_epmbench_scenario
