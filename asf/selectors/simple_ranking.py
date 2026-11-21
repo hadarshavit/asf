@@ -97,12 +97,10 @@ class SimpleRanking(ConfigurableMixin, AbstractModelBasedSelector):
             stacked_perf, on=["INSTANCE_ID", "ALGORITHM"], how="left"
         )
 
-        # Calculate ranks per instance
+        # XGBoost treats larger labels as greater relevance.
         gdfs = []
         for _name, gdf in merged.groupby("INSTANCE_ID"):
-            gdf["rank"] = gdf["PERFORMANCE"].rank(
-                ascending=not self.maximize, method="min"
-            )
+            gdf["rank"] = gdf["PERFORMANCE"].rank(ascending=self.maximize, method="min")
             gdfs.append(gdf)
         merged = pd.concat(gdfs)
 
@@ -162,7 +160,7 @@ class SimpleRanking(ConfigurableMixin, AbstractModelBasedSelector):
         for i, instance_name in enumerate(features.index):
             mask = total_features["INSTANCE_ID"] == instance_name
             # Local best for this group
-            best_idx = int(np.argmin(predictions[mask]))
+            best_idx = int(np.argmax(predictions[mask]))
             best_algo = total_features[mask].iloc[best_idx]["ALGORITHM"]
             results[str(instance_name)] = [(str(best_algo), float(self.budget or 0))]
 
