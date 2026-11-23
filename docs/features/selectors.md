@@ -725,35 +725,32 @@ A k-nearest neighbor-based selector that constructs algorithm schedules by findi
 
 **Survival Analysis-based Algorithm Selector**
 
-Uses survival analysis (Random Survival Forest) to model algorithm completion probability under budget constraints. Treats timeout as censored data and predicts which algorithms are most likely to complete within the budget.
+Uses survival analysis (Random Survival Forest) to model algorithm completion probability under budget constraints. Treats timeouts as censored data.
 
 - **Type**: Survival analysis with random forests
-- **Returns**: Single algorithm or Schedule (depending on `use_schedule`)
+- **Returns**: Single algorithm (`SurvivalAnalysis`) or schedule (`SurvivalAnalysisScheduler`)
 - **Key Features**: Timeout-aware probability modeling, censored data handling, optional schedule optimization
 - **References**: [Tornede et al. (2020)](https://arxiv.org/abs/2007.02816)
 
 **Key Parameters**
 
 - **`model_class`** (default: RandomSurvivalForestWrapper): The survival model class. Trains forests to predict completion probability.
-- **`use_schedule`** (default: False): If True, returns optimized schedule maximizing completion probability. If False, returns best single algorithm.
-- **`popsize`** (default: 20): Population size for differential evolution optimization (only used if use_schedule=True).
-- **`maxiter`** (default: 150): Maximum iterations for schedule optimization (only used if use_schedule=True).
-- **`dominance_resolution`** (default: 100): Resolution for dominance analysis grid when identifying non-dominated algorithms.
+- **`popsize`** (default: 20): Population size for differential evolution optimization (`SurvivalAnalysisScheduler` only).
+- **`maxiter`** (default: 150): Maximum iterations for schedule optimization (`SurvivalAnalysisScheduler` only).
 
 **How It Works**
 
 1. **Training** (creates structured survival data):
-   - For each (instance, algorithm) pair, creates row: [instance_features, algorithm_one_hot, status, runtime]
+   - Trains a separate forest per algorithm using the supplied instance features.
    - status=1 if algorithm completed within budget, 0 if timeout (censored)
-   - runtime=actual_runtime if completed, runtime=budget if timeout
+   - Uses the supplied finite runtimes, including pre-penalized timeouts.
    - Trains RandomSurvivalForest to predict P(algorithm completes by time t)
 
-2. **Single algorithm mode** (`use_schedule=False`):
+2. **Single algorithm mode** (`SurvivalAnalysis`):
    - For each algorithm, predicts survival probability at query instance
-   - Selects algorithm with highest P(completes within budget)
+   - Selects the algorithm with the lowest expected runtime, integrating through the larger of the budget and the largest finite training runtime.
 
-3. **Schedule mode** (`use_schedule=True`):
-   - Performs dominance analysis: identifies non-dominated algorithms
+3. **Schedule mode** (`SurvivalAnalysisScheduler`):
    - Uses differential evolution to optimize schedule:
      - Decision variables: which algorithms to include + time allocation for each
      - Objective: maximize P(at least one algorithm completes)

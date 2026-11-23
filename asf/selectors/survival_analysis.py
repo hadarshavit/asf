@@ -12,10 +12,12 @@ from asf.selectors.abstract_model_based_selector import AbstractModelBasedSelect
 from asf.utils.configurable import ClassChoice, ConfigurableMixin
 
 if SKSURV_AVAILABLE:
+    from sksurv.functions import StepFunction
     from sksurv.util import Surv
 
     try:
         from ConfigSpace import (  # noqa: F401
+            Categorical,
             ConfigurationSpace,
             Float,
             Integer,
@@ -34,27 +36,6 @@ if SKSURV_AVAILABLE:
         Tornede, A., et al. (2020).
         "Algorithm Selection with Survival Forests."
         https://arxiv.org/abs/2007.02816
-
-        Attributes
-        ----------
-        use_schedule : bool
-            Whether to build a schedule of multiple algorithms.
-        max_schedule_length : int or None
-            Maximum number of algorithms in a schedule.
-        popsize : int
-            Population size for differential evolution.
-        maxiter : int
-            Maximum iterations for differential evolution.
-        tol : float
-            Tolerance for differential evolution.
-        dominance_resolution : int
-            Resolution for dominance analysis.
-        random_state : int or None
-            Random seed for differential evolution.
-        survival_features : list[str]
-            Feature column names used by the survival model.
-        model : RandomSurvivalForestWrapper or None
-            Trained survival model.
         """
 
         PREFIX = "survival"
@@ -66,38 +47,21 @@ if SKSURV_AVAILABLE:
             random_state: int | None = 42,
             **kwargs: Any,
         ) -> None:
-            """
-            Initialize the SurvivalAnalysis selector.
-
-            Parameters
-            ----------
-            model_class : type[RandomSurvivalForestWrapper],
-            default=RandomSurvivalForestWrapper
-                Wrapper class for the survival model.
-            **kwargs : Any
-                Additional keyword arguments.
-            """
+            """Select the solver with the lowest expected runtime."""
             super().__init__(
                 model_class=model_class, random_state=random_state, **kwargs
             )
             self.use_schedule = False
-            self.max_schedule_length: int | None = None
-            self.popsize = 20
-            self.maxiter = 150
-            self.tol = 0.01
-            self.dominance_resolution = 100
-
-            if not isinstance(self.budget, (int, float)) or self.budget <= 0:
+            if self.budget is None or not np.isfinite(self.budget) or self.budget <= 0:
                 raise ValueError(
-                    "budget must be a positive number for survival analysis selector."
+                    "budget must be a finite positive number for survival analysis."
                 )
 
-            self.survival_features: list[str] = []
             self.model: RandomSurvivalForestWrapper | None = None
+            self.models_: dict[str, Any] | None = None
 
         def _build_design_matrix(self, features: pd.DataFrame) -> np.ndarray:
-            "Build the instance-algorithm design matrix without object-heavy"
-            "pandas expansion."
+            """Recreate the design matrix for a saved pooled forest."""
             n_instances = features.shape[0]
             n_algorithms = len(self.algorithms)
             instance_features = features.to_numpy(dtype=np.float32, copy=False)
@@ -110,239 +74,113 @@ if SKSURV_AVAILABLE:
         def _fit(
             self, features: pd.DataFrame, performance: pd.DataFrame, **kwargs: Any
         ) -> None:
-            """
-            Fit the survival analysis model.
-
-            Parameters
-            ----------
-            features : pd.DataFrame
-                Training features.
-            performance : pd.DataFrame
-                Training performance data.
-            """
-            self.survival_features = [str(col) for col in features.columns] + [
-                f"algo_{algo}" for algo in self.algorithms
-            ]
-
-            fit_features = self._build_design_matrix(features)
-
             budget = float(self.budget or 0)
-            runtimes = performance.reindex(
-                index=features.index, columns=self.algorithms
-            ).to_numpy(dtype=float, copy=False)
-            finished = np.isfinite(runtimes) & (runtimes < budget)
-            runtime_values = np.where(finished, runtimes, budget)
-
-            y_structured = Surv.from_arrays(
-                event=finished.ravel(),
-                time=runtime_values.ravel(),
+            runtimes = performance.reindex(index=features.index).to_numpy(
+                dtype=float, na_value=np.nan
             )
+            if not self.algorithms or len(set(self.algorithms)) != len(self.algorithms):
+                raise ValueError("Survival analysis requires unique algorithm names.")
 
-            self.model = self._make_model()
-            self.model.fit(fit_features, y_structured)
+            fit_features = features.to_numpy(dtype=float, na_value=np.nan)
+            finite = np.isfinite(runtimes)
+            runtime_horizon = float(np.max(runtimes, where=finite, initial=budget))
+            models = {}
+            for algo, times, observed in zip(self.algorithms, runtimes.T, finite.T):
+                finished = observed & (times < budget)
+                if not finished.any():
+                    models[algo] = None
+                    continue
+                model = self._make_model()
+                model.fit(
+                    fit_features,
+                    Surv.from_arrays(finished, np.where(observed, times, budget)),
+                )
+                models[algo] = model
+
+            self._survival_columns = features.columns.copy()
+            self._runtime_horizon = runtime_horizon
+            self.__dict__.pop("_survival_preprocessor", None)
+            self.models_ = models
+            self.model = None
+
+        def _budget_curve(self, curve: StepFunction) -> StepFunction:
+            """Extend a predicted survival curve to cover the full budget."""
+            budget = float(self.budget or 0)
+            events = curve.x[(curve.x > 0) & (curve.x < budget)]
+            times = np.r_[0.0, events, budget]
+            values = np.asarray(curve(np.minimum(times, curve.x[-1]))).copy()
+            values[times < curve.x[0]] = 1.0
+            return StepFunction(times, values)
+
+        def _expected_runtime(self, curve: StepFunction) -> float:
+            budget = float(self.budget or 0)
+            horizon = getattr(self, "_runtime_horizon", budget)
+            # No completion events occur after the budget.
+            return float(
+                np.dot(curve.y[:-1], np.diff(curve.x))
+                + (horizon - budget) * curve.y[-1]
+            )
 
         def _predict(
             self,
             features: pd.DataFrame | None,
             performance: pd.DataFrame | None = None,
         ) -> dict[str, list[tuple[str, float]]]:
-            """
-            Predict algorithm schedules for each instance.
-
-            Parameters
-            ----------
-            features : pd.DataFrame
-                The query instance features.
-
-            Returns
-            -------
-            dict
-                Mapping from instance name to algorithm schedules.
-            """
             if features is None:
-                raise ValueError("SurvivalAnalysis require features for prediction.")
-            if self.model is None:
+                raise ValueError("SurvivalAnalysis requires features for prediction.")
+
+            budget = float(self.budget or 0)
+            models = getattr(self, "models_", None)
+            if models is not None:
+                if hasattr(self, "_survival_preprocessor"):
+                    raise ValueError(
+                        "Refit this survival selector to use untransformed features."
+                    )
+                pred_features = features.loc[:, self._survival_columns].to_numpy(
+                    dtype=float, na_value=np.nan
+                )
+                no_event = StepFunction(np.array([0.0, budget]), np.ones(2))
+                curves_by_algorithm = {
+                    algo: (
+                        [no_event] * len(features)
+                        if model is None
+                        else [
+                            self._budget_curve(curve)
+                            for curve in model.predict_survival_function(pred_features)
+                        ]
+                    )
+                    for algo, model in models.items()
+                }
+            elif self.model is not None:
+                # Saved selectors may still contain a single pooled forest.
+                curves = self.model.predict_survival_function(
+                    self._build_design_matrix(features)
+                )
+                curves_by_algorithm = {
+                    algo: [
+                        self._budget_curve(curve)
+                        for curve in curves[i :: len(self.algorithms)]
+                    ]
+                    for i, algo in enumerate(self.algorithms)
+                }
+            else:
                 raise ValueError("Model has not been fitted yet.")
 
-            pred_features = self._build_design_matrix(features)
-            predicted_survival_functions = self.model.predict_survival_function(
-                pred_features
-            )
-
-            survival_by_instance: dict[Any, dict[str, Any]] = {}
-            n_algorithms = len(self.algorithms)
-            for row_idx, surv_func in enumerate(predicted_survival_functions):
-                instance = features.index[row_idx // n_algorithms]
-                algo = self.algorithms[row_idx % n_algorithms]
-                survival_by_instance.setdefault(instance, {})[str(algo)] = surv_func
-
-            predictions: dict[str, list[tuple[str, float]]] = {}
-            for instance in features.index:
-                surv_funcs = survival_by_instance[instance]
-
-                if not self.use_schedule:
-                    best_algo = None
-                    best_prob = -1.0
-                    for algo, surv_func in surv_funcs.items():
-                        completion_prob = 1.0 - float(surv_func(self.budget))
-                        if completion_prob > best_prob:
-                            best_prob = completion_prob
-                            best_algo = algo
-                    predictions[str(instance)] = [
-                        (str(best_algo), float(self.budget or 0))
-                    ]
-                else:
-                    schedule = self._find_optimal_schedule(surv_funcs)
-                    predictions[str(instance)] = schedule if schedule else []
-
+            predictions = {}
+            for row, instance in enumerate(features.index):
+                surv_funcs = {
+                    algo: curves[row] for algo, curves in curves_by_algorithm.items()
+                }
+                predictions[str(instance)] = self._find_optimal_schedule(surv_funcs)
             return predictions
 
-        def _eval_schedule(
-            self, x: np.ndarray, all_algos: list[str], surv_funcs: dict[str, Any]
-        ) -> float:
-            """
-            Evaluate the fitness of a schedule for differential evolution.
-
-            Parameters
-            ----------
-            x : np.ndarray
-                The vector from the optimizer.
-            all_algos : list[str]
-                List of available algorithms.
-            surv_funcs : dict
-                Mapping from algorithm names to survival functions.
-
-            Returns
-            -------
-            float
-                Negative success probability.
-            """
-            n_algorithms = len(all_algos)
-
-            inclusion_flags = x[:n_algorithms]
-            normalized_end_times = x[n_algorithms:]
-
-            n_included = np.sum(inclusion_flags >= 0.5)
-            if n_included == 0:
-                return 0.0
-            if (
-                self.max_schedule_length is not None
-                and n_included > self.max_schedule_length
-            ):
-                return 1.0
-
-            included_schedule_info = []
-            for i, algo in enumerate(all_algos):
-                if inclusion_flags[i] >= 0.5:
-                    included_schedule_info.append((algo, normalized_end_times[i]))
-
-            included_schedule_info.sort(key=lambda item: item[1])
-
-            total_success_prob = 0.0
-            prob_of_reaching_step = 1.0
-            last_actual_end_time = 0.0
-
-            for i, (algo, norm_end_time) in enumerate(included_schedule_info):
-                if i == len(included_schedule_info) - 1:
-                    time_slice = float(self.budget or 0) - last_actual_end_time
-                else:
-                    actual_end_time = float(norm_end_time) * float(self.budget or 0)
-                    time_slice = actual_end_time - last_actual_end_time
-
-                if time_slice <= 1e-6:
-                    continue
-
-                sur_func = surv_funcs[algo]
-                prob_solve_at_this_step = 1.0 - float(sur_func(time_slice))
-
-                total_success_prob += prob_of_reaching_step * prob_solve_at_this_step
-                prob_of_reaching_step *= float(sur_func(time_slice))
-
-                last_actual_end_time += time_slice
-
-            return -total_success_prob
-
         def _find_optimal_schedule(
-            self, surv_funcs: dict[str, Any]
+            self, surv_funcs: dict[str, StepFunction]
         ) -> list[tuple[str, float]]:
-            """
-            Find the optimal schedule using dominance analysis and evolution.
-
-            Parameters
-            ----------
-            surv_funcs : dict
-                Mapping from algorithm names to survival functions.
-
-            Returns
-            -------
-            list[tuple[str, float]]
-                The optimized algorithm schedule.
-            """
-            time_grid = np.linspace(
-                0, float(self.budget or 0), self.dominance_resolution
+            best_algo = min(
+                surv_funcs, key=lambda algo: self._expected_runtime(surv_funcs[algo])
             )
-            prob_matrix = np.array(
-                [surv_funcs[algo](time_grid) for algo in self.algorithms]
-            )
-
-            for i, algo in enumerate(self.algorithms):
-                is_dominant = np.all(prob_matrix[i, :] <= prob_matrix)
-                if is_dominant:
-                    return [(str(algo), float(self.budget or 0))]
-
-            lower_envelope = np.min(prob_matrix, axis=0)
-            non_dominated_algos = []
-            for i, algo in enumerate(self.algorithms):
-                if np.any(np.isclose(prob_matrix[i, :], lower_envelope)):
-                    non_dominated_algos.append(str(algo))
-
-            if len(non_dominated_algos) <= 1:
-                if non_dominated_algos:
-                    return [(str(non_dominated_algos[0]), float(self.budget or 0))]
-                else:
-                    return []
-
-            n_to_optimize = len(non_dominated_algos)
-            bounds = [(0, 1)] * (2 * n_to_optimize)
-
-            result = differential_evolution(
-                func=self._eval_schedule,
-                bounds=bounds,
-                args=(non_dominated_algos, surv_funcs),
-                popsize=self.popsize,
-                maxiter=self.maxiter,
-                tol=self.tol,
-                seed=self.random_state,
-            )
-
-            best_x = result.x
-            inclusion_flags = best_x[:n_to_optimize]
-            normalized_end_times = best_x[n_to_optimize:]
-
-            included_info = []
-            for i, algo in enumerate(non_dominated_algos):
-                if inclusion_flags[i] >= 0.5:
-                    included_info.append((algo, normalized_end_times[i]))
-
-            if not included_info:
-                return []
-
-            included_info.sort(key=lambda item: item[1])
-
-            schedule: list[tuple[str, float]] = []
-            last_actual_end_time = 0.0
-            for i, (algo, norm_end_time) in enumerate(included_info):
-                if i == len(included_info) - 1:
-                    time_slice = float(self.budget or 0) - last_actual_end_time
-                else:
-                    actual_end_time = float(norm_end_time) * float(self.budget or 0)
-                    time_slice = actual_end_time - last_actual_end_time
-
-                if time_slice > 1e-6:
-                    schedule.append((str(algo), float(time_slice)))
-                last_actual_end_time += time_slice
-
-            return schedule
+            return [(best_algo, float(self.budget or 0))]
 
         @staticmethod
         def _define_hyperparameters(
@@ -402,16 +240,94 @@ if SKSURV_AVAILABLE:
             random_state: int | None = 42,
             **kwargs: Any,
         ) -> None:
+            """Keep accepting dominance_resolution for older configurations."""
             super().__init__(
                 model_class=model_class, random_state=random_state, **kwargs
             )
             self.use_schedule = True
+            if max_schedule_length is not None and max_schedule_length < 1:
+                raise ValueError("max_schedule_length must be at least 1.")
             self.max_schedule_length = max_schedule_length
             self.popsize = int(popsize)
             self.maxiter = int(maxiter)
             self.tol = float(tol)
-            self.dominance_resolution = int(dominance_resolution)
             self.random_state = random_state
+
+        def _decode_schedule(
+            self,
+            x: np.ndarray,
+            algorithms: list[str],
+            surv_funcs: dict[str, StepFunction],
+        ) -> list[tuple[str, float]]:
+            budget = float(self.budget or 0)
+            included = [
+                (algo, float(end) * budget)
+                for algo, flag, end in zip(
+                    algorithms, x[: len(algorithms)], x[len(algorithms) :]
+                )
+                if flag >= 0.5
+            ]
+            included.sort(key=lambda item: item[1])
+            schedule = []
+            previous_end = 0.0
+            for i, (algo, end) in enumerate(included):
+                if i == len(included) - 1:
+                    end = budget
+                duration = end - previous_end
+                if i < len(included) - 1:
+                    # Extra time within a step can go to the next solver.
+                    times = surv_funcs[algo].x
+                    duration = float(
+                        times[np.searchsorted(times, duration, side="right") - 1]
+                    )
+                if duration > 0:
+                    schedule.append((algo, duration))
+                    previous_end += duration
+            return schedule
+
+        def _eval_schedule(
+            self,
+            x: np.ndarray,
+            algorithms: list[str],
+            surv_funcs: dict[str, StepFunction],
+        ) -> float:
+            schedule = self._decode_schedule(x, algorithms, surv_funcs)
+            if not schedule or (
+                self.max_schedule_length is not None
+                and len(schedule) > self.max_schedule_length
+            ):
+                return 1.0
+            return float(
+                np.prod([surv_funcs[algo](time) for algo, time in schedule]) - 1
+            )
+
+        def _find_optimal_schedule(
+            self, surv_funcs: dict[str, StepFunction]
+        ) -> list[tuple[str, float]]:
+            budget = float(self.budget or 0)
+            failure = {algo: float(curve(budget)) for algo, curve in surv_funcs.items()}
+            best_algo = min(failure, key=failure.__getitem__)
+            baseline = [(best_algo, budget)]
+            # A solver that never completes by budget cannot improve any slice.
+            candidates = [algo for algo in failure if failure[algo] < 1.0]
+            if len(candidates) <= 1 or self.max_schedule_length == 1:
+                return baseline
+
+            start = np.zeros(2 * len(candidates))
+            start[candidates.index(best_algo)] = 1
+            result = differential_evolution(
+                func=self._eval_schedule,
+                bounds=[(0, 1)] * len(start),
+                args=(candidates, surv_funcs),
+                popsize=self.popsize,
+                maxiter=self.maxiter,
+                tol=self.tol,
+                seed=self.random_state,
+                x0=start,
+            )
+            if result.fun < failure[best_algo] - 1:
+                return self._decode_schedule(result.x, candidates, surv_funcs)
+            return baseline
 
         @staticmethod
         def _define_hyperparameters(
@@ -435,6 +351,12 @@ if SKSURV_AVAILABLE:
                 default=choices[0],
             )
 
+            max_schedule_length_param = Categorical(
+                name="max_schedule_length",
+                items=[None, *range(1, 11)],
+                default=None,
+            )
+
             popsize_param = Integer(
                 name="popsize",
                 bounds=(10, 100),
@@ -454,18 +376,12 @@ if SKSURV_AVAILABLE:
                 default=0.01,
             )
 
-            dominance_resolution_param = Integer(
-                name="dominance_resolution",
-                bounds=(50, 500),
-                default=100,
-            )
-
             params = [
                 model_class_param,
+                max_schedule_length_param,
                 popsize_param,
                 maxiter_param,
                 tol_param,
-                dominance_resolution_param,
             ]
 
             return params, [], []
