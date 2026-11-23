@@ -196,10 +196,27 @@ class TestSelectorConfigurationSpaces:
 
         cs = SurvivalAnalysisScheduler.get_configuration_space()
         assert isinstance(cs, ConfigurationSpace)
-        hp_names = {hp.name for hp in cs.values()}
-        assert any("survival_schedule" in name for name in hp_names)
-        assert any("popsize" in name for name in hp_names)
-        assert not any("random_state" in name for name in hp_names)
+        defaults = cs.get_default_configuration()
+        default_scheduler = SurvivalAnalysisScheduler.get_from_configuration(defaults)(
+            budget=5.0
+        )
+        assert default_scheduler.max_schedule_length is None
+
+        settings = {
+            "max_schedule_length": 2,
+            "popsize": 30,
+            "maxiter": 100,
+            "tol": 0.02,
+        }
+        for name, value in settings.items():
+            defaults[f"survival_schedule:{name}"] = value
+        scheduler = SurvivalAnalysisScheduler.get_from_configuration(defaults)(
+            budget=5.0
+        )
+        for name, value in settings.items():
+            assert getattr(scheduler, name) == value
+        assert "survival_schedule:dominance_resolution" not in cs
+        assert "survival_schedule:random_state" not in cs
 
     def test_baseline_config_space(self) -> None:
         from asf.selectors.baselines import SingleBestSolver, VirtualBestSolver

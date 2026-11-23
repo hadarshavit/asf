@@ -113,7 +113,10 @@ def test_survival_wrapper_clones_configuration_and_resets_forest() -> None:
     selector.fit(
         X, pd.DataFrame({"a": np.arange(1.0, 7.0), "b": np.arange(6.0, 0.0, -1)})
     )
-    assert selector.model.model.n_estimators == 3
+    assert selector.models_ is not None
+    a, b = selector.models_.values()
+    assert a is not b and a is not estimator and b is not estimator
+    assert a.get_params() == b.get_params() == estimator.get_params()
     assert len(selector.predict(X)) == len(X)
 
 
