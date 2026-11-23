@@ -698,6 +698,10 @@ class ConfigurableMixin:
         return cs
 
     @classmethod
+    def _child_configuration_kwargs(cls, kwargs: dict[str, Any]) -> dict[str, Any]:
+        return kwargs
+
+    @classmethod
     def get_from_configuration(
         cls,
         configuration: Configuration | dict[str, Any],
@@ -759,7 +763,7 @@ class ConfigurableMixin:
                     value = chosen_cls.get_from_configuration(  # type: ignore[operator]
                         configuration=configuration,
                         pre_prefix=child_pre_prefix,
-                        **kwargs,
+                        **cls._child_configuration_kwargs(kwargs),
                     )
                 else:
                     value = chosen_cls

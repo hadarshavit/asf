@@ -11,6 +11,7 @@ from asf.selectors.cshc import CSHCSelector
 from asf.selectors.dyad_ranking import DyadRanking
 from asf.selectors.ensembles import (
     BaggingSelector,
+    BoostingSelector,
     StackingSelector,
     VotingSelector,
 )
@@ -70,6 +71,7 @@ __all__ = [
     "SingleBestSolver",
     "VirtualBestSolver",
     "BaggingSelector",
+    "BoostingSelector",
     "VotingSelector",
     "StackingSelector",
 ]
