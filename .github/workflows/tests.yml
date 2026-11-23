@@ -65,6 +65,7 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         files: coverage.xml
+        disable_search: true
         flags: full
         name: full-tests-${{ matrix.python-version }}
         verbose: true
