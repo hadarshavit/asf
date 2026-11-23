@@ -785,6 +785,27 @@ Here's a quick guide to choosing which selector fits your use case:
 
 ---
 
+## Ensemble selectors
+
+- `VotingSelector` fits different selectors on the same data. It defaults to
+  majority voting. Use `aggregation="borda"` to aggregate ranks,
+  `learn_weights=True` to weight members by training performance, or
+  `optimize_subset=True` to search for a better subset on the training set.
+- `BaggingSelector` fits copies of one selector on bootstrap samples. It defaults
+  to ten full-size samples and majority voting. It also supports Borda and
+  learned weights based on the bootstrap sample, the full training set, or
+  out-of-bag instances.
+- `StackingSelector` trains a meta-selector on the original features and the
+  base selectors' full-training predictions. Set `cv=5` to train the meta-selector
+  on out-of-fold predictions, `use_generated_features=False` for one-hot choices,
+  or `feature_selection=True` to apply the reference variance threshold of 0.16.
+- `BoostingSelector` fits a base selector on the full training set, then uses
+  SAMME to give misclassified instances more weight in later bootstrap samples.
+  The fitted members combine their choices by weighted voting.
+
+Vote ties are resolved using the order of the performance columns. The ensemble
+methods follow the [reference implementation](https://github.com/alexandertornede/as_on_a_meta_level/tree/main/ensemble_learning/ensembles).
+
 ## API Reference
 
 For detailed API documentation on each selector, visit the [Selectors API Reference](../api/selectors.md).
